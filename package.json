@@ -1,0 +1,18 @@
+{
+  "name": "mylauncher",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Illusioner",
+  "license": "ISC",
+  "description": "The best Minecraft launcher.",
+  "devDependencies": {
+    "electron": "^36.4.0"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  }
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EnderGate</title>
+    <link href="style.css" rel="stylesheet" type="text/css">
+    <link href="fontawesome/css/all.min.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+    <div class="sidebar">
+        <button id="playerSwitch"></button>
+        <button id="homeButtonEle"></button>
+        <button id="instanceButtonEle"></button>
+        <button id="worldButtonEle"></button>
+    </div>
+    <div class="content" id="content"></div>
+    <script src="script.js"></script>
+    <script>
+        homeButton.setSelected();
+        content.appendChild(showHomeContent());
+    </script>
+</body>
+</html>
