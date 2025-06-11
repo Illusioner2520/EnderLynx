@@ -412,6 +412,35 @@ class SearchDropdown {
     }
 }
 
+class Toggle {
+    constructor(element,onchange,startToggled) {
+        element.classList.add("toggle");
+        this.element = element;
+        this.onchange = onchange;
+        let insideToggle = document.createElement("div");
+        insideToggle.classList.add("toggle-inside");
+        element.appendChild(insideToggle);
+        element.onclick = (e) => {
+            this.processToggle();
+        }
+        if (startToggled) {
+            this.toggled = true;
+            element.classList.add("toggled");
+        } else {
+            this.toggled = false;
+        }
+    }
+    processToggle() {
+        if (this.toggled) {
+            this.element.classList.remove("toggled");
+        } else {
+            this.element.classList.add("toggled");
+        }
+        this.toggled = !this.toggled;
+        this.onchange();
+    }
+}
+
 class ContentList {
     /* features: {
         "checkbox": {
@@ -532,7 +561,7 @@ class ContentList {
             if (features?.disable?.enabled) {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
-                toggleElement.innerHTML = "temp toggle";
+                let toggle = new Toggle(toggleElement,() => {},true);
                 contentEle.appendChild(toggleElement);
             }
             if (features?.remove?.enabled) {

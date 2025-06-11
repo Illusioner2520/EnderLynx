@@ -999,3 +999,31 @@ i {
 .content-list-toggle {
     margin-left: auto;
 }
+
+.toggle {
+    padding: 4px;
+    width: 44px;
+    height: 26px;
+    background-color: #ffffff20;
+    position: relative;
+    cursor: pointer;
+    border-radius: 1000px;
+    --left: 4px;
+    transition: background-color .25s;
+}
+
+.toggle.toggled {
+    --left: 22px;
+    background-color:#0078d4;
+}
+
+.toggle-inside {
+    background-color: white;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    position:absolute;
+    left: var(--left);
+    top: 4px;
+    transition: left .125s;
+}
