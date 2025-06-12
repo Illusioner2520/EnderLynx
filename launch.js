@@ -5,7 +5,7 @@ const urlModule = require('url');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const os = require('os');
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execFile } = require('child_process');
 const fsPromises = require('fs').promises;
 
 let launchername = "EnderGate";
@@ -24,13 +24,13 @@ class Minecraft {
             let fileName = data.libraries[i].name.split(":");
             fileName.splice(0, 1);
             fileName = fileName.join("-") + ".jar";
-            let path = data.libraries[i].name.split(":");
-            path[0] = path[0].replaceAll(".", "/");
-            path = path.join("/") + "/" + fileName;
-            if (!fs.existsSync(`./minecraft/meta/libraries/${path}`)) {
-                await urlToFile(`https://maven.fabricmc.net/${path}`, `./minecraft/meta/libraries/${path}`);
+            let patha = data.libraries[i].name.split(":");
+            patha[0] = patha[0].replaceAll(".", "/");
+            patha = patha.join("/") + "/" + fileName;
+            if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+                await urlToFile(`https://maven.fabricmc.net/${patha}`, `./minecraft/meta/libraries/${patha}`);
             }
-            this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${path}`) + ";";
+            this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
             let libName = data.libraries[i].name.split(":");
             libName.splice(libName.length - 1, 1);
             this.libNames.push(libName.join(":"));
@@ -40,6 +40,8 @@ class Minecraft {
         this.modded_args_jvm = data.arguments.jvm;
     }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo) {
+        let newJava = new Java();
+        let recentJavaInstallation = newJava.getJavaInstallation(21);
         this.libs = "";
         this.libNames = [];
         const platform = os.platform();
@@ -66,7 +68,7 @@ class Minecraft {
                     let patha = fabric_json.libraries[i].name.split(":");
                     patha[0] = patha[0].replaceAll(".", "/");
                     patha = patha.join("/") + "/" + fileName;
-                    this.libs += path.resolve(__dirname,`minecraft/meta/libraries/${patha}`) + ";";
+                    this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
                     let libName = fabric_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
@@ -111,6 +113,7 @@ class Minecraft {
             this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             let java = new Java();
             this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion);
+            this.java_version = version_json.javaVersion.majorVersion;
             if (version_json?.arguments?.game) {
                 this.args = version_json.arguments;
             } else if (version_json?.minecraftArguments) {
@@ -119,11 +122,11 @@ class Minecraft {
             if (loader == "vanilla") this.main_class = version_json.mainClass;
             this.version_type = version_json.type;
             this.assets_index = version_json.assets;
-            this.asset_dir = path.resolve(__dirname,"minecraft/meta/assets");
+            this.asset_dir = path.resolve(__dirname, "minecraft/meta/assets");
             if (version_json.assets == "legacy") {
-                this.asset_dir = path.resolve(__dirname,"minecraft/meta/assets/legacy");
+                this.asset_dir = path.resolve(__dirname, "minecraft/meta/assets/legacy");
             } else if (version_json.assets == "pre-1.6") {
-                this.asset_dir = path.resolve(__dirname,`minecraft/instances/${this.instance_id}/resources`);
+                this.asset_dir = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`);
             }
         }
         if (loader == "vanilla") {
@@ -162,7 +165,7 @@ class Minecraft {
             this.args.game = this.args.game.map((e) => {
                 e = e.replace("${auth_player_name}", player_info.name);
                 e = e.replace("${version_name}", version);
-                e = e.replace("${game_directory}", path.resolve(__dirname,`minecraft/instances/${this.instance_id}`));
+                e = e.replace("${game_directory}", path.resolve(__dirname, `minecraft/instances/${this.instance_id}`));
                 e = e.replace("${assets_root}", this.asset_dir);
                 e = e.replace("${game_assets}", this.asset_dir);
                 e = e.replace("${assets_index_name}", this.assets_index);
@@ -246,7 +249,7 @@ class Minecraft {
             this.args = this.args.map((e) => {
                 e = e.replace("${auth_player_name}", player_info.name);
                 e = e.replace("${version_name}", version);
-                e = e.replace("${game_directory}", path.resolve(__dirname,`minecraft/instances/${this.instance_id}`));
+                e = e.replace("${game_directory}", path.resolve(__dirname, `minecraft/instances/${this.instance_id}`));
                 e = e.replace("${assets_root}", this.asset_dir);
                 e = e.replace("${game_assets}", this.asset_dir);
                 e = e.replace("${assets_index_name}", this.assets_index);
@@ -274,7 +277,7 @@ class Minecraft {
             stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')]
         });
         child.unref();
-        return child.pid;
+        return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
     async downloadGame(loader, version) {
         try {
@@ -331,7 +334,7 @@ class Minecraft {
                     }
                 }
             }
-            this.asset_dir = version_json.assets == "legacy" ? path.resolve(__dirname,"minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(__dirname,`minecraft/instances/${this.instance_id}/resources`) : path.resolve(__dirname,"minecraft/meta/assets");
+            this.asset_dir = version_json.assets == "legacy" ? path.resolve(__dirname, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(__dirname, "minecraft/meta/assets");
             console.log("asset directory set to " + this.asset_dir);
             console.log("Downloading jar file");
             await urlToFile(version_json.downloads.client.url, `./minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
@@ -340,6 +343,7 @@ class Minecraft {
             let paths = "";
             console.log("Checking java installation");
             this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion);
+            this.java_version = version_json.javaVersion.majorVersion;
             const platform = os.platform();
             const getPlatformString = () => {
                 if (platform === 'win32') return 'windows';
@@ -492,6 +496,35 @@ class Java {
         console.log(this.versions);
         fs.writeFileSync("./java/versions.json", JSON.stringify(this.versions), 'utf-8');
         console.log("Java installation complete");
+
+        // const JAVAC = path.resolve(__dirname, `java/java-${version}/${name}/bin/javac.exe`);
+        // const JAR = path.resolve(__dirname, `java/java-${version}/${name}/bin/jar.exe`);
+
+        // execFile(JAVAC, [
+        //     '--release', version,
+        //     '-d',`./java/java-${version}`,
+        //     './quit_agent/QuitAgentImpl.java',
+        //     './quit_agent/QuitAgent.java'
+        // ], (err, stdout, stderr) => {
+        //     if (err) {
+        //         console.error('Compile error:', stderr);
+        //         return;
+        //     }
+        //     console.log('✔ Java files compiled');
+
+        //     execFile(JAR, [
+        //         'cmf',
+        //         './quit_agent/MANIFEST.MF',
+        //         `./java/java-${version}/QuitAgentImpl.jar`,
+        //         `./java/java-${version}/QuitAgentImpl.class`,
+        //     ], (err2, stdout2, stderr2) => {
+        //         if (err2) {
+        //             console.error('JAR error:', stderr2);
+        //             return;
+        //         }
+        //         console.log('✔ QuitAgentImpl.jar created');
+        //     });
+        // });
     }
     async getJavaInstallation(version) {
         if (!this.versions["java-" + version]) {

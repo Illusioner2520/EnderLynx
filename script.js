@@ -413,7 +413,7 @@ class SearchDropdown {
 }
 
 class Toggle {
-    constructor(element,onchange,startToggled) {
+    constructor(element, onchange, startToggled) {
         element.classList.add("toggle");
         this.element = element;
         this.onchange = onchange;
@@ -561,7 +561,7 @@ class ContentList {
             if (features?.disable?.enabled) {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
-                let toggle = new Toggle(toggleElement,() => {},true);
+                let toggle = new Toggle(toggleElement, () => { }, true);
                 contentEle.appendChild(toggleElement);
             }
             if (features?.remove?.enabled) {
@@ -749,6 +749,7 @@ function showInstanceContent(e) {
     instanceGrid.appendChild(groupOne);
     ele.appendChild(instanceGrid);
     for (let i = 0; i < data.instances.length; i++) {
+        let running = checkForProcess(data.instances[i].pid);
         let instanceElement = document.createElement("button");
         instanceElement.setAttribute("data-name", data.instances[i].name);
         instanceElement.setAttribute("data-last-played", data.instances[i].last_played);
@@ -763,6 +764,7 @@ function showInstanceContent(e) {
             showSpecificInstanceContent(data.instances[i]);
         }
         instanceElement.classList.add("instance-item");
+        if (running) instanceElement.classList.add("running");
         let instanceImage = document.createElement("img");
         instanceImage.classList.add("instance-image");
         if (data.instances[i].image) {
@@ -784,9 +786,11 @@ function showInstanceContent(e) {
         instanceElement.appendChild(instanceInfoEle);
         let buttons = new ContextMenuButtons([
             {
-                "icon": '<i class="fa-solid fa-play"></i>',
-                "title": "Play Instance",
-                "func": (e) => {
+                "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
+                "title": running ? "Stop Instance" : "Play Instance",
+                "func": running ? (e) => {
+                    stopInstance(data.instances[i]);
+                } : (e) => {
                     playInstance(data.instances[i]);
                 }
             },
@@ -837,6 +841,7 @@ function showInstanceContent(e) {
     return ele;
 }
 function showSpecificInstanceContent(instanceInfo) {
+    let running = checkForProcess(instanceInfo.pid);
     content.innerHTML = "";
     let ele = document.createElement("div");
     content.appendChild(ele);
@@ -874,19 +879,29 @@ function showSpecificInstanceContent(instanceInfo) {
     instTopInfo.appendChild(instTopSubInfo);
     topBar.appendChild(instTopInfo);
     let playButton = document.createElement("button");
-    playButton.classList.add("instance-top-play-button");
-    playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
-    playButton.onclick = (e) => {
-        playInstance(instanceInfo);
+    if (!running) {
+        playButton.classList.add("instance-top-play-button");
+        playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
+        playButton.onclick = (e) => {
+            playInstance(instanceInfo);
+        }
+    } else {
+        playButton.classList.add("instance-top-stop-button");
+        playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>Stop';
+        playButton.onclick = (e) => {
+            stopInstance(instanceInfo);
+        }
     }
     let threeDots = document.createElement("button");
     threeDots.classList.add("instance-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
     let buttons = new ContextMenuButtons([
         {
-            "icon": '<i class="fa-solid fa-play"></i>',
-            "title": "Play Instance",
-            "func": (e) => {
+            "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
+            "title": running ? "Stop Instance" : "Play Instance",
+            "func": running ? (e) => {
+                stopInstance(instanceInfo);
+            } : (e) => {
                 playInstance(instanceInfo);
             }
         },
@@ -1159,12 +1174,20 @@ function filterContent() {
 async function playInstance(instInfo) {
     // loader,version,loaderVersion,instance_id,player_info
     let pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player);
+    if (!pid) return;
     for (let i = 0; i < data.instances.length; i++) {
         if (data.instances[i].instance_id == instInfo.instance_id) {
-            data.instances[i].pid = pid;
+            data.instances[i].pid = pid.pid;
+            data.instances[i].current_log_file = pid.log;
+            data.instances[i].java_path = pid.java_path;
+            data.instances[i].java_version = pid.java_version;
         }
     }
     saveData();
+}
+
+async function stopInstance(instInfo) {
+    return await window.electronAPI.killProcess(instInfo.pid);
 }
 
 function formatTime(secs) {
@@ -1199,6 +1222,10 @@ function saveData() {
     if (!success) {
         console.error("Error saving data");
     }
+}
+
+function checkForProcess(pid) {
+    return window.electronAPI.checkForProcess(pid);
 }
 
 loadFile();

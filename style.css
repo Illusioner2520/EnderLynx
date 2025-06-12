@@ -1,4 +1,6 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
 }
 
@@ -12,14 +14,14 @@ button {
 }
 
 .sidebar {
-    display:flex;
+    display: flex;
     flex-direction: column;
     padding: 10px;
     gap: 10px;
     width: 300px;
     background-color: #0078d420;
     height: 100%;
-    position:fixed;
+    position: fixed;
     top: 0;
     left: 0;
     border-right-style: solid;
@@ -38,6 +40,7 @@ button {
     transition: background-color .25s, scale .1s;
     anchor-name: --player-switch;
 }
+
 .player-switch:active {
     scale: .95;
 }
@@ -65,6 +68,7 @@ button {
 .menu-button.selected .menu-icon {
     background-color: #0078d4;
 }
+
 .menu-button:hover .menu-icon {
     background-color: #0078d4;
 }
@@ -134,8 +138,8 @@ body {
     aspect-ratio: 1;
     border-radius: 8px;
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
     transition: background-color .25s;
 }
 
@@ -147,6 +151,7 @@ body {
     height: max-content;
     display: grid;
     padding-block: 8px;
+
     @starting-style {
         height: 0px;
         padding-block: 0px;
@@ -166,7 +171,7 @@ body {
     gap: 8px;
     overflow-y: hidden;
     position-anchor: --player-switch;
-    position:absolute;
+    position: absolute;
     top: calc(anchor(bottom) + 10px);
     left: anchor(left);
     border-radius: 10px;
@@ -187,7 +192,7 @@ body {
     border: 0;
     padding: 0px;
     overflow-y: hidden;
-    position:fixed;
+    position: fixed;
     border-radius: 10px;
     height: 0px;
     interpolate-size: allow-keywords;
@@ -198,9 +203,11 @@ body {
     box-shadow: 0 0 10px black;
     width: max-content;
 }
+
 .context-menu:popover-open {
     height: max-content;
     display: grid;
+
     @starting-style {
         height: 0px;
     }
@@ -213,7 +220,7 @@ body {
     border: 0;
     padding: 0px;
     overflow-y: hidden;
-    position:absolute;
+    position: absolute;
     top: calc(anchor(bottom) + 5px);
     right: anchor(right);
     border-radius: 10px;
@@ -226,9 +233,11 @@ body {
     box-shadow: 0 0 10px black;
     width: max-content;
 }
+
 .more-menu:popover-open {
     height: max-content;
     display: grid;
+
     @starting-style {
         height: 0px;
     }
@@ -238,9 +247,9 @@ body {
     display: flex;
     padding: 8px;
     gap: 8px;
-    cursor:pointer;
-    transition:background-color .25s;
-    align-items:center;
+    cursor: pointer;
+    transition: background-color .25s;
+    align-items: center;
     font-size: 1rem;
 }
 
@@ -249,15 +258,15 @@ body {
 }
 
 .context-menu-button.danger:hover {
-    background-color:#d93e5d90;
+    background-color: #d93e5d90;
 }
 
 .context-menu-button i {
     color: #aaa;
     width: 24px;
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
 }
 
 .add-player {
@@ -270,7 +279,7 @@ body {
     transition: background-color .25s;
     display: flex;
     gap: 8px;
-    align-items:center;
+    align-items: center;
 }
 
 .add-player:hover {
@@ -288,7 +297,7 @@ body {
     display: flex;
     gap: 8px;
     font-size: 1rem;
-    align-items:center;
+    align-items: center;
     align-self: stretch;
 }
 
@@ -306,7 +315,7 @@ body {
     transition: background-color .25s, scale .1s;
     display: flex;
     gap: 8px;
-    align-items:center;
+    align-items: center;
     margin-left: auto;
     font-size: 1rem;
     font-weight: bold;
@@ -322,15 +331,15 @@ body {
 
 .title-top {
     display: flex;
-    align-items:center;
+    align-items: center;
 }
 
-*:focus-visible, 
+*:focus-visible,
 .search-bar:has(.search-input:focus-visible) {
-  outline-style: solid;
-  outline-color: #0078d4;
-  outline-width: 3.5px;
-  z-index: 100000;
+    outline-style: solid;
+    outline-color: #0078d4;
+    outline-width: 3.5px;
+    z-index: 100000;
 }
 
 .menu-icon {
@@ -338,8 +347,8 @@ body {
     border-radius: 5px;
     background-color: #ffffff20;
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
     color: white;
     aspect-ratio: 1;
     font-size: 1.2rem;
@@ -352,7 +361,7 @@ body {
 }
 
 .content {
-    position:absolute;
+    position: absolute;
     top: 0;
     left: 301px;
     width: calc(100% - 301px);
@@ -373,13 +382,13 @@ h1 {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 8px;
-    align-items:center;
+    align-items: center;
 }
 
 .search-and-filter-v2 {
     display: flex;
     gap: 8px;
-    align-items:center;
+    align-items: center;
 }
 
 .search {
@@ -397,7 +406,7 @@ h1 {
 
 .group {
     display: grid;
-    grid-template-columns: repeat(auto-fill,minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 8px;
     position: relative;
     font-size: 1.2rem;
@@ -424,7 +433,7 @@ h1 {
 }
 
 .group:not([data-group-title=""])::before {
-    content:"";
+    content: "";
     bottom: calc(100% + .5lh + 9px);
     width: 100%;
     font-size: 1.1rem;
@@ -449,12 +458,20 @@ h1 {
     transition: background-color .25s, scale .1s;
 }
 
+.instance-item.running {
+    background-color:#0078d4;
+}
+
 .instance-item:active {
     scale: .95;
 }
 
 .instance-item:hover {
     background-color: #ffffff40;
+}
+
+.instance-item.running:hover {
+    background-color: color-mix(in srgb, 85% #0078d4, white);
 }
 
 .instance-image {
@@ -477,6 +494,10 @@ h1 {
     overflow: hidden;
 }
 
+.instance-item.running .instance-desc {
+    color: #eee;
+}
+
 .instance-desc {
     font-size: .8rem;
     color: #aaa;
@@ -490,7 +511,7 @@ h1 {
     display: flex;
     background-color: #ffffff20;
     border-radius: 8px;
-    align-items:center;
+    align-items: center;
     grid-column: span 2;
     align-self: stretch;
     container-type: size;
@@ -563,7 +584,7 @@ h1 {
     display: flex;
     cursor: pointer;
     padding: 8px;
-    align-items:center;
+    align-items: center;
     width: 100%;
     border-radius: 8px;
 }
@@ -604,6 +625,7 @@ h1 {
     background-color: #0078d4;
     font-weight: bold;
 }
+
 .dropdown-item:focus-visible {
     background-color: #0078d4;
     font-weight: bold;
@@ -625,8 +647,8 @@ h1 {
     border: 0;
     padding: 0px;
     overflow-y: hidden;
-    flex-direction:column;
-    position:absolute;
+    flex-direction: column;
+    position: absolute;
     top: anchor(bottom);
     left: anchor(left);
     width: anchor-size(width);
@@ -640,9 +662,11 @@ h1 {
     border-width: 1px;
     box-shadow: 0 0 10px black;
 }
+
 .dropdown-list:popover-open {
     height: max-content;
     display: flex;
+
     @starting-style {
         height: 0px;
     }
@@ -651,7 +675,7 @@ h1 {
 .instance-top {
     display: flex;
     gap: 10px;
-    align-items:center;
+    align-items: center;
     border-bottom-style: solid;
     border-width: 2px;
     border-color: #ffffff40;
@@ -667,7 +691,7 @@ h1 {
 .instance-top-info {
     align-self: stretch;
     display: flex;
-    flex-direction:column;
+    flex-direction: column;
     justify-content: center;
     gap: 10px;
 }
@@ -683,8 +707,8 @@ h1 {
     color: white;
     font-size: 1.2rem;
     font-weight: bold;
-    position:relative;
-    align-items:center;
+    position: relative;
+    align-items: center;
 }
 
 .instance-top-sub-info-specific i {
@@ -710,7 +734,7 @@ h1 {
     display: flex;
     gap: 10px;
     font-weight: bold;
-    align-items:center;
+    align-items: center;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
     margin-left: auto;
@@ -719,6 +743,34 @@ h1 {
 .instance-top-play-button:active {
     scale: .95;
 }
+
+.instance-top-play-button:hover {
+    background-color: color-mix(in srgb, 70% #22ff84, white);
+}
+
+.instance-top-stop-button {
+    border-radius: 10px;
+    background-color: #d93e5d;
+    padding: 10px;
+    font-size: 1.5rem;
+    color: black;
+    display: flex;
+    gap: 10px;
+    font-weight: bold;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    margin-left: auto;
+}
+
+.instance-top-stop-button:active {
+    scale: .95;
+}
+
+.instance-top-stop-button:hover {
+    background-color: color-mix(in srgb, 70% #d93e5d, white);
+}
+
 .instance-top-more:active {
     scale: .95;
 }
@@ -734,10 +786,6 @@ h1 {
     border-radius: 50%;
     display: grid;
     place-items: center;
-}
-
-.instance-top-play-button:hover {
-    background-color: color-mix(in srgb, 70% #22ff84, white);
 }
 
 .instance-top-more:hover {
@@ -808,7 +856,7 @@ i {
 
 .content-list-top {
     display: flex;
-    align-items:center;
+    align-items: center;
     gap: 10px;
     padding: 10px;
 }
@@ -844,7 +892,7 @@ i {
     margin-left: auto;
     gap: 8px;
     font-size: 1rem;
-    align-items:center;
+    align-items: center;
     align-self: stretch;
 }
 
@@ -869,7 +917,7 @@ i {
     display: flex;
     gap: 8px;
     font-size: 1rem;
-    align-items:center;
+    align-items: center;
     align-self: stretch;
     color: color-mix(in srgb, #0078d4, white);
 }
@@ -886,7 +934,7 @@ i {
     display: flex;
     gap: 10px;
     padding: 10px;
-    align-items:center;
+    align-items: center;
 }
 
 .content-list-item:not(:has(.content-list-toggle)) .content-list-remove {
@@ -953,6 +1001,7 @@ i {
     text-overflow: ellipsis;
     width: 100%;
 }
+
 .content-list-remove {
     font-size: .8rem;
     color: #fff;
@@ -961,19 +1010,20 @@ i {
     aspect-ratio: 1;
     border-radius: 8px;
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
 }
 
 .content-list-remove:active {
-    scale: .95s;
+    scale: .95;
 }
 
 .content-list-remove:hover {
     background-color: #d93e5d;
 }
+
 .content-list-more {
     font-size: .8rem;
     color: #fff;
@@ -983,13 +1033,13 @@ i {
     cursor: pointer;
     border-radius: 8px;
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
     transition: background-color .25s, scale .1s;
 }
 
 .content-list-more:active {
-    scale: .95s;
+    scale: .95;
 }
 
 .content-list-more:hover {
@@ -1009,12 +1059,16 @@ i {
     cursor: pointer;
     border-radius: 1000px;
     --left: 4px;
-    transition: background-color .25s;
+    transition: background-color .25s, scale .1s;
+}
+
+.toggle:active {
+    scale: .95;
 }
 
 .toggle.toggled {
     --left: 22px;
-    background-color:#0078d4;
+    background-color: #0078d4;
 }
 
 .toggle-inside {
@@ -1022,7 +1076,7 @@ i {
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    position:absolute;
+    position: absolute;
     left: var(--left);
     top: 4px;
     transition: left .125s;
