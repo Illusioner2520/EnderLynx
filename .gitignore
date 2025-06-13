@@ -141,5 +141,3 @@ logs/
 config/
 
 *.dat
-
-quit_agent/

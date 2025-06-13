@@ -1,3 +1,4 @@
+let lang = null;
 class MinecraftAccountSwitcher {
     constructor(element, playerInfo) {
         element.classList.add("player-switch");
@@ -9,7 +10,7 @@ class MinecraftAccountSwitcher {
         let playerInfo = this.playerInfo;
         if (playerInfo?.default_player) {
             this.element.setAttribute("popovertarget", "player-dropdown");
-            this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${playerInfo.default_player.uuid}/40"><div class="player-info"><div class="player-name">${playerInfo.default_player.name}</div><div class="player-desc">Minecraft Account</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
+            this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${playerInfo.default_player.uuid}/40"><div class="player-info"><div class="player-name">${playerInfo.default_player.name}</div><div class="player-desc">${translate("app.players.minecraft_account")}</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
             let dropdownElement;
             let alreadyThere = false;
             if (this.dropdownElement) {
@@ -41,7 +42,7 @@ class MinecraftAccountSwitcher {
                 playerInfoEle.appendChild(playerName);
                 let playerDesc = document.createElement("div");
                 playerDesc.classList.add("player-desc");
-                playerDesc.innerHTML = "Selected";
+                playerDesc.innerHTML = translate("app.players.selected");
                 playerInfoEle.appendChild(playerDesc);
                 playerElement.appendChild(playerInfoEle);
                 let playerDelete = document.createElement("div");
@@ -67,14 +68,14 @@ class MinecraftAccountSwitcher {
             }
             let addPlayerButton = document.createElement("button");
             addPlayerButton.classList.add("add-player");
-            addPlayerButton.innerHTML = '<i class="fa-solid fa-plus"></i>Add player';
+            addPlayerButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.players.add");
             addPlayerButton.onclick = toggleMicrosoftSignIn;
             dropdownElement.appendChild(addPlayerButton);
             if (!alreadyThere) document.body.appendChild(dropdownElement);
         } else {
             this.element.removeAttribute("popovertarget");
             if (this.dropdownElement) this.dropdownElement.hidePopover();
-            this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/Steve/40"><div class="player-info"><div class="player-name">Sign in to continue</div></div><div class="player-chevron"><i class="fa-solid fa-arrow-right-to-bracket"></i></div>`;
+            this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/Steve/40"><div class="player-info"><div class="player-name">${translate("app.button.players.sign_in")}</div></div><div class="player-chevron"><i class="fa-solid fa-arrow-right-to-bracket"></i></div>`;
             this.element.onclick = toggleMicrosoftSignIn;
         }
     }
@@ -87,7 +88,7 @@ class MinecraftAccountSwitcher {
     }
     selectPlayer(newPlayerInfo) {
         this.playerInfo.default_player = newPlayerInfo;
-        this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${newPlayerInfo.uuid}/40"><div class="player-info"><div class="player-name">${newPlayerInfo.name}</div><div class="player-desc">Minecraft Account</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
+        this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${newPlayerInfo.uuid}/40"><div class="player-info"><div class="player-name">${newPlayerInfo.name}</div><div class="player-desc">${translate("app.players.minecraft_account")}</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
         for (let i = 0; i < this.playerElements.length; i++) {
             if (this.playerElements[i].getAttribute("data-uuid") != newPlayerInfo.uuid) {
                 this.playerElements[i].classList.add("not-selected");
@@ -288,13 +289,15 @@ class ContextMenuButtons {
 
 class SearchBar {
     constructor(element, oninput, onenter) {
+        this.oninput = oninput;
+        this.onenter = onenter;
         element.classList.add("search-bar");
         let searchIcon = document.createElement("div");
         searchIcon.classList.add("search-icon");
         searchIcon.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
         let searchInput = document.createElement("input");
         searchInput.classList.add("search-input");
-        searchInput.setAttribute("placeholder", "Search...");
+        searchInput.setAttribute("placeholder", translate("app.hint.search"));
         let searchClear = document.createElement("button");
         searchClear.classList.add("search-clear");
         searchClear.innerHTML = '<i class="fa-solid fa-xmark"></i>';
@@ -305,17 +308,23 @@ class SearchBar {
             searchInput.focus();
         }
         searchInput.oninput = (e) => {
-            oninput(searchInput.value)
+            this.oninput(searchInput.value)
         };
         searchInput.onkeydown = (e) => {
             if (e.key == "Enter") {
-                onenter(searchInput.value);
+                this.onenter(searchInput.value);
             }
         }
         searchClear.onclick = (e) => {
             searchInput.value = "";
-            oninput("");
+            this.oninput("");
         }
+    }
+    setOnInput(oninput) {
+        this.oninput = oninput;
+    }
+    setOnEnter(onenter) {
+        this.onenter = onenter;
     }
 }
 
@@ -469,7 +478,7 @@ class ContentList {
             "func": () => {}
         }
     } */
-    constructor(element, content, searchBar, features) {
+    constructor(element, content, searchBar, features, filter) {
         this.checkBoxes = [];
         element.classList.add("content-list-wrapper");
         let contentListTop = document.createElement("div");
@@ -500,23 +509,41 @@ class ContentList {
         if (features?.refresh?.enabled) {
             let refreshButton = document.createElement("button");
             refreshButton.className = "content-list-refresh";
-            refreshButton.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>Refresh';
+            refreshButton.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.button.content.refresh");
             refreshButton.onclick = features.refresh.func;
             contentListTop.appendChild(refreshButton);
         }
         if (features?.update_all?.enabled) {
             let updateAllButton = document.createElement("button");
             updateAllButton.className = "content-list-update-all";
-            updateAllButton.innerHTML = '<i class="fa-solid fa-download"></i>Update All';
+            updateAllButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.button.content.update_all");
             updateAllButton.onclick = features.update_all.func;
             contentListTop.appendChild(updateAllButton);
         }
 
+        searchBar.setOnInput((val) => {
+            for (let i = 0; i < this.items.length; i++) {
+                if (this.items[i].name.toLowerCase().includes(val.toLowerCase().trim())) {
+                    this.items[i].element.style.display = "flex";
+                    this.items[i].element.classList.remove("hidden");
+                } else {
+                    this.items[i].element.style.display = "none";
+                    this.items[i].element.classList.add("hidden");
+                }
+            }
+            this.figureOutMainCheckedState();
+        });
+
         let contentMainElement = document.createElement("div");
         contentMainElement.className = "content-list";
+
+        this.items = [];
         for (let i = 0; i < content.length; i++) {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
+            if (content[i].class) contentEle.classList.add(content[i].class);
+            if (content[i].type) contentEle.setAttribute("data-type",content[i].type);
+            this.items.push({ "name": [content[i].primary_column.title,content[i].primary_column.desc,content[i].secondary_column.title,content[i].secondary_column.desc].join("!!!!!!!!!!"), "element": contentEle });
             if (features?.more?.enabled) {
                 contentEle.oncontextmenu = (e) => {
                     contextmenu.showContextMenu(content[i].more.actionsList, e.clientX, e.clientY);
@@ -561,7 +588,7 @@ class ContentList {
             if (features?.disable?.enabled) {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
-                let toggle = new Toggle(toggleElement, () => { }, true);
+                let toggle = new Toggle(toggleElement, () => { }, !content[i].disabled);
                 contentEle.appendChild(toggleElement);
             }
             if (features?.remove?.enabled) {
@@ -582,14 +609,17 @@ class ContentList {
         element.appendChild(contentMainElement);
     }
     figureOutMainCheckedState() {
-        let total = this.checkBoxes.length;
+        let total = 0;
         let checked = 0;
         for (let i = 0; i < this.checkBoxes.length; i++) {
-            if (this.checkBoxes[i].checked) {
+            if (this.checkBoxes[i].checked && isNotDisplayNone(this.checkBoxes[i])) {
                 checked++;
             }
+            if (isNotDisplayNone(this.checkBoxes[i])) {
+                total++;
+            }
         }
-        if (total == checked) {
+        if (total == checked && total != 0) {
             this.checkBox.checked = true;
             this.checkBox.indeterminate = false;
         } else if (checked > 0) {
@@ -602,23 +632,23 @@ class ContentList {
     }
     checkCheckboxes() {
         this.checkBoxes.forEach((e) => {
-            e.checked = true;
+            if (isNotDisplayNone(e)) e.checked = true;
         });
     }
     uncheckCheckboxes() {
         this.checkBoxes.forEach((e) => {
-            e.checked = false;
+            if (isNotDisplayNone(e)) e.checked = false;
         });
     }
 }
 
-let homeContent = new PageContent(showHomeContent, "Home");
-let instanceContent = new PageContent(showInstanceContent, "Instances");
-let worldContent = new PageContent(showWorldContent, "Worlds");
+let homeContent = new PageContent(showHomeContent, translate("app.page.home"));
+let instanceContent = new PageContent(showInstanceContent, translate("app.page.instances"));
+let worldContent = new PageContent(showWorldContent, translate("app.page.discover"));
 let contextmenu = new ContextMenu();
-let homeButton = new NavigationButton(homeButtonEle, "Home", '<i class="fa-solid fa-house"></i>', homeContent);
-let instanceButton = new NavigationButton(instanceButtonEle, "Instances", '<i class="fa-solid fa-book"></i>', instanceContent);
-let worldButton = new NavigationButton(worldButtonEle, "Discover", '<i class="fa-solid fa-compass"></i>', worldContent);
+let homeButton = new NavigationButton(homeButtonEle, translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeContent);
+let instanceButton = new NavigationButton(instanceButtonEle, translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instanceContent);
+let worldButton = new NavigationButton(worldButtonEle, translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', worldContent);
 
 let navButtons = [homeButton, instanceButton, worldButton];
 
@@ -628,7 +658,7 @@ function toggleMicrosoftSignIn() {
 
 function showHomeContent(e) {
     let ele = document.createElement("div");
-    ele.innerHTML = 'Home';
+    ele.innerHTML = translate("app.page.home");
     return ele;
 }
 
@@ -637,9 +667,9 @@ function sortInstances(how) {
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
     let groups = document.getElementsByClassName("group");
-    let usedates = (how == "Last Played" || how == "Date Created" || how == "Date Modified")
-    let usenumbers = (how == "Play Time");
-    let reverseOrder = ["Last Played", "Date Created", "Date Modified", "Play Time", "Game Version"].includes(how);
+    let usedates = (how == "last_played" || how == "date_created" || how == "date_modified")
+    let usenumbers = (how == "play_time");
+    let reverseOrder = ["last_played", "date_created", "date_modified", "play_time", "game_version"].includes(how);
     let multiply = reverseOrder ? -1 : 1;
     for (let i = 0; i < groups.length; i++) {
         [...groups[i].children].sort((a, b) => {
@@ -700,11 +730,11 @@ function searchInstances(query) {
 }
 let sortBy;
 let loaders = {
-    "vanilla": "Vanilla",
-    "fabric": "Fabric",
-    "forge": "Forge",
-    "neoforge": "NeoForge",
-    "quilt": "Quilt"
+    "vanilla": translate("app.loader.vanilla"),
+    "fabric": translate("app.loader.fabric"),
+    "forge": translate("app.loader.forge"),
+    "neoforge": translate("app.loader.neoforge"),
+    "quilt": translate("app.loader.quilt")
 }
 function showInstanceContent(e) {
     data.instances.sort((a, b) => {
@@ -717,11 +747,11 @@ function showInstanceContent(e) {
     let title = document.createElement("div");
     title.classList.add("title-top");
     let h1 = document.createElement("h1");
-    h1.innerHTML = "Instances";
+    h1.innerHTML = translate("app.page.instances");
     title.appendChild(h1);
     let createButton = document.createElement("button");
     createButton.classList.add("create-button");
-    createButton.innerHTML = '<i class="fa-solid fa-plus"></i> Create Instance';
+    createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
     title.appendChild(createButton);
     ele.appendChild(title);
     let searchAndFilter = document.createElement("div");
@@ -730,14 +760,14 @@ function showInstanceContent(e) {
     let search = document.createElement("div");
     let searchbar = new SearchBar(search, searchInstances, null);
     let sort = document.createElement('div');
-    sortBy = new SearchDropdown("Sort By", [{ "name": "Name", "value": "name" },
-    { "name": "Last Played", "value": "last_played" },
-    { "name": "Date Created", "value": "date_created" },
-    { "name": "Date Modified", "value": "date_modified" },
-    { "name": "Play Time", "value": "play_time" },
-    { "name": "Game Version", "value": "game_version" }], sort, data.default_sort, sortInstances);
+    sortBy = new SearchDropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
+    { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
+    { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
+    { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
+    { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
+    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.default_sort, sortInstances);
     let group = document.createElement('div');
-    let groupBy = new SearchDropdown("Group By", [{ "name": "None", "value": "none" }, { "name": "Custom Groups", "value": "custom_groups" }, { "name": "Loader", "value": "loader" }, { "name": "Game Version", "value": "game_version" }], group, data.default_group, groupInstances);
+    let groupBy = new SearchDropdown(translate("app.instances.group.by"), [{ "name": translate("app.instances.group.none"), "value": "none" }, { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" }, { "name": translate("app.instances.group.loader"), "value": "loader" }, { "name": translate("app.instances.group.game_version"), "value": "game_version" }], group, data.default_group, groupInstances);
     searchAndFilter.appendChild(search);
     searchAndFilter.appendChild(sort);
     searchAndFilter.appendChild(group);
@@ -787,7 +817,7 @@ function showInstanceContent(e) {
         let buttons = new ContextMenuButtons([
             {
                 "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-                "title": running ? "Stop Instance" : "Play Instance",
+                "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
                 "func": running ? (e) => {
                     stopInstance(data.instances[i]);
                 } : (e) => {
@@ -796,39 +826,41 @@ function showInstanceContent(e) {
             },
             {
                 "icon": '<i class="fa-solid fa-plus"></i>',
-                "title": "Add Content",
+                "title": translate("app.button.content.add"),
                 "func": (e) => { }
             },
             {
                 "icon": '<i class="fa-solid fa-eye"></i>',
-                "title": "View Instance",
+                "title": translate("app.button.instances.view"),
                 "func": (e) => {
                     showSpecificInstanceContent(data.instances[i]);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
-                "title": "Duplicate Instance",
+                "title": translate("app.button.instances.duplicate"),
                 "func": (e) => { }
             },
             {
                 "icon": '<i class="fa-solid fa-folder"></i>',
-                "title": "Open Folder",
-                "func": (e) => { }
+                "title": translate("app.button.instances.open_folder"),
+                "func": (e) => {
+                    window.electronAPI.openFolder(`./minecraft/instances/${data.instances[i].instance_id}`);
+                }
             },
             {
                 "icon": '<i class="fa-solid fa-share"></i>',
-                "title": "Share Instance",
+                "title": translate("app.button.instances.share"),
                 "func": (e) => { }
             },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
-                "title": "Open Instance Settings",
+                "title": translate("app.button.instances.open_settings"),
                 "func": (e) => { }
             },
             {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
-                "title": "Delete Instance",
+                "title": translate("app.button.instances.delete"),
                 "func": (e) => { },
                 "danger": true
             }
@@ -881,13 +913,13 @@ function showSpecificInstanceContent(instanceInfo) {
     let playButton = document.createElement("button");
     if (!running) {
         playButton.classList.add("instance-top-play-button");
-        playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
+        playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
         playButton.onclick = (e) => {
             playInstance(instanceInfo);
         }
     } else {
         playButton.classList.add("instance-top-stop-button");
-        playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>Stop';
+        playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
         playButton.onclick = (e) => {
             stopInstance(instanceInfo);
         }
@@ -898,7 +930,7 @@ function showSpecificInstanceContent(instanceInfo) {
     let buttons = new ContextMenuButtons([
         {
             "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-            "title": running ? "Stop Instance" : "Play Instance",
+            "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
             "func": running ? (e) => {
                 stopInstance(instanceInfo);
             } : (e) => {
@@ -907,32 +939,34 @@ function showSpecificInstanceContent(instanceInfo) {
         },
         {
             "icon": '<i class="fa-solid fa-plus"></i>',
-            "title": "Add Content",
+            "title": translate("app.button.content.add"),
             "func": (e) => { }
         },
         {
             "icon": '<i class="fa-solid fa-copy"></i>',
-            "title": "Duplicate Instance",
+            "title": translate("app.button.instances.duplicate"),
             "func": (e) => { }
         },
         {
             "icon": '<i class="fa-solid fa-folder"></i>',
-            "title": "Open Folder",
-            "func": (e) => { }
+            "title": translate("app.button.instances.open_folder"),
+            "func": (e) => {
+                window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}`);
+            }
         },
         {
             "icon": '<i class="fa-solid fa-share"></i>',
-            "title": "Share Instance",
+            "title": translate("app.button.instances.share"),
             "func": (e) => { }
         },
         {
             "icon": '<i class="fa-solid fa-gear"></i>',
-            "title": "Open Instance Settings",
+            "title": translate("app.button.instances.open_settings"),
             "func": (e) => { }
         },
         {
             "icon": '<i class="fa-solid fa-trash-can"></i>',
-            "title": "Delete Instance",
+            "title": translate("app.button.instances.delete"),
             "func": (e) => { },
             "danger": true
         }
@@ -949,18 +983,23 @@ function showSpecificInstanceContent(instanceInfo) {
     ele.appendChild(tabsInfo);
     let tabs = new TabContent(tabContent, [
         {
-            "name": "Content", "value": "content", "func": () => {
+            "name": translate("app.instances.tabs.content"), "value": "content", "func": () => {
                 setInstanceTabContentContent(instanceInfo, tabsInfo);
             }
         },
         {
-            "name": "Worlds", "value": "worlds", "func": () => {
+            "name": translate("app.instances.tabs.worlds"), "value": "worlds", "func": () => {
                 setInstanceTabContentWorlds(instanceInfo, tabsInfo);
             }
         },
         {
-            "name": "Logs", "value": "logs", "func": () => {
+            "name": translate("app.instances.tabs.logs"), "value": "logs", "func": () => {
                 setInstanceTabContentLogs(instanceInfo, tabsInfo);
+            }
+        },
+        {
+            "name": translate("app.instances.tabs.options"), "value": "options", "func": () => {
+                setInstanceTabContentOptions(instanceInfo, tabsInfo);
             }
         }
     ]);
@@ -971,25 +1010,29 @@ function setInstanceTabContentContent(instanceInfo, element) {
     searchAndFilter.classList.add("search-and-filter-v2");
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
-    addContent.innerHTML = '<i class="fa-solid fa-plus"></i>Add Content'
+    addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
     let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
     let typeDropdown = document.createElement("div");
-    let dropdownInfo = new SearchDropdown("Content type", [
+    let dropdownInfo = new SearchDropdown(translate("app.button.content.type"), [
         {
-            "name": "Mods",
+            "name": translate("app.content.all"),
+            "value": "all"
+        },
+        {
+            "name": translate("app.content.mods"),
             "value": "mods"
         },
         {
-            "name": "Resource Packs",
+            "name": translate("app.content.resource_packs"),
             "value": "resource_packs"
         },
         {
-            "name": "Shaders",
+            "name": translate("app.content.shaders"),
             "value": "shaders"
         }
-    ], typeDropdown, "mods", filterContent);
+    ], typeDropdown, "all", filterContent);
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -997,111 +1040,50 @@ function setInstanceTabContentContent(instanceInfo, element) {
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
     let contentListWrap = document.createElement("div");
-    let contentList = new ContentList(contentListWrap, [
-        {
+    let content = [];
+    for (let i = 0; i < instanceInfo.content.length; i++) {
+        let e = instanceInfo.content[i];
+        content.push({
             "primary_column": {
-                "title": "Test Mod",
-                "desc": "by testing"
+                "title": e.name,
+                "desc": e.author ? "by " + e.author : ""
             },
             "secondary_column": {
-                "title": "something",
-                "desc": "blah_blah_blah.jar"
+                "title": e.version,
+                "desc": e.file_name
             },
-            "image": "",
+            "type": e.type,
+            "class": e.source,
+            "image": e.image,
             "more": {
                 "actionsList": new ContextMenuButtons([
                     {
-                        "title": "Open File",
+                        "title": translate("app.content.open"),
                         "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                         "func": () => { }
                     },
                     {
-                        "title": "Update Item",
+                        "title": translate("app.content.update"),
                         "icon": '<i class="fa-solid fa-download"></i>',
                         "func": () => { }
                     },
                     {
-                        "title": "Disable Item",
-                        "icon": '<i class="fa-solid fa-eye-slash"></i>',
+                        "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
+                        "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
                         "func": () => { }
                     },
                     {
-                        "title": "Delete Item",
+                        "title": translate("app.content.delete"),
                         "icon": '<i class="fa-solid fa-trash-can"></i>',
                         "danger": true,
                         "func": () => { }
                     }
                 ])
-            }
-        },
-        {
-            "primary_column": {
-                "title": "Test Mod 2",
-                "desc": "by testing 2"
             },
-            "secondary_column": {
-                "title": "something 2",
-                "desc": "blah_blah_blah_2.jar"
-            },
-            "image": "",
-            "more": {
-                "actionsList": new ContextMenuButtons([
-                    {
-                        "title": "Open File",
-                        "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
-                        "func": () => { }
-                    },
-                    {
-                        "title": "Update Item",
-                        "icon": '<i class="fa-solid fa-download"></i>',
-                        "func": () => { }
-                    },
-                    {
-                        "title": "Disable Item",
-                        "icon": '<i class="fa-solid fa-eye-slash"></i>',
-                        "func": () => { }
-                    },
-                    {
-                        "title": "Delete Item",
-                        "icon": '<i class="fa-solid fa-trash-can"></i>',
-                        "danger": true,
-                        "func": () => { }
-                    }
-                ])
-            }
-        },
-        {
-            "primary_column": {
-                "title": "Test Mod 3",
-                "desc": "by testing 3"
-            },
-            "secondary_column": {
-                "title": "something 3",
-                "desc": "blah_blah_blah_3.jar"
-            },
-            "image": "",
-            "more": {
-                "actionsList": new ContextMenuButtons([
-                    {
-                        "title": "Open File",
-                        "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
-                        "func": () => { }
-                    },
-                    {
-                        "title": "Disable Item",
-                        "icon": '<i class="fa-solid fa-eye-slash"></i>',
-                        "func": () => { }
-                    },
-                    {
-                        "title": "Delete Item",
-                        "icon": '<i class="fa-solid fa-trash-can"></i>',
-                        "danger": true,
-                        "func": () => { }
-                    }
-                ])
-            }
-        }
-    ], contentSearch, {
+            "disabled": e.disabled
+        })
+    }
+    let contentList = new ContentList(contentListWrap, content, searchBar, {
         "checkbox": {
             "enabled": true,
             "actionsList": null
@@ -1116,8 +1098,8 @@ function setInstanceTabContentContent(instanceInfo, element) {
             "enabled": true
         },
         "second_column_centered": false,
-        "primary_column_name": "Name",
-        "secondary_column_name": "File Info",
+        "primary_column_name": translate("app.content.name"),
+        "secondary_column_name": translate("app.content.file_info"),
         "refresh": {
             "enabled": true,
             "func": () => { }
@@ -1129,38 +1111,119 @@ function setInstanceTabContentContent(instanceInfo, element) {
     });
     element.appendChild(contentListWrap);
 }
+function isNotDisplayNone(element) {
+    return element.checkVisibility({ checkDisplayNone: true });
+}
 function setInstanceTabContentWorlds(instanceInfo, element) {
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
-    addContent.innerHTML = '<i class="fa-solid fa-plus"></i>Add Content'
+    addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.add")
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
     let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
     let typeDropdown = document.createElement("div");
-    let dropdownInfo = new SearchDropdown("World type", [
+    let dropdownInfo = new SearchDropdown(translate("app.worlds.type"), [
         {
-            "name": "Singleplayer Worlds",
+            "name": translate("app.worlds.singleplayer"),
             "value": "singleplayer"
         },
         {
-            "name": "Servers",
+            "name": translate("app.worlds.multiplayer"),
             "value": "multiplayer"
         },
         {
-            "name": "Realms",
+            "name": translate("app.worlds.realms"),
             "value": "realms"
         }
     ], typeDropdown, "singleplayer", filterContent);
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
+    searchAndFilter.appendChild(addContent);
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
+    let worldList = [];
+
+    let worlds = getInstanceWorlds(instanceInfo);
+    for (let i = 0; i < worlds.length; i++) {
+        worldList.push(
+        {
+            "primary_column": {
+                "title": worlds[i].name,
+                "desc": translate("app.worlds.last_played").replace("%s",formatDate(worlds[i].last_played))
+            },
+            "secondary_column": {
+                "title": translate("app.worlds.description.singleplayer"),
+                "desc": worlds[i].id
+            },
+            "image": worlds[i].icon ?? "https://picsum.photos/40",
+            "more": {
+                "actionsList": new ContextMenuButtons([
+                    {
+                        "title": translate("app.worlds.play"),
+                        "icon": '<i class="fa-solid fa-play"></i>',
+                        "func": () => {
+
+                        }
+                    },
+                    {
+                        "title": translate("app.worlds.open"),
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": () => {
+                            window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`)
+                        }
+                    },
+                    {
+                        "title": translate("app.worlds.share"),
+                        "icon": '<i class="fa-solid fa-share"></i>',
+                        "func": () => { }
+                    },
+                    {
+                        "title": translate("app.worlds.delete"),
+                        "icon": '<i class="fa-solid fa-trash-can"></i>',
+                        "danger": true,
+                        "func": () => { }
+                    }
+                ])
+            }
+        });
+    }
+
+    let contentListWrap = document.createElement("div");
+    let contentList = new ContentList(contentListWrap, worldList, searchBar, {
+        "checkbox": {
+            "enabled": true,
+            "actionsList": null
+        },
+        "disable": {
+            "enabled": false
+        },
+        "remove": {
+            "enabled": true
+        },
+        "more": {
+            "enabled": true
+        },
+        "second_column_centered": true,
+        "primary_column_name": translate("app.worlds.name"),
+        "secondary_column_name": "",
+        "refresh": {
+            "enabled": true,
+            "func": () => { }
+        },
+        "update_all": {
+            "enabled": false
+        }
+    });
+    element.appendChild(contentListWrap);
 }
 function setInstanceTabContentLogs(instanceInfo, element) {
-
+    element.innerHTML = "";
+}
+function setInstanceTabContentOptions(instanceInfo, element) {
+    element.innerHTML = "";
 }
 
 function searchInstanceContent(s) {
@@ -1196,13 +1259,16 @@ function formatTime(secs) {
     let minutes = Math.floor(secs / 60);
     secs = secs % 60;
     let seconds = secs;
-    return `${hours}h ${minutes}m ${seconds}s`;
+    let hoursString = translate("app.duration.hours").replace("%s",hours);
+    let minutesString = translate("app.duration.minutes").replace("%s",minutes);
+    let secondsString = translate("app.duration.seconds").replace("%s",seconds);
+    return translate("app.duration").replace("%h",hoursString).replace("%m",minutesString).replace("%s",secondsString);
 }
 
 function formatDate(dateString) {
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let months = [translate("app.date.jan"), translate("app.date.feb"), translate("app.date.mar"), translate("app.date.apr"), translate("app.date.may"), translate("app.date.jun"), translate("app.date.jul"), translate("app.date.aug"), translate("app.date.sep"), translate("app.date.oct"), translate("app.date.nov"), translate("app.date.dec")];
     let date = new Date(dateString);
-    return months[date.getMonth()] + " " + date.getDate() + ", " + date.getFullYear();
+    return translate("app.date").replace("%m",months[date.getMonth()]).replace("%d",date.getDate()).replace("%y",date.getFullYear());
 }
 
 function showWorldContent(e) {
@@ -1217,6 +1283,10 @@ function loadFile() {
     data = JSON.parse(window.electronAPI.readFile("data.json"));
 }
 
+function getLangFile(locale) {
+    return JSON.parse(window.electronAPI.readFile(`./lang/${locale}.json`));
+}
+
 function saveData() {
     let success = window.electronAPI.saveData(JSON.stringify(data));
     if (!success) {
@@ -1226,6 +1296,18 @@ function saveData() {
 
 function checkForProcess(pid) {
     return window.electronAPI.checkForProcess(pid);
+}
+
+function getInstanceWorlds(instanceInfo) {
+    return window.electronAPI.getSinglePlayerWorlds(instanceInfo.instance_id);
+}
+
+
+function translate(key) {
+    if (!lang) {
+        lang = getLangFile("en-us");
+    }
+    return lang[key];
 }
 
 loadFile();

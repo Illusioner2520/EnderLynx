@@ -261,6 +261,10 @@ body {
     background-color: #d93e5d90;
 }
 
+.context-menu-button.danger:hover > i {
+    color: white;
+}
+
 .context-menu-button i {
     color: #aaa;
     width: 24px;
@@ -843,7 +847,6 @@ h1 {
 
 .tab-info {
     display: grid;
-    gap: 10px;
 }
 
 i {
@@ -935,6 +938,19 @@ i {
     gap: 10px;
     padding: 10px;
     align-items: center;
+    position: relative;
+    --accent-color: transparent;
+}
+
+.content-list-item::after {
+    position: absolute;
+    left: -1px;
+    height: 50%;
+    top: 25%;
+    width: 4px;
+    border-radius: 2px;
+    background-color: var(--accent-color);
+    content: "";
 }
 
 .content-list-item:not(:has(.content-list-toggle)) .content-list-remove {
@@ -945,7 +961,7 @@ i {
     margin-left: auto;
 }
 
-.content-list-item:not(:last-of-type) {
+.content-list-item:not(.hidden):not(:last-of-type) {
     border-bottom-style: solid;
     border-bottom-color: #ffffff20;
     border-bottom-width: 1px;
@@ -1080,4 +1096,32 @@ i {
     left: var(--left);
     top: 4px;
     transition: left .125s;
+}
+
+.content-list-item:has(.content-list-toggle:not(.toggled)) > * {
+    opacity: .3;
+}
+
+.modrinth {
+    --accent-color: #1bd96a;
+}
+
+.curseforge {
+    --accent-color: #f16436;
+}
+
+.vanilla_tweaks {
+    --accent-color: #f1c218;
+}
+
+.minecraft_maps {
+    --accent-color: #c6c5c1;
+}
+
+.planet_minecraft {
+    --accent-color: #3da2ff;
+}
+
+.player_install {
+    --accent-color: #666;
 }

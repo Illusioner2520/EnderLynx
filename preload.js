@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { Minecraft, Java, Fabric } = require('./launch.js');
 const { spawn, exec } = require('child_process');
+const nbt = require('prismarine-nbt');
+const zlib = require('zlib');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => {
@@ -62,24 +64,62 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     killProcess: async (pid) => {
         if (!pid) return;
-        let java = new Java();
-        let javaPath = await java.getJavaInstallation(21);
-        const quit = spawn(javaPath, ['-cp', `./quit_agent`, 'QuitAgent', pid]);
+        process.kill(pid);
+    },
+    getSinglePlayerWorlds: (instance_id) => {
+        let patha = `./minecraft/instances/${instance_id}/saves`;
+        fs.mkdirSync(patha, { recursive: true });
+        let worldDirs = fs.opendirSync(patha);
+        let worlds = [];
 
-        quit.stdout.on('data', (data) => {
-            console.log(`[JAVA STDOUT] ${data.toString().trim()}`);
-        });
+        let dir;
+        while ((dir = worldDirs.readSync()) !== null) {
+            if (!dir.isDirectory()) continue;
+            const levelDatPath = path.resolve(patha, dir.name, 'level.dat');
 
-        quit.stderr.on('data', (data) => {
-            console.error(`[JAVA STDERR] ${data.toString().trim()}`);
-        });
+            try {
+                const buffer = fs.readFileSync(levelDatPath);
+                const decompressed = zlib.gunzipSync(buffer); // Decompress the GZip data
 
-        quit.on('close', (code) => {
-            console.log(`[JAVA EXIT] Process exited with code ${code}`);
-        });
+                const data = nbt.parseUncompressed(decompressed); // Synchronous parsing
+                const levelData = data.value.Data.value;
 
-        quit.on('error', (err) => {
-            console.error(`[JAVA ERROR] ${err.message}`);
+                worlds.push({
+                    name: levelData.LevelName.value,
+                    id: dir.name,
+                    last_played: Number(levelData.LastPlayed.value),
+                    icon: fs.existsSync(path.resolve(patha, dir.name, "icon.png"))
+                        ? `minecraft/instances/${instance_id}/saves/${dir.name}/icon.png`
+                        : null
+                });
+            } catch (e) {
+                console.error(`Failed to parse level.dat for world ${dir.name}:`, e);
+            }
+        }
+        worldDirs.closeSync();
+        return worlds;
+    },
+    openFolder: (folderPath) => {
+        let command;
+        switch (process.platform) {
+            case 'win32':
+                command = `explorer "${path.resolve(folderPath)}"`;
+                break;
+            case 'darwin':
+                command = `open "${path.resolve(folderPath)}"`;
+                break;
+            case 'linux':
+                command = `xdg-open "${path.resolve(folderPath)}"`;
+                break;
+            default:
+                console.error('Unsupported operating system.');
+                return;
+        }
+
+        exec(command, (error) => {
+            if (error) {
+                console.error(`Error opening folder: ${error}`);
+            }
         });
     }
 });

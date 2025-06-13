@@ -217,7 +217,6 @@ class Minecraft {
                     e = e.replace("${launcher_name}", launchername);
                     e = e.replace("${launcher_version}", launcherversion);
                     if (e.includes("${classpath}")) {
-                        // e = e.replace("${classpath}", this.libs + this.jarfile + " " + "-Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M" + " " + this.main_class);
                         let theargs = [this.libs + this.jarfile];
                         theargs = theargs.concat(this.modded_args_jvm);
                         theargs = theargs.concat(["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", this.main_class]);
@@ -238,7 +237,7 @@ class Minecraft {
             if (arch == "x86") {
                 args.push("-Xss1M");
             }
-            args.push("-Djava.library.path=" + `./minecraft/meta/natives/${this.instance_id}-${version}`);
+            args.push("-Djava.library.path=" + path.resolve(__dirname,`minecraft/meta/natives/${this.instance_id}-${version}`));
             args.push("-Dminecraft.launcher.brand=" + launchername);
             args.push("-Dminecraft.launcher.version=" + launcherversion);
             args.push("-Dminecraft.client.jar=" + this.jarfile);
