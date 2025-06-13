@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
+    "msmc": "^5.0.5",
     "prismarine-nbt": "^2.7.0"
   }
 }

@@ -1,4 +1,5 @@
 let lang = null;
+document.getElementsByTagName("title")[0].innerHTML = translate("app.name");
 class MinecraftAccountSwitcher {
     constructor(element, playerInfo) {
         element.classList.add("player-switch");
@@ -11,6 +12,7 @@ class MinecraftAccountSwitcher {
         if (playerInfo?.default_player) {
             this.element.setAttribute("popovertarget", "player-dropdown");
             this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${playerInfo.default_player.uuid}/40"><div class="player-info"><div class="player-name">${playerInfo.default_player.name}</div><div class="player-desc">${translate("app.players.minecraft_account")}</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
+            this.element.onclick = () => { };
             let dropdownElement;
             let alreadyThere = false;
             if (this.dropdownElement) {
@@ -82,7 +84,8 @@ class MinecraftAccountSwitcher {
     addPlayer(newPlayerInfo) {
         if (!this.playerInfo.players) this.playerInfo.players = [];
         this.playerInfo.players.push(newPlayerInfo);
-        this.selectPlayer(newPlayerInfo);
+        this.playerInfo.default_player = newPlayerInfo;
+        this.setPlayerInfo();
         data.profile_info = this.playerInfo;
         saveData();
     }
@@ -419,6 +422,9 @@ class SearchDropdown {
     get getSelected() {
         return this.selected;
     }
+    setOnChange(onchange) {
+        this.onchange = onchange;
+    }
 }
 
 class Toggle {
@@ -534,6 +540,19 @@ class ContentList {
             this.figureOutMainCheckedState();
         });
 
+        filter.setOnChange((val) => {
+            for (let i = 0; i < this.items.length; i++) {
+                if (this.items[i].type == val || val == "all") {
+                    this.items[i].element.style.display = "flex";
+                    this.items[i].element.classList.remove("hidden");
+                } else {
+                    this.items[i].element.style.display = "none";
+                    this.items[i].element.classList.add("hidden");
+                }
+            }
+            this.figureOutMainCheckedState();
+        });
+
         let contentMainElement = document.createElement("div");
         contentMainElement.className = "content-list";
 
@@ -542,8 +561,8 @@ class ContentList {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
             if (content[i].class) contentEle.classList.add(content[i].class);
-            if (content[i].type) contentEle.setAttribute("data-type",content[i].type);
-            this.items.push({ "name": [content[i].primary_column.title,content[i].primary_column.desc,content[i].secondary_column.title,content[i].secondary_column.desc].join("!!!!!!!!!!"), "element": contentEle });
+            if (content[i].type) contentEle.setAttribute("data-type", content[i].type);
+            this.items.push({ "name": [content[i].primary_column.title, content[i].primary_column.desc, content[i].secondary_column.title, content[i].secondary_column.desc].join("!!!!!!!!!!"), "element": contentEle, "type": content[i].type });
             if (features?.more?.enabled) {
                 contentEle.oncontextmenu = (e) => {
                     contextmenu.showContextMenu(content[i].more.actionsList, e.clientX, e.clientY);
@@ -568,7 +587,7 @@ class ContentList {
             contentEle.appendChild(infoElement1);
             let infoElement1Title = document.createElement("div");
             infoElement1Title.className = "content-list-info-title-1";
-            infoElement1Title.innerHTML = content[i].primary_column.title;
+            infoElement1Title.innerHTML = parseMinecraftFormatting(content[i].primary_column.title);
             infoElement1.appendChild(infoElement1Title);
             let infoElement1Desc = document.createElement("div");
             infoElement1Desc.className = "content-list-info-desc-1";
@@ -652,8 +671,21 @@ let worldButton = new NavigationButton(worldButtonEle, translate("app.page.disco
 
 let navButtons = [homeButton, instanceButton, worldButton];
 
-function toggleMicrosoftSignIn() {
-
+async function toggleMicrosoftSignIn() {
+    let newData = await window.electronAPI.triggerMicrosoftLogin();
+    if (data.profile_info?.players) {
+        for (let i = 0; i < data.profile_info.players.length; i++) {
+            if (newData.uuid == data.profile_info.players[i].uuid) {
+                // data.profile_info.players = newData;
+                accountSwitcher.selectPlayer(newData);
+                // saveData();
+                return;
+            }
+        }
+    }
+    // data.profile_info.players.push(newData);
+    accountSwitcher.addPlayer(newData);
+    // saveData();
 }
 
 function showHomeContent(e) {
@@ -1022,15 +1054,15 @@ function setInstanceTabContentContent(instanceInfo, element) {
         },
         {
             "name": translate("app.content.mods"),
-            "value": "mods"
+            "value": "mod"
         },
         {
             "name": translate("app.content.resource_packs"),
-            "value": "resource_packs"
+            "value": "resource_pack"
         },
         {
             "name": translate("app.content.shaders"),
-            "value": "shaders"
+            "value": "shader"
         }
     ], typeDropdown, "all", filterContent);
     typeDropdown.style.minWidth = "200px";
@@ -1040,6 +1072,11 @@ function setInstanceTabContentContent(instanceInfo, element) {
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
     let contentListWrap = document.createElement("div");
+    let old_file_names = instanceInfo.content.map((e) => e.file_name);
+    let newContent = getInstanceContent(instanceInfo);
+    newContent = newContent.filter((e) => !old_file_names.includes(e.file_name));
+    instanceInfo.content = instanceInfo.content.concat(newContent);
+    saveData();
     let content = [];
     for (let i = 0; i < instanceInfo.content.length; i++) {
         let e = instanceInfo.content[i];
@@ -1102,19 +1139,21 @@ function setInstanceTabContentContent(instanceInfo, element) {
         "secondary_column_name": translate("app.content.file_info"),
         "refresh": {
             "enabled": true,
-            "func": () => { }
+            "func": () => {
+                setInstanceTabContentContent(instanceInfo, element)
+            }
         },
         "update_all": {
             "enabled": true,
             "func": () => { }
         }
-    });
+    }, dropdownInfo);
     element.appendChild(contentListWrap);
 }
 function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
 }
-function setInstanceTabContentWorlds(instanceInfo, element) {
+async function setInstanceTabContentWorlds(instanceInfo, element) {
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let addContent = document.createElement("button");
@@ -1125,6 +1164,10 @@ function setInstanceTabContentWorlds(instanceInfo, element) {
     let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
     let typeDropdown = document.createElement("div");
     let dropdownInfo = new SearchDropdown(translate("app.worlds.type"), [
+        {
+            "name": translate("app.worlds.all"),
+            "value": "all"
+        },
         {
             "name": translate("app.worlds.singleplayer"),
             "value": "singleplayer"
@@ -1137,7 +1180,7 @@ function setInstanceTabContentWorlds(instanceInfo, element) {
             "name": translate("app.worlds.realms"),
             "value": "realms"
         }
-    ], typeDropdown, "singleplayer", filterContent);
+    ], typeDropdown, "all", filterContent);
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -1147,48 +1190,87 @@ function setInstanceTabContentWorlds(instanceInfo, element) {
     let worldList = [];
 
     let worlds = getInstanceWorlds(instanceInfo);
+    let worldsMultiplayer = await getInstanceWorldsMulti(instanceInfo);
     for (let i = 0; i < worlds.length; i++) {
         worldList.push(
-        {
-            "primary_column": {
-                "title": worlds[i].name,
-                "desc": translate("app.worlds.last_played").replace("%s",formatDate(worlds[i].last_played))
-            },
-            "secondary_column": {
-                "title": translate("app.worlds.description.singleplayer"),
-                "desc": worlds[i].id
-            },
-            "image": worlds[i].icon ?? "https://picsum.photos/40",
-            "more": {
-                "actionsList": new ContextMenuButtons([
-                    {
-                        "title": translate("app.worlds.play"),
-                        "icon": '<i class="fa-solid fa-play"></i>',
-                        "func": () => {
-
+            {
+                "primary_column": {
+                    "title": worlds[i].name,
+                    "desc": translate("app.worlds.last_played").replace("%s", formatDate(worlds[i].last_played))
+                },
+                "secondary_column": {
+                    "title": translate("app.worlds.description.singleplayer"),
+                    "desc": translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - " + translate("app.worlds.description.hardcore") : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "")
+                },
+                "type": "singleplayer",
+                "image": worlds[i].icon ?? "https://picsum.photos/40",
+                "more": {
+                    "actionsList": new ContextMenuButtons([
+                        {
+                            "title": translate("app.worlds.play"),
+                            "icon": '<i class="fa-solid fa-play"></i>',
+                            "func": () => {
+                                playSingleplayerWorld(instanceInfo, worlds[i].id);
+                            }
+                        },
+                        {
+                            "title": translate("app.worlds.open"),
+                            "icon": '<i class="fa-solid fa-folder"></i>',
+                            "func": () => {
+                                window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`)
+                            }
+                        },
+                        {
+                            "title": translate("app.worlds.share"),
+                            "icon": '<i class="fa-solid fa-share"></i>',
+                            "func": () => { }
+                        },
+                        {
+                            "title": translate("app.worlds.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "func": () => { }
                         }
-                    },
-                    {
-                        "title": translate("app.worlds.open"),
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": () => {
-                            window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`)
+                    ])
+                }
+            });
+    }
+    for (let i = 0; i < worldsMultiplayer.length; i++) {
+        worldList.push(
+            {
+                "primary_column": {
+                    "title": worldsMultiplayer[i].name,
+                    "desc": (new Date(worldsMultiplayer[i].last_played)).getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(worldsMultiplayer[i].last_played))
+                },
+                "secondary_column": {
+                    "title": translate("app.worlds.description.multiplayer"),
+                    "desc": worldsMultiplayer[i].ip
+                },
+                "type": "multiplayer",
+                "image": worldsMultiplayer[i].icon ?? "https://picsum.photos/40",
+                "more": {
+                    "actionsList": new ContextMenuButtons([
+                        {
+                            "title": translate("app.worlds.play"),
+                            "icon": '<i class="fa-solid fa-play"></i>',
+                            "func": () => {
+                                playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
+                            }
+                        },
+                        {
+                            "title": translate("app.worlds.share"),
+                            "icon": '<i class="fa-solid fa-share"></i>',
+                            "func": () => { }
+                        },
+                        {
+                            "title": translate("app.worlds.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "func": () => { }
                         }
-                    },
-                    {
-                        "title": translate("app.worlds.share"),
-                        "icon": '<i class="fa-solid fa-share"></i>',
-                        "func": () => { }
-                    },
-                    {
-                        "title": translate("app.worlds.delete"),
-                        "icon": '<i class="fa-solid fa-trash-can"></i>',
-                        "danger": true,
-                        "func": () => { }
-                    }
-                ])
-            }
-        });
+                    ])
+                }
+            });
     }
 
     let contentListWrap = document.createElement("div");
@@ -1211,12 +1293,14 @@ function setInstanceTabContentWorlds(instanceInfo, element) {
         "secondary_column_name": "",
         "refresh": {
             "enabled": true,
-            "func": () => { }
+            "func": () => {
+                setInstanceTabContentWorlds(instanceInfo, element);
+            }
         },
         "update_all": {
             "enabled": false
         }
-    });
+    }, dropdownInfo);
     element.appendChild(contentListWrap);
 }
 function setInstanceTabContentLogs(instanceInfo, element) {
@@ -1234,19 +1318,34 @@ function filterContent() {
 
 }
 
-async function playInstance(instInfo) {
+async function playInstance(instInfo, quickPlay = null) {
     // loader,version,loaderVersion,instance_id,player_info
-    let pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player);
+    let pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player, quickPlay);
     if (!pid) return;
     for (let i = 0; i < data.instances.length; i++) {
         if (data.instances[i].instance_id == instInfo.instance_id) {
-            data.instances[i].pid = pid.pid;
-            data.instances[i].current_log_file = pid.log;
-            data.instances[i].java_path = pid.java_path;
-            data.instances[i].java_version = pid.java_version;
+            data.instances[i].pid = pid.minecraft.pid;
+            data.instances[i].current_log_file = pid.minecraft.log;
+            data.instances[i].java_path = pid.minecraft.java_path;
+            data.instances[i].java_version = pid.minecraft.java_version;
+        }
+    }
+    data.profile_info.default_player = pid.player_info;
+    if (data.profile_info.players) {
+        for (let i = 0; i < data.profile_info.players.length; i++) {
+            if (pid.player_info.uuid == data.profile_info.players[i].uuid) {
+                data.profile_info.players[i] = pid.player_info;
+            }
         }
     }
     saveData();
+}
+
+async function playSingleplayerWorld(instInfo, world_id) {
+    await playInstance(instInfo, { "type": "singleplayer", "info": world_id });
+}
+async function playMultiplayerWorld(instInfo, world_id) {
+    await playInstance(instInfo, { "type": "multiplayer", "info": world_id });
 }
 
 async function stopInstance(instInfo) {
@@ -1259,16 +1358,16 @@ function formatTime(secs) {
     let minutes = Math.floor(secs / 60);
     secs = secs % 60;
     let seconds = secs;
-    let hoursString = translate("app.duration.hours").replace("%s",hours);
-    let minutesString = translate("app.duration.minutes").replace("%s",minutes);
-    let secondsString = translate("app.duration.seconds").replace("%s",seconds);
-    return translate("app.duration").replace("%h",hoursString).replace("%m",minutesString).replace("%s",secondsString);
+    let hoursString = translate("app.duration.hours").replace("%s", hours);
+    let minutesString = translate("app.duration.minutes").replace("%s", minutes);
+    let secondsString = translate("app.duration.seconds").replace("%s", seconds);
+    return translate("app.duration").replace("%h", hoursString).replace("%m", minutesString).replace("%s", secondsString);
 }
 
 function formatDate(dateString) {
     let months = [translate("app.date.jan"), translate("app.date.feb"), translate("app.date.mar"), translate("app.date.apr"), translate("app.date.may"), translate("app.date.jun"), translate("app.date.jul"), translate("app.date.aug"), translate("app.date.sep"), translate("app.date.oct"), translate("app.date.nov"), translate("app.date.dec")];
     let date = new Date(dateString);
-    return translate("app.date").replace("%m",months[date.getMonth()]).replace("%d",date.getDate()).replace("%y",date.getFullYear());
+    return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
 }
 
 function showWorldContent(e) {
@@ -1302,6 +1401,13 @@ function getInstanceWorlds(instanceInfo) {
     return window.electronAPI.getSinglePlayerWorlds(instanceInfo.instance_id);
 }
 
+async function getInstanceWorldsMulti(instanceInfo) {
+    return await window.electronAPI.getMultiplayerWorlds(instanceInfo.instance_id);
+}
+
+function getInstanceContent(instanceInfo) {
+    return window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id,instanceInfo.content);
+}
 
 function translate(key) {
     if (!lang) {
@@ -1313,3 +1419,58 @@ function translate(key) {
 loadFile();
 
 let accountSwitcher = new MinecraftAccountSwitcher(playerSwitch, data.profile_info);
+
+const colorCodes = {
+    '0': 'mc-black',
+    '1': 'mc-dark_blue',
+    '2': 'mc-dark_green',
+    '3': 'mc-dark_aqua',
+    '4': 'mc-dark_red',
+    '5': 'mc-dark_purple',
+    '6': 'mc-gold',
+    '7': 'mc-gray',
+    '8': 'mc-dark_gray',
+    '9': 'mc-blue',
+    'a': 'mc-green',
+    'b': 'mc-aqua',
+    'c': 'mc-red',
+    'd': 'mc-light_purple',
+    'e': 'mc-yellow',
+    'f': 'mc-white',
+};
+
+const formatCodes = {
+    'l': 'mc-bold',
+    'm': 'mc-strikethrough',
+    'n': 'mc-underline',
+    'o': 'mc-italic',
+    'k': 'mc-obfuscated',
+};
+
+function parseMinecraftFormatting(text) {
+    let result = '';
+    let currentClasses = [];
+    let i = 0;
+
+    while (i < text.length) {
+        if (text[i] === '§' && i + 1 < text.length) {
+            const code = text[i + 1].toLowerCase();
+            i += 2;
+
+            if (colorCodes[code]) {
+                currentClasses = [colorCodes[code]];
+            } else if (formatCodes[code]) {
+                currentClasses.push(formatCodes[code]);
+            } else if (code === 'r') {
+                currentClasses = [];
+            }
+            continue;
+        }
+
+        const span = `<span class="${currentClasses.join(' ')}">${text[i]}</span>`;
+        result += span;
+        i++;
+    }
+
+    return result;
+}

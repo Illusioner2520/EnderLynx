@@ -153,8 +153,14 @@ class Minecraft {
                     } else if (customResolution?.width && customResolution?.height && e.rules[0].features.has_custom_resolution) {
                         extraArgs = extraArgs.concat(["--width", customResolution.width, "--height", customResolution.height]);
                         return "";
-                    } else {
-                        // SUPPORT quick play here
+                    } else if (quickPlay?.type == "singleplayer" && quickPlay?.info && e.rules[0].features.is_quick_play_singleplayer) {
+                        extraArgs = extraArgs.concat(["--quickPlaySingleplayer",quickPlay.info]);
+                        return "";
+                    } else if (quickPlay?.type == "multiplayer" && quickPlay?.info && e.rules[0].features.is_quick_play_multiplayer) {
+                        extraArgs = extraArgs.concat(["--quickPlayMultiplayer",quickPlay.info]);
+                        return "";
+                    } else if (quickPlay?.type == "realms" && quickPlay?.info && e.rules[0].features.is_quick_play_realms) {
+                        extraArgs = extraArgs.concat(["--quickPlayRealms",quickPlay.info]);
                         return "";
                     }
                 } else {

@@ -5,6 +5,9 @@ const { Minecraft, Java, Fabric } = require('./launch.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
+const { Auth } = require('msmc');
+const AdmZip = require('adm-zip');
+const https = require('https');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => {
@@ -23,14 +26,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info) => {
+    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay) => {
+        let date = new Date();
+        date.setHours(date.getHours() - 1);
+        if (new Date(player_info.expires) < date) {
+            player_info = getNewAccessToken(player_info.refresh_token);
+        }
         let mc = new Minecraft(instance_id);
         try {
-            return await mc.launchGame(loader, version, loaderVersion, player_info.name, player_info.uuid, {
-                "accessToken": "eyJraWQiOiIwNDkxODEiLCJhbGciOiJSUzI1NiJ9.eyJ4dWlkIjoiMjUzNTQzMTQxMjU4Mzg5NSIsImFnZyI6IlRlZW4iLCJzdWIiOiIzZGMzMGNmNy04M2YzLTRhMjgtOTE4ZS03NTI5YWYzMjgxNjkiLCJhdXRoIjoiWEJPWCIsIm5zIjoiZGVmYXVsdCIsInJvbGVzIjpbXSwiaXNzIjoiYXV0aGVudGljYXRpb24iLCJmbGFncyI6WyJtc2FtaWdyYXRpb25fc3RhZ2U0Iiwib3JkZXJzXzIwMjIiLCJtdWx0aXBsYXllciIsInR3b2ZhY3RvcmF1dGgiXSwicHJvZmlsZXMiOnsibWMiOiI4NGQ3NDkwNS0wZGQyLTRiNzUtYjIxNi00NDZjYjU5NjU4ZDkifSwicGxhdGZvcm0iOiJPTkVTVE9SRSIsInl1aWQiOiJmY2ZhMjkzYTY4NDRhYWFjNzkyMDNmOWFlZjZmNWIwMCIsInBmZCI6W3sidHlwZSI6Im1jIiwiaWQiOiI4NGQ3NDkwNS0wZGQyLTRiNzUtYjIxNi00NDZjYjU5NjU4ZDkiLCJuYW1lIjoiSWxsdXNpb25lcjI1MjAifV0sIm5iZiI6MTc0OTUwNTg2NCwiZXhwIjoxNzQ5NTkyMjY0LCJpYXQiOjE3NDk1MDU4NjR9.UmzVb2VCUsn2MBeCVFjQ8ltKfv46KIL2kzuIXYIHml1fz3d5D4YIu9uV06ul_lmUi7lj3X6j2pNfLSZntm6wvaC_heXkbwtfj4g3Nzy6LJQpnqAQWzoP5SCWQFU77-aj67CCKYpG5nyeeWuGWK_mn8Q6z3RS_1ssL7-6pEi82pa4_F4dUxjRSqLEgA9NtbDaWjORML5YdiXC-MvTwTqRyLAxdtJQRx8qRGzV9BznH3HIobIYbeJ05c7A5kVQ4FdZnY7uwCwglBL19kx00qQz2WKDfdNHgYLYyzC2CG0IHA5X6c4I-ma4OhXw1Jf-GSg9y99cHUuPpyB8VKDukiqqGA",
-                "xuid": "2535431412583895",
-                "clientId": "MzkyYWY5ODItMzI0OS00YzY3LWE1NTQtYmQ2YzExZTdhNjVj"
-            }, null, null, false);
+            return {
+                "minecraft": await mc.launchGame(loader, version, loaderVersion, player_info.name, player_info.uuid, {
+                    "accessToken": player_info.access_token,
+                    "xuid": player_info.xuid,
+                    "clientId": player_info.client_id
+                }, null, quickPlay, false), "player_info": player_info
+            };
         } catch (err) {
             console.error(err);
             return false;
@@ -90,13 +100,67 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     last_played: Number(levelData.LastPlayed.value),
                     icon: fs.existsSync(path.resolve(patha, dir.name, "icon.png"))
                         ? `minecraft/instances/${instance_id}/saves/${dir.name}/icon.png`
-                        : null
+                        : null,
+                    mode: (() => {
+                        const modeId = levelData.GameType?.value ?? 0;
+                        switch (modeId) {
+                            case 0: return "survival";
+                            case 1: return "creative";
+                            case 2: return "adventure";
+                            case 3: return "spectator";
+                            default: return "unknown";
+                        }
+                    })(),
+                    hardcore: !!levelData.hardcore?.value,
+                    commands: !!levelData.allowCommands?.value,
+                    difficulty: (() => {
+                        const diffId = levelData.Difficulty?.value ?? 2;
+                        switch (diffId) {
+                            case 0: return "peaceful";
+                            case 1: return "easy";
+                            case 2: return "normal";
+                            case 3: return "hard";
+                            default: return "unknown";
+                        }
+                    })()
                 });
             } catch (e) {
                 console.error(`Failed to parse level.dat for world ${dir.name}:`, e);
             }
         }
         worldDirs.closeSync();
+        return worlds;
+    },
+    getMultiplayerWorlds: async (instance_id) => {
+        let patha = `./minecraft/instances/${instance_id}`;
+        fs.mkdirSync(patha, { recursive: true });
+        let serversDatPath = path.resolve(patha, 'servers.dat');
+        let worlds = [];
+
+        if (!fs.existsSync(serversDatPath)) {
+            return worlds;
+        }
+
+        try {
+            const buffer = fs.readFileSync(serversDatPath);
+            const data = await nbt.parse(buffer);
+            console.log(data);
+            const servers = data.parsed?.value?.servers?.value?.value || [];
+
+            for (const server of servers) {
+                worlds.push({
+                    name: server.name?.value || "Unknown",
+                    ip: server.ip?.value || "",
+                    icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
+                    acceptTextures: server.acceptTextures?.value ?? false,
+                    hideAddress: server.hideAddress?.value ?? false,
+                    last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null
+                });
+            }
+        } catch (e) {
+            console.error(`Failed to parse servers.dat:`, e);
+        }
+
         return worlds;
     },
     openFolder: (folderPath) => {
@@ -121,5 +185,180 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 console.error(`Error opening folder: ${error}`);
             }
         });
+    },
+    triggerMicrosoftLogin: async () => {
+        let date = new Date();
+        date.setHours(date.getHours() + 1);
+        const authManager = new Auth("select_account");
+        const xboxManager = await authManager.launch("raw");
+        const token = await xboxManager.getMinecraft();
+        return {
+            "access_token": token.mcToken,
+            "uuid": token.profile.id,
+            "refresh_token": token.parent.msToken.refresh_token,
+            "capes": token.profile.capes,
+            "skins": token.profile.skins,
+            "name": token.profile.name,
+            "is_demo": token.profile.demo,
+            "xuid": token.xuid,
+            "client_id": getUUID(),
+            "expires": date.toString()
+        }
+    },
+    getNewAccessToken: async (refresh_token) => {
+        let date = new Date();
+        date.setHours(date.getHours() + 1);
+        const authManager = new Auth("select_account");
+        const xboxManager = await authManager.refresh(refresh_token);
+        const token = await xboxManager.getMinecraft();
+        return {
+            "access_token": token.mcToken,
+            "uuid": token.profile.id,
+            "refresh_token": token.parent.msToken.refresh_token,
+            "capes": token.profile.capes,
+            "skins": token.profile.skins,
+            "name": token.profile.name,
+            "is_demo": token.profile.demo,
+            "xuid": token.xuid,
+            "client_id": getUUID(),
+            "expires": date.toString()
+        }
+    },
+    getInstanceContent: (loader, instance_id, old_content) => {
+        let old_files = old_content.map((e) => e.file_name);
+        let patha = `./minecraft/instances/${instance_id}/mods`;
+        let pathb = `./minecraft/instances/${instance_id}/resourcepacks`;
+        let pathc = `./minecraft/instances/${instance_id}/shaderpacks`;
+        fs.mkdirSync(patha, { recursive: true });
+        fs.mkdirSync(pathb, { recursive: true });
+        fs.mkdirSync(pathc, { recursive: true });
+        let mods = [];
+        if (loader != "vanilla") mods = fs.readdirSync(patha).map(file => {
+            if (old_files.includes(file)) return null;
+            const filePath = path.resolve(patha, file);
+            if (path.extname(file).toLowerCase() !== '.jar' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".jar.disabled"))) {
+                return null;
+            }
+            let fabricModJson = null;
+            try {
+                const zip = fs.readFileSync(filePath);
+
+                const admZip = new AdmZip(zip);
+                const entry = admZip.getEntry('fabric.mod.json');
+                if (entry) {
+                    fabricModJson = JSON.parse(entry.getData().toString('utf-8'));
+                    if (fabricModJson.icon) {
+                        let iconPath = Array.isArray(fabricModJson.icon) ? fabricModJson.icon[0] : fabricModJson.icon;
+                        const iconEntry = admZip.getEntry(iconPath);
+                        if (iconEntry) {
+                            const iconBuffer = iconEntry.getData();
+                            let mime = 'image/png';
+                            if (iconPath.endsWith('.jpg') || iconPath.endsWith('.jpeg')) mime = 'image/jpeg';
+                            else if (iconPath.endsWith('.gif')) mime = 'image/gif';
+                            fabricModJson.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
+                        }
+                    }
+                }
+            } catch (e) { }
+            return {
+                type: 'mod',
+                name: fabricModJson?.name ?? file.replace(".jar.disabled", ".jar"),
+                source: "player_install",
+                file_name: file,
+                version: fabricModJson?.version ?? "",
+                disabled: file.includes(".jar.disabled"),
+                author: fabricModJson?.authors && fabricModJson?.authors[0] ? (fabricModJson?.authors[0]?.name ? fabricModJson.authors[0].name : fabricModJson.authors[0]) : "",
+                image: fabricModJson?.icon ?? ""
+            };
+        }).filter(Boolean);
+        const resourcepacks = fs.readdirSync(pathb).map(file => {
+            if (old_files.includes(file)) return null;
+            const filePath = path.resolve(pathb, file);
+            if (path.extname(file).toLowerCase() !== '.zip' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".zip.disabled"))) {
+                return null;
+            }
+            let packMcMeta = null;
+            try {
+                const zip = fs.readFileSync(filePath);
+
+                const admZip = new AdmZip(zip);
+                const entry = admZip.getEntry('pack.mcmeta');
+                if (entry) {
+                    packMcMeta = JSON.parse(entry.getData().toString('utf-8'));
+                }
+                const iconEntry = admZip.getEntry("pack.png");
+                if (iconEntry) {
+                    const iconBuffer = iconEntry.getData();
+                    let mime = 'image/png';
+                    packMcMeta.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
+                }
+            } catch (e) { }
+            return {
+                type: 'resource_pack',
+                name: packMcMeta?.pack?.description ?? file.replace(".zip.disabled", ".zip"),
+                source: "player_install",
+                file_name: file,
+                version: "",
+                disabled: file.includes(".zip.disabled"),
+                author: "",
+                image: packMcMeta?.icon ?? ""
+            };
+        });
+        let shaderpacks = [];
+        if (loader != "vanilla") shaderpacks = fs.readdirSync(pathc).map(file => {
+            if (old_files.includes(file)) return null;
+            const filePath = path.resolve(pathc, file);
+            if (path.extname(file).toLowerCase() !== '.zip' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".zip.disabled"))) {
+                return null;
+            }
+            return {
+                type: 'shader',
+                name: file.replace(".zip.disabled", ".zip"),
+                source: "player_install",
+                file_name: file,
+                version: "",
+                disabled: file.includes(".zip.disabled"),
+                author: "",
+                image: ""
+            };
+        });
+        return [...mods, ...resourcepacks, ...shaderpacks].filter(e => e);
+    },
+    downloadVanillaTweaks: (packs, version) => {
+        let h = JSON.stringify({
+            "packs": "{\"aesthetic\":[\"AnimatedCampfireItem\",\"HDShieldBanners\"],\"terrain\":[\"ShorterTallGrass\",\"ShorterGrass\",\"BetterBedrock\"],\"variation\":[\"VariatedBookshelves\",\"VariatedUnpolishedStones\",\"VariatedTerracotta\",\"VariatedStone\",\"VariatedPlanks\",\"VariatedLogs\",\"VariatedMushroomBlocks\",\"VariatedNylium\",\"VariatedEndStone\",\"VariatedGravel\",\"VariatedMycelium\",\"RandomMossRotation\",\"VariatedCobblestone\",\"VariatedGrass\",\"RandomCoarseDirtRotation\"],\"utility\":[\"NoteblockBanners\",\"VisualComposterStages\",\"VisualCauldronStages\",\"VisualHoney\",\"BrewingGuide\",\"CompassLodestone\",\"GroovyLevers\",\"RedstonePowerLevels\",\"BetterObservers\",\"DirectionalDispensersDroppers\",\"DirectionalHoppers\",\"StickyPistonSides\",\"MusicDiscRedstonePreview\",\"HungerPreview\",\"Age25Kelp\",\"DifferentStems\",\"FullAgeAmethystMarker\",\"FullAgeCropMarker\",\"VisualWaxedCopperItems\",\"VisualInfestedStoneItems\",\"BuddingAmethystBorders\",\"SuspiciousSandGravelBorders\",\"OreBorders\",\"UniqueAxolotlBuckets\",\"UniquePaintingItems\"],\"unobtrusive\":[\"NoPumpkinOverlay\",\"LowerFire\",\"LowerShield\",\"CleanTintedGlass\",\"CleanStainedGlass\",\"CleanGlass\"],\"gui\":[\"RainbowExperience\",\"NumberedHotbar\",\"DarkUI\"],\"gui.hearts\":[\"ColoredHeartsOrange\"],\"gui.hotbar-selector\":[\"ColoredHotbarSelOrange\"],\"gui.widgets\":[\"ColoredWidgetsGray\"],\"fun\":[\"WhatSpyglassMeme\",\"GreenAxolotl\",\"SmileyAxolotls\"],\"world-of-color\":[\"UniqueDyes\"],\"fixes-and-consistency\":[\"HoeFix\",\"IronBarsFix\",\"ProperBreakParticles\",\"SlimeParticleFix\",\"DripleafFixBig\",\"CactusBottomFix\",\"ConsistentDecorPot\"]}",
+            "version": "1.21"
+        });
+        
+        const options = {
+            hostname: 'vanillatweaks.net',
+            path: '/assets/server/zipresourcepacks.php',
+            method: 'POST'
+        };
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            res.on('end', () => {
+                console.log('Response:', data);
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error('Error:', error);
+        });
+
+        req.write(h);
+        req.end();
     }
 });
+
+function getUUID() {
+    var result = "";
+    for (var i = 0; i <= 4; i++) {
+        result += (Math.floor(Math.random() * 16777216) + 1048576).toString(16);
+        if (i < 4) result += "-";
+    }
+    return result;
+}

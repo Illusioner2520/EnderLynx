@@ -171,7 +171,7 @@ body {
     gap: 8px;
     overflow-y: hidden;
     position-anchor: --player-switch;
-    position: absolute;
+    position: fixed;
     top: calc(anchor(bottom) + 10px);
     left: anchor(left);
     border-radius: 10px;
@@ -261,7 +261,7 @@ body {
     background-color: #d93e5d90;
 }
 
-.context-menu-button.danger:hover > i {
+.context-menu-button.danger:hover>i {
     color: white;
 }
 
@@ -463,7 +463,7 @@ h1 {
 }
 
 .instance-item.running {
-    background-color:#0078d4;
+    background-color: #0078d4;
 }
 
 .instance-item:active {
@@ -482,6 +482,7 @@ h1 {
     height: 40px;
     border-radius: 5px;
     width: 40px;
+    image-rendering: pixelated;
 }
 
 .instance-name {
@@ -690,6 +691,7 @@ h1 {
     height: 100px;
     width: 100px;
     border-radius: 12.5px;
+    image-rendering: pixelated;
 }
 
 .instance-top-info {
@@ -1098,7 +1100,7 @@ i {
     transition: left .125s;
 }
 
-.content-list-item:has(.content-list-toggle:not(.toggled)) > * {
+.content-list-item:has(.content-list-toggle:not(.toggled))>* {
     opacity: .3;
 }
 
@@ -1124,4 +1126,98 @@ i {
 
 .player_install {
     --accent-color: #666;
+}
+
+.mc-black {
+    color: #000000;
+}
+
+.mc-dark_blue {
+    color: #0000AA;
+}
+
+.mc-dark_green {
+    color: #00AA00;
+}
+
+.mc-dark_aqua {
+    color: #00AAAA;
+}
+
+.mc-dark_red {
+    color: #AA0000;
+}
+
+.mc-dark_purple {
+    color: #AA00AA;
+}
+
+.mc-gold {
+    color: #FFAA00;
+}
+
+.mc-gray {
+    color: #AAAAAA;
+}
+
+.mc-dark_gray {
+    color: #555555;
+}
+
+.mc-blue {
+    color: #5555FF;
+}
+
+.mc-green {
+    color: #55FF55;
+}
+
+.mc-aqua {
+    color: #55FFFF;
+}
+
+.mc-red {
+    color: #FF5555;
+}
+
+.mc-light_purple {
+    color: #FF55FF;
+}
+
+.mc-yellow {
+    color: #FFFF55;
+}
+
+.mc-white {
+    color: #FFFFFF;
+}
+
+.mc-bold {
+    font-weight: bold;
+}
+
+.mc-italic {
+    font-style: italic;
+}
+
+.mc-underline {
+    text-decoration: underline;
+}
+
+.mc-strikethrough {
+    text-decoration: line-through;
+}
+
+.mc-obfuscated {
+    animation: obfuscate 0.1s infinite steps(1);
+}
+
+@keyframes obfuscate {
+    from {
+        visibility: hidden;
+    }
+
+    to {
+        visibility: visible;
+    }
 }
