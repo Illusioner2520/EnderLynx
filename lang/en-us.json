@@ -43,6 +43,7 @@
     "app.instances.tabs.worlds": "Worlds",
     "app.instances.tabs.logs": "Logs",
     "app.instances.tabs.options": "Options",
+    "app.instances.no_running": "No Instance Running",
     "app.button.content.type": "Content type",
     "app.content.all": "All",
     "app.content.mods": "Mods",

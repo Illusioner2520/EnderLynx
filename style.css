@@ -1221,3 +1221,70 @@ i {
         visibility: visible;
     }
 }
+
+.live {
+    display: flex;
+    border-style: solid;
+    border-width: 1px;
+    border-color: #ffffff20;
+    align-items: center;
+    height: 30px;
+    border-radius: 8px;
+    margin-top: auto;
+}
+
+.live-name {
+    flex-grow: 1;
+    font-size: 1rem;
+    color: white;
+    margin-right: 8px;
+}
+
+.live-stop {
+    display: grid;
+    height: 28px;
+    width: 28px;
+    cursor: pointer;
+    place-items: center;
+    transition: background-color .25s;
+    color: #d93e5d;
+    border-radius: 8px;
+}
+
+.live-stop:hover {
+    background-color: #ffffff20;
+}
+
+.live-log {
+    display: grid;
+    height: 28px;
+    width: 28px;
+    cursor: pointer;
+    place-items: center;
+    transition: background-color .25s;
+    border-radius: 8px;
+}
+
+.live-log:hover {
+    background-color: #ffffff20;
+}
+
+.live:not(.minecraft-live) .live-stop {
+    display: none;
+}
+
+.live:not(.minecraft-live) .live-log {
+    display: none;
+}
+
+.live-indicator {
+    width: 10px;
+    height: 10px;
+    background-color: #aaa;
+    border-radius: 50%;
+    margin: 10px;
+}
+
+.live.minecraft-live .live-indicator {
+    background-color: #22ff84;
+}

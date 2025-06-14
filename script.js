@@ -172,6 +172,37 @@ class PageContent {
     }
 }
 
+class LiveMinecraft {
+    constructor(element) {
+        this.element = element;
+        element.className = "live";
+        let indicator = document.createElement("div");
+        indicator.className = "live-indicator";
+        let name = document.createElement("div");
+        name.className = "live-name";
+        name.innerHTML = translate("app.instances.no_running");
+        this.nameElement = name;
+        let stopButton = document.createElement("div");
+        stopButton.className = "live-stop";
+        stopButton.innerHTML = '<i class="fa-regular fa-circle-stop"></i>';
+        let logButton = document.createElement("div");
+        logButton.className = "live-log";
+        logButton.innerHTML = '<i class="fa-solid fa-terminal"></i>';
+        element.appendChild(indicator);
+        element.appendChild(name);
+        element.appendChild(stopButton);
+        element.appendChild(logButton);
+    }
+    setLive(instanceInfo) {
+        this.nameElement.innerHTML = instanceInfo.name;
+        this.element.classList.add("minecraft-live");
+    }
+    removeLive() {
+        this.nameElement.innerHTML = translate("app.instances.no_running");
+        this.element.classList.remove("minecraft-live");
+    }
+}
+
 class TabContent {
     constructor(element, options) {
         this.element = element;
@@ -1074,9 +1105,11 @@ function setInstanceTabContentContent(instanceInfo, element) {
     let contentListWrap = document.createElement("div");
     let old_file_names = instanceInfo.content.map((e) => e.file_name);
     let newContent = getInstanceContent(instanceInfo);
-    newContent = newContent.filter((e) => !old_file_names.includes(e.file_name));
-    instanceInfo.content = instanceInfo.content.concat(newContent);
+    let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
+    instanceInfo.content = instanceInfo.content.concat(newContentAdd);
     saveData();
+    let deleteContent = newContent.deleteContent;
+    instanceInfo.content = instanceInfo.content.filter(e => !deleteContent.includes(e.file_name));
     let content = [];
     for (let i = 0; i < instanceInfo.content.length; i++) {
         let e = instanceInfo.content[i];
@@ -1474,3 +1507,5 @@ function parseMinecraftFormatting(text) {
 
     return result;
 }
+
+let live = new LiveMinecraft(liveMinecraft);

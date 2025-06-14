@@ -234,7 +234,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fs.mkdirSync(pathc, { recursive: true });
         let mods = [];
         if (loader != "vanilla") mods = fs.readdirSync(patha).map(file => {
-            if (old_files.includes(file)) return null;
+            if (old_files.includes(file)) {
+                old_files[old_files.indexOf(file)] = null;
+                return null;
+            }
             const filePath = path.resolve(patha, file);
             if (path.extname(file).toLowerCase() !== '.jar' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".jar.disabled"))) {
                 return null;
@@ -272,7 +275,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             };
         }).filter(Boolean);
         const resourcepacks = fs.readdirSync(pathb).map(file => {
-            if (old_files.includes(file)) return null;
+            if (old_files.includes(file)) {
+                old_files[old_files.indexOf(file)] = null;
+                return null;
+            }
             const filePath = path.resolve(pathb, file);
             if (path.extname(file).toLowerCase() !== '.zip' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".zip.disabled"))) {
                 return null;
@@ -306,7 +312,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         });
         let shaderpacks = [];
         if (loader != "vanilla") shaderpacks = fs.readdirSync(pathc).map(file => {
-            if (old_files.includes(file)) return null;
+            if (old_files.includes(file)) {
+                old_files[old_files.indexOf(file)] = null;
+                return null;
+            }
             const filePath = path.resolve(pathc, file);
             if (path.extname(file).toLowerCase() !== '.zip' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".zip.disabled"))) {
                 return null;
@@ -322,7 +331,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 image: ""
             };
         });
-        return [...mods, ...resourcepacks, ...shaderpacks].filter(e => e);
+        let deleteFromContent = old_files.filter(e => e);
+        return {
+            "newContent": [...mods, ...resourcepacks, ...shaderpacks].filter(e => e),
+            "deleteContent": deleteFromContent
+        }
     },
     downloadVanillaTweaks: (packs, version) => {
         let h = JSON.stringify({
