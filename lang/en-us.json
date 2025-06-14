@@ -10,6 +10,7 @@
     "app.page.home": "Home",
     "app.page.instances": "Instances",
     "app.page.discover": "Discover",
+    "app.page.my_account": "My Account",
     "app.instances.sort.by": "Sort By",
     "app.instances.sort.name": "Name",
     "app.instances.sort.last_played": "Last Played",

@@ -695,12 +695,14 @@ class ContentList {
 let homeContent = new PageContent(showHomeContent, translate("app.page.home"));
 let instanceContent = new PageContent(showInstanceContent, translate("app.page.instances"));
 let worldContent = new PageContent(showWorldContent, translate("app.page.discover"));
+let myAccountContent = new PageContent(showMyAccountContent, translate("app.page.my_account"));
 let contextmenu = new ContextMenu();
 let homeButton = new NavigationButton(homeButtonEle, translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeContent);
 let instanceButton = new NavigationButton(instanceButtonEle, translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instanceContent);
 let worldButton = new NavigationButton(worldButtonEle, translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', worldContent);
+let myAccountButton = new NavigationButton(myAccountButtonEle, translate("app.page.my_account"), '<i class="fa-solid fa-user"></i>', myAccountContent);
 
-let navButtons = [homeButton, instanceButton, worldButton];
+let navButtons = [homeButton, instanceButton, worldButton, myAccountButton];
 
 async function toggleMicrosoftSignIn() {
     let newData = await window.electronAPI.triggerMicrosoftLogin();
@@ -722,6 +724,12 @@ async function toggleMicrosoftSignIn() {
 function showHomeContent(e) {
     let ele = document.createElement("div");
     ele.innerHTML = translate("app.page.home");
+    return ele;
+}
+
+function showMyAccountContent(e) {
+    let ele = document.createElement("div");
+    ele.innerHTML = translate("app.page.my_account");
     return ele;
 }
 
