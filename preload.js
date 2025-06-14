@@ -1,13 +1,14 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { Minecraft, Java, Fabric } = require('./launch.js');
+const { Minecraft, Java, Fabric, urlToFile } = require('./launch.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
 const { Auth } = require('msmc');
 const AdmZip = require('adm-zip');
 const https = require('https');
+const querystring = require('querystring');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => {
@@ -337,33 +338,43 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "deleteContent": deleteFromContent
         }
     },
-    downloadVanillaTweaks: (packs, version) => {
-        let h = JSON.stringify({
-            "packs": "{\"aesthetic\":[\"AnimatedCampfireItem\",\"HDShieldBanners\"],\"terrain\":[\"ShorterTallGrass\",\"ShorterGrass\",\"BetterBedrock\"],\"variation\":[\"VariatedBookshelves\",\"VariatedUnpolishedStones\",\"VariatedTerracotta\",\"VariatedStone\",\"VariatedPlanks\",\"VariatedLogs\",\"VariatedMushroomBlocks\",\"VariatedNylium\",\"VariatedEndStone\",\"VariatedGravel\",\"VariatedMycelium\",\"RandomMossRotation\",\"VariatedCobblestone\",\"VariatedGrass\",\"RandomCoarseDirtRotation\"],\"utility\":[\"NoteblockBanners\",\"VisualComposterStages\",\"VisualCauldronStages\",\"VisualHoney\",\"BrewingGuide\",\"CompassLodestone\",\"GroovyLevers\",\"RedstonePowerLevels\",\"BetterObservers\",\"DirectionalDispensersDroppers\",\"DirectionalHoppers\",\"StickyPistonSides\",\"MusicDiscRedstonePreview\",\"HungerPreview\",\"Age25Kelp\",\"DifferentStems\",\"FullAgeAmethystMarker\",\"FullAgeCropMarker\",\"VisualWaxedCopperItems\",\"VisualInfestedStoneItems\",\"BuddingAmethystBorders\",\"SuspiciousSandGravelBorders\",\"OreBorders\",\"UniqueAxolotlBuckets\",\"UniquePaintingItems\"],\"unobtrusive\":[\"NoPumpkinOverlay\",\"LowerFire\",\"LowerShield\",\"CleanTintedGlass\",\"CleanStainedGlass\",\"CleanGlass\"],\"gui\":[\"RainbowExperience\",\"NumberedHotbar\",\"DarkUI\"],\"gui.hearts\":[\"ColoredHeartsOrange\"],\"gui.hotbar-selector\":[\"ColoredHotbarSelOrange\"],\"gui.widgets\":[\"ColoredWidgetsGray\"],\"fun\":[\"WhatSpyglassMeme\",\"GreenAxolotl\",\"SmileyAxolotls\"],\"world-of-color\":[\"UniqueDyes\"],\"fixes-and-consistency\":[\"HoeFix\",\"IronBarsFix\",\"ProperBreakParticles\",\"SlimeParticleFix\",\"DripleafFixBig\",\"CactusBottomFix\",\"ConsistentDecorPot\"]}",
+    downloadVanillaTweaks: async (packs, version) => {
+        let h = querystring.stringify({
+            "packs": '{"aesthetic":["AnimatedCampfireItem","HDShieldBanners"],"terrain":["ShorterTallGrass","ShorterGrass","BetterBedrock"],"variation":["VariatedBookshelves","VariatedUnpolishedStones","VariatedTerracotta","VariatedStone","VariatedPlanks","VariatedLogs","VariatedMushroomBlocks","VariatedNylium","VariatedEndStone","VariatedGravel","VariatedMycelium","RandomMossRotation","VariatedCobblestone","VariatedGrass","RandomCoarseDirtRotation"],"utility":["NoteblockBanners","VisualComposterStages","VisualCauldronStages","VisualHoney","BrewingGuide","CompassLodestone","GroovyLevers","RedstonePowerLevels","BetterObservers","DirectionalDispensersDroppers","DirectionalHoppers","StickyPistonSides","MusicDiscRedstonePreview","HungerPreview","Age25Kelp","DifferentStems","FullAgeAmethystMarker","FullAgeCropMarker","VisualWaxedCopperItems","VisualInfestedStoneItems","BuddingAmethystBorders","SuspiciousSandGravelBorders","OreBorders","UniqueAxolotlBuckets","UniquePaintingItems"],"unobtrusive":["NoPumpkinOverlay","LowerFire","LowerShield","CleanTintedGlass","CleanStainedGlass","CleanGlass"],"gui":["RainbowExperience","NumberedHotbar","DarkUI"],"gui.hearts":["ColoredHeartsOrange"],"gui.hotbar-selector":["ColoredHotbarSelOrange"],"gui.widgets":["ColoredWidgetsGray"],"fun":["WhatSpyglassMeme","GreenAxolotl","SmileyAxolotls"],"world-of-color":["UniqueDyes"],"fixes-and-consistency":["HoeFix","IronBarsFix","ProperBreakParticles","SlimeParticleFix","DripleafFixBig","CactusBottomFix","ConsistentDecorPot"]}',
             "version": "1.21"
         });
-        
+
         const options = {
             hostname: 'vanillatweaks.net',
             path: '/assets/server/zipresourcepacks.php',
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': h.length
+            }
         };
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
+        let data = await new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve(data);
+                });
             });
-            res.on('end', () => {
-                console.log('Response:', data);
+
+            req.on('error', (error) => {
+                reject(error);
             });
-        });
 
-        req.on('error', (error) => {
-            console.error('Error:', error);
+            req.write(h);
+            req.end();
         });
-
-        req.write(h);
-        req.end();
+        data = JSON.parse(data);
+        if (data.link) {
+            urlToFile("https://vanillatweaks.net" + data.link, "test.zip");
+        }
     }
 });
 

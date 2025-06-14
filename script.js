@@ -1413,7 +1413,7 @@ function formatDate(dateString) {
 
 function showWorldContent(e) {
     let ele = document.createElement("div");
-    ele.innerHTML = 'Worlds';
+    ele.innerHTML = 'Discover';
     return ele;
 }
 

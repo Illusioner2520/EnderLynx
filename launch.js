@@ -633,5 +633,6 @@ module.exports = {
     Fabric,
     Forge,
     Quilt,
-    NeoForge
+    NeoForge,
+    urlToFile
 }
