@@ -803,7 +803,7 @@ h1 {
 }
 
 .tab-list {
-    background-color: #ffffff20;
+    background-color: #292929;
     border-radius: 10000px;
     display: flex;
     padding: 4px;
@@ -1228,9 +1228,8 @@ i {
     border-width: 1px;
     border-color: #ffffff20;
     align-items: center;
-    height: 30px;
+    height: 40px;
     border-radius: 8px;
-    margin-top: auto;
 }
 
 .live-name {
@@ -1238,17 +1237,26 @@ i {
     font-size: 1rem;
     color: white;
     margin-right: 8px;
+    overflow: hidden;
+}
+
+.live-name > div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
 
 .live-stop {
     display: grid;
-    height: 28px;
-    width: 28px;
+    height: 38px;
+    width: 38px;
     cursor: pointer;
     place-items: center;
     transition: background-color .25s;
     color: #d93e5d;
     border-radius: 8px;
+    flex-shrink: 0;
 }
 
 .live-stop:hover {
@@ -1257,12 +1265,13 @@ i {
 
 .live-log {
     display: grid;
-    height: 28px;
-    width: 28px;
+    height: 38px;
+    width: 38px;
     cursor: pointer;
     place-items: center;
     transition: background-color .25s;
     border-radius: 8px;
+    flex-shrink: 0;
 }
 
 .live-log:hover {
@@ -1282,9 +1291,286 @@ i {
     height: 10px;
     background-color: #aaa;
     border-radius: 50%;
-    margin: 10px;
+    margin-inline: 10px;
+    margin-block: 15px;
+    transition: color .25s;
+    flex-shrink: 0;
 }
 
 .live.minecraft-live .live-indicator {
     background-color: #22ff84;
+}
+
+.download-log {
+    margin-top: auto;
+    display: flex;
+    flex-direction:column;
+    background-color: #222;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #333;
+    border-radius: 8px;
+    padding-inline: 8px;
+}
+
+.download-log:empty {
+    opacity: 0;
+}
+
+.download-item {
+    display: flex;
+    flex-direction:column;
+    gap: 8px;
+    padding-block: 8px;
+}
+
+.download-item:not(:last-child) {
+    border-bottom-style: solid;
+    border-color: #333;
+    border-width: 1px;
+}
+
+.download-title {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.download-desc {
+    font-size: 1rem;
+}
+
+.download-progress {
+    background-color: #aaa;
+    border-radius: 100px;
+    height: 12px;
+    width: 100%;
+    position: relative;
+}
+
+.download-progress::after {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: var(--percent);
+    background-color:#0078d4;
+    transition: width .1s;
+    content: "";
+    border-radius: 100px;
+}
+
+.logs {
+    display: grid;
+}
+
+.logs-copy {
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    margin-left: auto;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    align-self: stretch;
+}
+
+.logs-copy:active {
+    scale: .95;
+}
+
+.logs-copy:hover {
+    background-color: #ffffff20;
+}
+
+.logs-share {
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    margin-left: auto;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    align-self: stretch;
+    color: color-mix(in srgb, #0078d4, white);
+}
+
+.logs-share:active {
+    scale: .95;
+}
+
+.logs-share:hover {
+    background-color: #ffffff20;
+}
+
+.logs-delete {
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    margin-left: auto;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    align-self: stretch;
+    color: color-mix(in srgb, #d93e5d, white);
+}
+
+.logs-delete:active {
+    scale: .95;
+}
+
+.logs-delete:hover {
+    background-color: #ffffff20;
+}
+
+.logs-top {
+    display: flex;
+    align-items:center;
+    gap: 10px;
+    padding: 10px;
+}
+
+.logs-display {
+    font-family: monospace;
+}
+
+dialog {
+  border: 0;
+  padding: 0;
+  display: none;
+  opacity: 0;
+  translate: 0 25vh;
+  transition-property: overlay display opacity;
+  transition-duration: .5s;
+  transition-behavior: allow-discrete;
+}
+
+dialog[open] {
+  display: block;
+  opacity: 1;
+  translate: 0 0;
+
+  @starting-style {
+    opacity: 0;
+    translate: 0 -25vh;
+  }
+}
+
+dialog::backdrop {
+  background-color: #00000088;
+  transition-property: overlay display opacity;
+  transition-duration: .5s;
+  transition-behavior: allow-discrete;
+  opacity: 0;
+  backdrop-filter: blur(0px);
+}
+
+dialog[open]::backdrop {
+  opacity: 1;
+  backdrop-filter: blur(5px);
+
+  @starting-style {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+.dialog-top {
+    height: 60px;
+    display: flex;
+    padding: 10px;
+    align-items:center;
+    border-bottom-style: solid;
+    border-width: 1px;
+    border-color: #444444;
+}
+
+.dialog-title {
+    font-weight: bold;
+    font-size: 1.4rem;
+    margin-right: 10px;
+}
+
+.dialog-x {
+    height: 40px;
+    width: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items:center;
+    justify-content:center;
+    color: white;
+    font-size: 1.2rem;
+    border-radius: 5px;
+    transition: background-color .25s, scale .1s;
+    margin-left: auto;
+}
+
+.dialog-x:hover {
+    background-color: #ffffff20;
+}
+
+.dialog-x:active {
+    scale: .95;
+}
+
+.dialog {
+    border-radius: 10px;
+    background-color: #ffffff10;
+    backdrop-filter: blur(15px);
+    border-color: #444444;
+    border-width: 1px;
+    border-style: solid;
+    min-width: 400px;
+}
+
+.dialog-content {
+    padding: 10px;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    border-top-style: solid;
+    border-width: 1px;
+    border-color: #444;
+}
+
+.dialog-button {
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 10px;
+    background-color: white;
+    color: black;
+    transition: background-color .25s, scale .1s;
+    font-size: 1rem;
+}
+
+.dialog-button:first-child {
+    margin-left: auto;
+}
+
+.dialog-button:active {
+    scale: .95;
+}
+
+.dialog-button:hover {
+    background-color: #ddd;
+}
+
+.dialog-button.confirm {
+    background-color: #0078d4;
+    color: white;
+}
+
+.dialog-button.confirm:hover {
+    background-color: color-mix(in srgb, 85% #0078d4, white);
 }

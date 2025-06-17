@@ -180,8 +180,10 @@ class LiveMinecraft {
         indicator.className = "live-indicator";
         let name = document.createElement("div");
         name.className = "live-name";
-        name.innerHTML = translate("app.instances.no_running");
-        this.nameElement = name;
+        let innerName = document.createElement("div");
+        innerName.innerHTML = translate("app.instances.no_running");
+        name.appendChild(innerName);
+        this.nameElement = innerName;
         let stopButton = document.createElement("div");
         stopButton.className = "live-stop";
         stopButton.innerHTML = '<i class="fa-regular fa-circle-stop"></i>';
@@ -1345,7 +1347,19 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     element.appendChild(contentListWrap);
 }
 function setInstanceTabContentLogs(instanceInfo, element) {
+    let searchAndFilter = document.createElement("div");
+    searchAndFilter.classList.add("search-and-filter-v2");
+    let contentSearch = document.createElement("div");
+    contentSearch.style.flexGrow = 2;
+    let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
+    let typeDropdown = document.createElement("div");
+    let log_info = window.electronAPI.getInstanceLogs(instanceInfo.instance_id);
+    let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": "Live Log", "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", filterContent);
+    typeDropdown.style.minWidth = "300px";
+    searchAndFilter.appendChild(contentSearch);
+    searchAndFilter.appendChild(typeDropdown);
     element.innerHTML = "";
+    element.appendChild(searchAndFilter);
 }
 function setInstanceTabContentOptions(instanceInfo, element) {
     element.innerHTML = "";
@@ -1411,6 +1425,22 @@ function formatDate(dateString) {
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
 }
 
+function formatDateAndTime(dateString) {
+    let date = new Date(dateString);
+    let minutes = date.getMinutes().toString();
+    if (minutes.length == 1) minutes = "0" + minutes;
+    let seconds = date.getSeconds().toString();
+    if (seconds.length == 1) seconds = "0" + seconds;
+    let amorpm = "am";
+    if (date.getHours() >= 12) {
+        amorpm = "pm";
+    }
+    let hours = date.getHours();
+    hours %= 12;
+    if (hours == 0) hours = 12;
+    return translate("app.date_time").replace("%date", formatDate(dateString)).replace("%h", hours).replace("%m", minutes).replace("%s", seconds).replace("%amorpm", amorpm);
+}
+
 function showWorldContent(e) {
     let ele = document.createElement("div");
     ele.innerHTML = 'Discover';
@@ -1447,7 +1477,7 @@ async function getInstanceWorldsMulti(instanceInfo) {
 }
 
 function getInstanceContent(instanceInfo) {
-    return window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id,instanceInfo.content);
+    return window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.content);
 }
 
 function translate(key) {
@@ -1517,3 +1547,151 @@ function parseMinecraftFormatting(text) {
 }
 
 let live = new LiveMinecraft(liveMinecraft);
+
+class DownloadLogEntry {
+    constructor(startingTitle, startingDescription, startingProgress) {
+        let element = document.createElement("div");
+        element.className = "download-item";
+        let title = document.createElement("div");
+        let progress = document.createElement("div");
+        let desc = document.createElement("div");
+        title.className = "download-title";
+        progress.className = "download-progress";
+        desc.className = "download-desc";
+        progress.style.setProperty("--percent", startingProgress + "%");
+        title.innerHTML = startingTitle;
+        desc.innerHTML = startingDescription;
+        element.appendChild(title);
+        element.appendChild(progress);
+        element.appendChild(desc);
+        this.titleEle = title;
+        this.descEle = desc;
+        this.progressEle = progress;
+        this.ele = element;
+        this.title = startingTitle;
+        this.progress = startingProgress;
+    }
+
+    get getTitle() {
+        return this.title;
+    }
+
+    get getProgress() {
+        return this.progress;
+    }
+
+    setDesc(desc) {
+        this.descEle.innerHTML = desc;
+    }
+
+    setProgress(progress) {
+        this.progressEle.style.setProperty("--percent", progress + "%");
+        this.progress = progress;
+    }
+
+    remove() {
+        this.ele.remove();
+    }
+}
+
+class DownloadLog {
+    constructor(element) {
+        element.className = "download-log";
+        this.logs = [];
+        this.element = element;
+    }
+
+    setData(info) {
+        info: for (let i = 0; i < info.length; i++) {
+            logs: for (let j = 0; j < this.logs.length; j++) {
+                if (this.logs[j].getTitle == info[i].title) {
+                    this.logs[j].setDesc(info[i].desc);
+                    this.logs[j].setProgress(info[i].progress);
+                    continue info;
+                }
+            }
+            let log = new DownloadLogEntry(info[i].title, info[i].desc, info[i].progress);
+            this.logs.push(log);
+            this.element.appendChild(log.ele);
+        }
+
+        this.logs.forEach((e) => {
+            if (e.getProgress == 100) {
+                e.remove();
+            }
+        })
+        this.logs = this.logs.filter((e) => e.getProgress != 100);
+    }
+}
+
+let log = new DownloadLog(downloadLog);
+
+window.electronAPI.onProgressUpdate((a, b, c) => {
+    log.setData([
+        {
+            "title": a,
+            "progress": b,
+            "desc": c
+        }
+    ]);
+});
+
+class Dialog {
+    constructor() { }
+    showDialog(title, type, info, buttons) {
+        let element = document.createElement("dialog");
+        element.className = "dialog";
+        element.oncancel = (e) => {
+            setTimeout(() => {
+                this.element.remove();
+            }, 1000);
+        }
+        this.element = element;
+        let dialogTop = document.createElement("div");
+        dialogTop.className = "dialog-top";
+        let dialogTitle = document.createElement("div");
+        dialogTitle.className = "dialog-title";
+        dialogTitle.innerHTML = title;
+        let dialogX = document.createElement("button");
+        dialogX.className = "dialog-x";
+        dialogX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        dialogX.onclick = (e) => {
+            this.element.close();
+            setTimeout(() => {
+                this.element.remove();
+            }, 1000);
+        }
+        dialogTop.appendChild(dialogTitle);
+        dialogTop.appendChild(dialogX);
+        element.appendChild(dialogTop);
+        let dialogContent = document.createElement("div");
+        dialogContent.className = "dialog-content";
+        element.appendChild(dialogContent);
+        document.body.appendChild(element);
+        element.showModal();
+        if (type == "notice") {
+            dialogContent.innerHTML = info;
+        } else if (type == "form") {
+
+        }
+        let dialogButtons = document.createElement("div");
+        dialogButtons.className = "dialog-buttons";
+        for (let i = 0; i < buttons.length; i++) {
+            let buttonElement = document.createElement("button");
+            buttonElement.className = "dialog-button";
+            buttonElement.innerHTML = buttons[i].content;
+            if (buttons[i].type == "cancel") {
+                buttonElement.onclick = (e) => {
+                    this.element.close();
+                    setTimeout(() => {
+                        this.element.remove();
+                    }, 1000);
+                }
+            } else if (buttons[i].type == "confirm") {
+                buttonElement.classList.add("confirm");
+            }
+            dialogButtons.appendChild(buttonElement);
+        }
+        element.appendChild(dialogButtons);
+    }
+}

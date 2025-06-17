@@ -7,6 +7,7 @@ const AdmZip = require('adm-zip');
 const os = require('os');
 const { spawn, exec, execFile } = require('child_process');
 const fsPromises = require('fs').promises;
+const { ipcRenderer } = require('electron');
 
 let launchername = "EnderGate";
 let launcherversion = "0.0.1";
@@ -16,11 +17,14 @@ class Minecraft {
         this.instance_id = instance_id;
     }
     async installFabric(mcversion, fabricversion) {
+        ipcRenderer.send('progress-update',"Downloading Fabric",0,"Download fabric info...");
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${mcversion}/${fabricversion}/profile/json`);
         const data = await fabric_json.json();
         fs.mkdirSync(`./minecraft/meta/fabric/${mcversion}/${fabricversion}`, { recursive: true });
         fs.writeFileSync(`./minecraft/meta/fabric/${mcversion}/${fabricversion}/fabric-${mcversion}-${fabricversion}.json`, JSON.stringify(data));
+        ipcRenderer.send('progress-update',"Downloading Fabric",20,"Downloading fabric libraries...");
         for (let i = 0; i < data.libraries.length; i++) {
+            ipcRenderer.send('progress-update',"Downloading Fabric",((i+1)/data.libraries.length)*80+20,`Downloading library ${i+1} of ${data.libraries.length}...`);
             let fileName = data.libraries[i].name.split(":");
             fileName.splice(0, 1);
             fileName = fileName.join("-") + ".jar";
@@ -41,7 +45,6 @@ class Minecraft {
     }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo) {
         let newJava = new Java();
-        let recentJavaInstallation = newJava.getJavaInstallation(21);
         this.libs = "";
         this.libNames = [];
         const platform = os.platform();
@@ -286,6 +289,7 @@ class Minecraft {
     }
     async downloadGame(loader, version) {
         try {
+            ipcRenderer.send('progress-update',"Downloading Minecraft",0,"Creating directories...");
             console.log("Creating directories");
             fs.mkdirSync(`./minecraft/instances/${this.instance_id}/versions/${version}`, { recursive: true });
             fs.mkdirSync(`./minecraft/meta/natives/${this.instance_id}-${version}`, { recursive: true });
@@ -297,6 +301,7 @@ class Minecraft {
                 fs.closeSync(fd);
             });
             this.version = version;
+            ipcRenderer.send('progress-update',"Downloading Minecraft",2,"Downloading version list...");
             console.log("Downloading version manifest");
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
             const version_manifest = await obtainVersionManifest.json();
@@ -304,6 +309,7 @@ class Minecraft {
             for (let i = 0; i < version_manifest.versions.length; i++) {
                 if (version_manifest.versions[i].id == version) {
                     console.log("Downloading version json");
+                    ipcRenderer.send('progress-update',"Downloading Minecraft",3,"Downloading version info...");
                     const obtainVersionJSON = await fetch(version_manifest.versions[i].url);
                     version_json = await obtainVersionJSON.json();
                     break;
@@ -315,6 +321,7 @@ class Minecraft {
             }
             fs.writeFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`, JSON.stringify(version_json));
             console.log("Downloading asset json");
+            ipcRenderer.send('progress-update',"Downloading Minecraft",5,"Downloading asset info...");
             const assetJSON = await fetch(version_json.assetIndex.url);
             let asset_json = await assetJSON.json();
             fs.mkdirSync(`./minecraft/meta/assets/indexes`, { recursive: true });
@@ -323,6 +330,7 @@ class Minecraft {
             let assetKeys = Object.keys(asset_json.objects);
             console.log("Downloading Assets");
             for (let i = 0; i < assetKeys.length; i++) {
+                ipcRenderer.send('progress-update',"Downloading Minecraft",((i+1)/assetKeys.length)*30+5,`Downloading asset ${i+1} of ${assetKeys.length}...`);
                 console.log(`Downloading asset ${i + 1} of ${assetKeys.length}`);
                 let asset_data = asset_json.objects[assetKeys[i]];
                 if (version_json.assets == "legacy") {
@@ -342,11 +350,13 @@ class Minecraft {
             this.asset_dir = version_json.assets == "legacy" ? path.resolve(__dirname, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(__dirname, "minecraft/meta/assets");
             console.log("asset directory set to " + this.asset_dir);
             console.log("Downloading jar file");
+            ipcRenderer.send('progress-update',"Downloading Minecraft",40,"Downloading version jar...");
             await urlToFile(version_json.downloads.client.url, `./minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             let java = new Java();
             let paths = "";
             console.log("Checking java installation");
+            ipcRenderer.send('progress-update',"Downloading Minecraft",45,"Checking for java...");
             this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion);
             this.java_version = version_json.javaVersion.majorVersion;
             const platform = os.platform();
@@ -366,7 +376,9 @@ class Minecraft {
             this.assets_index = version_json.assets;
             let platformString = getPlatformString();
             let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
+            ipcRenderer.send('progress-update',"Downloading Minecraft",60,"Starting library download...");
             libs: for (let i = 0; i < version_json.libraries.length; i++) {
+                ipcRenderer.send('progress-update',"Downloading Minecraft",((i+1)/version_json.libraries.length)*40+60,`Downloading library ${i+1} of ${version_json.libraries.length}`);
                 if (version_json.libraries[i].rules) {
                     rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
                         let rule = version_json.libraries[i].rules[j];
@@ -411,6 +423,7 @@ class Minecraft {
         } catch (err) {
             console.error('Error in download chain:', err);
         }
+        ipcRenderer.send('progress-update',"Downloading Minecraft",100,"Done");
     }
 }
 
@@ -448,6 +461,7 @@ class Java {
         }
     }
     async downloadJava(version) {
+        ipcRenderer.send('progress-update',"Downloading Java",0,"Starting java download...");
         console.log("Initializing downloading java " + version);
         const installDir = `./java/java-${version}`;
         const platform = os.platform(); // 'win32', 'linux', 'darwin'
@@ -462,6 +476,7 @@ class Java {
         };
         const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${getPlatformString()}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
 
+        ipcRenderer.send('progress-update',"Downloading Java",5,"Fetching java version info...");
         const res = await fetch(versionApi);
         const data = await res.json();
 
@@ -477,9 +492,9 @@ class Java {
         const downloadPath = "./java/" + fileName;
 
         console.log(`Downloading java...`);
-
+        ipcRenderer.send('progress-update',"Downloading Java",10,"Fetching java zip...");
         await urlToFile(downloadUrl, downloadPath);
-
+        ipcRenderer.send('progress-update',"Downloading Java",60,"Extracting java zip...");
         console.log(`Extracting java...`);
         let name = "";
         if (fileName.endsWith('.zip')) {
@@ -494,13 +509,15 @@ class Java {
         } else {
             console.error("AHHHHHHHHHH");
         }
+        ipcRenderer.send('progress-update',"Downloading Java",95,"Deleting old zip...");
 
         fs.unlinkSync(downloadPath);
-
+        ipcRenderer.send('progress-update',"Downloading Java",98,"Remembering version...");
         this.versions["java-" + version] = path.resolve(__dirname, `java/java-${version}/${name}/bin/javaw.exe`);
         console.log(this.versions);
         fs.writeFileSync("./java/versions.json", JSON.stringify(this.versions), 'utf-8');
         console.log("Java installation complete");
+        ipcRenderer.send('progress-update',"Downloading Java",100,"Done");
 
         // const JAVAC = path.resolve(__dirname, `java/java-${version}/${name}/bin/javac.exe`);
         // const JAR = path.resolve(__dirname, `java/java-${version}/${name}/bin/jar.exe`);

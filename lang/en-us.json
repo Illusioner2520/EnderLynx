@@ -85,6 +85,7 @@
     "app.worlds.description.commands": "Commands",
     "app.worlds.description.never_played": "Never Played",
     "app.date": "%m %d, %y",
+    "app.date_time": "%date %h:%m:%s %amorpm",
     "app.date.jan": "Jan",
     "app.date.feb": "Feb",
     "app.date.mar": "Mar",
@@ -100,5 +101,6 @@
     "app.duration": "%h %m %s",
     "app.duration.hours": "%sh",
     "app.duration.minutes": "%sm",
-    "app.duration.seconds": "%ss"
+    "app.duration.seconds": "%ss",
+    "app.logs.session": "Log Session"
 }

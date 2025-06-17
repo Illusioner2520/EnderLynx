@@ -10,6 +10,12 @@ const AdmZip = require('adm-zip');
 const https = require('https');
 const querystring = require('querystring');
 
+let default_data = { "instances": [], "profile_info": {}, "default_sort": "name", "default_group": "none" }
+
+if (!fs.existsSync("./data.json")) {
+    fs.writeFileSync("./data.json", JSON.stringify(default_data));
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => {
         try {
@@ -31,7 +37,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let date = new Date();
         date.setHours(date.getHours() - 1);
         if (new Date(player_info.expires) < date) {
-            player_info = getNewAccessToken(player_info.refresh_token);
+            player_info = await getNewAccessToken(player_info.refresh_token);
         }
         let mc = new Minecraft(instance_id);
         try {
@@ -206,24 +212,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "expires": date.toString()
         }
     },
-    getNewAccessToken: async (refresh_token) => {
-        let date = new Date();
-        date.setHours(date.getHours() + 1);
-        const authManager = new Auth("select_account");
-        const xboxManager = await authManager.refresh(refresh_token);
-        const token = await xboxManager.getMinecraft();
-        return {
-            "access_token": token.mcToken,
-            "uuid": token.profile.id,
-            "refresh_token": token.parent.msToken.refresh_token,
-            "capes": token.profile.capes,
-            "skins": token.profile.skins,
-            "name": token.profile.name,
-            "is_demo": token.profile.demo,
-            "xuid": token.xuid,
-            "client_id": getUUID(),
-            "expires": date.toString()
-        }
+    getInstanceLogs: (instance_id) => {
+        let patha = `./minecraft/instances/${instance_id}/logs`;
+        fs.mkdirSync(patha, { recursive: true });
+        return fs.readdirSync(patha).filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz")).map(e => {
+            let date = e.replace(".log", "").split("_");
+            if (date[1]) date[1] = date[1].replaceAll("-", ":");
+            return ({ "date": (new Date(date.join(" "))).toString(), "file_path": path.resolve(patha, e) });
+        });
     },
     getInstanceContent: (loader, instance_id, old_content) => {
         let old_files = old_content.map((e) => e.file_name);
@@ -375,6 +371,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (data.link) {
             urlToFile("https://vanillatweaks.net" + data.link, "test.zip");
         }
+    },
+    onProgressUpdate: (callback) => {
+        ipcRenderer.on('progress-update', (_event, title, progress, desc) => {
+            callback(title, progress, desc);
+        });
     }
 });
 
@@ -385,4 +386,24 @@ function getUUID() {
         if (i < 4) result += "-";
     }
     return result;
+}
+
+async function getNewAccessToken(refresh_token) {
+    let date = new Date();
+    date.setHours(date.getHours() + 1);
+    const authManager = new Auth("select_account");
+    const xboxManager = await authManager.refresh(refresh_token);
+    const token = await xboxManager.getMinecraft();
+    return {
+        "access_token": token.mcToken,
+        "uuid": token.profile.id,
+        "refresh_token": token.parent.msToken.refresh_token,
+        "capes": token.profile.capes,
+        "skins": token.profile.skins,
+        "name": token.profile.name,
+        "is_demo": token.profile.demo,
+        "xuid": token.xuid,
+        "client_id": getUUID(),
+        "expires": date.toString()
+    }
 }
