@@ -376,9 +376,7 @@ function createId() {
 class SearchDropdown {
     constructor(title, options, element, initial, onchange) {
         this.title = title;
-        this.options = options;
         this.element = element;
-        this.selected = initial;
         this.onchange = onchange;
         this.id = createId();
         let dropdownButton = document.createElement('button');
@@ -394,14 +392,6 @@ class SearchDropdown {
         dropdownTitle.innerHTML = title;
         let dropdownSelected = document.createElement("div");
         dropdownSelected.classList.add("dropdown-selected");
-        let name = "";
-        for (let i = 0; i < this.options.length; i++) {
-            if (this.options[i].value == initial) {
-                name = this.options[i].name;
-                break;
-            }
-        }
-        dropdownSelected.innerHTML = name;
         dropdownInfo.appendChild(dropdownTitle);
         dropdownInfo.appendChild(dropdownSelected);
         dropdownButton.appendChild(dropdownInfo);
@@ -416,7 +406,23 @@ class SearchDropdown {
         dropdownList.setAttribute("popover", "");
         dropdownList.style.positionAnchor = "--" + this.id;
         this.popover = dropdownList;
+        this.setOptions(options, initial);
+        element.appendChild(dropdownList);
+    }
+    setOptions(options, initial) {
+        this.options = options;
+        this.selected = initial;
+        this.value = initial;
         this.optEles = [];
+        let name = "";
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == initial) {
+                name = this.options[i].name;
+                break;
+            }
+        }
+        this.selectedElement.innerHTML = name;
+        this.popover.innerHTML = "";
         for (let i = 0; i < options.length; i++) {
             let optEle = document.createElement("button");
             optEle.classList.add("dropdown-item");
@@ -428,10 +434,9 @@ class SearchDropdown {
             if (options[i].value == initial) {
                 optEle.classList.add("selected");
             }
-            dropdownList.appendChild(optEle);
+            this.popover.appendChild(optEle);
             this.optEles.push(optEle);
         }
-        element.appendChild(dropdownList);
     }
     selectOption(option) {
         let name = "";
@@ -450,6 +455,7 @@ class SearchDropdown {
             }
         }
         this.selected = option;
+        this.value = option;
         this.popover.hidePopover();
     }
     get getSelected() {
@@ -457,6 +463,97 @@ class SearchDropdown {
     }
     setOnChange(onchange) {
         this.onchange = onchange;
+    }
+}
+
+class DialogDropdown {
+    constructor(title, options, element, initial,) {
+        this.title = title;
+        this.element = element;
+        this.id = createId();
+        let dropdownButton = document.createElement('button');
+        dropdownButton.setAttribute("popovertarget", this.id);
+        element.style.anchorName = "--" + this.id;
+        dropdownButton.classList.add('dropdown-button');
+        element.appendChild(dropdownButton);
+        element.classList.add('search-dropdown');
+        let dropdownInfo = document.createElement("div");
+        dropdownInfo.classList.add("dropdown-info");
+        let dropdownTitle = document.createElement("div");
+        dropdownTitle.classList.add("dropdown-title");
+        dropdownTitle.innerHTML = title;
+        let dropdownSelected = document.createElement("div");
+        dropdownSelected.classList.add("dropdown-selected");
+        dropdownInfo.appendChild(dropdownTitle);
+        dropdownInfo.appendChild(dropdownSelected);
+        dropdownButton.appendChild(dropdownInfo);
+        this.selectedElement = dropdownSelected;
+        let dropdownChevron = document.createElement("div");
+        dropdownChevron.classList.add("dropdown-chevron");
+        dropdownChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+        dropdownButton.appendChild(dropdownChevron);
+        let dropdownList = document.createElement("div");
+        dropdownList.id = this.id;
+        dropdownList.classList.add("dropdown-list-dialog");
+        dropdownList.setAttribute("popover", "");
+        dropdownList.style.positionAnchor = "--" + this.id;
+        this.popover = dropdownList;
+        this.setOptions(options, initial);
+        element.appendChild(dropdownList);
+    }
+    setOptions(options, initial) {
+        this.options = options;
+        this.selected = initial;
+        this.value = initial;
+        this.optEles = [];
+        let name = "";
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == initial) {
+                name = this.options[i].name;
+                break;
+            }
+        }
+        this.selectedElement.innerHTML = name;
+        this.popover.innerHTML = "";
+        for (let i = 0; i < options.length; i++) {
+            let optEle = document.createElement("button");
+            optEle.classList.add("dropdown-item");
+            optEle.innerHTML = options[i].name;
+            optEle.onclick = (e) => {
+                this.selectOption(options[i].value);
+            }
+            if (options[i].value == initial) {
+                optEle.classList.add("selected");
+            }
+            this.popover.appendChild(optEle);
+            this.optEles.push(optEle);
+        }
+    }
+    selectOption(option) {
+        console.log("selecting", option);
+        let name = "";
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == option) {
+                name = this.options[i].name;
+                break;
+            }
+        }
+        console.log("name is", name)
+        this.selectedElement.innerHTML = name;
+        for (let i = 0; i < this.optEles.length; i++) {
+            if (this.optEles[i].innerHTML == name) {
+                this.optEles[i].classList.add("selected");
+            } else {
+                this.optEles[i].classList.remove("selected");
+            }
+        }
+        this.selected = option;
+        this.value = option;
+        this.popover.hidePopover();
+        console.log("done selecting", option);
+    }
+    get getSelected() {
+        return this.selected;
     }
 }
 
@@ -485,7 +582,7 @@ class Toggle {
             this.element.classList.add("toggled");
         }
         this.toggled = !this.toggled;
-        this.onchange();
+        this.onchange(this.toggled);
     }
 }
 
@@ -825,6 +922,81 @@ function showInstanceContent(e) {
     let createButton = document.createElement("button");
     createButton.classList.add("create-button");
     createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
+    createButton.onclick = (e) => {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.button.instances.create"), "form", [
+            {
+                "type": "image-upload",
+                "id": "icon",
+                "name": "Icon" //TODO: replace with translate
+            },
+            {
+                "type": "text",
+                "name": "Name", //TODO
+                "id": "name"
+            },
+            {
+                "type": "multi-select",
+                "name": "Loader", // TODO
+                "options": [
+                    { "name": loaders["vanilla"], "value": "vanilla" },
+                    { "name": loaders["fabric"], "value": "fabric" },
+                    { "name": loaders["forge"], "value": "forge" },
+                    { "name": loaders["neoforge"], "value": "neoforge" },
+                    { "name": loaders["quilt"], "value": "quilt" }
+                ],
+                "id": "loader"
+            },
+            {
+                "type": "dropdown",
+                "name": "Game Version", // TODO
+                "options": [],
+                "id": "game_version",
+                "input_source": "loader",
+                "source": (new VersionList).getVersions
+            }
+        ], [
+            { "content": "Cancel", "type": "cancel" },
+            { "content": "Submit", "type": "confirm" }
+        ], [
+            {
+                "name": "Custom", //TODO
+                "value": "custom"
+            },
+            {
+                "name": "File Import", //TODO
+                "value": "file"
+            },
+            {
+                "name": "Import from Launcher", //TODO
+                "value": "launcher"
+            }
+        ], (e) => {
+            let info = {};
+            e.forEach(e => { info[e.id] = e.value });
+            let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+            let newInstanceInfo = {
+                "name": info.name,
+                "last_played": "",
+                "date_created": (new Date()).toString(),
+                "date_modified": (new Date()).toString(),
+                "playtime": 0,
+                "loader": info.loader,
+                "vanilla_version": info.game_version,
+                "loader_version": "0.16.14",
+                "instance_id": instance_id,
+                "image": info.icon,
+                "downloaded": false,
+                "locked": false,
+                "content": [],
+                "group": ""
+            }
+            data.instances.push(newInstanceInfo);
+            showSpecificInstanceContent(newInstanceInfo);
+            window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, "0.16.14");
+            saveData();
+        })
+    }
     title.appendChild(createButton);
     ele.appendChild(title);
     let searchAndFilter = document.createElement("div");
@@ -958,7 +1130,7 @@ function showSpecificInstanceContent(instanceInfo) {
     if (instanceInfo.image) {
         instImg.src = instanceInfo.image;
     } else {
-        instImg.src = "https://picsum.photos/100";
+        instImg.src = "https://picsum.photos/96";
     }
     topBar.appendChild(instImg);
     let instTopInfo = document.createElement("div");
@@ -1351,15 +1523,155 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     searchAndFilter.classList.add("search-and-filter-v2");
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
+    let searchBar = new SearchBar(contentSearch, (v) => {
+        let logEntries = document.getElementsByClassName("log-entry");
+        [...logEntries].forEach(e => {
+            if (e.innerHTML.toLowerCase().includes(v.trim().toLowerCase())) {
+                e.style.display = "block";
+            } else {
+                e.style.display = "none";
+            }
+        })
+    }, null);
     let typeDropdown = document.createElement("div");
     let log_info = window.electronAPI.getInstanceLogs(instanceInfo.instance_id);
-    let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": "Live Log", "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", filterContent);
+    let logDisplay = document.createElement("div");
+    let visible = document.createElement("div");
+    visible.className = "logs-visible";
+    let spacer = document.createElement("div");
+    logDisplay.appendChild(visible);
+    logDisplay.appendChild(spacer);
+    let logs = [];
+    let render = () => {
+        
+        const totalItems = logs.length;
+        const itemHeight = 15;
+        const containerHeight = 600;
+        const buffer = 5;
+        spacer.style.height = totalItems * itemHeight + "px";
+        
+        const scrollTop = logDisplay.scrollTop;
+        const startIdx = Math.max(Math.floor(scrollTop / itemHeight) - buffer, 0);
+        const visibleCount = Math.ceil(containerHeight / itemHeight) + buffer * 2;
+        const endIdx = Math.min(startIdx + visibleCount, totalItems);
+
+        visible.style.transform = `translateY(${startIdx * itemHeight}px)`;
+        visible.innerHTML = '';
+        for (let i = startIdx; i < endIdx; i++) {
+            visible.appendChild(logs[i]);
+        }
+    }
+    logDisplay.onscroll = render;
+    let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": "Live Log", "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", (e) => {
+        if (e == "live_log") {
+            let log_path = instanceInfo.current_log_file;
+            let running = checkForProcess(instanceInfo.pid);
+            if (!running) {
+                logDisplay.innerHTML = "No live game detected for this instance.";
+            } else {
+                let logInfo = window.electronAPI.getLog(log_path);
+                logInfo = logInfo.split("\n");
+                logs = [];
+                logInfo.forEach((e) => {
+                    if (e == "") return;
+                    let lineElement = document.createElement("span");
+                    lineElement.innerHTML = e;
+                    lineElement.classList.add("log-entry");
+                    if (e.includes("INFO")) {
+                        lineElement.classList.add("log-info");
+                    } else if (e.includes("WARN")) {
+                        lineElement.classList.add("log-warn");
+                    } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                        lineElement.classList.add("log-error");
+                    }
+                    logs.push(lineElement);
+                });
+                window.electronAPI.watchFile(log_path, (log) => {
+                    let logInfo = log.split("\n");
+                    console.log(logInfo);
+                    let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
+                    logInfo.forEach((e) => {
+                        if (e == "") return;
+                        if (e.length == 1) return;
+                        let lineElement = document.createElement("span");
+                        lineElement.innerHTML = e;
+                        lineElement.classList.add("log-entry");
+                        if (e.includes("INFO")) {
+                            lineElement.classList.add("log-info");
+                        } else if (e.includes("WARN")) {
+                            lineElement.classList.add("log-warn");
+                        } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                            lineElement.classList.add("log-error");
+                        }
+                        logs.push(lineElement);
+                    });
+                    spacer.style.height = logs.length * 15 + "px";
+                    if (scroll) logDisplay.scrollTo(0,logDisplay.scrollHeight);
+                    render();
+                });
+            }
+        } else {
+            try {
+                window.electronAPI.stopWatching(instanceInfo.current_log_file);
+            } catch (e) { }
+            let logInfo = window.electronAPI.getLog(e);
+            logInfo = logInfo.split("\n");
+            logs = [];
+            logInfo.forEach((e) => {
+                if (e == "") return;
+                let lineElement = document.createElement("span");
+                lineElement.innerHTML = e;
+                lineElement.classList.add("log-entry");
+                if (e.includes("INFO")) {
+                    lineElement.classList.add("log-info");
+                } else if (e.includes("WARN")) {
+                    lineElement.classList.add("log-warn");
+                } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                    lineElement.classList.add("log-error");
+                }
+                logs.push(lineElement);
+            });
+        }
+        render();
+    });
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
+    let logWrapper = document.createElement("div");
+    logWrapper.className = "logs";
+    let logTop = document.createElement("div");
+    logTop.className = "logs-top";
+    logWrapper.appendChild(logTop);
+    // let wordWrapToggle = document.createElement("button");
+    // let actualToggle = new Toggle(wordWrapToggle, (e) => {
+    //     if (e) {
+    //         logDisplay.classList.add("word-wrap");
+    //     } else {
+    //         logDisplay.classList.remove("word-wrap");
+    //     }
+    // }, true);
+    // let wordWrapLabel = document.createElement("div");
+    // wordWrapLabel.innerHTML = "Word Wrap";
+    let copyButton = document.createElement("button");
+    let shareButton = document.createElement("button");
+    let deleteButton = document.createElement("button");
+    copyButton.className = "logs-copy";
+    shareButton.className = "logs-share";
+    deleteButton.className = "logs-delete";
+    copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>Copy';
+    shareButton.innerHTML = '<i class="fa-solid fa-share"></i>Share';
+    deleteButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>Delete';
+    // logTop.appendChild(wordWrapToggle);
+    // logTop.appendChild(wordWrapLabel);
+    logTop.appendChild(copyButton);
+    logTop.appendChild(shareButton);
+    logTop.appendChild(deleteButton);
+    logDisplay.className = "logs-display";
+    // logDisplay.classList.add("word-wrap");
+    logWrapper.appendChild(logDisplay);
+    element.appendChild(logWrapper);
 }
 function setInstanceTabContentOptions(instanceInfo, element) {
     element.innerHTML = "";
@@ -1422,6 +1734,9 @@ function formatTime(secs) {
 function formatDate(dateString) {
     let months = [translate("app.date.jan"), translate("app.date.feb"), translate("app.date.mar"), translate("app.date.apr"), translate("app.date.may"), translate("app.date.jun"), translate("app.date.jul"), translate("app.date.aug"), translate("app.date.sep"), translate("app.date.oct"), translate("app.date.nov"), translate("app.date.dec")];
     let date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        return "Never Played";
+    }
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
 }
 
@@ -1636,9 +1951,106 @@ window.electronAPI.onProgressUpdate((a, b, c) => {
     ]);
 });
 
+class MultiSelect {
+    constructor(element, list) {
+        this.onchange = () => { };
+        this.tabs = new TabContent(element, list.map(e => ({
+            "name": e.name, "value": e.value, "func": () => {
+                this.value = e.value;
+                this.onchange();
+            }
+        })));
+        this.value = list[0].value;
+    }
+    addOnChange(onchange) {
+        this.onchange = onchange;
+    }
+}
+
+class VersionList {
+    constructor() { }
+    async getVersions(loader) {
+        if (loader == "vanilla") {
+            return await window.electronAPI.getVanillaVersions();
+        } else if (loader == "fabric") {
+            return await window.electronAPI.getFabricVersions();
+        } else if (loader == "forge") {
+            return await window.electronAPI.getForgeVersions();
+        } else if (loader == "neoforge") {
+            return await window.electronAPI.getNeoForgeVersions();
+        } else if (loader == "quilt") {
+            return await window.electronAPI.getQuiltVersions();
+        }
+    }
+}
+
+class ImageUpload {
+    constructor(element) {
+        element.className = "image-upload-wrapper";
+        let preview = document.createElement("img");
+        preview.className = "image-preview";
+        preview.src = "https://picsum.photos/96"
+        this.previewElement = preview;
+        element.appendChild(preview);
+        let containButtons = document.createElement("div");
+        containButtons.className = "image-upload-buttons";
+        let uploadButton = document.createElement("button");
+        let removeButton = document.createElement("button");
+        uploadButton.className = "image-upload-button";
+        removeButton.className = "image-upload-button";
+        uploadButton.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i>Upload Image';
+        removeButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>Remove Image'
+        containButtons.appendChild(uploadButton);
+        containButtons.appendChild(removeButton);
+        element.appendChild(containButtons);
+        this.value = "";
+        uploadButton.onclick = () => {
+            let temp = document.createElement("input");
+            temp.setAttribute("type", "file");
+            temp.setAttribute("accept", "image/*");
+            temp.click();
+            temp.onchange = () => {
+                if (temp.files.length <= 0) return;
+                let selectedFile = temp.files[0];
+                const reader = new FileReader();
+                reader.readAsDataURL(selectedFile);
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let maxWidth = 96;
+                        let maxHeight = 96;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > maxWidth || height > maxHeight) {
+                            const widthRatio = maxWidth / width;
+                            const heightRatio = maxHeight / height;
+                            const ratio = Math.min(widthRatio, heightRatio);
+                            width = Math.round(width * ratio);
+                            height = Math.round(height * ratio);
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        this.value = dataUrl;
+                        this.previewElement.src = dataUrl;
+                    };
+                    img.src = e.target.result;
+                };
+            }
+        }
+        removeButton.onclick = () => {
+            this.value = "";
+            this.previewElement.src = "https://picsum.photos/96";
+        }
+    }
+}
+
 class Dialog {
     constructor() { }
-    showDialog(title, type, info, buttons) {
+    showDialog(title, type, info, buttons, tabs, onsubmit) {
         let element = document.createElement("dialog");
         element.className = "dialog";
         element.oncancel = (e) => {
@@ -1669,10 +2081,90 @@ class Dialog {
         element.appendChild(dialogContent);
         document.body.appendChild(element);
         element.showModal();
+        let tabElement = document.createElement("div");
+        dialogContent.appendChild(tabElement);
+        this.values = [];
+        let whocareswhatinamethisvariableiamnotgoingtouseitanyways = new TabContent(tabElement, tabs.map(e => ({ "name": e.name, "value": e.value, "func": () => { } })))
         if (type == "notice") {
             dialogContent.innerHTML = info;
         } else if (type == "form") {
-
+            for (let i = 0; i < info.length; i++) {
+                if (info[i].type == "text") {
+                    let id = createId();
+                    let label = document.createElement("label");
+                    label.innerHTML = info[i].name;
+                    label.className = "dialog-label";
+                    label.setAttribute("for", id);
+                    let textInput = document.createElement("input");
+                    textInput.type = "text";
+                    textInput.className = "dialog-text-input";
+                    textInput.setAttribute("placeholder", info[i].name);
+                    textInput.id = id;
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    dialogContent.appendChild(wrapper);
+                    wrapper.appendChild(label);
+                    wrapper.appendChild(textInput);
+                    this.values.push({ "id": info[i].id, "element": textInput });
+                } else if (info[i].type == "image-upload") {
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    let label = document.createElement("div");
+                    label.innerHTML = info[i].name;
+                    label.className = "dialog-label";
+                    wrapper.appendChild(label);
+                    let element = document.createElement("div");
+                    let imageUpload = new ImageUpload(element);
+                    wrapper.appendChild(element);
+                    dialogContent.appendChild(wrapper);
+                    this.values.push({ "id": info[i].id, "element": imageUpload });
+                } else if (info[i].type == "multi-select") {
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    let label = document.createElement("div");
+                    label.innerHTML = info[i].name;
+                    label.className = "dialog-label";
+                    wrapper.appendChild(label);
+                    let element = document.createElement("div");
+                    wrapper.appendChild(element);
+                    dialogContent.appendChild(wrapper);
+                    let multiSelect = new MultiSelect(element, info[i].options);
+                    this.values.push({ "id": info[i].id, "element": multiSelect });
+                } else if (info[i].type == "dropdown") {
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    let label = document.createElement("div");
+                    label.innerHTML = info[i].name;
+                    label.className = "dialog-label";
+                    wrapper.appendChild(label);
+                    let element = document.createElement("div");
+                    wrapper.appendChild(element);
+                    dialogContent.appendChild(wrapper);
+                    let multiSelect = new DialogDropdown("", info[i].options, element, info[i].options[0]?.value);
+                    if (info[i].source) {
+                        console.log("has source");
+                        for (let j = 0; j < this.values.length; j++) {
+                            console.log("comparing", this.values[j].id, info[i].input_source)
+                            if (this.values[j].id != info[i].input_source) continue;
+                            console.log("Found element with id", info[i].input_source)
+                            this.values[j].element.addOnChange(async (e) => {
+                                console.log("Detected change");
+                                let value = this.values[j].element.value;
+                                let list = await info[i].source(value);
+                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list[0]);
+                            });
+                            let setInitialValues = async () => {
+                                console.log("setting intiial value");
+                                let value = this.values[j].element.value;
+                                let list = await info[i].source(value);
+                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list[0]);
+                            }
+                            setInitialValues();
+                        }
+                    }
+                    this.values.push({ "id": info[i].id, "element": multiSelect });
+                }
+            }
         }
         let dialogButtons = document.createElement("div");
         dialogButtons.className = "dialog-buttons";
@@ -1689,6 +2181,14 @@ class Dialog {
                 }
             } else if (buttons[i].type == "confirm") {
                 buttonElement.classList.add("confirm");
+                buttonElement.onclick = () => {
+                    let info = this.values.map(e => ({ "id": e.id, "value": e.element.value }));
+                    onsubmit(info);
+                    this.element.close();
+                    setTimeout(() => {
+                        this.element.remove();
+                    }, 1000);
+                }
             }
             dialogButtons.appendChild(buttonElement);
         }

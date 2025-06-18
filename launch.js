@@ -103,7 +103,7 @@ class Minecraft {
                 let libName = e.name.split(":");
                 libName.splice(libName.length - 1, 1);
                 libName = libName.join(":");
-                if (!this.libNames.includes(libName)) {
+                if (!this.libNames?.includes(libName)) {
                     if (e.downloads.artifact) {
                         paths += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
                     }
@@ -288,6 +288,7 @@ class Minecraft {
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
     async downloadGame(loader, version) {
+        if (!this.libNames) this.libNames = [];
         try {
             ipcRenderer.send('progress-update',"Downloading Minecraft",0,"Creating directories...");
             console.log("Creating directories");
@@ -398,7 +399,7 @@ class Minecraft {
                     let libName = version_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     libName = libName.join(":");
-                    if (!this.libNames.includes(libName)) {
+                    if (!this.libNames?.includes(libName)) {
                         paths += path.resolve(__dirname, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`) + ";";
                     }
                     this.libNames.push(libName);
@@ -411,7 +412,7 @@ class Minecraft {
                     let libName = version_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     libName = libName.join(":");
-                    if (!this.libNames.includes(libName)) {
+                    if (!this.libNames?.includes(libName)) {
                         paths += path.resolve(__dirname, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`) + ";";
                     }
                     this.libNames.push(libName);
@@ -618,7 +619,7 @@ class Fabric {
     async getSupportedVanillaVersions() {
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/game`);
         const data = await fabric_json.json();
-        let versions = data.map((e) => e.version.replaceAll(" Pre-Release ", "-pre"));
+        let versions = data.map((e) => e.version);
         versions = versions.filter((e) => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original"));
         return versions;
     }
@@ -629,18 +630,21 @@ class Fabric {
     }
 }
 class Forge {
-    constructor() {
-
+    constructor() { }
+    async getSupportedVanillaVersions() {
+        return [];
     }
 }
 class Quilt {
-    constructor() {
-
+    constructor() { }
+    async getSupportedVanillaVersions() {
+        return [];
     }
 }
 class NeoForge {
-    constructor() {
-
+    constructor() { }
+    async getSupportedVanillaVersions() {
+        return [];
     }
 }
 

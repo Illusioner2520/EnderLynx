@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { Minecraft, Java, Fabric, urlToFile } = require('./launch.js');
+const { Minecraft, Java, Fabric, urlToFile, Forge, NeoForge, Quilt } = require('./launch.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
@@ -221,6 +221,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return ({ "date": (new Date(date.join(" "))).toString(), "file_path": path.resolve(patha, e) });
         });
     },
+    getLog: (log_path) => {
+        return fs.readFileSync(log_path, { encoding: 'utf8', flag: 'r' });
+    },
     getInstanceContent: (loader, instance_id, old_content) => {
         let old_files = old_content.map((e) => e.file_name);
         let patha = `./minecraft/instances/${instance_id}/mods`;
@@ -376,8 +379,91 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('progress-update', (_event, title, progress, desc) => {
             callback(title, progress, desc);
         });
+    },
+    getVanillaVersions: async () => {
+        let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
+        let json = await res.json();
+        return json.versions.map(e => e.id);
+    },
+    getFabricVersions: async () => {
+        let fabric = new Fabric();
+        return await fabric.getSupportedVanillaVersions();
+    },
+    getForgeVersions: async () => {
+        let forge = new Forge();
+        return await forge.getSupportedVanillaVersions();
+    },
+    getNeoForgeVersions: async () => {
+        let neoforge = new NeoForge();
+        return await neoforge.getSupportedVanillaVersions();
+    },
+    getQuiltVersions: async () => {
+        let quilt = new Quilt();
+        return await quilt.getSupportedVanillaVersions();
+    },
+    getInstanceFolderName: (instance_id) => {
+        let baseInstanceId = instance_id;
+        let counter = 1;
+        while (folderExists(`./minecraft/instances/${instance_id}`)) {
+            instance_id = `${baseInstanceId}_${counter}`;
+            counter++;
+        }
+        fs.mkdirSync(`./minecraft/instances/${instance_id}`, { recursive: true });
+        return instance_id;
+    },
+    downloadMinecraft: (instance_id, loader, vanilla_version, loader_version) => {
+        let mc = new Minecraft(instance_id);
+        mc.downloadGame(loader, vanilla_version);
+        if (loader == "fabric") {
+            mc.installFabric(vanilla_version, loader_version);
+        }
+    },
+    watchFile: (filepath, callback) => {
+        let lastSize = 0;
+
+        fs.stat(filepath, (err, stats) => {
+
+            if (err) {
+                return console.error('Failed to stat file:', err);
+            }
+
+            lastSize = stats.size;
+
+            fs.watchFile(filepath, { interval: 1000 }, (curr, prev) => {
+                const newSize = curr.size;
+
+                if (newSize > lastSize) {
+                    const stream = fs.createReadStream(filepath, {
+                        start: lastSize,
+                        end: newSize,
+                        encoding: 'utf8'
+                    });
+
+                    stream.on('data', (chunk) => {
+                        callback(chunk);
+                    });
+
+                    stream.on('error', (err) => {
+                        console.error('Error reading file:', err);
+                    });
+
+                    lastSize = newSize;
+                }
+            });
+        });
+    },
+    stopWatching: (filepath) => {
+        fs.unwatchFile(filepath);
     }
 });
+
+function folderExists(folderPath) {
+    try {
+        return fs.statSync(folderPath).isDirectory();
+    } catch (err) {
+        return false;
+    }
+}
 
 function getUUID() {
     var result = "";

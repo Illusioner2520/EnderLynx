@@ -576,7 +576,7 @@ h1 {
 
 .search-dropdown {
     position: relative;
-    background-color: #ffffff20;
+    background-color: #292929;
     border-radius: 8px 8px 8px 8px;
     transition: border-radius .25s;
 }
@@ -677,6 +677,39 @@ h1 {
     }
 }
 
+.dropdown-list-dialog {
+    margin: 0;
+    inset: unset;
+    background-color: #222;
+    backdrop-filter: blur(10px);
+    border: 0;
+    padding: 0px;
+    overflow-y: auto;
+    flex-direction: column;
+    position: absolute;
+    top: anchor(bottom);
+    left: anchor(left);
+    width: anchor-size(width);
+    border-radius: 0 0 10px 10px;
+    height: 0px;
+    padding-block: 0px;
+    interpolate-size: allow-keywords;
+    transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
+    border-style: solid;
+    border-color: #353535;
+    border-width: 1px;
+    box-shadow: 0 0 10px black;
+}
+
+.dropdown-list-dialog:popover-open {
+    height: 200px;
+    display: flex;
+
+    @starting-style {
+        height: 0px;
+    }
+}
+
 .instance-top {
     display: flex;
     gap: 10px;
@@ -688,10 +721,14 @@ h1 {
 }
 
 .instance-top-image {
-    height: 100px;
-    width: 100px;
-    border-radius: 12.5px;
+    height: 98px;
+    width: 98px;
+    border-radius: 12px;
     image-rendering: pixelated;
+    background-color: #292929;
+    border-color: #444;
+    border-width: 1px;
+    border-style: solid;
 }
 
 .instance-top-info {
@@ -1392,7 +1429,6 @@ i {
     cursor: pointer;
     transition: background-color .25s, scale .1s;
     display: flex;
-    margin-left: auto;
     gap: 8px;
     font-size: 1rem;
     align-items: center;
@@ -1415,7 +1451,6 @@ i {
     cursor: pointer;
     transition: background-color .25s, scale .1s;
     display: flex;
-    margin-left: auto;
     gap: 8px;
     font-size: 1rem;
     align-items: center;
@@ -1440,6 +1475,24 @@ i {
 
 .logs-display {
     font-family: monospace;
+    width: 100%;
+    border-radius: 10px;
+    padding: 10px;
+    background-color: black;
+    max-width: 100%;
+    overflow: auto;
+    display: grid;
+    max-height: 600px;
+    position: relative;
+    overflow-x: scroll;
+}
+
+.logs-visible {
+    display: grid;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: calc(100% - 20px);
 }
 
 dialog {
@@ -1533,6 +1586,8 @@ dialog[open]::backdrop {
 
 .dialog-content {
     padding: 10px;
+    display: grid;
+    gap: 10px;
 }
 
 .dialog-buttons {
@@ -1573,4 +1628,91 @@ dialog[open]::backdrop {
 
 .dialog-button.confirm:hover {
     background-color: color-mix(in srgb, 85% #0078d4, white);
+}
+
+.dialog-text-input {
+    color: white;
+    padding: 8px;
+    flex-grow: 1;
+    min-width: 0;
+    border: 0;
+    border-radius: 5px;
+    background: #292929;
+    font-size: 1.1rem;
+}
+
+.dialog-label {
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.dialog-text-label-wrapper {
+    display: grid;
+    gap: 4px;
+}
+
+.image-upload-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items:center;
+}
+
+.image-preview {
+    height: 98px;
+    width: 98px;
+    border-radius: 12px;
+    image-rendering: pixelated;
+    object-fit: contain;
+    flex-shrink: 0;
+    background-color: #292929;
+    border-color: #444;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.image-upload-buttons {
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
+}
+
+.image-upload-button {
+    display: flex;
+    border-radius: 10px;
+    cursor: pointer;
+    padding: 8px;
+    transition: background-color .25s, scale .1s;
+    align-items: center;
+    gap: 8px;
+    color: white;
+    background-color: #292929;
+    text-decoration: none;
+}
+
+.image-upload-button:active {
+    scale: .95;
+}
+
+.image-upload-buttonn.selected {
+    background-color: #474747;
+}
+
+.log-info {
+    color: skyblue;
+}
+
+.log-error {
+    color: lightcoral;
+}
+
+.log-warn {
+    color: yellow;
+}
+
+.logs-display:not(.word-wrap) .log-entry {
+    white-space: nowrap;
+}
+
+.logs-display.word-wrap .log-entry {
+    overflow-wrap: anywhere;
 }
