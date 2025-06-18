@@ -16,6 +16,8 @@ if (!fs.existsSync("./data.json")) {
     fs.writeFileSync("./data.json", JSON.stringify(default_data));
 }
 
+let processWatches = {};
+
 contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => {
         try {
@@ -151,7 +153,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         try {
             const buffer = fs.readFileSync(serversDatPath);
             const data = await nbt.parse(buffer);
-            console.log(data);
             const servers = data.parsed?.value?.servers?.value?.value || [];
 
             for (const server of servers) {
@@ -454,6 +455,45 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     stopWatching: (filepath) => {
         fs.unwatchFile(filepath);
+    },
+    clearProcessWatches: () => {
+        let keys = Object.keys(processWatches);
+        for (let i = 0; i < keys.length; i++) {
+            clearInterval(processWatches[keys[i]]['interval']);
+            delete processWatches[keys[i]];
+        }
+    },
+    watchProcessForExit: (pid, callback) => {
+        if (processWatches[pid]) {
+            processWatches[pid]['callback'] = callback;
+        } else {
+            processWatches[pid] = {};
+            processWatches[pid]['callback'] = callback;
+            const timer = setInterval(() => {
+                try {
+                    process.kill(pid, 0);
+                } catch (err) {
+                    if (err.code === 'ESRCH') {
+                        clearInterval(timer);
+                        processWatches[pid]['callback']();
+                        delete processWatches[pid];
+                    } else {
+                        processWatches[pid]['callback']();
+                    }
+                }
+            }, 1000);
+            processWatches[pid]['interval'] = timer;
+        }
+    },
+    // mod, modpack, resourcepack, shader, datapack
+    modrinthSearch: async (query, loader, project_type, version) => {
+        let facets = [];
+        if (loader) facets.push([`categories:${loader}`]);
+        if (version) facets.push([`versions:${version}`]);
+        facets.push([`project_type:${project_type}`]);
+        let url = `https://api.modrinth.com/v2/search?query=${query}&facets=${JSON.stringify(facets)}&limit=100`;
+        let res = await fetch(url);
+        return await res.json();
     }
 });
 

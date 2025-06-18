@@ -17,14 +17,14 @@ class Minecraft {
         this.instance_id = instance_id;
     }
     async installFabric(mcversion, fabricversion) {
-        ipcRenderer.send('progress-update',"Downloading Fabric",0,"Download fabric info...");
+        ipcRenderer.send('progress-update', "Downloading Fabric", 0, "Download fabric info...");
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${mcversion}/${fabricversion}/profile/json`);
         const data = await fabric_json.json();
         fs.mkdirSync(`./minecraft/meta/fabric/${mcversion}/${fabricversion}`, { recursive: true });
         fs.writeFileSync(`./minecraft/meta/fabric/${mcversion}/${fabricversion}/fabric-${mcversion}-${fabricversion}.json`, JSON.stringify(data));
-        ipcRenderer.send('progress-update',"Downloading Fabric",20,"Downloading fabric libraries...");
+        ipcRenderer.send('progress-update', "Downloading Fabric", 20, "Downloading fabric libraries...");
         for (let i = 0; i < data.libraries.length; i++) {
-            ipcRenderer.send('progress-update',"Downloading Fabric",((i+1)/data.libraries.length)*80+20,`Downloading library ${i+1} of ${data.libraries.length}...`);
+            ipcRenderer.send('progress-update', "Downloading Fabric", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
             let fileName = data.libraries[i].name.split(":");
             fileName.splice(0, 1);
             fileName = fileName.join("-") + ".jar";
@@ -146,6 +146,7 @@ class Minecraft {
         let args = [];
         if (this.args.game) {
             let extraArgs = [];
+            let quickPlayHandled = false;
             // ~1.13+
             this.args.game = this.args.game.concat(this.modded_args_game);
             this.args.game = this.args.game.map((e) => {
@@ -157,19 +158,28 @@ class Minecraft {
                         extraArgs = extraArgs.concat(["--width", customResolution.width, "--height", customResolution.height]);
                         return "";
                     } else if (quickPlay?.type == "singleplayer" && quickPlay?.info && e.rules[0].features.is_quick_play_singleplayer) {
-                        extraArgs = extraArgs.concat(["--quickPlaySingleplayer",quickPlay.info]);
+                        extraArgs = extraArgs.concat(["--quickPlaySingleplayer", quickPlay.info]);
+                        quickPlayHandled = true;
                         return "";
                     } else if (quickPlay?.type == "multiplayer" && quickPlay?.info && e.rules[0].features.is_quick_play_multiplayer) {
-                        extraArgs = extraArgs.concat(["--quickPlayMultiplayer",quickPlay.info]);
+                        extraArgs = extraArgs.concat(["--quickPlayMultiplayer", quickPlay.info]);
+                        quickPlayHandled = true;
                         return "";
                     } else if (quickPlay?.type == "realms" && quickPlay?.info && e.rules[0].features.is_quick_play_realms) {
-                        extraArgs = extraArgs.concat(["--quickPlayRealms",quickPlay.info]);
+                        extraArgs = extraArgs.concat(["--quickPlayRealms", quickPlay.info]);
+                        quickPlayHandled = true;
                         return "";
                     }
                 } else {
                     return e;
                 }
             });
+            if (!quickPlayHandled && quickPlay?.type == "multiplayer") {
+                let split = quickPlay.info.split(":");
+                let server = split[0];
+                let port = split[1] ?? "25565";
+                extraArgs = extraArgs.concat(["--server",server,"--port",port])
+            }
             this.args.game = this.args.game.filter((e) => e);
             this.args.game = this.args.game.map((e) => {
                 e = e.replace("${auth_player_name}", player_info.name);
@@ -228,7 +238,7 @@ class Minecraft {
                     if (e.includes("${classpath}")) {
                         let theargs = [this.libs + this.jarfile];
                         theargs = theargs.concat(this.modded_args_jvm);
-                        theargs = theargs.concat(["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", this.main_class]);
+                        theargs = theargs.concat(["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname,"log_config.xml"), this.main_class]);
                         args = args.concat(theargs);
                     } else {
                         args.push(e);
@@ -246,13 +256,14 @@ class Minecraft {
             if (arch == "x86") {
                 args.push("-Xss1M");
             }
-            args.push("-Djava.library.path=" + path.resolve(__dirname,`minecraft/meta/natives/${this.instance_id}-${version}`));
+            args.push("-Djava.library.path=" + path.resolve(__dirname, `minecraft/meta/natives/${this.instance_id}-${version}`));
             args.push("-Dminecraft.launcher.brand=" + launchername);
             args.push("-Dminecraft.launcher.version=" + launcherversion);
             args.push("-Dminecraft.client.jar=" + this.jarfile);
             args.push("-cp");
             args.push(this.libs + this.jarfile);
             args = args.concat("-Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
+            args = args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname,"log_config.xml"));
             args.push(this.main_class);
             this.args = this.args.map((e) => {
                 e = e.replace("${auth_player_name}", player_info.name);
@@ -272,6 +283,12 @@ class Minecraft {
                 return e;
             });
             args = args.concat(this.args);
+            if (quickPlay?.type == "multiplayer") {
+                let split = quickPlay.info.split(":");
+                let server = split[0];
+                let port = split[1] ?? "25565";
+                args = args.concat(["--server",server,"--port",port])
+            }
         }
         console.log("Launching game.");
         console.log(this.libNames);
@@ -290,7 +307,7 @@ class Minecraft {
     async downloadGame(loader, version) {
         if (!this.libNames) this.libNames = [];
         try {
-            ipcRenderer.send('progress-update',"Downloading Minecraft",0,"Creating directories...");
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
             console.log("Creating directories");
             fs.mkdirSync(`./minecraft/instances/${this.instance_id}/versions/${version}`, { recursive: true });
             fs.mkdirSync(`./minecraft/meta/natives/${this.instance_id}-${version}`, { recursive: true });
@@ -302,7 +319,7 @@ class Minecraft {
                 fs.closeSync(fd);
             });
             this.version = version;
-            ipcRenderer.send('progress-update',"Downloading Minecraft",2,"Downloading version list...");
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
             console.log("Downloading version manifest");
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
             const version_manifest = await obtainVersionManifest.json();
@@ -310,7 +327,7 @@ class Minecraft {
             for (let i = 0; i < version_manifest.versions.length; i++) {
                 if (version_manifest.versions[i].id == version) {
                     console.log("Downloading version json");
-                    ipcRenderer.send('progress-update',"Downloading Minecraft",3,"Downloading version info...");
+                    ipcRenderer.send('progress-update', "Downloading Minecraft", 3, "Downloading version info...");
                     const obtainVersionJSON = await fetch(version_manifest.versions[i].url);
                     version_json = await obtainVersionJSON.json();
                     break;
@@ -322,7 +339,7 @@ class Minecraft {
             }
             fs.writeFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`, JSON.stringify(version_json));
             console.log("Downloading asset json");
-            ipcRenderer.send('progress-update',"Downloading Minecraft",5,"Downloading asset info...");
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
             const assetJSON = await fetch(version_json.assetIndex.url);
             let asset_json = await assetJSON.json();
             fs.mkdirSync(`./minecraft/meta/assets/indexes`, { recursive: true });
@@ -331,7 +348,7 @@ class Minecraft {
             let assetKeys = Object.keys(asset_json.objects);
             console.log("Downloading Assets");
             for (let i = 0; i < assetKeys.length; i++) {
-                ipcRenderer.send('progress-update',"Downloading Minecraft",((i+1)/assetKeys.length)*30+5,`Downloading asset ${i+1} of ${assetKeys.length}...`);
+                ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
                 console.log(`Downloading asset ${i + 1} of ${assetKeys.length}`);
                 let asset_data = asset_json.objects[assetKeys[i]];
                 if (version_json.assets == "legacy") {
@@ -351,13 +368,13 @@ class Minecraft {
             this.asset_dir = version_json.assets == "legacy" ? path.resolve(__dirname, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(__dirname, "minecraft/meta/assets");
             console.log("asset directory set to " + this.asset_dir);
             console.log("Downloading jar file");
-            ipcRenderer.send('progress-update',"Downloading Minecraft",40,"Downloading version jar...");
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
             await urlToFile(version_json.downloads.client.url, `./minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             let java = new Java();
             let paths = "";
             console.log("Checking java installation");
-            ipcRenderer.send('progress-update',"Downloading Minecraft",45,"Checking for java...");
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
             this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion);
             this.java_version = version_json.javaVersion.majorVersion;
             const platform = os.platform();
@@ -377,9 +394,9 @@ class Minecraft {
             this.assets_index = version_json.assets;
             let platformString = getPlatformString();
             let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
-            ipcRenderer.send('progress-update',"Downloading Minecraft",60,"Starting library download...");
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 60, "Starting library download...");
             libs: for (let i = 0; i < version_json.libraries.length; i++) {
-                ipcRenderer.send('progress-update',"Downloading Minecraft",((i+1)/version_json.libraries.length)*40+60,`Downloading library ${i+1} of ${version_json.libraries.length}`);
+                ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`);
                 if (version_json.libraries[i].rules) {
                     rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
                         let rule = version_json.libraries[i].rules[j];
@@ -424,7 +441,7 @@ class Minecraft {
         } catch (err) {
             console.error('Error in download chain:', err);
         }
-        ipcRenderer.send('progress-update',"Downloading Minecraft",100,"Done");
+        ipcRenderer.send('progress-update', "Downloading Minecraft", 100, "Done");
     }
 }
 
@@ -462,7 +479,7 @@ class Java {
         }
     }
     async downloadJava(version) {
-        ipcRenderer.send('progress-update',"Downloading Java",0,"Starting java download...");
+        ipcRenderer.send('progress-update', "Downloading Java", 0, "Starting java download...");
         console.log("Initializing downloading java " + version);
         const installDir = `./java/java-${version}`;
         const platform = os.platform(); // 'win32', 'linux', 'darwin'
@@ -477,7 +494,7 @@ class Java {
         };
         const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${getPlatformString()}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
 
-        ipcRenderer.send('progress-update',"Downloading Java",5,"Fetching java version info...");
+        ipcRenderer.send('progress-update', "Downloading Java", 5, "Fetching java version info...");
         const res = await fetch(versionApi);
         const data = await res.json();
 
@@ -493,9 +510,9 @@ class Java {
         const downloadPath = "./java/" + fileName;
 
         console.log(`Downloading java...`);
-        ipcRenderer.send('progress-update',"Downloading Java",10,"Fetching java zip...");
+        ipcRenderer.send('progress-update', "Downloading Java", 10, "Fetching java zip...");
         await urlToFile(downloadUrl, downloadPath);
-        ipcRenderer.send('progress-update',"Downloading Java",60,"Extracting java zip...");
+        ipcRenderer.send('progress-update', "Downloading Java", 60, "Extracting java zip...");
         console.log(`Extracting java...`);
         let name = "";
         if (fileName.endsWith('.zip')) {
@@ -510,15 +527,15 @@ class Java {
         } else {
             console.error("AHHHHHHHHHH");
         }
-        ipcRenderer.send('progress-update',"Downloading Java",95,"Deleting old zip...");
+        ipcRenderer.send('progress-update', "Downloading Java", 95, "Deleting old zip...");
 
         fs.unlinkSync(downloadPath);
-        ipcRenderer.send('progress-update',"Downloading Java",98,"Remembering version...");
+        ipcRenderer.send('progress-update', "Downloading Java", 98, "Remembering version...");
         this.versions["java-" + version] = path.resolve(__dirname, `java/java-${version}/${name}/bin/javaw.exe`);
         console.log(this.versions);
         fs.writeFileSync("./java/versions.json", JSON.stringify(this.versions), 'utf-8');
         console.log("Java installation complete");
-        ipcRenderer.send('progress-update',"Downloading Java",100,"Done");
+        ipcRenderer.send('progress-update', "Downloading Java", 100, "Done");
 
         // const JAVAC = path.resolve(__dirname, `java/java-${version}/${name}/bin/javac.exe`);
         // const JAR = path.resolve(__dirname, `java/java-${version}/${name}/bin/jar.exe`);
@@ -611,7 +628,8 @@ function urlToFile(url, filepath, redirectCount = 0) {
 function fileFormatDate(date) {
     let m = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
     let d = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"];
-    return date.getFullYear() + "-" + m[date.getMonth()] + "-" + d[date.getDate()] + "_" + date.getHours() + "-" + date.getMinutes() + "-" + date.getSeconds();
+    let hms = ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59"];
+    return date.getFullYear() + "-" + m[date.getMonth()] + "-" + d[date.getDate()] + "_" + hms[date.getHours()] + "-" + hms[date.getMinutes()] + "-" + hms[date.getSeconds()];
 }
 
 class Fabric {

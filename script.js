@@ -1,5 +1,10 @@
 let lang = null;
 document.getElementsByTagName("title")[0].innerHTML = translate("app.name");
+let minecraftVersions = []
+let getVersions = async () => {
+    minecraftVersions = (await window.electronAPI.getVanillaVersions()).reverse();
+}
+getVersions();
 class MinecraftAccountSwitcher {
     constructor(element, playerInfo) {
         element.classList.add("player-switch");
@@ -167,8 +172,15 @@ class PageContent {
         this.title = title;
     }
     displayContent() {
+        if (this.title == "discover") {
+            showAddContent();
+            return;
+        }
         content.innerHTML = "";
         content.appendChild(this.func());
+        if (this.title == "instances") {
+            groupInstances(data.default_group);
+        }
     }
 }
 
@@ -213,6 +225,7 @@ class TabContent {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("tab-button");
             buttonElement.innerHTML = options[i].name;
+            buttonElement.setAttribute("data-color",options[i].color ?? "#0078d4");
             buttonElement.onclick = (e) => {
                 this.selectOption(options[i].value);
                 let oldLeft = this.offset_left;
@@ -220,7 +233,8 @@ class TabContent {
                 this.offset_right = element.offsetWidth - buttonElement.offsetLeft - buttonElement.offsetWidth;
                 element.style.setProperty("--left", this.offset_left + "px");
                 element.style.setProperty("--right", this.offset_right + "px");
-                element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s" : "right .125s .125s, left .125s");
+                element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
+                element.style.setProperty("--color",options[i].color ?? "#0078d4");
             }
             element.appendChild(buttonElement);
             options[i].element = buttonElement;
@@ -232,7 +246,8 @@ class TabContent {
         let oldLeft = 0;
         element.style.setProperty("--left", "4px");
         element.style.setProperty("--right", element.offsetWidth - options[0].element.offsetLeft - options[0].element.offsetWidth + "px");
-        element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s" : "right .125s .125s, left .125s");
+        element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
+        element.style.setProperty("--color",options[0].color ?? "#0078d4");
         this.selected = options[0].value;
     }
     get getSelected() {
@@ -249,6 +264,19 @@ class TabContent {
             }
         }
         opt.func();
+        this.selected = val;
+    }
+    selectOptionAdvanced(val) {
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == val) {
+                this.element.style.setProperty("--left", this.options[i].element.offset_left + "px");
+                this.element.style.setProperty("--right", this.options[i].element.offset_right + "px");
+                this.element.style.setProperty("--transition", "");
+                this.element.style.setProperty("--color",this.options[i].color ?? "#0078d4");
+                this.options[i].element.click();
+            }
+        }
+        this.selected = val;
     }
 }
 
@@ -530,7 +558,6 @@ class DialogDropdown {
         }
     }
     selectOption(option) {
-        console.log("selecting", option);
         let name = "";
         for (let i = 0; i < this.options.length; i++) {
             if (this.options[i].value == option) {
@@ -538,7 +565,6 @@ class DialogDropdown {
                 break;
             }
         }
-        console.log("name is", name)
         this.selectedElement.innerHTML = name;
         for (let i = 0; i < this.optEles.length; i++) {
             if (this.optEles[i].innerHTML == name) {
@@ -550,7 +576,6 @@ class DialogDropdown {
         this.selected = option;
         this.value = option;
         this.popover.hidePopover();
-        console.log("done selecting", option);
     }
     get getSelected() {
         return this.selected;
@@ -744,6 +769,9 @@ class ContentList {
                 let removeElement = document.createElement("button");
                 removeElement.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
                 removeElement.className = 'content-list-remove';
+                removeElement.onclick = () => {
+                    content[i].onremove();
+                }
                 contentEle.appendChild(removeElement);
             }
             if (features?.more?.enabled) {
@@ -791,10 +819,10 @@ class ContentList {
     }
 }
 
-let homeContent = new PageContent(showHomeContent, translate("app.page.home"));
-let instanceContent = new PageContent(showInstanceContent, translate("app.page.instances"));
-let worldContent = new PageContent(showWorldContent, translate("app.page.discover"));
-let myAccountContent = new PageContent(showMyAccountContent, translate("app.page.my_account"));
+let homeContent = new PageContent(showHomeContent, "home");
+let instanceContent = new PageContent(showInstanceContent, "instances");
+let worldContent = new PageContent(showWorldContent, "discover");
+let myAccountContent = new PageContent(showMyAccountContent, "my_account");
 let contextmenu = new ContextMenu();
 let homeButton = new NavigationButton(homeButtonEle, translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeContent);
 let instanceButton = new NavigationButton(instanceButtonEle, translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instanceContent);
@@ -844,7 +872,13 @@ function sortInstances(how) {
     for (let i = 0; i < groups.length; i++) {
         [...groups[i].children].sort((a, b) => {
             if (usedates) {
-                return multiply * (new Date(a.getAttribute(attrhow)) - new Date(b.getAttribute(attrhow)));
+                let c = new Date(a.getAttribute(attrhow))
+                let d = new Date(b.getAttribute(attrhow))
+                c = c.getTime();
+                d = d.getTime();
+                if (isNaN(c)) c = 0;
+                if (isNaN(d)) d = 0;
+                return multiply * (c - d);
             }
             if (usenumbers) {
                 return multiply * (a.getAttribute(attrhow) - b.getAttribute(attrhow));
@@ -858,6 +892,7 @@ function sortInstances(how) {
             return 0;
         }).forEach((e) => { groups[i].appendChild(e) });
     }
+    saveData();
 }
 function groupInstances(how) {
     data.default_group = how;
@@ -1025,6 +1060,12 @@ function showInstanceContent(e) {
     ele.appendChild(instanceGrid);
     for (let i = 0; i < data.instances.length; i++) {
         let running = checkForProcess(data.instances[i].pid);
+        if (!running) data.instances[i].pid = null;
+        if (running) {
+            window.electronAPI.watchProcessForExit(data.instances[i].pid, () => {
+                instanceContent.displayContent();
+            });
+        }
         let instanceElement = document.createElement("button");
         instanceElement.setAttribute("data-name", data.instances[i].name);
         instanceElement.setAttribute("data-last-played", data.instances[i].last_played);
@@ -1063,10 +1104,12 @@ function showInstanceContent(e) {
             {
                 "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
                 "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-                "func": running ? (e) => {
-                    stopInstance(data.instances[i]);
-                } : (e) => {
-                    playInstance(data.instances[i]);
+                "func": running ? async (e) => {
+                    await stopInstance(data.instances[i]);
+                    instanceContent.displayContent();
+                } : async (e) => {
+                    await playInstance(data.instances[i]);
+                    instanceContent.displayContent();
                 }
             },
             {
@@ -1106,7 +1149,23 @@ function showInstanceContent(e) {
             {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.button.instances.delete"),
-                "func": (e) => { },
+                "func": (e) => {
+                    let dialog = new Dialog();
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the instance '" + data.instances[i].name + "'?", [ // TODO
+                        {
+                            "type": "cancel",
+                            "content": "Cancel"
+                        },
+                        {
+                            "type": "confirm",
+                            "content": "Confirm Deletion"
+                        }
+                    ], [], () => {
+                        data.instances.splice(i,1);
+                        saveData();
+                        instanceContent.displayContent();
+                    });
+                },
                 "danger": true
             }
         ]);
@@ -1117,8 +1176,9 @@ function showInstanceContent(e) {
     }
     return ele;
 }
-function showSpecificInstanceContent(instanceInfo) {
+function showSpecificInstanceContent(instanceInfo,default_tab) {
     let running = checkForProcess(instanceInfo.pid);
+    if (!running) instanceInfo.pid = null;
     content.innerHTML = "";
     let ele = document.createElement("div");
     content.appendChild(ele);
@@ -1156,18 +1216,48 @@ function showSpecificInstanceContent(instanceInfo) {
     instTopInfo.appendChild(instTopSubInfo);
     topBar.appendChild(instTopInfo);
     let playButton = document.createElement("button");
+    let playButtonClick = async () => {
+        playButton.innerHTML = '<i class="spinner"></i>' + "Loading"; //TODO
+        playButton.classList.remove("instance-top-play-button");
+        playButton.classList.add("instance-top-loading-button");
+        playButton.onclick = () => { };
+        await playInstance(instanceInfo);
+        playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
+        playButton.classList.remove("instance-top-loading-button");
+        playButton.classList.add("instance-top-stop-button");
+        playButton.onclick = stopButtonClick;
+        if (tabs.selected == 'logs') {
+            setInstanceTabContentLogs(instanceInfo, tabsInfo);
+        }
+        window.electronAPI.clearProcessWatches();
+        window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.classList.remove("instance-top-stop-button");
+            playButton.classList.add("instance-top-play-button");
+            playButton.onclick = playButtonClick;
+        });
+    }
+    let stopButtonClick = () => {
+        stopInstance(instanceInfo);
+        playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+        playButton.classList.remove("instance-top-stop-button");
+        playButton.classList.add("instance-top-play-button");
+        playButton.onclick = playButtonClick;
+    }
     if (!running) {
         playButton.classList.add("instance-top-play-button");
         playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-        playButton.onclick = (e) => {
-            playInstance(instanceInfo);
-        }
+        playButton.onclick = playButtonClick
     } else {
         playButton.classList.add("instance-top-stop-button");
         playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-        playButton.onclick = (e) => {
-            stopInstance(instanceInfo);
-        }
+        playButton.onclick = stopButtonClick
+        window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.classList.remove("instance-top-stop-button");
+            playButton.classList.add("instance-top-play-button");
+            playButton.onclick = playButtonClick;
+        });
     }
     let threeDots = document.createElement("button");
     threeDots.classList.add("instance-top-more");
@@ -1248,6 +1338,7 @@ function showSpecificInstanceContent(instanceInfo) {
             }
         }
     ]);
+    tabs.selectOptionAdvanced(default_tab ?? "content");
 }
 
 function setInstanceTabContentContent(instanceInfo, element) {
@@ -1258,7 +1349,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
+    let searchBar = new SearchBar(contentSearch, () => { }, null);
     let typeDropdown = document.createElement("div");
     let dropdownInfo = new SearchDropdown(translate("app.button.content.type"), [
         {
@@ -1277,7 +1368,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
             "name": translate("app.content.shaders"),
             "value": "shader"
         }
-    ], typeDropdown, "all", filterContent);
+    ], typeDropdown, "all", () => { });
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -1376,7 +1467,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.add")
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, searchInstanceContent, null);
+    let searchBar = new SearchBar(contentSearch, () => { }, null);
     let typeDropdown = document.createElement("div");
     let dropdownInfo = new SearchDropdown(translate("app.worlds.type"), [
         {
@@ -1395,7 +1486,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             "name": translate("app.worlds.realms"),
             "value": "realms"
         }
-    ], typeDropdown, "all", filterContent);
+    ], typeDropdown, "all", () => { });
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -1419,15 +1510,31 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 },
                 "type": "singleplayer",
                 "image": worlds[i].icon ?? "https://picsum.photos/40",
+                "onremove": () => {
+                    let dialog = new Dialog();
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
+                        {
+                            "type": "cancel",
+                            "content": "Cancel"
+                        },
+                        {
+                            "type": "confirm",
+                            "content": "Confirm Deletion"
+                        }
+                    ], [], () => {
+                        // DELETE WORLD HERE
+                    });
+                },
                 "more": {
                     "actionsList": new ContextMenuButtons([
-                        {
+                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") ? {
                             "title": translate("app.worlds.play"),
                             "icon": '<i class="fa-solid fa-play"></i>',
-                            "func": () => {
-                                playSingleplayerWorld(instanceInfo, worlds[i].id);
+                            "func": async () => {
+                                await playSingleplayerWorld(instanceInfo, worlds[i].id);
+                                showSpecificInstanceContent(instanceInfo,'worlds');
                             }
-                        },
+                        } : null,
                         {
                             "title": translate("app.worlds.open"),
                             "icon": '<i class="fa-solid fa-folder"></i>',
@@ -1444,9 +1551,23 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
-                            "func": () => { }
+                            "func": () => {
+                                let dialog = new Dialog();
+                                dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
+                                    {
+                                        "type": "cancel",
+                                        "content": "Cancel"
+                                    },
+                                    {
+                                        "type": "confirm",
+                                        "content": "Confirm Deletion"
+                                    }
+                                ], [], () => {
+                                    // DELETE WORLD HERE
+                                });
+                            }
                         }
-                    ])
+                    ].filter(e=>e))
                 }
             });
     }
@@ -1463,15 +1584,31 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 },
                 "type": "multiplayer",
                 "image": worldsMultiplayer[i].icon ?? "https://picsum.photos/40",
+                "onremove": () => {
+                    let dialog = new Dialog();
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worldsMultiplayer[i].name + "'?", [ // TODO
+                        {
+                            "type": "cancel",
+                            "content": "Cancel"
+                        },
+                        {
+                            "type": "confirm",
+                            "content": "Confirm Deletion"
+                        }
+                    ], [], () => {
+                        // DELETE WORLD HERE
+                    });
+                },
                 "more": {
                     "actionsList": new ContextMenuButtons([
-                        {
+                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") ? {
                             "title": translate("app.worlds.play"),
                             "icon": '<i class="fa-solid fa-play"></i>',
-                            "func": () => {
-                                playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
+                            "func": async () => {
+                                await playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
+                                showSpecificInstanceContent(instanceInfo,'worlds');
                             }
-                        },
+                        } : null,
                         {
                             "title": translate("app.worlds.share"),
                             "icon": '<i class="fa-solid fa-share"></i>',
@@ -1481,9 +1618,23 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
-                            "func": () => { }
+                            "func": () => {
+                                let dialog = new Dialog();
+                                dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worldsMultiplayer[i].name + "'?", [ // TODO
+                                    {
+                                        "type": "cancel",
+                                        "content": "Cancel"
+                                    },
+                                    {
+                                        "type": "confirm",
+                                        "content": "Confirm Deletion"
+                                    }
+                                ], [], () => {
+                                    // DELETE WORLD HERE
+                                });
+                            }
                         }
-                    ])
+                    ].filter(e=>e))
                 }
             });
     }
@@ -1523,15 +1674,10 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     searchAndFilter.classList.add("search-and-filter-v2");
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
+    let searchBarFilter = "";
     let searchBar = new SearchBar(contentSearch, (v) => {
-        let logEntries = document.getElementsByClassName("log-entry");
-        [...logEntries].forEach(e => {
-            if (e.innerHTML.toLowerCase().includes(v.trim().toLowerCase())) {
-                e.style.display = "block";
-            } else {
-                e.style.display = "none";
-            }
-        })
+        searchBarFilter = v.toLowerCase().trim();
+        render();
     }, null);
     let typeDropdown = document.createElement("div");
     let log_info = window.electronAPI.getInstanceLogs(instanceInfo.instance_id);
@@ -1543,13 +1689,13 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     logDisplay.appendChild(spacer);
     let logs = [];
     let render = () => {
-        
-        const totalItems = logs.length;
+        let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
+        const totalItems = showLogs.length;
         const itemHeight = 15;
         const containerHeight = 600;
         const buffer = 5;
         spacer.style.height = totalItems * itemHeight + "px";
-        
+
         const scrollTop = logDisplay.scrollTop;
         const startIdx = Math.max(Math.floor(scrollTop / itemHeight) - buffer, 0);
         const visibleCount = Math.ceil(containerHeight / itemHeight) + buffer * 2;
@@ -1558,22 +1704,45 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         visible.style.transform = `translateY(${startIdx * itemHeight}px)`;
         visible.innerHTML = '';
         for (let i = startIdx; i < endIdx; i++) {
-            visible.appendChild(logs[i]);
+            visible.appendChild(showLogs[i].element);
         }
     }
-    logDisplay.onscroll = render;
-    let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": "Live Log", "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", (e) => {
-        if (e == "live_log") {
-            let log_path = instanceInfo.current_log_file;
-            let running = checkForProcess(instanceInfo.pid);
-            if (!running) {
-                logDisplay.innerHTML = "No live game detected for this instance.";
-            } else {
-                let logInfo = window.electronAPI.getLog(log_path);
-                logInfo = logInfo.split("\n");
-                logs = [];
+    let setUpLiveLog = () => {
+        let log_path = instanceInfo.current_log_file;
+        let running = checkForProcess(instanceInfo.pid);
+        if (!running) {
+            instanceInfo.pid = null;
+            logs = [];
+            let lineElement = document.createElement("span");
+            lineElement.innerHTML = "No live game detected for this instance."; //TODO
+            lineElement.classList.add("log-entry");
+            logs.push({ "element": lineElement, "content": "No live game detected for this instance." });
+        } else {
+            let logInfo = window.electronAPI.getLog(log_path);
+            logInfo = logInfo.split("\n");
+            logs = [];
+            logInfo.forEach((e) => {
+                if (e == "") return;
+                let lineElement = document.createElement("span");
+                lineElement.innerHTML = e;
+                lineElement.classList.add("log-entry");
+                if (e.includes("INFO")) {
+                    lineElement.classList.add("log-info");
+                } else if (e.includes("WARN")) {
+                    lineElement.classList.add("log-warn");
+                } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                    lineElement.classList.add("log-error");
+                }
+                logs.push({ "element": lineElement, "content": e });
+            });
+            spacer.style.height = logs.length * 15 + "px";
+            logDisplay.scrollTo(0, logDisplay.scrollHeight);
+            window.electronAPI.watchFile(log_path, (log) => {
+                let logInfo = log.split("\n");
+                let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
                 logInfo.forEach((e) => {
                     if (e == "") return;
+                    if (e.length == 1) return;
                     let lineElement = document.createElement("span");
                     lineElement.innerHTML = e;
                     lineElement.classList.add("log-entry");
@@ -1584,36 +1753,23 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                     } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                         lineElement.classList.add("log-error");
                     }
-                    logs.push(lineElement);
+                    logs.push({ "element": lineElement, "content": e });
                 });
-                window.electronAPI.watchFile(log_path, (log) => {
-                    let logInfo = log.split("\n");
-                    console.log(logInfo);
-                    let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
-                    logInfo.forEach((e) => {
-                        if (e == "") return;
-                        if (e.length == 1) return;
-                        let lineElement = document.createElement("span");
-                        lineElement.innerHTML = e;
-                        lineElement.classList.add("log-entry");
-                        if (e.includes("INFO")) {
-                            lineElement.classList.add("log-info");
-                        } else if (e.includes("WARN")) {
-                            lineElement.classList.add("log-warn");
-                        } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
-                            lineElement.classList.add("log-error");
-                        }
-                        logs.push(lineElement);
-                    });
-                    spacer.style.height = logs.length * 15 + "px";
-                    if (scroll) logDisplay.scrollTo(0,logDisplay.scrollHeight);
-                    render();
-                });
-            }
+                spacer.style.height = logs.length * 15 + "px";
+                if (scroll) logDisplay.scrollTo(0, logDisplay.scrollHeight);
+                render();
+            });
+        }
+    }
+    logDisplay.onscroll = render;
+    let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": "Live Log", "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", (e) => {
+        try {
+            window.electronAPI.stopWatching(instanceInfo.current_log_file);
+        } catch (e) { }
+
+        if (e == "live_log") {
+            setUpLiveLog();
         } else {
-            try {
-                window.electronAPI.stopWatching(instanceInfo.current_log_file);
-            } catch (e) { }
             let logInfo = window.electronAPI.getLog(e);
             logInfo = logInfo.split("\n");
             logs = [];
@@ -1629,11 +1785,13 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                 } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                     lineElement.classList.add("log-error");
                 }
-                logs.push(lineElement);
+                logs.push({ "element": lineElement, "content": e });
             });
         }
         render();
     });
+    setUpLiveLog();
+    render();
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -1677,15 +1835,8 @@ function setInstanceTabContentOptions(instanceInfo, element) {
     element.innerHTML = "";
 }
 
-function searchInstanceContent(s) {
-
-}
-
-function filterContent() {
-
-}
-
 async function playInstance(instInfo, quickPlay = null) {
+    instInfo.last_played = (new Date()).toString();
     // loader,version,loaderVersion,instance_id,player_info
     let pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player, quickPlay);
     if (!pid) return;
@@ -2084,7 +2235,7 @@ class Dialog {
         let tabElement = document.createElement("div");
         dialogContent.appendChild(tabElement);
         this.values = [];
-        let whocareswhatinamethisvariableiamnotgoingtouseitanyways = new TabContent(tabElement, tabs.map(e => ({ "name": e.name, "value": e.value, "func": () => { } })))
+        if (tabs && tabs.length) new TabContent(tabElement, tabs.map(e => ({ "name": e.name, "value": e.value, "func": () => { } })))
         if (type == "notice") {
             dialogContent.innerHTML = info;
         } else if (type == "form") {
@@ -2142,19 +2293,14 @@ class Dialog {
                     dialogContent.appendChild(wrapper);
                     let multiSelect = new DialogDropdown("", info[i].options, element, info[i].options[0]?.value);
                     if (info[i].source) {
-                        console.log("has source");
                         for (let j = 0; j < this.values.length; j++) {
-                            console.log("comparing", this.values[j].id, info[i].input_source)
                             if (this.values[j].id != info[i].input_source) continue;
-                            console.log("Found element with id", info[i].input_source)
                             this.values[j].element.addOnChange(async (e) => {
-                                console.log("Detected change");
                                 let value = this.values[j].element.value;
                                 let list = await info[i].source(value);
                                 multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list[0]);
                             });
                             let setInitialValues = async () => {
-                                console.log("setting intiial value");
                                 let value = this.values[j].element.value;
                                 let list = await info[i].source(value);
                                 multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list[0]);
@@ -2193,5 +2339,206 @@ class Dialog {
             dialogButtons.appendChild(buttonElement);
         }
         element.appendChild(dialogButtons);
+    }
+}
+
+function showAddContent(instance_id,vanilla_version,loader) {
+    content.innerHTML = "";
+    let title = document.createElement("h1");
+    title.innerHTML = "Add Content";
+    if (!instance_id) title.innerHTML = "Discover";
+    let ele = document.createElement("div");
+    ele.classList.add("instance-content");
+    ele.appendChild(title);
+    content.appendChild(ele);
+    let tabsElement = document.createElement("div");
+    ele.appendChild(tabsElement);
+    let tabs = new TabContent(tabsElement,[
+        !instance_id ? {
+            "name": "Modpacks",
+            "value": "modpack",
+            "func": () => {
+                contentTabSelect("modpack",tabInfo,loader,vanilla_version);
+            }
+        } : null,
+        !loader || loader != "vanilla" ? {
+            "name": "Mods",
+            "value": "mod",
+            "func": () => {
+                contentTabSelect("mod",tabInfo,loader,vanilla_version);
+            }
+        } : null,
+        {
+            "name": "Resource Packs",
+            "value": "resourcepack",
+            "func": () => {
+                contentTabSelect("resourcepack",tabInfo,loader,vanilla_version);
+            }
+        },
+        !loader || loader != "vanilla" ? {
+            "name": "Shaders",
+            "value": "shader",
+            "func": () => {
+                contentTabSelect("shader",tabInfo,loader,vanilla_version);
+            }
+        } : null,
+        {
+            "name": "Worlds",
+            "value": "world",
+            "func": () => {
+                contentTabSelect("world",tabInfo,loader,vanilla_version);
+            }
+        },
+        {
+            "name": "Data Packs",
+            "value": "datapack",
+            "func": () => {
+                contentTabSelect("datapack",tabInfo,loader,vanilla_version);
+            }
+        }
+    ].filter(e=>e));
+    let tabInfo = document.createElement("div");
+    tabInfo.className = "tab-info";
+    ele.appendChild(tabInfo);
+}
+
+class ContentSearchEntry {
+    constructor(title,author,description,downloadCount,imageURL,installContent,installFunction,tags) {
+        let element = document.createElement("div");
+        element.className = "discover-item";
+        this.element = element;
+        let image = document.createElement("img");
+        image.src = imageURL;
+        image.className = "discover-item-image";
+        element.appendChild(image);
+        let info = document.createElement("div");
+        info.className = "discover-item-info";
+        element.appendChild(info);
+        let actions = document.createElement("div");
+        actions.className = "discover-item-actions";
+        element.appendChild(actions);
+        let top = document.createElement("div");
+        top.className = "discover-item-top";
+        info.appendChild(top);
+        let titleElement = document.createElement("div");
+        titleElement.className = "discover-item-title";
+        titleElement.innerHTML = title;
+        top.appendChild(titleElement);
+        let authorElement = document.createElement("div");
+        authorElement.className = "discover-item-author";
+        authorElement.innerHTML = `by ${author}`;
+        top.appendChild(authorElement);
+        let descElement = document.createElement("div");
+        descElement.className = "discover-item-desc";
+        descElement.innerHTML = description;
+        info.appendChild(descElement);
+        let tagsElement = document.createElement("div");
+        tagsElement.className = "discover-item-tags";
+        info.appendChild(tagsElement);
+        tags.forEach(e => {
+            let tagElement = document.createElement("div");
+            tagElement.innerHTML = e;
+            tagElement.className = "discover-item-tag";
+            tagsElement.appendChild(tagElement);
+        })
+        let downloadCountElement = document.createElement("div");
+        downloadCountElement.innerHTML = '<i class="fa-solid fa-download"></i> ' + formatNumber(downloadCount) + " downloads";
+        downloadCountElement.className = "discover-item-downloads";
+        actions.appendChild(downloadCountElement);
+        let installButton = document.createElement("button");
+        installButton.className = "discover-item-install";
+        installButton.innerHTML = installContent;
+        installButton.onclick = installFunction;
+        actions.appendChild(installButton);
+    }
+}
+
+function formatNumber(num) {
+    num = num.toString();
+    let output = "";
+    let counter = 0;
+    for (let i = num.length - 1; i >= 0; i--) {
+        if (counter % 3 == 0 && counter != 0) {
+            output = "," + output;
+        }
+        output = num[i] + output;
+        counter++;
+    }
+    return output;
+}
+
+function contentTabSelect(tab,ele,loader,version) {
+    let tabsElement = document.createElement("div");
+    ele.innerHTML = '';
+    let sources = [];
+    ele.appendChild(tabsElement);
+    if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "datapack") {
+        sources.push({
+            "name": "Modrinth",
+            "value": "modrinth",
+            "func": () => {},
+            "color": "#1bd96a"
+        });
+    }
+    if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "world" || tab == "datapack") {
+        sources.push({
+            "name": "CurseForge",
+            "value": "curseforge",
+            "func": () => {},
+            "color": "#f16436"
+        });
+    }
+    if (tab == "resourcepack" || tab == "datapack") {
+        sources.push({
+            "name": "Vanilla Tweaks",
+            "value": "vanilla_tweaks",
+            "func": () => {},
+            "color": "#f1c218"
+        });
+    }
+    if (tab == "world") {
+        sources.push({
+            "name": "Minecraft Maps",
+            "value": "minecraft_maps",
+            "func": () => {},
+            "color": "#c6c5c1"
+        });
+    }
+    // let tabs = new TabContent(tabsElement,sources);
+
+    let searchAndFilter = document.createElement("div");
+    searchAndFilter.className = "search-and-filter-v2";
+    let discoverList = document.createElement("div");
+    discoverList.className = "discover-list";
+    let searchElement = document.createElement("div");
+    searchElement.style.flexGrow = 2;
+    let searchContents = "";
+    let s = new SearchBar(searchElement,(v)=>{
+        searchContents = v;
+        getContent(discoverList,d.getSelected,v,loader,version,tab);
+    },()=>{});
+    let dropdownElement = document.createElement("div");
+    dropdownElement.style.minWidth = "200px";
+    let d = new SearchDropdown("Content Source",sources,dropdownElement,sources[0].value,()=>{
+        getContent(discoverList,d.getSelected,searchContents,loader,version,tab);
+    });
+    getContent(discoverList,sources[0].value,"",loader,version,tab);
+    searchAndFilter.appendChild(dropdownElement);
+    searchAndFilter.appendChild(searchElement);
+    ele.appendChild(searchAndFilter);
+    ele.appendChild(discoverList);
+
+}
+
+async function getContent(element,source,query,loader,version,project_type) {
+    if (source == "modrinth") {
+        //query, loader, project_type, version
+        let apiresult = await window.electronAPI.modrinthSearch(query,loader,project_type,version);
+        element.innerHTML = "";
+        for (let i = 0; i < apiresult.hits.length; i++) {
+            let e = apiresult.hits[i];
+            let entry = new ContentSearchEntry(e.title,e.author,e.description,e.downloads,e.icon_url,'<i class="fa-solid fa-download"></i>Install',()=>{},e.categories.filter(e=>Object.keys(loaders).includes(e)).map(e=>loaders[e]));
+            element.appendChild(entry.element);
+        }
     }
 }
