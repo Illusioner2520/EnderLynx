@@ -658,7 +658,7 @@ h1 {
     padding: 0px;
     overflow-y: hidden;
     flex-direction: column;
-    position: absolute;
+    position: fixed;
     top: anchor(bottom);
     left: anchor(left);
     width: anchor-size(width);
@@ -691,7 +691,7 @@ h1 {
     padding: 0px;
     overflow-y: auto;
     flex-direction: column;
-    position: absolute;
+    position: fixed;
     top: anchor(bottom);
     left: anchor(left);
     width: anchor-size(width);
@@ -907,10 +907,6 @@ h1 {
     background-color: #ffffff00;
 }
 
-.tab-button.selected {
-    color: color-mix(in srgb, var(--color), white);
-}
-
 .tab-button:active {
     scale: .9;
 }
@@ -921,7 +917,7 @@ h1 {
     bottom: 4px;
     left: var(--left);
     right: var(--right);
-    background-color: color-mix(in srgb, 15.686% var(--color), transparent);
+    background-color: var(--color);
     border-radius: 10000px;
     content: "";
     transition: var(--transition);
@@ -1593,6 +1589,9 @@ dialog[open]::backdrop {
     font-weight: bold;
     font-size: 1.4rem;
     margin-right: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dialog-x {
@@ -1619,12 +1618,13 @@ dialog[open]::backdrop {
 
 .dialog {
     border-radius: 10px;
-    background-color: #ffffff10;
-    backdrop-filter: blur(15px);
+    background-color: #22222210;
+    backdrop-filter: blur(30px);
     border-color: #444444;
     border-width: 1px;
     border-style: solid;
     min-width: 400px;
+    box-shadow: 0px 0px 10px black;
 }
 
 .dialog-content {
@@ -1776,6 +1776,7 @@ dialog[open]::backdrop {
     border-radius: 10px;
     padding: 10px;
     gap: 10px;
+    min-width: 0;
 }
 
 .discover-item-image {
@@ -1794,6 +1795,7 @@ dialog[open]::backdrop {
 .discover-item-info {
     display: grid;
     flex-shrink: 1;
+    min-width: 0;
 }
 
 .discover-item-title {
@@ -1804,6 +1806,15 @@ dialog[open]::backdrop {
     overflow: hidden;
     text-overflow: ellipsis;
     flex-grow: 0;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.discover-item-title > div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
 
 .discover-item-author {
@@ -1814,6 +1825,7 @@ dialog[open]::backdrop {
     text-overflow: ellipsis;
     flex-grow: 0;
     margin-bottom: 2px;
+    flex-shrink: 0;
 }
 
 .discover-item-desc {
@@ -1828,7 +1840,7 @@ dialog[open]::backdrop {
 
 .discover-item-actions {
     display: flex;
-    flex-direction:column;
+    flex-direction: column;
     margin-left: auto;
     flex-shrink: 0;
 }
@@ -1882,11 +1894,50 @@ dialog[open]::backdrop {
     color: #ccc;
     padding-inline: 8px;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .discover-item-top {
     display: flex;
     gap: 6px;
-    align-items:flex-end;
+    align-items: flex-end;
     justify-content: flex-start;
+    width: 100%;
+    overflow: hidden;
+}
+
+.error {
+    inset: unset;
+    position: fixed;
+    bottom: 10px;
+    max-width: calc(100% - 20px);
+    right: 10px;
+    /* background-color: #ffcccc; */
+    /* color: rgb(200, 0, 0); */
+    color: white;
+    background-color: rgb(200, 0, 0);
+    padding: 8px;
+    font-weight: bold;
+    /* border-width: 1px;
+    border-style: solid; */
+    border-radius: 8px;
+    display: none;
+    font-family: Arial, Helvetica, sans-serif;
+    transform: translateX(100%);
+    transition: transform .25s, display .25s allow-discrete;
+    width: max-content;
+    margin-block: 0;
+    font-size: 1rem;
+    border-width: 2px;
+}
+
+.error:popover-open {
+    display: block;
+    transform: translateX(0);
+
+    @starting-style {
+        transform: translateX(100%);
+    }
 }

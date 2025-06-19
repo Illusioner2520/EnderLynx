@@ -43,6 +43,46 @@ class Minecraft {
         this.modded_args_game = data.arguments.game;
         this.modded_args_jvm = data.arguments.jvm;
     }
+    async installForge(mcversion, forgeversion) {
+        ipcRenderer.send('progress-update', "Downloading Forge", 0, "Download Forge info...");
+        const forgeInstallerURL = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
+        await urlToFile(forgeInstallerURL,`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-installer.jar`);
+
+        let admzip = new AdmZip(`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-installer.jar`);
+        let versionJsonEntry = admzip.getEntry('version.json');
+        if (!versionJsonEntry) {
+            throw new Error('version.json not found in Forge installer JAR');
+        }
+        let data = versionJsonEntry.getData().toString('utf8');
+        fs.writeFileSync(`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-${mcversion}-${forgeversion}.json`, data);
+
+        ipcRenderer.send('progress-update', "Downloading Forge", 20, "Downloading Forge libraries...");
+        this.libs = this.libs || "";
+        this.libNames = this.libNames || [];
+
+        for (let i = 0; i < data.libraries.length; i++) {
+            ipcRenderer.send('progress-update', "Downloading Forge", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
+            let e = data.libraries[i];
+            let patha = path.resolve("./meta/libraries",e.downloads.artifact.path);
+            if (e.downloads && e.downloads.artifact && e.downloads.artifact.url && e.downloads.artifact.path) {
+                if (!fs.existsSync(`./minecraft/meta/libraries/${e.downloads.artifact.path}`)) {
+                    await urlToFile(e.downloads.artifact.url, `./minecraft/meta/libraries/${e.downloads.artifact.path}`);
+                }
+                this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
+            }/* else {
+                if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+                    await urlToFile(`https://maven.minecraftforge.net/${patha}`, `./minecraft/meta/libraries/${patha}`);
+                }
+                this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+            }*/
+            let libName = e.name.split(":");
+            libName.splice(libName.length - 1, 1);
+            this.libNames.push(libName.join(":"));
+        }
+        this.main_class = data.mainClass;
+        this.modded_args_game = data.arguments && data.arguments.game ? data.arguments.game : [];
+        this.modded_args_jvm = data.arguments && data.arguments.jvm ? data.arguments.jvm : [];
+    }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo) {
         let newJava = new Java();
         this.libs = "";
@@ -73,6 +113,23 @@ class Minecraft {
                     patha = patha.join("/") + "/" + fileName;
                     this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
                     let libName = fabric_json.libraries[i].name.split(":");
+                    libName.splice(libName.length - 1, 1);
+                    this.libNames.push(libName.join(":"));
+                }
+            }
+        } else if (loader == "forge") {
+            if (!fs.existsSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`)) {
+                await this.installForge(version, loaderVersion);
+            } else {
+                let forge_json = fs.readFileSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`);
+                forge_json = JSON.parse(forge_json);
+                this.main_class = forge_json.mainClass;
+                this.modded_args_game = forge_json.arguments.game;
+                this.modded_args_jvm = forge_json.arguments.jvm;
+                for (let i = 0; i < forge_json.libraries.length; i++) {
+                    let patha = forge_json.libraries[i].downloads.artifact.path;
+                    this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+                    let libName = forge_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
                 }
@@ -649,20 +706,87 @@ class Fabric {
 }
 class Forge {
     constructor() { }
+
+    // Returns a list of supported vanilla Minecraft versions for Forge
     async getSupportedVanillaVersions() {
-        return [];
+        // Use the Forge version manifest
+        const res = await fetch('https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json');
+        const data = await res.json();
+
+        // The manifest contains an array of versions, filter out non-standard ones
+        // Only include versions that look like vanilla Minecraft versions (e.g., "1.20.1")
+        const versions = Object.keys(data)
+            .filter(v => /^\d+\.\d+(\.\d+)?$/.test(v));
+        return versions.reverse();
+    }
+
+    // Returns a list of Forge loader versions for a given vanilla version
+    async getVersions(mcVersion) {
+        // Forge provides a JSON per vanilla version
+        const url = `https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        // The "promos" object contains keys like "1.20.1-latest", "1.20.1-recommended"
+        // We'll extract all Forge versions for the given mcVersion
+        const forgeVersions = [];
+        for (const key in data.promos) {
+            if (key.startsWith(mcVersion + '-')) {
+                const version = data.promos[key];
+                if (!forgeVersions.includes(version)) {
+                    forgeVersions.push(version);
+                }
+            }
+        }
+        // Additionally, the "number" object contains all available Forge versions
+        // if (data.number && data.number[mcVersion]) {
+        //     forgeVersions.push(...data.number[mcVersion]);
+        // }
+        return forgeVersions;
     }
 }
 class Quilt {
     constructor() { }
     async getSupportedVanillaVersions() {
-        return [];
+        // Fetch supported Minecraft versions for Quilt
+        const res = await fetch('https://meta.quiltmc.org/v3/versions/game');
+        const data = await res.json();
+        // Filter out non-standard versions
+        let versions = data.map(e => e.version);
+        versions = versions.filter(e => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original"));
+        return versions;
+    }
+    async getVersions(mcVersion) {
+        // Fetch Quilt loader versions for a given Minecraft version
+        const res = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcVersion}`);
+        const data = await res.json();
+        return data.map(e => e.version);
     }
 }
+
 class NeoForge {
     constructor() { }
     async getSupportedVanillaVersions() {
         return [];
+        // Use NeoForged API to fetch supported Minecraft versions for NeoForge
+        // const res = await fetch('https://maven.neoforged.net/api/maven/versions/net.neoforged/neoforge');
+        // const data = await res.json();
+        // // Extract unique Minecraft versions from NeoForge version strings (format: <mcversion>-<neoforgeversion>)
+        // const versions = new Set();
+        // for (const v of data.versions) {
+        //     const match = v.match(/^(\d+\.\d+(?:\.\d+)?)-/);
+        //     if (match) {
+        //         versions.add(match[1]);
+        //     }
+        // }
+        // return Array.from(versions).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+    }
+    async getVersions(mcVersion) {
+        return [];
+        // // Fetch NeoForge loader versions for a given Minecraft version
+        // const res = await fetch('https://maven.neoforged.net/api/maven/versions/net.neoforged/neoforge');
+        // const data = await res.json();
+        // // Filter for versions matching the MC version prefix
+        // return data.versions.filter(v => v.startsWith(mcVersion + '-'));
     }
 }
 

@@ -18,6 +18,12 @@ if (!fs.existsSync("./data.json")) {
 
 let processWatches = {};
 
+class LoginError extends Error {
+    constructor(message) {
+        super(message);
+    }
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (filePath) => {
         try {
@@ -36,6 +42,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay) => {
+        if (!player_info) throw new LoginError("Please sign in to your Microsoft account to play Minecraft.");
+
         let date = new Date();
         date.setHours(date.getHours() - 1);
         if (new Date(player_info.expires) < date) {
@@ -494,6 +502,76 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let url = `https://api.modrinth.com/v2/search?query=${query}&facets=${JSON.stringify(facets)}&limit=100`;
         let res = await fetch(url);
         return await res.json();
+    },
+    addContent: async (instance_id, project_type, project_url, filename) => {
+        let install_path = "";
+        if (project_type == "mod") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`, filename);
+        } else if (project_type == "resourcepack") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`, filename);
+        } else if (project_type == "shader") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`, filename);
+        }
+
+        console.log("Installing", project_url, "to", install_path);
+
+        await urlToFile(project_url, install_path);
+
+        let type_convert = {
+            "mod": "mod",
+            "resourcepack": "resource_pack",
+            "shader": "shader"
+        }
+
+        return {
+            type: type_convert[project_type],
+            file_name: filename
+        };
+    },
+    downloadModrinthPack: async (instance_id, url) => {
+        await urlToFile(url, `./minecraft/instances/${instance_id}/pack.mrpack`);
+    },
+    processMrPack: async (instance_id, mrpack_path) => {
+        const zip = new AdmZip(mrpack_path);
+
+        let extractToPath = `./minecraft/instances/${instance_id}`;
+
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
+        }
+
+        zip.extractAllTo(extractToPath, true);
+
+        let srcDir = `./minecraft/instances/${instance_id}/overrides`;
+        let destDir = `./minecraft/instances/${instance_id}`;
+
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const files = fs.readdirSync(srcDir);
+
+        for (const file of files) {
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                const stats = fs.lstatSync(destPath);
+                if (stats.isDirectory()) {
+                    fs.rmSync(destPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(destPath);
+                }
+            }
+
+            fs.renameSync(srcPath, destPath);
+        }
+
+        let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
+        modrinth_index_json = JSON.parse(modrinth_index_json);
+
+        for (let i = 0; i < modrinth_index_json.files.length; i++) {
+            await urlToFile(modrinth_index_json.files[i].downloads[0], path.resolve(extractToPath, modrinth_index_json.files[i].path));
+        }
     }
 });
 

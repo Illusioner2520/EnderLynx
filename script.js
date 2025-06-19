@@ -225,7 +225,7 @@ class TabContent {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("tab-button");
             buttonElement.innerHTML = options[i].name;
-            buttonElement.setAttribute("data-color",options[i].color ?? "#0078d4");
+            buttonElement.setAttribute("data-color", options[i].color ?? "#0078d4");
             buttonElement.onclick = (e) => {
                 this.selectOption(options[i].value);
                 let oldLeft = this.offset_left;
@@ -234,7 +234,7 @@ class TabContent {
                 element.style.setProperty("--left", this.offset_left + "px");
                 element.style.setProperty("--right", this.offset_right + "px");
                 element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
-                element.style.setProperty("--color",options[i].color ?? "#0078d4");
+                element.style.setProperty("--color", options[i].color ?? "#0078d4");
             }
             element.appendChild(buttonElement);
             options[i].element = buttonElement;
@@ -247,7 +247,7 @@ class TabContent {
         element.style.setProperty("--left", "4px");
         element.style.setProperty("--right", element.offsetWidth - options[0].element.offsetLeft - options[0].element.offsetWidth + "px");
         element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
-        element.style.setProperty("--color",options[0].color ?? "#0078d4");
+        element.style.setProperty("--color", options[0].color ?? "#0078d4");
         this.selected = options[0].value;
     }
     get getSelected() {
@@ -272,7 +272,7 @@ class TabContent {
                 this.element.style.setProperty("--left", this.options[i].element.offset_left + "px");
                 this.element.style.setProperty("--right", this.options[i].element.offset_right + "px");
                 this.element.style.setProperty("--transition", "");
-                this.element.style.setProperty("--color",this.options[i].color ?? "#0078d4");
+                this.element.style.setProperty("--color", this.options[i].color ?? "#0078d4");
                 this.options[i].element.click();
             }
         }
@@ -735,7 +735,7 @@ class ContentList {
             }
             let imageElement = document.createElement("img");
             imageElement.className = "content-list-image";
-            imageElement.src = content[i].image ? content[i].image : "https://picsum.photos/40";
+            imageElement.src = content[i].image ? content[i].image : "default.png";
             contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
             infoElement1.className = "content-list-info";
@@ -1086,7 +1086,7 @@ function showInstanceContent(e) {
         if (data.instances[i].image) {
             instanceImage.src = data.instances[i].image;
         } else {
-            instanceImage.src = "https://picsum.photos/40";
+            instanceImage.src = "default.png";
         }
         instanceElement.appendChild(instanceImage);
         let instanceInfoEle = document.createElement("div");
@@ -1161,7 +1161,7 @@ function showInstanceContent(e) {
                             "content": "Confirm Deletion"
                         }
                     ], [], () => {
-                        data.instances.splice(i,1);
+                        data.instances.splice(i, 1);
                         saveData();
                         instanceContent.displayContent();
                     });
@@ -1176,7 +1176,7 @@ function showInstanceContent(e) {
     }
     return ele;
 }
-function showSpecificInstanceContent(instanceInfo,default_tab) {
+function showSpecificInstanceContent(instanceInfo, default_tab) {
     let running = checkForProcess(instanceInfo.pid);
     if (!running) instanceInfo.pid = null;
     content.innerHTML = "";
@@ -1190,7 +1190,7 @@ function showSpecificInstanceContent(instanceInfo,default_tab) {
     if (instanceInfo.image) {
         instImg.src = instanceInfo.image;
     } else {
-        instImg.src = "https://picsum.photos/96";
+        instImg.src = "default.png";
     }
     topBar.appendChild(instImg);
     let instTopInfo = document.createElement("div");
@@ -1384,6 +1384,15 @@ function setInstanceTabContentContent(instanceInfo, element) {
     let deleteContent = newContent.deleteContent;
     instanceInfo.content = instanceInfo.content.filter(e => !deleteContent.includes(e.file_name));
     let content = [];
+    instanceInfo.content.sort((a, b) => {
+        if (a.name.toLowerCase() > b.name.toLowerCase()) {
+            return 1;
+        }
+        if (a.name.toLowerCase() < b.name.toLowerCase()) {
+            return -1;
+        }
+        return 0;
+    });
     for (let i = 0; i < instanceInfo.content.length; i++) {
         let e = instanceInfo.content[i];
         content.push({
@@ -1509,7 +1518,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     "desc": translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - " + translate("app.worlds.description.hardcore") : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "")
                 },
                 "type": "singleplayer",
-                "image": worlds[i].icon ?? "https://picsum.photos/40",
+                "image": worlds[i].icon ?? "default.png",
                 "onremove": () => {
                     let dialog = new Dialog();
                     dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
@@ -1532,7 +1541,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playSingleplayerWorld(instanceInfo, worlds[i].id);
-                                showSpecificInstanceContent(instanceInfo,'worlds');
+                                showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
                         {
@@ -1567,7 +1576,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 });
                             }
                         }
-                    ].filter(e=>e))
+                    ].filter(e => e))
                 }
             });
     }
@@ -1583,7 +1592,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     "desc": worldsMultiplayer[i].ip
                 },
                 "type": "multiplayer",
-                "image": worldsMultiplayer[i].icon ?? "https://picsum.photos/40",
+                "image": worldsMultiplayer[i].icon ?? "default.png",
                 "onremove": () => {
                     let dialog = new Dialog();
                     dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worldsMultiplayer[i].name + "'?", [ // TODO
@@ -1606,7 +1615,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
-                                showSpecificInstanceContent(instanceInfo,'worlds');
+                                showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
                         {
@@ -1634,7 +1643,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 });
                             }
                         }
-                    ].filter(e=>e))
+                    ].filter(e => e))
                 }
             });
     }
@@ -1835,28 +1844,46 @@ function setInstanceTabContentOptions(instanceInfo, element) {
     element.innerHTML = "";
 }
 
+let hideError = (e) => {
+    document.getElementsByClassName("error")[0].hidePopover();
+}
+
+let errorTimeout;
+
+function displayError(error) {
+    document.getElementsByClassName("error")[0].showPopover();
+    document.getElementsByClassName("error")[0].innerHTML = error.toString();
+    clearTimeout(errorTimeout);
+    errorTimeout = setTimeout(hideError, 3000);
+}
+
 async function playInstance(instInfo, quickPlay = null) {
     instInfo.last_played = (new Date()).toString();
     // loader,version,loaderVersion,instance_id,player_info
-    let pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player, quickPlay);
-    if (!pid) return;
-    for (let i = 0; i < data.instances.length; i++) {
-        if (data.instances[i].instance_id == instInfo.instance_id) {
-            data.instances[i].pid = pid.minecraft.pid;
-            data.instances[i].current_log_file = pid.minecraft.log;
-            data.instances[i].java_path = pid.minecraft.java_path;
-            data.instances[i].java_version = pid.minecraft.java_version;
-        }
-    }
-    data.profile_info.default_player = pid.player_info;
-    if (data.profile_info.players) {
-        for (let i = 0; i < data.profile_info.players.length; i++) {
-            if (pid.player_info.uuid == data.profile_info.players[i].uuid) {
-                data.profile_info.players[i] = pid.player_info;
+    let pid;
+    try {
+        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player, quickPlay);
+        if (!pid) return;
+        for (let i = 0; i < data.instances.length; i++) {
+            if (data.instances[i].instance_id == instInfo.instance_id) {
+                data.instances[i].pid = pid.minecraft.pid;
+                data.instances[i].current_log_file = pid.minecraft.log;
+                data.instances[i].java_path = pid.minecraft.java_path;
+                data.instances[i].java_version = pid.minecraft.java_version;
             }
         }
+        data.profile_info.default_player = pid.player_info;
+        if (data.profile_info.players) {
+            for (let i = 0; i < data.profile_info.players.length; i++) {
+                if (pid.player_info.uuid == data.profile_info.players[i].uuid) {
+                    data.profile_info.players[i] = pid.player_info;
+                }
+            }
+        }
+        saveData();
+    } catch (e) {
+        displayError(e);
     }
-    saveData();
 }
 
 async function playSingleplayerWorld(instInfo, world_id) {
@@ -2136,11 +2163,11 @@ class VersionList {
 }
 
 class ImageUpload {
-    constructor(element) {
+    constructor(element, defaultImage) {
         element.className = "image-upload-wrapper";
         let preview = document.createElement("img");
         preview.className = "image-preview";
-        preview.src = "https://picsum.photos/96"
+        preview.src = defaultImage ?? "default.png"
         this.previewElement = preview;
         element.appendChild(preview);
         let containButtons = document.createElement("div");
@@ -2154,7 +2181,7 @@ class ImageUpload {
         containButtons.appendChild(uploadButton);
         containButtons.appendChild(removeButton);
         element.appendChild(containButtons);
-        this.value = "";
+        this.value = defaultImage ?? "";
         uploadButton.onclick = () => {
             let temp = document.createElement("input");
             temp.setAttribute("type", "file");
@@ -2194,7 +2221,7 @@ class ImageUpload {
         }
         removeButton.onclick = () => {
             this.value = "";
-            this.previewElement.src = "https://picsum.photos/96";
+            this.previewElement.src = "default.png";
         }
     }
 }
@@ -2233,9 +2260,11 @@ class Dialog {
         document.body.appendChild(element);
         element.showModal();
         let tabElement = document.createElement("div");
-        dialogContent.appendChild(tabElement);
         this.values = [];
-        if (tabs && tabs.length) new TabContent(tabElement, tabs.map(e => ({ "name": e.name, "value": e.value, "func": () => { } })))
+        if (tabs && tabs.length) {
+            dialogContent.appendChild(tabElement);
+            new TabContent(tabElement, tabs.map(e => ({ "name": e.name, "value": e.value, "func": () => { } })))
+        }
         if (type == "notice") {
             dialogContent.innerHTML = info;
         } else if (type == "form") {
@@ -2251,6 +2280,7 @@ class Dialog {
                     textInput.className = "dialog-text-input";
                     textInput.setAttribute("placeholder", info[i].name);
                     textInput.id = id;
+                    if (info[i].default) textInput.value = info[i].default;
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     dialogContent.appendChild(wrapper);
@@ -2265,7 +2295,7 @@ class Dialog {
                     label.className = "dialog-label";
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
-                    let imageUpload = new ImageUpload(element);
+                    let imageUpload = new ImageUpload(element, info[i].default);
                     wrapper.appendChild(element);
                     dialogContent.appendChild(wrapper);
                     this.values.push({ "id": info[i].id, "element": imageUpload });
@@ -2291,7 +2321,12 @@ class Dialog {
                     let element = document.createElement("div");
                     wrapper.appendChild(element);
                     dialogContent.appendChild(wrapper);
-                    let multiSelect = new DialogDropdown("", info[i].options, element, info[i].options[0]?.value);
+                    let multiSelect;
+                    if (info[i].options.length >= 10 || info[i].source) {
+                        multiSelect = new DialogDropdown("", info[i].options, element, info[i].options[0]?.value);
+                    } else {
+                        multiSelect = new SearchDropdown("", info[i].options, element, info[i].options[0]?.value, () => { });
+                    }
                     if (info[i].source) {
                         for (let j = 0; j < this.values.length; j++) {
                             if (this.values[j].id != info[i].input_source) continue;
@@ -2342,7 +2377,7 @@ class Dialog {
     }
 }
 
-function showAddContent(instance_id,vanilla_version,loader) {
+function showAddContent(instance_id, vanilla_version, loader) {
     content.innerHTML = "";
     let title = document.createElement("h1");
     title.innerHTML = "Add Content";
@@ -2353,62 +2388,62 @@ function showAddContent(instance_id,vanilla_version,loader) {
     content.appendChild(ele);
     let tabsElement = document.createElement("div");
     ele.appendChild(tabsElement);
-    let tabs = new TabContent(tabsElement,[
+    let tabs = new TabContent(tabsElement, [
         !instance_id ? {
             "name": "Modpacks",
             "value": "modpack",
             "func": () => {
-                contentTabSelect("modpack",tabInfo,loader,vanilla_version);
+                contentTabSelect("modpack", tabInfo, loader, vanilla_version);
             }
         } : null,
         !loader || loader != "vanilla" ? {
             "name": "Mods",
             "value": "mod",
             "func": () => {
-                contentTabSelect("mod",tabInfo,loader,vanilla_version);
+                contentTabSelect("mod", tabInfo, loader, vanilla_version);
             }
         } : null,
         {
             "name": "Resource Packs",
             "value": "resourcepack",
             "func": () => {
-                contentTabSelect("resourcepack",tabInfo,loader,vanilla_version);
+                contentTabSelect("resourcepack", tabInfo, loader, vanilla_version);
             }
         },
         !loader || loader != "vanilla" ? {
             "name": "Shaders",
             "value": "shader",
             "func": () => {
-                contentTabSelect("shader",tabInfo,loader,vanilla_version);
+                contentTabSelect("shader", tabInfo, loader, vanilla_version);
             }
         } : null,
         {
             "name": "Worlds",
             "value": "world",
             "func": () => {
-                contentTabSelect("world",tabInfo,loader,vanilla_version);
+                contentTabSelect("world", tabInfo, loader, vanilla_version);
             }
         },
         {
             "name": "Data Packs",
             "value": "datapack",
             "func": () => {
-                contentTabSelect("datapack",tabInfo,loader,vanilla_version);
+                contentTabSelect("datapack", tabInfo, loader, vanilla_version);
             }
         }
-    ].filter(e=>e));
+    ].filter(e => e));
     let tabInfo = document.createElement("div");
     tabInfo.className = "tab-info";
     ele.appendChild(tabInfo);
 }
 
 class ContentSearchEntry {
-    constructor(title,author,description,downloadCount,imageURL,installContent,installFunction,tags) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData) {
         let element = document.createElement("div");
         element.className = "discover-item";
         this.element = element;
         let image = document.createElement("img");
-        image.src = imageURL;
+        image.src = imageURL ? imageURL : "default.png";
         image.className = "discover-item-image";
         element.appendChild(image);
         let info = document.createElement("div");
@@ -2422,11 +2457,11 @@ class ContentSearchEntry {
         info.appendChild(top);
         let titleElement = document.createElement("div");
         titleElement.className = "discover-item-title";
-        titleElement.innerHTML = title;
+        titleElement.innerHTML = `<div>${title}</div>`;
         top.appendChild(titleElement);
         let authorElement = document.createElement("div");
         authorElement.className = "discover-item-author";
-        authorElement.innerHTML = `by ${author}`;
+        authorElement.innerHTML = `<div>by ${author}</div>`;
         top.appendChild(authorElement);
         let descElement = document.createElement("div");
         descElement.className = "discover-item-desc";
@@ -2442,13 +2477,15 @@ class ContentSearchEntry {
             tagsElement.appendChild(tagElement);
         })
         let downloadCountElement = document.createElement("div");
-        downloadCountElement.innerHTML = '<i class="fa-solid fa-download"></i> ' + formatNumber(downloadCount) + " downloads";
+        downloadCountElement.innerHTML = /*'<i class="fa-solid fa-download"></i> ' + */formatNumber(downloadCount) + " downloads";
         downloadCountElement.className = "discover-item-downloads";
         actions.appendChild(downloadCountElement);
         let installButton = document.createElement("button");
         installButton.className = "discover-item-install";
         installButton.innerHTML = installContent;
-        installButton.onclick = installFunction;
+        installButton.onclick = () => {
+            installFunction(infoData);
+        }
         actions.appendChild(installButton);
     }
 }
@@ -2467,7 +2504,7 @@ function formatNumber(num) {
     return output;
 }
 
-function contentTabSelect(tab,ele,loader,version) {
+function contentTabSelect(tab, ele, loader, version) {
     let tabsElement = document.createElement("div");
     ele.innerHTML = '';
     let sources = [];
@@ -2476,7 +2513,7 @@ function contentTabSelect(tab,ele,loader,version) {
         sources.push({
             "name": "Modrinth",
             "value": "modrinth",
-            "func": () => {},
+            "func": () => { },
             "color": "#1bd96a"
         });
     }
@@ -2484,7 +2521,7 @@ function contentTabSelect(tab,ele,loader,version) {
         sources.push({
             "name": "CurseForge",
             "value": "curseforge",
-            "func": () => {},
+            "func": () => { },
             "color": "#f16436"
         });
     }
@@ -2492,7 +2529,7 @@ function contentTabSelect(tab,ele,loader,version) {
         sources.push({
             "name": "Vanilla Tweaks",
             "value": "vanilla_tweaks",
-            "func": () => {},
+            "func": () => { },
             "color": "#f1c218"
         });
     }
@@ -2500,7 +2537,7 @@ function contentTabSelect(tab,ele,loader,version) {
         sources.push({
             "name": "Minecraft Maps",
             "value": "minecraft_maps",
-            "func": () => {},
+            "func": () => { },
             "color": "#c6c5c1"
         });
     }
@@ -2513,16 +2550,16 @@ function contentTabSelect(tab,ele,loader,version) {
     let searchElement = document.createElement("div");
     searchElement.style.flexGrow = 2;
     let searchContents = "";
-    let s = new SearchBar(searchElement,(v)=>{
+    let s = new SearchBar(searchElement, (v) => {
         searchContents = v;
-        getContent(discoverList,d.getSelected,v,loader,version,tab);
-    },()=>{});
+        getContent(discoverList, d.getSelected, v, loader, version, tab);
+    }, () => { });
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
-    let d = new SearchDropdown("Content Source",sources,dropdownElement,sources[0].value,()=>{
-        getContent(discoverList,d.getSelected,searchContents,loader,version,tab);
+    let d = new SearchDropdown("Content Source", sources, dropdownElement, sources[0].value, () => {
+        getContent(discoverList, d.getSelected, searchContents, loader, version, tab);
     });
-    getContent(discoverList,sources[0].value,"",loader,version,tab);
+    getContent(discoverList, sources[0].value, "", loader, version, tab);
     searchAndFilter.appendChild(dropdownElement);
     searchAndFilter.appendChild(searchElement);
     ele.appendChild(searchAndFilter);
@@ -2530,15 +2567,149 @@ function contentTabSelect(tab,ele,loader,version) {
 
 }
 
-async function getContent(element,source,query,loader,version,project_type) {
+async function getContent(element, source, query, loader, version, project_type) {
     if (source == "modrinth") {
         //query, loader, project_type, version
-        let apiresult = await window.electronAPI.modrinthSearch(query,loader,project_type,version);
+        let apiresult = await window.electronAPI.modrinthSearch(query, loader, project_type, version);
         element.innerHTML = "";
         for (let i = 0; i < apiresult.hits.length; i++) {
             let e = apiresult.hits[i];
-            let entry = new ContentSearchEntry(e.title,e.author,e.description,e.downloads,e.icon_url,'<i class="fa-solid fa-download"></i>Install',()=>{},e.categories.filter(e=>Object.keys(loaders).includes(e)).map(e=>loaders[e]));
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
+                let dialog = new Dialog();
+                dialog.showDialog(translate("app.button.instances.create"), "form", [
+                    {
+                        "type": "image-upload",
+                        "id": "icon",
+                        "name": "Icon", //TODO: replace with translate
+                        "default": i.icon_url
+                    },
+                    {
+                        "type": "text",
+                        "name": "Name", //TODO
+                        "id": "name",
+                        "default": i.title
+                    },
+                    {
+                        "type": "dropdown",
+                        "name": "Game Version", //TODO
+                        "id": "game_version",
+                        "options": i.versions.map(e => ({ "name": e, "value": e })).reverse()
+                    }
+                ], [
+                    { "content": "Cancel", "type": "cancel" },
+                    { "content": "Submit", "type": "confirm" }
+                ], [], async (e) => {
+                    let info = {};
+                    e.forEach(e => { info[e.id] = e.value });
+                    let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+                    let res = await fetch(`https://api.modrinth.com/v2/project/${i.project_id}/version`);
+                    let version_json = await res.json();
+                    let version = {};
+                    for (let j = 0; j < version_json.length; j++) {
+                        if (version_json[j].game_versions.includes(info.game_version)) {
+                            version = version_json[j];
+                            break;
+                        }
+                    }
+                    let newInstanceInfo = {
+                        "name": info.name,
+                        "last_played": "",
+                        "date_created": (new Date()).toString(),
+                        "date_modified": (new Date()).toString(),
+                        "playtime": 0,
+                        "loader": version.loaders[0],
+                        "vanilla_version": info.game_version,
+                        "loader_version": "0.16.14",
+                        "instance_id": instance_id,
+                        "image": info.icon,
+                        "downloaded": false,
+                        "locked": false,
+                        "content": [],
+                        "group": "",
+                        "install_source": "modrinth",
+                        "install_project_id": i.project_id
+                    }
+                    data.instances.push(newInstanceInfo);
+                    showSpecificInstanceContent(newInstanceInfo);
+                    console.log(version.files[0].url);
+                    await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url);
+                    await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`);
+                    window.electronAPI.downloadMinecraft(instance_id, version.loaders[0], info.game_version, "0.16.14");
+                    saveData();
+                })
+            } : (i) => {
+                let dialog = new Dialog();
+                dialog.showDialog(`Select Instance to install ${i.title}`, "form", [
+                    {
+                        "type": "dropdown",
+                        "name": "Instance",
+                        "id": "instance",
+                        "options": project_type == "mod" ? data.instances.filter(e => i.categories.includes(e.loader)).map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? data.instances.map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "shader" ? data.instances.filter(e => e.loader != "vanilla").map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : data.instances.map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id }))
+                    }
+                ], [
+                    { "content": "Cancel", "type": "cancel" },
+                    { "content": "Submit", "type": "confirm" }
+                ], null, async (e) => {
+                    let info = {};
+                    e.forEach(e => { info[e.id] = e.value });
+                    let instance = {};
+                    console.log(e);
+                    for (let j = 0; j < data.instances.length; j++) {
+                        if (data.instances[j].instance_id == info.instance) {
+                            instance = data.instances[j];
+                            break;
+                        }
+                    }
+                    let res = await fetch(`https://api.modrinth.com/v2/project/${i.project_id}/version`);
+                    let version_json = await res.json();
+                    console.log(version_json);
+                    console.log(instance);
+                    let initialContent = {};
+                    let version;
+                    for (let j = 0; j < version_json.length; j++) {
+                        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader))) {
+                            initialContent = await addContent(info.instance, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
+                            version = version_json[j].version_number;
+                            break;
+                        }
+                    }
+                    if (!initialContent.type) {
+                        for (let j = 0; j < version_json.length; j++) {
+                            if (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader)) {
+                                initialContent = await addContent(info.instance, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
+                                version = version_json[j].version_number;
+                                break;
+                            }
+                        }
+                    }
+                    initialContent.name = i.title;
+                    initialContent.source = "modrinth";
+                    initialContent.version = version;
+                    initialContent.disabled = false;
+                    initialContent.author = i.author;
+                    initialContent.image = i.icon_url;
+                    for (let i = 0; i < data.instances.length; i++) {
+                        if (data.instances[i].instance_id == info.instance) {
+                            data.instances[i].content.push(initialContent);
+                        }
+                    }
+                });
+            }, e.categories.map(e => formatCategory(e)), e);
             element.appendChild(entry.element);
         }
     }
+}
+
+function formatCategory(e) {
+    return toTitleCase(e.replaceAll("-", " "));
+}
+
+function toTitleCase(str) {
+    return str.replace(/\w\S*/g, function (txt) {
+        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+}
+
+async function addContent(instance_id, project_type, project_url, filename) {
+    return await window.electronAPI.addContent(instance_id, project_type, project_url, filename);
 }
