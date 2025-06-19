@@ -8,6 +8,7 @@ const os = require('os');
 const { spawn, exec, execFile } = require('child_process');
 const fsPromises = require('fs').promises;
 const { ipcRenderer } = require('electron');
+const lzma = require('lzma-native');
 
 let launchername = "EnderGate";
 let launcherversion = "0.0.1";
@@ -44,44 +45,71 @@ class Minecraft {
         this.modded_args_jvm = data.arguments.jvm;
     }
     async installForge(mcversion, forgeversion) {
-        ipcRenderer.send('progress-update', "Downloading Forge", 0, "Download Forge info...");
-        const forgeInstallerURL = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
-        await urlToFile(forgeInstallerURL,`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-installer.jar`);
+        ipcRenderer.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...");
+        const forgeInstallerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
+        const forgeMetaDir = `./minecraft/meta/forge/${mcversion}/${forgeversion}`;
+        const forgeLibDir = `./minecraft/meta/libraries`;
+        fs.mkdirSync(forgeMetaDir, { recursive: true });
+        fs.mkdirSync(forgeLibDir, { recursive: true });
 
-        let admzip = new AdmZip(`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-installer.jar`);
-        let versionJsonEntry = admzip.getEntry('version.json');
-        if (!versionJsonEntry) {
-            throw new Error('version.json not found in Forge installer JAR');
+        const installerPath = `${forgeMetaDir}/forge-installer.jar`;
+        await urlToFile(forgeInstallerUrl, installerPath);
+
+        let zip = new AdmZip(installerPath);
+        let version_json_entry = zip.getEntry("version.json");
+        let install_profile_entry = zip.getEntry("install_profile.json");
+        let version_json,install_profile_json;
+        if (version_json_entry) {
+            version_json = JSON.parse(version_json_entry.getData().toString('utf8'));
+        } else {
+            version_json = {};
         }
-        let data = versionJsonEntry.getData().toString('utf8');
-        fs.writeFileSync(`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-${mcversion}-${forgeversion}.json`, data);
-
-        ipcRenderer.send('progress-update', "Downloading Forge", 20, "Downloading Forge libraries...");
-        this.libs = this.libs || "";
-        this.libNames = this.libNames || [];
-
-        for (let i = 0; i < data.libraries.length; i++) {
-            ipcRenderer.send('progress-update', "Downloading Forge", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
-            let e = data.libraries[i];
-            let patha = path.resolve("./meta/libraries",e.downloads.artifact.path);
-            if (e.downloads && e.downloads.artifact && e.downloads.artifact.url && e.downloads.artifact.path) {
-                if (!fs.existsSync(`./minecraft/meta/libraries/${e.downloads.artifact.path}`)) {
-                    await urlToFile(e.downloads.artifact.url, `./minecraft/meta/libraries/${e.downloads.artifact.path}`);
-                }
-                this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
-            }/* else {
-                if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
-                    await urlToFile(`https://maven.minecraftforge.net/${patha}`, `./minecraft/meta/libraries/${patha}`);
-                }
-                this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
-            }*/
-            let libName = e.name.split(":");
-            libName.splice(libName.length - 1, 1);
-            this.libNames.push(libName.join(":"));
+        if (install_profile_entry) {
+            install_profile_json = JSON.parse(install_profile_entry.getData().toString('utf8'));
+        } else {
+            install_profile_json = {};
         }
-        this.main_class = data.mainClass;
-        this.modded_args_game = data.arguments && data.arguments.game ? data.arguments.game : [];
-        this.modded_args_jvm = data.arguments && data.arguments.jvm ? data.arguments.jvm : [];
+
+        fs.writeFileSync(`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-${mcversion}-${forgeversion}.json`, JSON.stringify(version_json));
+        fs.writeFileSync(`./minecraft/meta/forge/${mcversion}/${forgeversion}/forge-${mcversion}-${forgeversion}-install-profile.json`, JSON.stringify(install_profile_json));
+
+        let libraries = version_json.libraries;
+        let lib_paths = libraries.map(e => path.resolve(__dirname,`minecraft/instances/${this.instance_id}/libraries`,e.downloads.artifact.path));
+        this.libs = lib_paths.join(";") + ";";
+
+        this.main_class = version_json.mainClass;
+        this.modded_args_game = version_json.arguments.game ?? [];
+        this.modded_args_jvm = version_json.arguments.jvm.map(e => {
+            e = e.replaceAll("${library_directory}",path.resolve(__dirname,`minecraft/instances/${this.instance_id}/libraries`));
+            e = e.replaceAll("${classpath_separator}",";");
+            e = e.replaceAll("${version_name}",`${mcversion}-forge-${forgeversion}`);
+        }) ?? [];
+
+        let java = new Java();
+        let installation = await java.getJavaInstallation(21);
+
+        fs.mkdirSync(`./minecraft/instances/${this.instance_id}`,{recursive:true});
+
+        fs.writeFileSync(path.resolve(__dirname, `minecraft/instances/${this.instance_id}/launcher_profiles.json`), "{}");
+        fs.writeFileSync(path.resolve(__dirname, `minecraft/instances/${this.instance_id}/launcher_profiles_microsoft_store.json`), "{}");
+        
+        ipcRenderer.send('progress-update', "Downloading Forge", 20, "Running Forge Installer");
+
+        await new Promise((resolve, reject) => {
+            const installer = spawn(installation, ["-jar", installerPath, "--installClient", path.resolve(__dirname, `minecraft/instances/${this.instance_id}`)]);
+
+            installer.stdout.on('data', data => console.log(`Installer: ${data}`));
+            installer.stderr.on('data', data => console.error(`Installer Error: ${data}`));
+
+            installer.on('close', code => {
+                if (code === 0) resolve();
+                else reject(new Error(`Forge installer exited with code ${code}`));
+            });
+        });
+
+
+
+        ipcRenderer.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
     }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo) {
         let newJava = new Java();
@@ -121,18 +149,26 @@ class Minecraft {
             if (!fs.existsSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`)) {
                 await this.installForge(version, loaderVersion);
             } else {
-                let forge_json = fs.readFileSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`);
-                forge_json = JSON.parse(forge_json);
-                this.main_class = forge_json.mainClass;
-                this.modded_args_game = forge_json.arguments.game;
-                this.modded_args_jvm = forge_json.arguments.jvm;
-                for (let i = 0; i < forge_json.libraries.length; i++) {
-                    let patha = forge_json.libraries[i].downloads.artifact.path;
-                    this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
-                    let libName = forge_json.libraries[i].name.split(":");
-                    libName.splice(libName.length - 1, 1);
-                    this.libNames.push(libName.join(":"));
-                }
+                // let forge_json = fs.readFileSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`);
+                // forge_json = JSON.parse(forge_json);
+                // console.log(forge_json);
+                // this.main_class = forge_json.mainClass;
+                // this.modded_args_game = forge_json.arguments.game;
+                // this.modded_args_jvm = forge_json.arguments.jvm.map(e => {
+                //     e = e.replaceAll("${library_directory}", path.resolve(__dirname, "minecraft/meta/libraries"));
+                //     e = e.replaceAll("${classpath_separator}", ";");
+                //     e = e.replaceAll("${version_name}", `forge-${version}-${loaderVersion}`);
+                //     return e;
+                // });;
+                // for (let i = 0; i < forge_json.libraries.length; i++) {
+                //     if (forge_json.libraries[i].downloads.artifact.url) {
+                //         let patha = forge_json.libraries[i].downloads.artifact.path;
+                //         this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+                //         let libName = forge_json.libraries[i].name.split(":");
+                //         libName.splice(libName.length - 1, 1);
+                //         this.libNames.push(libName.join(":"));
+                //     }
+                // }
             }
         }
         if (!fs.existsSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`)) {
@@ -235,7 +271,7 @@ class Minecraft {
                 let split = quickPlay.info.split(":");
                 let server = split[0];
                 let port = split[1] ?? "25565";
-                extraArgs = extraArgs.concat(["--server",server,"--port",port])
+                extraArgs = extraArgs.concat(["--server", server, "--port", port])
             }
             this.args.game = this.args.game.filter((e) => e);
             this.args.game = this.args.game.map((e) => {
@@ -255,6 +291,7 @@ class Minecraft {
                 e = e.replace("${auth_session}", auth.accessToken);
                 return e;
             });
+            if (this.modded_args_jvm_top) args = args.concat(this.modded_args_jvm_top);
             args: for (let i = 0; i < this.args.jvm.length; i++) {
                 let e = this.args.jvm[i];
                 if (e.value && e.rules) {
@@ -295,7 +332,7 @@ class Minecraft {
                     if (e.includes("${classpath}")) {
                         let theargs = [this.libs + this.jarfile];
                         theargs = theargs.concat(this.modded_args_jvm);
-                        theargs = theargs.concat(["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname,"log_config.xml"), this.main_class]);
+                        theargs = theargs.concat(["-Xmx2G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"), this.main_class]);
                         args = args.concat(theargs);
                     } else {
                         args.push(e);
@@ -320,7 +357,7 @@ class Minecraft {
             args.push("-cp");
             args.push(this.libs + this.jarfile);
             args = args.concat("-Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
-            args = args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname,"log_config.xml"));
+            args = args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"));
             args.push(this.main_class);
             this.args = this.args.map((e) => {
                 e = e.replace("${auth_player_name}", player_info.name);
@@ -344,7 +381,7 @@ class Minecraft {
                 let split = quickPlay.info.split(":");
                 let server = split[0];
                 let port = split[1] ?? "25565";
-                args = args.concat(["--server",server,"--port",port])
+                args = args.concat(["--server", server, "--port", port])
             }
         }
         console.log("Launching game.");

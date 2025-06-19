@@ -5,3 +5,5 @@ java/
 data.json
 
 temp.json
+
+*.log
