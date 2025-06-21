@@ -1625,6 +1625,7 @@ dialog[open]::backdrop {
     border-style: solid;
     min-width: 400px;
     box-shadow: 0px 0px 10px black;
+    max-width: 600px;
 }
 
 .dialog-content {

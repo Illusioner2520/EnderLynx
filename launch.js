@@ -115,10 +115,10 @@ class Minecraft {
             let name = name_items[1];
             let version = name_items[2].split("@")[0];
             let installation_path = `${package_.replace(".", "/")}/${name}/${version}`;
-            installation_path =  path.resolve(__dirname,"minecraft/meta/libraries",installation_path);
-            let installation_path_w_file = path.resolve(installation_path,forge_library_path);
+            installation_path = path.resolve(__dirname, "minecraft/meta/libraries", installation_path);
+            let installation_path_w_file = path.resolve(installation_path, forge_library_path);
             if (!fs.existsSync(installation_path_w_file)) {
-                zip.extractEntryTo(forge_library_path,installation_path);
+                zip.extractEntryTo(forge_library_path, installation_path);
             }
 
             this.libs += installation_path_w_file + ";";
@@ -169,7 +169,6 @@ class Minecraft {
 
                 installer.stdout.on('data', data => {
                     console.log(`${data}`);
-                    ipcRenderer.send('progress-update', "Downloading Forge", 20, `${data}`);
                 });
                 installer.stderr.on('data', data => console.error(`Installer Error: ${data}`));
 
@@ -234,26 +233,90 @@ class Minecraft {
             if (!fs.existsSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`)) {
                 await this.installForge(version, loaderVersion);
             } else {
-                // let forge_json = fs.readFileSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`);
-                // forge_json = JSON.parse(forge_json);
-                // console.log(forge_json);
-                // this.main_class = forge_json.mainClass;
-                // this.modded_args_game = forge_json.arguments.game;
-                // this.modded_args_jvm = forge_json.arguments.jvm.map(e => {
-                //     e = e.replaceAll("${library_directory}", path.resolve(__dirname, "minecraft/meta/libraries"));
-                //     e = e.replaceAll("${classpath_separator}", ";");
-                //     e = e.replaceAll("${version_name}", `forge-${version}-${loaderVersion}`);
-                //     return e;
-                // });;
-                // for (let i = 0; i < forge_json.libraries.length; i++) {
-                //     if (forge_json.libraries[i].downloads.artifact.url) {
-                //         let patha = forge_json.libraries[i].downloads.artifact.path;
-                //         this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
-                //         let libName = forge_json.libraries[i].name.split(":");
-                //         libName.splice(libName.length - 1, 1);
-                //         this.libNames.push(libName.join(":"));
-                //     }
-                // }
+                let compareVersions = (v1, v2) => {
+                    const a = v1.split('-')[0].split('.').map(Number);
+                    const b = v2.split('-')[0].split('.').map(Number);
+                    const length = Math.max(a.length, b.length);
+
+                    for (let i = 0; i < length; i++) {
+                        const num1 = a[i] || 0;
+                        const num2 = b[i] || 0;
+                        if (num1 < num2) return -1;
+                        if (num1 > num2) return 1;
+                    }
+                    return 0;
+                }
+                const lowerBound = "7.8.0.684";
+                const upperBound = "14.23.5.2851";
+
+                if (compareVersions(loaderVersion, lowerBound) >= 0 && compareVersions(loaderVersion, upperBound) <= 0) {
+                    let install_profile_json = JSON.parse(fs.readFileSync(`./minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}-install-profile.json`));
+                    let forge_library_path = install_profile_json.install.filePath;
+                    let name_items = install_profile_json.install.path.split(":");
+                    let package_ = name_items[0];
+                    let name = name_items[1];
+                    let version = name_items[2].split("@")[0];
+                    let installation_path = `${package_.replace(".", "/")}/${name}/${version}`;
+                    installation_path = path.resolve(__dirname, "minecraft/meta/libraries", installation_path);
+                    let installation_path_w_file = path.resolve(installation_path, forge_library_path);
+
+                    this.libs += installation_path_w_file + ";";
+
+                    for (let i = 0; i < install_profile_json.versionInfo.libraries.length; i++) {
+                        let entry = install_profile_json.versionInfo.libraries[i];
+                        if (entry.name == install_profile_json.install.path) {
+                            // hi
+                        } else if (entry.url && !entry.url.includes("https://libraries.minecraft.net/")) {
+                            let fileName = entry.name.split(":");
+                            fileName.splice(0, 1);
+                            fileName = fileName.join("-") + ".jar";
+                            let patha = entry.name.split(":");
+                            patha[0] = patha[0].replaceAll(".", "/");
+                            patha = patha.join("/") + "/" + fileName;
+                            this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+                            let libName = entry.name.split(":");
+                            libName.splice(libName.length - 1, 1);
+                            this.libNames.push(libName.join(":"));
+                        } else if (!entry.url) {
+                            let fileName = entry.name.split(":");
+                            fileName.splice(0, 1);
+                            fileName = fileName.join("-") + ".jar";
+                            let patha = entry.name.split(":");
+                            patha[0] = patha[0].replaceAll(".", "/");
+                            patha = patha.join("/") + "/" + fileName;
+                            this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+                            let libName = entry.name.split(":");
+                            libName.splice(libName.length - 1, 1);
+                            this.libNames.push(libName.join(":"));
+                        }
+                    }
+                    this.main_class = install_profile_json.versionInfo.mainClass;
+                    this.legacy_modded_arguments = install_profile_json.versionInfo.minecraftArguments;
+                    this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                    this.modded_args_game = [];
+                    this.modded_args_jvm = [];
+                } else if (compareVersions(loaderVersion, upperBound) > 0) {
+                    let forge_version_info = fs.readFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}-forge-${loaderVersion}/${version}-forge-${loaderVersion}.json`)
+                    forge_version_info = JSON.parse(forge_version_info);
+                    let libraries = forge_version_info.libraries;
+                    let lib_paths = libraries.map(e => path.resolve(__dirname, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+                    this.libs = [...(new Set(this.libs))];
+                    this.libs = lib_paths.join(";") + ";";
+                    this.libNames = libraries.map(e => {
+                        let libName = e.name.split(":");
+                        libName.splice(libName.length - 1, 1);
+                        return libName.join(":");
+                    });
+                    this.main_class = forge_version_info.mainClass;
+                    this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}-forge-${loaderVersion}/${version}-forge-${loaderVersion}.jar`);
+                    this.modded_args_game = forge_version_info?.arguments?.game ? forge_version_info.arguments.game : [];
+                    this.modded_args_jvm = forge_version_info?.arguments?.jvm ? forge_version_info.arguments.jvm.map(e => {
+                        e = e.replaceAll("${library_directory}", path.resolve(__dirname, `minecraft/instances/${this.instance_id}/libraries`));
+                        e = e.replaceAll("${classpath_separator}", ";");
+                        e = e.replaceAll("${version_name}", `${version}-forge-${loaderVersion}`);
+                        return e;
+                    }) : [];
+                }
             }
         }
         if (!fs.existsSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`)) {

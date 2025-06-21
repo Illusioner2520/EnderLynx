@@ -15,6 +15,7 @@
     "adm-zip": "^0.5.16",
     "lzma-native": "^8.0.6",
     "msmc": "^5.0.5",
-    "prismarine-nbt": "^2.7.0"
+    "prismarine-nbt": "^2.7.0",
+    "toml": "^3.0.0"
   }
 }

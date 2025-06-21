@@ -456,8 +456,8 @@ class SearchDropdown {
             optEle.classList.add("dropdown-item");
             optEle.innerHTML = options[i].name;
             optEle.onclick = (e) => {
-                this.onchange(options[i].value);
                 this.selectOption(options[i].value);
+                this.onchange(options[i].value);
             }
             if (options[i].value == initial) {
                 optEle.classList.add("selected");
@@ -1006,10 +1006,16 @@ function showInstanceContent(e) {
                 "name": "Import from Launcher", //TODO
                 "value": "launcher"
             }
-        ], (e) => {
+        ], async (e) => {
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
             let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+            let loader_version = "";
+            if (info.loader == "fabric") {
+                loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+            } else if (info.loader == "forge") {
+                loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+            }
             let newInstanceInfo = {
                 "name": info.name,
                 "last_played": "",
@@ -1018,7 +1024,7 @@ function showInstanceContent(e) {
                 "playtime": 0,
                 "loader": info.loader,
                 "vanilla_version": info.game_version,
-                "loader_version": "0.16.14",
+                "loader_version": loader_version,
                 "instance_id": instance_id,
                 "image": info.icon,
                 "downloaded": false,
@@ -1028,7 +1034,7 @@ function showInstanceContent(e) {
             }
             data.instances.push(newInstanceInfo);
             showSpecificInstanceContent(newInstanceInfo);
-            window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, "0.16.14");
+            window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
             saveData();
         })
     }
@@ -2475,11 +2481,13 @@ class ContentSearchEntry {
             tagElement.innerHTML = e;
             tagElement.className = "discover-item-tag";
             tagsElement.appendChild(tagElement);
-        })
-        let downloadCountElement = document.createElement("div");
-        downloadCountElement.innerHTML = /*'<i class="fa-solid fa-download"></i> ' + */formatNumber(downloadCount) + " downloads";
-        downloadCountElement.className = "discover-item-downloads";
-        actions.appendChild(downloadCountElement);
+        });
+        if (downloadCount) {
+            let downloadCountElement = document.createElement("div");
+            downloadCountElement.innerHTML = /*'<i class="fa-solid fa-download"></i> ' + */formatNumber(downloadCount) + " downloads";
+            downloadCountElement.className = "discover-item-downloads";
+            actions.appendChild(downloadCountElement);
+        }
         let installButton = document.createElement("button");
         installButton.className = "discover-item-install";
         installButton.innerHTML = installContent;
@@ -2568,6 +2576,7 @@ function contentTabSelect(tab, ele, loader, version) {
 }
 
 async function getContent(element, source, query, loader, version, project_type) {
+    console.log("getting content for source", source);
     if (source == "modrinth") {
         //query, loader, project_type, version
         let apiresult = await window.electronAPI.modrinthSearch(query, loader, project_type, version);
@@ -2575,6 +2584,12 @@ async function getContent(element, source, query, loader, version, project_type)
         for (let i = 0; i < apiresult.hits.length; i++) {
             let e = apiresult.hits[i];
             let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
+                let options = [];
+                i.categories.forEach((e) => {
+                    if (loaders[e]) {
+                        options.push({ "name": loaders[e], "value": e })
+                    }
+                })
                 let dialog = new Dialog();
                 dialog.showDialog(translate("app.button.instances.create"), "form", [
                     {
@@ -2594,6 +2609,12 @@ async function getContent(element, source, query, loader, version, project_type)
                         "name": "Game Version", //TODO
                         "id": "game_version",
                         "options": i.versions.map(e => ({ "name": e, "value": e })).reverse()
+                    },
+                    {
+                        "type": "dropdown",
+                        "name": "Mod Loader", //TODO
+                        "id": "loader",
+                        "options": options
                     }
                 ], [
                     { "content": "Cancel", "type": "cancel" },
@@ -2606,35 +2627,38 @@ async function getContent(element, source, query, loader, version, project_type)
                     let version_json = await res.json();
                     let version = {};
                     for (let j = 0; j < version_json.length; j++) {
-                        if (version_json[j].game_versions.includes(info.game_version)) {
+                        if (version_json[j].game_versions.includes(info.game_version) && version_json[j].loaders.includes(info.loader)) {
                             version = version_json[j];
                             break;
                         }
                     }
+                    if (!version.files) {
+                        displayError(`Error: Could not find version of '${i.title}' that is version ${info.game_version} and uses loader ${loaders[info.loader]}`);
+                        return;
+                    }
+                    await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, i.title);
+                    let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, i.title);
                     let newInstanceInfo = {
                         "name": info.name,
                         "last_played": "",
                         "date_created": (new Date()).toString(),
                         "date_modified": (new Date()).toString(),
                         "playtime": 0,
-                        "loader": version.loaders[0],
+                        "loader": info.loader,
                         "vanilla_version": info.game_version,
-                        "loader_version": "0.16.14",
+                        "loader_version": mr_pack_info.loader_version,
                         "instance_id": instance_id,
                         "image": info.icon,
                         "downloaded": false,
                         "locked": false,
-                        "content": [],
+                        "content": mr_pack_info.content,
                         "group": "",
                         "install_source": "modrinth",
                         "install_project_id": i.project_id
                     }
                     data.instances.push(newInstanceInfo);
                     showSpecificInstanceContent(newInstanceInfo);
-                    console.log(version.files[0].url);
-                    await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url);
-                    await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`);
-                    window.electronAPI.downloadMinecraft(instance_id, version.loaders[0], info.game_version, "0.16.14");
+                    window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
                     saveData();
                 })
             } : (i) => {
@@ -2652,52 +2676,116 @@ async function getContent(element, source, query, loader, version, project_type)
                 ], null, async (e) => {
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
-                    let instance = {};
-                    console.log(e);
-                    for (let j = 0; j < data.instances.length; j++) {
-                        if (data.instances[j].instance_id == info.instance) {
-                            instance = data.instances[j];
-                            break;
-                        }
-                    }
-                    let res = await fetch(`https://api.modrinth.com/v2/project/${i.project_id}/version`);
-                    let version_json = await res.json();
-                    console.log(version_json);
-                    console.log(instance);
-                    let initialContent = {};
-                    let version;
-                    for (let j = 0; j < version_json.length; j++) {
-                        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader))) {
-                            initialContent = await addContent(info.instance, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
-                            version = version_json[j].version_number;
-                            break;
-                        }
-                    }
-                    if (!initialContent.type) {
-                        for (let j = 0; j < version_json.length; j++) {
-                            if (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader)) {
-                                initialContent = await addContent(info.instance, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
-                                version = version_json[j].version_number;
-                                break;
-                            }
-                        }
-                    }
-                    initialContent.name = i.title;
-                    initialContent.source = "modrinth";
-                    initialContent.version = version;
-                    initialContent.disabled = false;
-                    initialContent.author = i.author;
-                    initialContent.image = i.icon_url;
-                    for (let i = 0; i < data.instances.length; i++) {
-                        if (data.instances[i].instance_id == info.instance) {
-                            data.instances[i].content.push(initialContent);
-                        }
-                    }
+                    await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
                 });
             }, e.categories.map(e => formatCategory(e)), e);
             element.appendChild(entry.element);
         }
+    } else if (source == "vanilla_tweaks") {
+        let result;
+        if (project_type == "resourcepack") {
+            result = await window.electronAPI.getVanillaTweaksResourcePacks(query, version);
+        } else if (project_type == "datapack") {
+            result = await window.electronAPI.getVanillaTweaksDataPacks(query, version);
+        }
+        element.innerHTML = "";
+        for (let i = 0; i < result.hits.length; i++) {
+            let e = result.hits[i];
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-plus"></i>Add Pack', () => { }, e.categories, e);
+            element.appendChild(entry.element);
+        }
     }
+}
+
+async function installContent(source, project_id, instance_id, project_type, title, author, icon_url) {
+    let instance = {};
+    for (let j = 0; j < data.instances.length; j++) {
+        if (data.instances[j].instance_id == instance_id) {
+            instance = data.instances[j];
+            break;
+        }
+    }
+    let version_json;
+    if (source == "modrinth") {
+        let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version`);
+        version_json = await res.json();
+    }
+    console.log(version_json);
+    console.log(instance);
+    let initialContent = {};
+    let version;
+    for (let i = 0; i < data.instances.length; i++) {
+        if (data.instances[i].instance_id == instance_id) {
+            if (data.instances[i].content.map(e => e.source_id).includes(project_id)) {
+                return;
+            }
+            break;
+        }
+    }
+    let dependencies;
+    for (let j = 0; j < version_json.length; j++) {
+        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader))) {
+            initialContent = await addContent(instance_id, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
+            version = version_json[j].version_number;
+            dependencies = version_json[j].dependencies;
+            break;
+        }
+    }
+    if (!initialContent.type) {
+        for (let j = 0; j < version_json.length; j++) {
+            if (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader)) {
+                initialContent = await addContent(instance_id, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
+                version = version_json[j].version_number;
+                dependencies = version_json[j].dependencies;
+                break;
+            }
+        }
+    }
+    for (let j = 0; j < dependencies.length; j++) {
+        let dependency = dependencies[j];
+        let res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}`);
+        let res_json = await res.json();
+        let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}/members`);
+        let get_author_res_json = await get_author_res.json();
+        let author = "";
+        get_author_res_json.forEach(e => {
+            if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
+                author = e.user.username;
+            }
+        })
+        if (dependency.dependency_type == "required") {
+            await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
+        } else {
+            let dialog = new Dialog();
+            dialog.showDialog("Would you like to install this optional dependency?", "notice", `The content '${title}' that you just installed has an optional dependency. The name of this dependency is '${res_json.title}'. Would you like to install this extra content to the same instance?`, [
+                {
+                    "type": "cancel",
+                    "content": "No"
+                },
+                {
+                    "type": "confirm",
+                    "content": "Yes"
+                }
+            ], [], async () => {
+                await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
+            });
+        }
+    }
+    initialContent.name = title;
+    initialContent.source = source;
+    initialContent.version = version;
+    initialContent.disabled = false;
+    initialContent.author = author;
+    initialContent.image = icon_url;
+    initialContent.source_id = project_id;
+    console.log(initialContent);
+    for (let i = 0; i < data.instances.length; i++) {
+        if (data.instances[i].instance_id == instance_id) {
+            console.log("FOUND INSTANCE, ADDING CONTENT NAMED " + title.toUpperCase());
+            data.instances[i].content.push(initialContent);
+        }
+    }
+    saveData();
 }
 
 function formatCategory(e) {

@@ -9,8 +9,11 @@ const { Auth } = require('msmc');
 const AdmZip = require('adm-zip');
 const https = require('https');
 const querystring = require('querystring');
+const toml = require('toml');
 
 let default_data = { "instances": [], "profile_info": {}, "default_sort": "name", "default_group": "none" }
+
+let vt_rp, vt_dp, vt_ct;
 
 if (!fs.existsSync("./data.json")) {
     fs.writeFileSync("./data.json", JSON.stringify(default_data));
@@ -227,7 +230,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return fs.readdirSync(patha).filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz")).map(e => {
             let date = e.replace(".log", "").split("_");
             if (date[1]) date[1] = date[1].replaceAll("-", ":");
-            return ({ "date": (new Date(date.join(" "))).toString(), "file_path": path.resolve(patha, e) });
+            let dateStr = date.join(" ");
+            let parsedDate = new Date(dateStr);
+            return ({
+                "date": isNaN(parsedDate.getTime()) ? e : parsedDate.toString(),
+                "file_path": path.resolve(patha, e)
+            });
         });
     },
     getLog: (log_path) => {
@@ -251,36 +259,65 @@ contextBridge.exposeInMainWorld('electronAPI', {
             if (path.extname(file).toLowerCase() !== '.jar' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".jar.disabled"))) {
                 return null;
             }
-            let fabricModJson = null;
+            let modJson = null;
             try {
                 const zip = fs.readFileSync(filePath);
 
                 const admZip = new AdmZip(zip);
                 const entry = admZip.getEntry('fabric.mod.json');
                 if (entry) {
-                    fabricModJson = JSON.parse(entry.getData().toString('utf-8'));
-                    if (fabricModJson.icon) {
-                        let iconPath = Array.isArray(fabricModJson.icon) ? fabricModJson.icon[0] : fabricModJson.icon;
+                    modJson = JSON.parse(entry.getData().toString('utf-8'));
+                    if (modJson.icon) {
+                        let iconPath = Array.isArray(modJson.icon) ? modJson.icon[0] : modJson.icon;
                         const iconEntry = admZip.getEntry(iconPath);
                         if (iconEntry) {
                             const iconBuffer = iconEntry.getData();
                             let mime = 'image/png';
                             if (iconPath.endsWith('.jpg') || iconPath.endsWith('.jpeg')) mime = 'image/jpeg';
                             else if (iconPath.endsWith('.gif')) mime = 'image/gif';
-                            fabricModJson.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
+                            modJson.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
                         }
                     }
+                }
+                const entry_forge = admZip.getEntry("META-INF/mods.toml");
+                if (entry_forge) {
+                    const modsTomlData = entry_forge.getData().toString('utf-8');
+                    let forgeModJson = null;
+                    try {
+                        forgeModJson = toml.parse(modsTomlData);
+                        if (Array.isArray(forgeModJson.mods) && forgeModJson.mods.length > 0) {
+                            const mod = forgeModJson.mods[0];
+                            if (mod.logoFile) {
+                                let iconPath = Array.isArray(mod.logoFile) ? mod.logoFile[0] : mod.logoFile;
+                                const iconEntry = admZip.getEntry(iconPath);
+                                if (iconEntry) {
+                                    const iconBuffer = iconEntry.getData();
+                                    let mime = 'image/png';
+                                    if (iconPath.endsWith('.jpg') || iconPath.endsWith('.jpeg')) mime = 'image/jpeg';
+                                    else if (iconPath.endsWith('.gif')) mime = 'image/gif';
+                                    modJson.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
+                                }
+                            }
+                            modJson = {
+                                ...modJson,
+                                name: mod.displayName || mod.modId || file.replace(".jar.disabled", ".jar"),
+                                version: (!mod.version?.includes("$") && mod.version) ? mod.version : "",
+                                authors: mod.authors ? [mod.authors] : [],
+                                description: mod.description || "",
+                            };
+                        }
+                    } catch (e) { }
                 }
             } catch (e) { }
             return {
                 type: 'mod',
-                name: fabricModJson?.name ?? file.replace(".jar.disabled", ".jar"),
+                name: modJson?.name ?? file.replace(".jar.disabled", ".jar"),
                 source: "player_install",
                 file_name: file,
-                version: fabricModJson?.version ?? "",
+                version: modJson?.version ?? "",
                 disabled: file.includes(".jar.disabled"),
-                author: fabricModJson?.authors && fabricModJson?.authors[0] ? (fabricModJson?.authors[0]?.name ? fabricModJson.authors[0].name : fabricModJson.authors[0]) : "",
-                image: fabricModJson?.icon ?? ""
+                author: modJson?.authors && modJson?.authors[0] ? (modJson?.authors[0]?.name ? modJson.authors[0].name : modJson.authors[0]) : "",
+                image: modJson?.icon ?? ""
             };
         }).filter(Boolean);
         const resourcepacks = fs.readdirSync(pathb).map(file => {
@@ -308,9 +345,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     packMcMeta.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
                 }
             } catch (e) { }
+            let name = file.replace(".zip.disabled", ".zip");
+            if (packMcMeta?.pack?.description) name = packMcMeta.pack.description;
+            if (packMcMeta?.pack?.description.fallback) name = packMcMeta.pack.description.fallback;
+            if (typeof name !== "string") name = file.replace(".zip.disabled", ".zip");
             return {
                 type: 'resource_pack',
-                name: packMcMeta?.pack?.description ?? file.replace(".zip.disabled", ".zip"),
+                name: name,
                 source: "player_install",
                 file_name: file,
                 version: "",
@@ -384,6 +425,97 @@ contextBridge.exposeInMainWorld('electronAPI', {
             urlToFile("https://vanillatweaks.net" + data.link, "test.zip");
         }
     },
+    getVanillaTweaksResourcePacks: async (query = "", version = "1.21") => {
+        query = query.toLowerCase().trim();
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let data_json = vt_rp;
+        if (!vt_rp) {
+            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
+            data_json = await data.json();
+            vt_rp = data_json;
+        }
+
+        let return_data = {};
+        return_data.hits = [];
+
+        let process_category = (category,previous_categories = []) => {
+            previous_categories.push(category.category);
+            let packs = category.packs;
+            packs = packs.map(e => ({
+                "title": e.display,
+                "description": e.description,
+                "icon_url": `https://vanillatweaks.net/assets/resources/icons/resourcepacks/${version}/${e.name}.png`,
+                "categories": [
+                    previous_categories.join(" > ")
+                ],
+                "author": "Vanilla Tweaks",
+                "incompatible": e.incompatible
+            }));
+            packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
+            return_data.hits = return_data.hits.concat(packs);
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e,structuredClone(previous_categories));
+                })
+            }
+        }
+        for (let i = 0; i < data_json.categories.length; i++) {
+            process_category(data_json.categories[i]);
+        }
+        return return_data;
+    },
+    getVanillaTweaksDataPacks: async (query = "", version = "1.21") => {
+        query = query.toLowerCase().trim();
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let data_json = vt_dp;
+        let data_ct_json = vt_ct;
+        if (!vt_dp) {
+            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
+            data_json = await data.json();
+            vt_dp = data_json;
+        }
+        if (!vt_ct) {
+            let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
+            data_ct_json = await data_ct.json();
+            vt_ct = data_ct_json;
+        }
+
+
+        let return_data = {};
+        return_data.hits = [];
+
+        let process_category = (category, type) => {
+            let packs = category.packs;
+            packs = packs.map(e => ({
+                "title": e.display,
+                "description": e.description,
+                "icon_url": `https://vanillatweaks.net/assets/resources/icons/${type == "dp" ? "datapacks" : "craftingtweaks"}/${version}/${e.name}.png`,
+                "categories": [
+                    category.category
+                ],
+                "author": "Vanilla Tweaks",
+                "incompatible": e.incompatible
+            }));
+            packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
+            return_data.hits = return_data.hits.concat(packs);
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e);
+                })
+            }
+        }
+        for (let i = 0; i < data_json.categories.length; i++) {
+            process_category(data_json.categories[i], "dp");
+        }
+        for (let i = 0; i < data_ct_json.categories.length; i++) {
+            process_category(data_ct_json.categories[i], "ct");
+        }
+        return return_data;
+    },
     onProgressUpdate: (callback) => {
         ipcRenderer.on('progress-update', (_event, title, progress, desc) => {
             callback(title, progress, desc);
@@ -420,12 +552,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fs.mkdirSync(`./minecraft/instances/${instance_id}`, { recursive: true });
         return instance_id;
     },
-    downloadMinecraft: (instance_id, loader, vanilla_version, loader_version) => {
+    downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
         let mc = new Minecraft(instance_id);
-        mc.downloadGame(loader, vanilla_version);
+        await mc.downloadGame(loader, vanilla_version);
         if (loader == "fabric") {
-            mc.installFabric(vanilla_version, loader_version);
+            await mc.installFabric(vanilla_version, loader_version);
+        } else if (loader == "forge") {
+            await mc.installForge(vanilla_version, loader_version);
         }
+    },
+    getForgeVersion: async (mcversion) => {
+        let forge = new Forge();
+        return (await forge.getVersions(mcversion)).reverse()[0];
+    },
+    getFabricVersion: async (mcversion) => {
+        let fabric = new Fabric();
+        return (await fabric.getVersions(mcversion))[0];
     },
     watchFile: (filepath, callback) => {
         let lastSize = 0;
@@ -496,7 +638,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // mod, modpack, resourcepack, shader, datapack
     modrinthSearch: async (query, loader, project_type, version) => {
         let facets = [];
-        if (loader) facets.push([`categories:${loader}`]);
+        if (loader && ["modpack", "mod"].includes(project_type)) facets.push([`categories:${loader}`]);
         if (version) facets.push([`versions:${version}`]);
         facets.push([`project_type:${project_type}`]);
         let url = `https://api.modrinth.com/v2/search?query=${query}&facets=${JSON.stringify(facets)}&limit=100`;
@@ -528,10 +670,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
             file_name: filename
         };
     },
-    downloadModrinthPack: async (instance_id, url) => {
+    downloadModrinthPack: async (instance_id, url, title) => {
+        ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
         await urlToFile(url, `./minecraft/instances/${instance_id}/pack.mrpack`);
+        ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
     },
-    processMrPack: async (instance_id, mrpack_path) => {
+    processMrPack: async (instance_id, mrpack_path, loader = "minecraft", title = ".mrpack file") => {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
         const zip = new AdmZip(mrpack_path);
 
         let extractToPath = `./minecraft/instances/${instance_id}`;
@@ -551,6 +696,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const files = fs.readdirSync(srcDir);
 
         for (const file of files) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -569,9 +715,56 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
         modrinth_index_json = JSON.parse(modrinth_index_json);
 
+        let content = [];
+
         for (let i = 0; i < modrinth_index_json.files.length; i++) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / modrinth_index_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${modrinth_index_json.files.length}`);
             await urlToFile(modrinth_index_json.files[i].downloads[0], path.resolve(extractToPath, modrinth_index_json.files[i].path));
+            if (modrinth_index_json.files[i].downloads[0].includes("https://cdn.modrinth.com/data")) {
+                let split = modrinth_index_json.files[i].downloads[0].split("/");
+                let project_id = split[4];
+                let file_id = split[6];
+                if (project_id && file_id) {
+                    let res_1 = await fetch(`https://api.modrinth.com/v2/project/${project_id}`);
+                    let res_1_json = await res_1.json();
+                    let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
+                    let res_json = await res.json();
+                    let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/members`);
+                    let get_author_res_json = await get_author_res.json();
+                    let author = "";
+                    get_author_res_json.forEach(e => {
+                        if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
+                            author = e.user.username;
+                        }
+                    });
+
+                    let file_name = res_json.files[0].filename;
+                    let version = res_json.version_number;
+
+                    let project_type = res_1_json.project_type;
+                    if (project_type == "resourcepack") project_type = "resource_pack";
+
+                    content.push({
+                        "author": author,
+                        "disabled": false,
+                        "file_name": file_name,
+                        "image": res_1_json.icon_url,
+                        "source": "modrinth",
+                        "source_id": project_id,
+                        "type": project_type,
+                        "version": version,
+                        "name": res_1_json.title
+                    })
+                }
+            }
         }
+        if (loader == "fabric") loader = "fabric-loader";
+        if (loader == "quilt") loader = "quilt-loader";
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
+        return ({
+            "loader_version": modrinth_index_json.dependencies[loader],
+            "content": content
+        })
     }
 });
 
