@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, nativeImage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, Forge, NeoForge, Quilt } = require('./launch.js');
@@ -13,7 +13,7 @@ const toml = require('toml');
 
 let default_data = { "instances": [], "profile_info": {}, "default_sort": "name", "default_group": "none" }
 
-let vt_rp, vt_dp, vt_ct;
+let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
 if (!fs.existsSync("./data.json")) {
     fs.writeFileSync("./data.json", JSON.stringify(default_data));
@@ -387,10 +387,51 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "deleteContent": deleteFromContent
         }
     },
-    downloadVanillaTweaks: async (packs, version) => {
+    downloadVanillaTweaksResourcePacks: async (packs, version, instance_id) => {
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let data_json = vt_rp[version];
+        if (!vt_rp[version]) {
+            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
+            data_json = await data.json();
+            vt_rp[version] = data_json;
+        }
+        let pack_info = {};
+
+        let process_category = (category,previous_categories = []) => {
+            previous_categories.push(category.category);
+            let id = previous_categories.join(".").toLowerCase().replaceAll(" ","-").replaceAll("'","-");
+            let packs = category.packs.map(e => e.name);
+            packs.forEach(e => {
+                pack_info[e] = id;
+            });
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e,structuredClone(previous_categories));
+                })
+            }
+        }
+        for (let i = 0; i < data_json.categories.length; i++) {
+            process_category(data_json.categories[i]);
+        }
+
+        console.log(pack_info);
+
+        let packs_send = {};
+        for (let i = 0; i < packs.length; i++) {
+            if (!packs_send[pack_info[packs[i].id]]) {
+                packs_send[pack_info[packs[i].id]] = [packs[i].id]
+            } else {
+                packs_send[pack_info[packs[i].id]].push(packs[i].id);
+            }
+        }
+
+        console.log(packs_send);
+
         let h = querystring.stringify({
-            "packs": '{"aesthetic":["AnimatedCampfireItem","HDShieldBanners"],"terrain":["ShorterTallGrass","ShorterGrass","BetterBedrock"],"variation":["VariatedBookshelves","VariatedUnpolishedStones","VariatedTerracotta","VariatedStone","VariatedPlanks","VariatedLogs","VariatedMushroomBlocks","VariatedNylium","VariatedEndStone","VariatedGravel","VariatedMycelium","RandomMossRotation","VariatedCobblestone","VariatedGrass","RandomCoarseDirtRotation"],"utility":["NoteblockBanners","VisualComposterStages","VisualCauldronStages","VisualHoney","BrewingGuide","CompassLodestone","GroovyLevers","RedstonePowerLevels","BetterObservers","DirectionalDispensersDroppers","DirectionalHoppers","StickyPistonSides","MusicDiscRedstonePreview","HungerPreview","Age25Kelp","DifferentStems","FullAgeAmethystMarker","FullAgeCropMarker","VisualWaxedCopperItems","VisualInfestedStoneItems","BuddingAmethystBorders","SuspiciousSandGravelBorders","OreBorders","UniqueAxolotlBuckets","UniquePaintingItems"],"unobtrusive":["NoPumpkinOverlay","LowerFire","LowerShield","CleanTintedGlass","CleanStainedGlass","CleanGlass"],"gui":["RainbowExperience","NumberedHotbar","DarkUI"],"gui.hearts":["ColoredHeartsOrange"],"gui.hotbar-selector":["ColoredHotbarSelOrange"],"gui.widgets":["ColoredWidgetsGray"],"fun":["WhatSpyglassMeme","GreenAxolotl","SmileyAxolotls"],"world-of-color":["UniqueDyes"],"fixes-and-consistency":["HoeFix","IronBarsFix","ProperBreakParticles","SlimeParticleFix","DripleafFixBig","CactusBottomFix","ConsistentDecorPot"]}',
-            "version": "1.21"
+            "packs": JSON.stringify(packs_send),
+            "version": version
         });
 
         const options = {
@@ -402,7 +443,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 'Content-Length': h.length
             }
         };
-        let data = await new Promise((resolve, reject) => {
+        let data_vt = await new Promise((resolve, reject) => {
             const req = https.request(options, (res) => {
                 let data = '';
                 res.on('data', (chunk) => {
@@ -420,9 +461,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             req.write(h);
             req.end();
         });
-        data = JSON.parse(data);
-        if (data.link) {
-            urlToFile("https://vanillatweaks.net" + data.link, "test.zip");
+        console.log(data_vt);
+        data_vt = JSON.parse(data_vt);
+        if (data_vt.link) {
+            await urlToFile("https://vanillatweaks.net" + data_vt.link, `./minecraft/instances/${instance_id}/resourcepacks/vanilla_tweaks.zip`);
         }
     },
     getVanillaTweaksResourcePacks: async (query = "", version = "1.21") => {
@@ -430,11 +472,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (version.split(".").length > 2) {
             version = version.split(".").splice(0, 2).join(".");
         }
-        let data_json = vt_rp;
-        if (!vt_rp) {
+        let data_json = vt_rp[version];
+        if (!vt_rp[version]) {
             let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
             data_json = await data.json();
-            vt_rp = data_json;
+            vt_rp[version] = data_json;
         }
 
         let return_data = {};
@@ -451,7 +493,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     previous_categories.join(" > ")
                 ],
                 "author": "Vanilla Tweaks",
-                "incompatible": e.incompatible
+                "incompatible": e.incompatible,
+                "vt_id": e.name
             }));
             packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
             return_data.hits = return_data.hits.concat(packs);
@@ -471,17 +514,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (version.split(".").length > 2) {
             version = version.split(".").splice(0, 2).join(".");
         }
-        let data_json = vt_dp;
-        let data_ct_json = vt_ct;
-        if (!vt_dp) {
+        let data_json = vt_dp[version];
+        let data_ct_json = vt_ct[version];
+        if (!vt_dp[version]) {
             let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
             data_json = await data.json();
-            vt_dp = data_json;
+            vt_dp[version] = data_json;
         }
-        if (!vt_ct) {
+        if (!vt_ct[version]) {
             let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
             data_ct_json = await data_ct.json();
-            vt_ct = data_ct_json;
+            vt_ct[version] = data_ct_json;
         }
 
 
@@ -498,7 +541,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     category.category
                 ],
                 "author": "Vanilla Tweaks",
-                "incompatible": e.incompatible
+                "incompatible": e.incompatible,
+                "vt_id": e.name
             }));
             packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
             return_data.hits = return_data.hits.concat(packs);
@@ -765,6 +809,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "loader_version": modrinth_index_json.dependencies[loader],
             "content": content
         })
+    },
+    getScreenshots: (instance_id) => {
+        let screenshotsPath = `./minecraft/instances/${instance_id}/screenshots`;
+        fs.mkdirSync(screenshotsPath, { recursive: true });
+        let files = fs.readdirSync(screenshotsPath)
+            .filter(file => /\.(png|jpg|jpeg|bmp|gif)$/i.test(file))
+            .map(file => {
+                let date = file.replace(".png", "").split("_");
+                if (date[1]) date[1] = date[1].replaceAll(".", ":");
+                if (date[2]) date = [date[0],date[1]]
+                let dateStr = date.join(" ");
+                let parsedDate = new Date(dateStr);
+                
+                return {
+                    file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
+                    file_path: `minecraft/instances/${instance_id}/screenshots/` + file
+                }
+            });
+        return files;
+    },
+    copyImageToClipboard: (file_path) => {
+        try {
+            const image = nativeImage.createFromPath(file_path);
+            clipboard.writeImage(image);
+            return true;
+        } catch (err) {
+            return false;
+        }
+    },
+    deleteScreenshot: (file_path) => {
+        try {
+            fs.unlinkSync(file_path);
+            return true;
+        } catch (err) {
+            return false;
+        }
     }
 });
 

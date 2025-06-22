@@ -865,59 +865,68 @@ function sortInstances(how) {
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
     let groups = document.getElementsByClassName("group");
-    let usedates = (how == "last_played" || how == "date_created" || how == "date_modified")
+    let usedates = (how == "last_played" || how == "date_created" || how == "date_modified");
     let usenumbers = (how == "play_time");
     let reverseOrder = ["last_played", "date_created", "date_modified", "play_time", "game_version"].includes(how);
     let multiply = reverseOrder ? -1 : 1;
     for (let i = 0; i < groups.length; i++) {
-        [...groups[i].children].sort((a, b) => {
-            if (usedates) {
-                let c = new Date(a.getAttribute(attrhow))
-                let d = new Date(b.getAttribute(attrhow))
-                c = c.getTime();
-                d = d.getTime();
-                if (isNaN(c)) c = 0;
-                if (isNaN(d)) d = 0;
-                return multiply * (c - d);
-            }
-            if (usenumbers) {
-                return multiply * (a.getAttribute(attrhow) - b.getAttribute(attrhow));
-            }
-            if (a.getAttribute(attrhow).toLowerCase() > b.getAttribute(attrhow).toLowerCase()) {
-                return 1 * multiply;
-            }
-            if (a.getAttribute(attrhow).toLowerCase() < b.getAttribute(attrhow).toLowerCase()) {
-                return -1 * multiply;
-            }
-            return 0;
-        }).forEach((e) => { groups[i].appendChild(e) });
+        // Use Array.from for better performance and avoid live HTMLCollection
+        let children = Array.from(groups[i].children);
+        // Only sort if more than 1 child
+        if (children.length > 1) {
+            children.sort((a, b) => {
+                if (usedates) {
+                    let c = new Date(a.getAttribute(attrhow));
+                    let d = new Date(b.getAttribute(attrhow));
+                    c = c.getTime();
+                    d = d.getTime();
+                    if (isNaN(c)) c = 0;
+                    if (isNaN(d)) d = 0;
+                    return multiply * (c - d);
+                }
+                if (usenumbers) {
+                    return multiply * (a.getAttribute(attrhow) - b.getAttribute(attrhow));
+                }
+                let av = a.getAttribute(attrhow)?.toLowerCase() ?? "";
+                let bv = b.getAttribute(attrhow)?.toLowerCase() ?? "";
+                if (av > bv) return 1 * multiply;
+                if (av < bv) return -1 * multiply;
+                return 0;
+            });
+            // Use DocumentFragment to minimize reflows
+            let frag = document.createDocumentFragment();
+            children.forEach(e => frag.appendChild(e));
+            groups[i].appendChild(frag);
+        }
     }
     saveData();
 }
+
 function groupInstances(how) {
     data.default_group = how;
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
-    let newGroups = [];
-    let instances = document.querySelectorAll(".group-list .instance-item");
-    for (let i = 0; i < instances.length; i++) {
-        if (!newGroups.includes(instances[i].getAttribute(attrhow))) {
-            newGroups.push(instances[i].getAttribute(attrhow));
-        }
-    }
-    let groups = document.getElementsByClassName("group");
-    [...groups].forEach((e) => { e.remove(); });
-    let elementDictionary = {};
-    for (let i = 0; i < newGroups.length; i++) {
+    let instances = Array.from(document.querySelectorAll(".group-list .instance-item"));
+    // Build group map in one pass
+    let groupMap = {};
+    instances.forEach(inst => {
+        let key = inst.getAttribute(attrhow) || "";
+        if (!groupMap[key]) groupMap[key] = [];
+        groupMap[key].push(inst);
+    });
+    // Remove old groups
+    let groupList = document.getElementsByClassName("group-list")[0];
+    while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
+    // Add new groups with DocumentFragment
+    Object.keys(groupMap).forEach(groupKey => {
         let newElement = document.createElement("div");
         newElement.classList.add("group");
-        newElement.setAttribute("data-group-title", how == "loader" ? loaders[newGroups[i]] : newGroups[i]);
-        document.getElementsByClassName("group-list")[0].appendChild(newElement);
-        elementDictionary[newGroups[i]] = newElement;
-    }
-    for (let i = 0; i < instances.length; i++) {
-        elementDictionary[instances[i].getAttribute(attrhow)].appendChild(instances[i]);
-    }
+        newElement.setAttribute("data-group-title", how == "loader" ? loaders[groupKey] : groupKey);
+        let frag = document.createDocumentFragment();
+        groupMap[groupKey].forEach(inst => frag.appendChild(inst));
+        newElement.appendChild(frag);
+        groupList.appendChild(newElement);
+    });
     sortInstances(sortBy.getSelected);
 }
 function searchInstances(query) {
@@ -942,11 +951,6 @@ let loaders = {
     "quilt": translate("app.loader.quilt")
 }
 function showInstanceContent(e) {
-    data.instances.sort((a, b) => {
-        if (a.name.toLowerCase() > b.name.toLowerCase()) return 1;
-        if (a.name.toLowerCase() < b.name.toLowerCase()) return -1;
-        return 0;
-    });
     let ele = document.createElement("div");
     ele.classList.add("instance-content");
     let title = document.createElement("div");
@@ -1121,7 +1125,9 @@ function showInstanceContent(e) {
             {
                 "icon": '<i class="fa-solid fa-plus"></i>',
                 "title": translate("app.button.content.add"),
-                "func": (e) => { }
+                "func": (e) => {
+                    showAddContent(data.instances[i].instance_id, data.instances[i].vanilla_version, data.instances[i].loader);
+                }
             },
             {
                 "icon": '<i class="fa-solid fa-eye"></i>',
@@ -1281,7 +1287,9 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         {
             "icon": '<i class="fa-solid fa-plus"></i>',
             "title": translate("app.button.content.add"),
-            "func": (e) => { }
+            "func": (e) => {
+                showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+            }
         },
         {
             "icon": '<i class="fa-solid fa-copy"></i>',
@@ -1342,6 +1350,11 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             "name": translate("app.instances.tabs.options"), "value": "options", "func": () => {
                 setInstanceTabContentOptions(instanceInfo, tabsInfo);
             }
+        },
+        {
+            "name": "Screenshots", "value": "screenshots", "func": () => {
+                setInstanceTabContentScreenshots(instanceInfo, tabsInfo);
+            }
         }
     ]);
     tabs.selectOptionAdvanced(default_tab ?? "content");
@@ -1353,6 +1366,9 @@ function setInstanceTabContentContent(instanceInfo, element) {
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
+    addContent.onclick = () => {
+        showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+    }
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
     let searchBar = new SearchBar(contentSearch, () => { }, null);
@@ -1849,18 +1865,206 @@ function setInstanceTabContentLogs(instanceInfo, element) {
 function setInstanceTabContentOptions(instanceInfo, element) {
     element.innerHTML = "";
 }
+function setInstanceTabContentScreenshots(instanceInfo, element) {
+    element.innerHTML = "";
+    let galleryElement = document.createElement("div");
+    galleryElement.className = "gallery";
+    element.appendChild(galleryElement);
+    let screenshots = window.electronAPI.getScreenshots(instanceInfo.instance_id).reverse();
+    screenshots.forEach(e => {
+        let screenshotElement = document.createElement("button");
+        screenshotElement.className = "gallery-screenshot";
+        screenshotElement.setAttribute("data-title", formatDateAndTime(e.file_name));
+        screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
+        let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
+        screenshotElement.onclick = () => {
+            displayScreenshot(formatDateAndTime(e.file_name), e.file_path, instanceInfo, element, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
+        }
+        let buttons = new ContextMenuButtons([
+            {
+                "icon": '<i class="fa-solid fa-folder"></i>',
+                "title": "Open in Folder",
+                "func": (e) => {
+                    window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-image"></i>',
+                "title": "Open Photo",
+                "func": () => {
+                    window.electronAPI.openFolder(e.file_path);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "title": "Copy Screenshot",
+                "func": () => {
+                    let success = window.electronAPI.copyImageToClipboard(e.file_path);
+                    if (success) {
+                        displaySuccess("Screenshot copied to clipboard!");
+                    } else {
+                        displayError("Failed to copy to clipboard");
+                    }
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "title": "Share Screenshot",
+                "func": (e) => { }
+            },
+            {
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "title": "Delete Screenshot",
+                "func": () => {
+                    let success = window.electronAPI.deleteScreenshot(e.file_path);
+                    if (success) {
+                        displaySuccess("Screenshot deleted!");
+                    } else {
+                        displayError("Failed to delete screenshot");
+                    }
+                    setInstanceTabContentScreenshots(instanceInfo, element);
+                },
+                "danger": true
+            }
+        ]);
+        screenshotElement.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
+        galleryElement.appendChild(screenshotElement);
+    });
+}
+
+function displayScreenshot(name, file, instanceInfo, element, list, currentIndex) {
+    let index = currentIndex;
+    let buttonLeft = document.createElement("button");
+    buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+    buttonLeft.className = "screenshot-arrow";
+    let changeDisplay = (name, file) => {
+        screenshotAction2.onclick = () => {
+            window.electronAPI.openFolder(file);
+        };
+        screenshotAction3.onclick = () => {
+            let success = window.electronAPI.copyImageToClipboard(file);
+            if (success) {
+                displaySuccess("Screenshot copied to clipboard!");
+            } else {
+                displayError("Failed to copy to clipboard");
+            }
+        };
+        screenshotAction5.onclick = () => {
+            let success = window.electronAPI.deleteScreenshot(file);
+            if (success) {
+                screenshotPreview.close();
+                displaySuccess("Screenshot deleted!");
+            } else {
+                displayError("Failed to delete screenshot");
+            }
+            setInstanceTabContentScreenshots(instanceInfo, element);
+        };
+        screenshotTitle.innerHTML = name;
+        screenshotDisplay.src = file;
+        screenshotDisplay.alt = name;
+    }
+    let shiftLeft = () => {
+        index--;
+        if (index < 0) index = list.length - 1;
+        changeDisplay(list[index].name, list[index].file);
+    }
+    let shiftRight = () => {
+        index++;
+        if (index > list.length - 1) index = 0;
+        changeDisplay(list[index].name, list[index].file);
+    }
+    buttonLeft.onclick = shiftLeft;
+    let buttonRight = document.createElement("button");
+    buttonRight.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+    buttonRight.className = "screenshot-arrow";
+    buttonRight.onclick = shiftRight;
+    screenshotPreview.onkeydown = (e) => {
+        if (e.key == "ArrowRight") {
+            shiftRight();
+        } else if (e.key == "ArrowLeft") {
+            shiftLeft();
+        }
+    }
+    let screenshotDisplay = document.createElement("img");
+    screenshotDisplay.className = "screenshot-display";
+    let screenshotInfo = document.createElement("div");
+    screenshotInfo.className = "screenshot-info";
+    let screenshotX = document.createElement("button");
+    screenshotX.className = "dialog-x";
+    screenshotX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    screenshotX.onclick = () => {
+        screenshotPreview.close();
+    }
+    screenshotInfo.appendChild(screenshotX);
+    let screenshotTitle = document.createElement("div");
+    screenshotTitle.className = "screenshot-title";
+    screenshotInfo.appendChild(screenshotTitle);
+    let screenshotActions = document.createElement("div");
+    screenshotActions.className = "screenshot-actions";
+    screenshotInfo.appendChild(screenshotActions);
+    let screenshotWrapper = document.createElement("div");
+    screenshotWrapper.className = "screenshot-wrapper";
+    screenshotPreview.innerHTML = '';
+    let screenshotAction1 = document.createElement("button");
+    screenshotAction1.className = "screenshot-action";
+    screenshotAction1.innerHTML = '<i class="fa-solid fa-folder"></i>Open in Folder';
+    screenshotAction1.onclick = () => {
+        window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`);
+    };
+    screenshotActions.appendChild(screenshotAction1);
+    let screenshotAction2 = document.createElement("button");
+    screenshotAction2.className = "screenshot-action";
+    screenshotAction2.innerHTML = '<i class="fa-solid fa-image"></i>Open Photo';
+    screenshotActions.appendChild(screenshotAction2);
+    let screenshotAction3 = document.createElement("button");
+    screenshotAction3.className = "screenshot-action";
+    screenshotAction3.innerHTML = '<i class="fa-solid fa-copy"></i>Copy Screenshot';
+    screenshotActions.appendChild(screenshotAction3);
+    let screenshotAction4 = document.createElement("button");
+    screenshotAction4.className = "screenshot-action";
+    screenshotAction4.innerHTML = '<i class="fa-solid fa-share"></i>Share Screenshot';
+    screenshotAction4.onclick = () => {
+
+    };
+    screenshotActions.appendChild(screenshotAction4);
+    let screenshotAction5 = document.createElement("button");
+    screenshotAction5.className = "screenshot-action";
+    screenshotAction5.innerHTML = '<i class="fa-solid fa-trash-can"></i>Delete Screenshot';
+    screenshotActions.appendChild(screenshotAction5);
+    screenshotWrapper.appendChild(buttonLeft);
+    screenshotWrapper.appendChild(screenshotDisplay);
+    screenshotWrapper.appendChild(buttonRight);
+    screenshotWrapper.appendChild(screenshotInfo);
+    screenshotPreview.appendChild(screenshotWrapper);
+    changeDisplay(name, file);
+    screenshotPreview.showModal();
+}
 
 let hideError = (e) => {
     document.getElementsByClassName("error")[0].hidePopover();
 }
 
+let hideSuccess = (e) => {
+    document.getElementsByClassName("success")[0].hidePopover();
+}
+
 let errorTimeout;
+let successTimeout;
 
 function displayError(error) {
     document.getElementsByClassName("error")[0].showPopover();
     document.getElementsByClassName("error")[0].innerHTML = error.toString();
     clearTimeout(errorTimeout);
     errorTimeout = setTimeout(hideError, 3000);
+}
+
+function displaySuccess(success) {
+    document.getElementsByClassName("success")[0].showPopover();
+    document.getElementsByClassName("success")[0].innerHTML = success.toString();
+    clearTimeout(successTimeout);
+    successTimeout = setTimeout(hideSuccess, 3000);
 }
 
 async function playInstance(instInfo, quickPlay = null) {
@@ -1926,6 +2130,9 @@ function formatDate(dateString) {
 
 function formatDateAndTime(dateString) {
     let date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        return dateString;
+    }
     let minutes = date.getMinutes().toString();
     if (minutes.length == 1) minutes = "0" + minutes;
     let seconds = date.getSeconds().toString();
@@ -1937,6 +2144,7 @@ function formatDateAndTime(dateString) {
     let hours = date.getHours();
     hours %= 12;
     if (hours == 0) hours = 12;
+
     return translate("app.date_time").replace("%date", formatDate(dateString)).replace("%h", hours).replace("%m", minutes).replace("%s", seconds).replace("%amorpm", amorpm);
 }
 
@@ -2275,7 +2483,11 @@ class Dialog {
             dialogContent.innerHTML = info;
         } else if (type == "form") {
             for (let i = 0; i < info.length; i++) {
-                if (info[i].type == "text") {
+                if (info[i].type == "notice") {
+                    let textElement = document.createElement("div");
+                    textElement.innerHTML = info[i].content;
+                    dialogContent.appendChild(textElement);
+                } else if (info[i].type == "text") {
                     let id = createId();
                     let label = document.createElement("label");
                     label.innerHTML = info[i].name;
@@ -2399,55 +2611,63 @@ function showAddContent(instance_id, vanilla_version, loader) {
             "name": "Modpacks",
             "value": "modpack",
             "func": () => {
-                contentTabSelect("modpack", tabInfo, loader, vanilla_version);
+                contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id);
             }
         } : null,
         !loader || loader != "vanilla" ? {
             "name": "Mods",
             "value": "mod",
             "func": () => {
-                contentTabSelect("mod", tabInfo, loader, vanilla_version);
+                contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id);
             }
         } : null,
         {
             "name": "Resource Packs",
             "value": "resourcepack",
             "func": () => {
-                contentTabSelect("resourcepack", tabInfo, loader, vanilla_version);
+                contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id);
             }
         },
         !loader || loader != "vanilla" ? {
             "name": "Shaders",
             "value": "shader",
             "func": () => {
-                contentTabSelect("shader", tabInfo, loader, vanilla_version);
+                contentTabSelect("shader", tabInfo, loader, vanilla_version, instance_id);
             }
         } : null,
         {
             "name": "Worlds",
             "value": "world",
             "func": () => {
-                contentTabSelect("world", tabInfo, loader, vanilla_version);
+                contentTabSelect("world", tabInfo, loader, vanilla_version, instance_id);
             }
         },
         {
             "name": "Data Packs",
             "value": "datapack",
             "func": () => {
-                contentTabSelect("datapack", tabInfo, loader, vanilla_version);
+                contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id);
             }
         }
     ].filter(e => e));
     let tabInfo = document.createElement("div");
     tabInfo.className = "tab-info";
     ele.appendChild(tabInfo);
+    if (!instance_id) {
+        contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id);
+    } else if (!loader || loader != "vanilla") {
+        contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id);
+    } else {
+        contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id);
+    }
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id) {
         let element = document.createElement("div");
         element.className = "discover-item";
         this.element = element;
+        if (id) element.id = id;
         let image = document.createElement("img");
         image.src = imageURL ? imageURL : "default.png";
         image.className = "discover-item-image";
@@ -2492,7 +2712,7 @@ class ContentSearchEntry {
         installButton.className = "discover-item-install";
         installButton.innerHTML = installContent;
         installButton.onclick = () => {
-            installFunction(infoData);
+            installFunction(infoData, installButton);
         }
         actions.appendChild(installButton);
     }
@@ -2512,7 +2732,7 @@ function formatNumber(num) {
     return output;
 }
 
-function contentTabSelect(tab, ele, loader, version) {
+function contentTabSelect(tab, ele, loader, version, instance_id) {
     let tabsElement = document.createElement("div");
     ele.innerHTML = '';
     let sources = [];
@@ -2560,14 +2780,14 @@ function contentTabSelect(tab, ele, loader, version) {
     let searchContents = "";
     let s = new SearchBar(searchElement, (v) => {
         searchContents = v;
-        getContent(discoverList, d.getSelected, v, loader, version, tab);
+        getContent(discoverList, instance_id, d.getSelected, v, loader, version, tab);
     }, () => { });
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
     let d = new SearchDropdown("Content Source", sources, dropdownElement, sources[0].value, () => {
-        getContent(discoverList, d.getSelected, searchContents, loader, version, tab);
+        getContent(discoverList, instance_id, d.getSelected, searchContents, loader, version, tab);
     });
-    getContent(discoverList, sources[0].value, "", loader, version, tab);
+    getContent(discoverList, instance_id, sources[0].value, "", loader, version, tab);
     searchAndFilter.appendChild(dropdownElement);
     searchAndFilter.appendChild(searchElement);
     ele.appendChild(searchAndFilter);
@@ -2575,7 +2795,11 @@ function contentTabSelect(tab, ele, loader, version) {
 
 }
 
-async function getContent(element, source, query, loader, version, project_type) {
+let added_vt_rp_packs = [];
+let added_vt_dp_packs = [];
+let selected_vt_version = "1.21";
+
+async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version) {
     console.log("getting content for source", source);
     if (source == "modrinth") {
         //query, loader, project_type, version
@@ -2661,6 +2885,12 @@ async function getContent(element, source, query, loader, version, project_type)
                     window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
                     saveData();
                 })
+            } : instance_id ? async (i, button) => {
+                button.innerHTML = '<i class="spinner"></i>Installing...';
+                button.classList.add("disabled");
+                button.onclick = () => { };
+                await installContent("modrinth", i.project_id, instance_id, project_type, i.title, i.author, i.icon_url);
+                button.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
             } : (i) => {
                 let dialog = new Dialog();
                 dialog.showDialog(`Select Instance to install ${i.title}`, "form", [
@@ -2684,16 +2914,158 @@ async function getContent(element, source, query, loader, version, project_type)
     } else if (source == "vanilla_tweaks") {
         let result;
         if (project_type == "resourcepack") {
-            result = await window.electronAPI.getVanillaTweaksResourcePacks(query, version);
+            result = await window.electronAPI.getVanillaTweaksResourcePacks(query, version ? version : vt_version);
         } else if (project_type == "datapack") {
-            result = await window.electronAPI.getVanillaTweaksDataPacks(query, version);
+            result = await window.electronAPI.getVanillaTweaksDataPacks(query, version ? version : vt_version);
         }
         element.innerHTML = "";
+        let buttonWrapper = document.createElement("div");
+        buttonWrapper.className = "vt-button-wrapper";
+        if (!version) {
+            let dropdownElement = document.createElement("div");
+            let drodpown = new SearchDropdown("Version", [
+                {
+                    "name": "1.21",
+                    "value": "1.21"
+                },
+                {
+                    "name": "1.20",
+                    "value": "1.20"
+                },
+                {
+                    "name": "1.19",
+                    "value": "1.19"
+                },
+                {
+                    "name": "1.18",
+                    "value": "1.18"
+                },
+                {
+                    "name": "1.17",
+                    "value": "1.17"
+                },
+                {
+                    "name": "1.16",
+                    "value": "1.16"
+                },
+                {
+                    "name": "1.15",
+                    "value": "1.15"
+                },
+                {
+                    "name": "1.14",
+                    "value": "1.14"
+                },
+                {
+                    "name": "1.13",
+                    "value": "1.13"
+                },
+                project_type == "resourcepack" ? {
+                    "name": "1.12",
+                    "value": "1.12"
+                } : null,
+                project_type == "resourcepack" ? {
+                    "name": "1.11",
+                    "value": "1.11"
+                } : null
+            ].filter(e => e), dropdownElement, vt_version, (s) => {
+                getContent(element, instance_id, source, query, loader, version, project_type, s);
+                selected_vt_version = s;
+                added_vt_rp_packs = [];
+                added_vt_dp_packs = [];
+            });
+            buttonWrapper.appendChild(dropdownElement);
+        }
+        let submitButton = document.createElement("button");
+        submitButton.className = "vt-submit-button";
+        submitButton.innerHTML = '<i class="fa-solid fa-download"></i>Install Selected Packs';
+        submitButton.onclick = instance_id ? async () => {
+            submitButton.innerHTML = '<i class="spinner"></i>Installing';
+            submitButton.onclick = () => { };
+            await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
+            let initialContent = {
+                "name": "Vanilla Tweaks Resource Pack",
+                "file_name": "vanilla_tweaks.zip",
+                "source": "vanilla_tweaks",
+                "source_id": added_vt_rp_packs,
+                "disabled": false,
+                "type": "resource_pack",
+                "image": "https://vanillatweaks.net/assets/images/logo.png",
+                "version": "",
+                "author": "Vanilla Tweaks"
+            }
+            for (let i = 0; i < data.instances.length; i++) {
+                if (data.instances[i].instance_id == instance_id) {
+                    data.instances[i].content.push(initialContent);
+                }
+            }
+            submitButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+        } : () => {
+            let dialog = new Dialog();
+            dialog.showDialog(`Select Instance to install the selected packs`, "form", [
+                {
+                    "type": "notice",
+                    "content": "Selected Packs: " + (project_type == "resourcepack" ? added_vt_rp_packs : added_vt_dp_packs).map(e => e.name).join(", ") + "<br>"
+                },
+                {
+                    "type": "dropdown",
+                    "name": "Instance",
+                    "id": "instance",
+                    "options": data.instances.map(e => ({ "name": e.name, "value": e.instance_id }))
+                }
+            ], [
+                { "content": "Cancel", "type": "cancel" },
+                { "content": "Submit", "type": "confirm" }
+            ], null, async (e) => {
+                let info = {};
+                e.forEach(e => { info[e.id] = e.value });
+                await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
+                let initialContent = {
+                    "name": "Vanilla Tweaks Resource Pack",
+                    "file_name": "vanilla_tweaks.zip",
+                    "source": "vanilla_tweaks",
+                    "source_id": added_vt_rp_packs,
+                    "disabled": false,
+                    "type": "resource_pack",
+                    "image": "https://vanillatweaks.net/assets/images/logo.png",
+                    "version": "",
+                    "author": "Vanilla Tweaks"
+                }
+                for (let i = 0; i < data.instances.length; i++) {
+                    if (data.instances[i].instance_id == info.instance) {
+                        data.instances[i].content.push(initialContent);
+                    }
+                }
+                // await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
+            });
+        }
+        buttonWrapper.append(submitButton);
+        element.appendChild(buttonWrapper);
         for (let i = 0; i < result.hits.length; i++) {
             let e = result.hits[i];
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-plus"></i>Add Pack', () => { }, e.categories, e);
+            let added_vt_packs = project_type == "resourcepack" ? added_vt_rp_packs : added_vt_dp_packs;
+            let onAddPack = (info, button) => {
+                button.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Pack';
+                button.onclick = () => {
+                    onRemovePack(info, button);
+                }
+                displaySuccess(`${e.title} added.<br>Click the button at the top or bottom of the page to add the selected packs to an instance.`);
+                added_vt_packs.push({ "id": info.vt_id, "name": e.title });
+                console.log(added_vt_packs);
+            }
+            let onRemovePack = (info, button) => {
+                button.innerHTML = '<i class="fa-solid fa-plus"></i>Add Pack';
+                button.onclick = () => {
+                    onAddPack(info, button);
+                }
+                displaySuccess(`${e.title} removed.<br>Click the button at the top or bottom of the page to add the selected packs to an instance.`);
+                added_vt_packs.filter(e => e.id != info.vt_id);
+                console.log(added_vt_packs);
+            }
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, added_vt_packs.map(e => e.id).includes(e.vt_id) ? '<i class="fa-solid fa-minus"></i>Remove Pack' : '<i class="fa-solid fa-plus"></i>Add Pack', added_vt_packs.map(e => e.id).includes(e.vt_id) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id);
             element.appendChild(entry.element);
         }
+        // element.appendChild();
     }
 }
 
@@ -2724,7 +3096,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
     }
     let dependencies;
     for (let j = 0; j < version_json.length; j++) {
-        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader))) {
+        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type != "mod" || version_json[j].loaders.includes(instance.loader))) {
             initialContent = await addContent(instance_id, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
             version = version_json[j].version_number;
             dependencies = version_json[j].dependencies;
@@ -2733,7 +3105,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
     }
     if (!initialContent.type) {
         for (let j = 0; j < version_json.length; j++) {
-            if (project_type == "resourcepack" || version_json[j].loaders.includes(instance.loader)) {
+            if (project_type != "mod" || version_json[j].loaders.includes(instance.loader)) {
                 initialContent = await addContent(instance_id, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
                 version = version_json[j].version_number;
                 dependencies = version_json[j].dependencies;
@@ -2741,34 +3113,40 @@ async function installContent(source, project_id, instance_id, project_type, tit
             }
         }
     }
-    for (let j = 0; j < dependencies.length; j++) {
-        let dependency = dependencies[j];
-        let res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}`);
-        let res_json = await res.json();
-        let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}/members`);
-        let get_author_res_json = await get_author_res.json();
-        let author = "";
-        get_author_res_json.forEach(e => {
-            if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
-                author = e.user.username;
-            }
-        })
-        if (dependency.dependency_type == "required") {
-            await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
-        } else {
-            let dialog = new Dialog();
-            dialog.showDialog("Would you like to install this optional dependency?", "notice", `The content '${title}' that you just installed has an optional dependency. The name of this dependency is '${res_json.title}'. Would you like to install this extra content to the same instance?`, [
-                {
-                    "type": "cancel",
-                    "content": "No"
-                },
-                {
-                    "type": "confirm",
-                    "content": "Yes"
+    if (!initialContent.type) {
+        displayError("Error: Unable to install " + title);
+        return;
+    }
+    if (dependencies) {
+        for (let j = 0; j < dependencies.length; j++) {
+            let dependency = dependencies[j];
+            let res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}`);
+            let res_json = await res.json();
+            let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}/members`);
+            let get_author_res_json = await get_author_res.json();
+            let author = "";
+            get_author_res_json.forEach(e => {
+                if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
+                    author = e.user.username;
                 }
-            ], [], async () => {
+            })
+            if (dependency.dependency_type == "required") {
                 await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
-            });
+            } else {
+                let dialog = new Dialog();
+                dialog.showDialog("Would you like to install this optional dependency?", "notice", `The content '${title}' that you just installed has an optional dependency. The name of this dependency is '${res_json.title}'. Would you like to install this extra content to the same instance?`, [
+                    {
+                        "type": "cancel",
+                        "content": "No"
+                    },
+                    {
+                        "type": "confirm",
+                        "content": "Yes"
+                    }
+                ], [], async () => {
+                    await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
+                });
+            }
         }
     }
     initialContent.name = title;
