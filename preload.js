@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer, clipboard, nativeImage } = require('electron');
 const fs = require('fs');
+const fsa = require('fs').promises;
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, Forge, NeoForge, Quilt } = require('./launch.js');
 const { spawn, exec } = require('child_process');
@@ -10,8 +11,17 @@ const AdmZip = require('adm-zip');
 const https = require('https');
 const querystring = require('querystring');
 const toml = require('toml');
+const Database = require('better-sqlite3');
+const db = new Database('app.db');
 
-let default_data = { "instances": [], "profile_info": {}, "default_sort": "name", "default_group": "none" }
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, uuid TEXT, file_name TEXT, last_used TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT)').run();
+
+db.pragma('journal_mode = WAL');
 
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
@@ -28,6 +38,15 @@ class LoginError extends Error {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
+    databaseGet: (sql, ...params) => {
+        return db.prepare(sql).get(...params);
+    },
+    databaseAll: (sql, ...params) => {
+        return db.prepare(sql).all(...params);
+    },
+    databaseRun: (sql, ...params) => {
+        return db.prepare(sql).run(...params);
+    },
     readFile: (filePath) => {
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
@@ -36,9 +55,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return `Error reading file: ${err.message}`;
         }
     },
-    saveData: (data) => {
+    saveData: async (data) => {
         try {
-            fs.writeFileSync("data.json", data, 'utf-8');
+            await fsa.writeFile("data.json", data, 'utf-8');
             return true;
         } catch (err) {
             return false;
@@ -62,8 +81,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 }, null, quickPlay, false), "player_info": player_info
             };
         } catch (err) {
-            console.error(err);
-            return false;
+            throw err;
         }
     },
     getJavaInstallation: async (v) => {
@@ -399,16 +417,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         let pack_info = {};
 
-        let process_category = (category,previous_categories = []) => {
+        let process_category = (category, previous_categories = []) => {
             previous_categories.push(category.category);
-            let id = previous_categories.join(".").toLowerCase().replaceAll(" ","-").replaceAll("'","-");
+            let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
             let packs = category.packs.map(e => e.name);
             packs.forEach(e => {
                 pack_info[e] = id;
             });
             if (category.categories) {
                 category.categories.forEach(e => {
-                    process_category(e,structuredClone(previous_categories));
+                    process_category(e, structuredClone(previous_categories));
                 })
             }
         }
@@ -482,7 +500,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let return_data = {};
         return_data.hits = [];
 
-        let process_category = (category,previous_categories = []) => {
+        let process_category = (category, previous_categories = []) => {
             previous_categories.push(category.category);
             let packs = category.packs;
             packs = packs.map(e => ({
@@ -500,7 +518,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return_data.hits = return_data.hits.concat(packs);
             if (category.categories) {
                 category.categories.forEach(e => {
-                    process_category(e,structuredClone(previous_categories));
+                    process_category(e, structuredClone(previous_categories));
                 })
             }
         }
@@ -818,10 +836,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             .map(file => {
                 let date = file.replace(".png", "").split("_");
                 if (date[1]) date[1] = date[1].replaceAll(".", ":");
-                if (date[2]) date = [date[0],date[1]]
+                if (date[2]) date = [date[0], date[1]]
                 let dateStr = date.join(" ");
                 let parsedDate = new Date(dateStr);
-                
+
                 return {
                     file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
                     file_path: `minecraft/instances/${instance_id}/screenshots/` + file
@@ -845,6 +863,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } catch (err) {
             return false;
         }
+    },
+    disableFile: (file_path) => {
+        try {
+            const disabledPath = file_path.endsWith('.disabled') ? file_path : file_path + '.disabled';
+            fs.renameSync(file_path, disabledPath);
+            return path.basename(disabledPath);
+        } catch (err) {
+            return false;
+        }
+    },
+    enableFile: (file_path) => {
+        try {
+            if (file_path.endsWith('.disabled')) {
+                const enabledPath = file_path.slice(0, -9);
+                fs.renameSync(file_path, enabledPath);
+                return path.basename(enabledPath);
+            }
+            return false;
+        } catch (err) {
+            return false;
+        }
     }
 });
 
@@ -865,22 +904,3 @@ function getUUID() {
     return result;
 }
 
-async function getNewAccessToken(refresh_token) {
-    let date = new Date();
-    date.setHours(date.getHours() + 1);
-    const authManager = new Auth("select_account");
-    const xboxManager = await authManager.refresh(refresh_token);
-    const token = await xboxManager.getMinecraft();
-    return {
-        "access_token": token.mcToken,
-        "uuid": token.profile.id,
-        "refresh_token": token.parent.msToken.refresh_token,
-        "capes": token.profile.capes,
-        "skins": token.profile.skins,
-        "name": token.profile.name,
-        "is_demo": token.profile.demo,
-        "xuid": token.xuid,
-        "client_id": getUUID(),
-        "expires": date.toString()
-    }
-}

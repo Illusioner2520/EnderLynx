@@ -4,6 +4,8 @@ java/
 
 data.json
 
-temp.json
-
 *.log
+
+app.db
+app.db-shm
+app.db-wal

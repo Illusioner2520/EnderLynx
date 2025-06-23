@@ -1931,71 +1931,76 @@ dialog[open]::backdrop {
 }
 
 .error {
-    inset: unset;
-    position: fixed;
-    bottom: 10px;
-    max-width: calc(100% - 20px);
-    right: 10px;
-    /* background-color: #ffcccc; */
-    /* color: rgb(200, 0, 0); */
+    max-width: calc(100svw - 20px);
     color: white;
     background-color: rgb(200, 0, 0);
     padding: 8px;
     font-weight: bold;
-    /* border-width: 1px;
-    border-style: solid; */
     border-radius: 8px;
     display: none;
     font-family: Arial, Helvetica, sans-serif;
-    transform: translateX(100%);
+    transform: translateX(150%);
     transition: transform .25s, display .25s allow-discrete;
     width: max-content;
     margin-block: 0;
     font-size: 1rem;
     border-width: 2px;
+    border-color: white;
+    border-style: solid;
+    margin-left: auto;
+    box-shadow: 0px 0px 10px black;
 }
 
-.error:popover-open {
+.error.shown {
     display: block;
     transform: translateX(0);
 
     @starting-style {
-        transform: translateX(100%);
+        transform: translateX(150%);
     }
 }
 
 .success {
-    inset: unset;
-    position: fixed;
-    bottom: 10px;
-    max-width: calc(100% - 20px);
-    right: 10px;
-    /* background-color: #ffcccc; */
-    /* color: rgb(200, 0, 0); */
+    max-width: calc(100svw - 20px);
     color: white;
     background-color: rgb(0, 170, 0);
     padding: 8px;
     font-weight: bold;
-    /* border-width: 1px;
-    border-style: solid; */
     border-radius: 8px;
     display: none;
     font-family: Arial, Helvetica, sans-serif;
-    transform: translateX(100%);
+    transform: translateX(150%);
     transition: transform .25s, display .25s allow-discrete;
     width: max-content;
     margin-block: 0;
     font-size: 1rem;
     border-width: 2px;
+    border-color: white;
+    border-style: solid;
+    margin-left: auto;
+    box-shadow: 0px 0px 10px black;
 }
 
-.success:popover-open {
+.success.shown {
     display: block;
     transform: translateX(0);
 
     @starting-style {
-        transform: translateX(100%);
+        transform: translateX(150%);
     }
+}
+
+.toasts {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    padding: 10px;
+    gap: 10px;
+    width: max-content;
+    overflow: hidden;
+    
 }
 
 .vt-button-wrapper {

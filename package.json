@@ -9,10 +9,12 @@
   "license": "ISC",
   "description": "The best Minecraft launcher.",
   "devDependencies": {
-    "electron": "^36.4.0"
+    "electron": "^36.4.0",
+    "electron-rebuild": "^3.2.9"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
+    "better-sqlite3": "^12.0.0",
     "lzma-native": "^8.0.6",
     "msmc": "^5.0.5",
     "prismarine-nbt": "^2.7.0",

@@ -1,2 +1,17 @@
 Credits:
+
+Minecraft: https://www.minecraft.net/
+
+Loaders:
+Fabric: https://fabricmc.net/
+Forge: https://minecraftforge.net/
+NeoForge: https://neoforged.net/
+Quilt: https://quiltmc.org/
+
+Content Distributors:
+Modrinth: https://modrinth.com/
+CurseForge: https://www.curseforge.com/
 Vanilla Tweaks: https://vanillatweaks.net/
+
+Artists:
+Fruit Salad

@@ -5,6 +5,262 @@ let getVersions = async () => {
     minecraftVersions = (await window.electronAPI.getVanillaVersions()).reverse();
 }
 getVersions();
+
+class SQL {
+    constructor(sql) {
+        this.sql = sql;
+    }
+    get(...params) {
+        return window.electronAPI.databaseGet(this.sql, ...params);
+    }
+    run(...params) {
+        return window.electronAPI.databaseRun(this.sql, ...params);
+    }
+    all(...params) {
+        return window.electronAPI.databaseAll(this.sql, ...params);
+    }
+}
+
+class DB {
+    prepare(sql) {
+        return new SQL(sql);
+    }
+}
+
+const db = new DB();
+
+class Content {
+    constructor(id_or_instanceId, fileName) {
+        let content;
+
+        if (!fileName) {
+            content = db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(id_or_instanceId);
+        } else {
+            content = db.prepare("SELECT * FROM content WHERE instance = ? AND file_name = ? LIMIT 1").get(id_or_instanceId, fileName);
+        }
+
+        if (!content) throw new Error("Content not found");
+
+        this.id = id;
+        this.name = content.name;
+        this.author = content.author;
+        this.disabled = Boolean(content.disabled);
+        this.image = content.image;
+        this.file_name = content.file_name;
+        this.source = content.source;
+        this.type = content.type;
+        this.version = content.version;
+        this.instance = content.instance;
+        this.source_info = content.source_info;
+    }
+
+    changeOption(option, value) {
+        db.prepare("UPDATE content SET ? = ? WHERE id = ?").run(option, value, this.id);
+    }
+
+    setName(name) {
+        this.changeOption("name", name);
+    }
+    setAuthor(author) {
+        this.changeOption("author", author);
+    }
+    setDisabled(disabled) {
+        this.changeOption("disabled", Number(disabled));
+    }
+    setImage(image) {
+        this.changeOption("image", image);
+    }
+    setFileName(file_name) {
+        this.changeOption("file_name", file_name);
+    }
+    setSource(source) {
+        this.changeOption("source", source);
+    }
+    setType(type) {
+        this.changeOption("type", type);
+    }
+    setVersion(version) {
+        this.changeOption("version", version);
+    }
+    setInstance(instance) {
+        this.changeOption("instance", instance);
+    }
+    setSourceInfo(source_info) {
+        this.changeOption("source_info", source_info);
+    }
+
+    delete() {
+        db.prepare("DELETE FROM content WHERE id = ?").run(this.id);
+    }
+}
+
+class Instance {
+    constructor(id) {
+        let content = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(id);
+        if (!content) throw new Error("Instance not found");
+        this.name = content.name;
+        this.date_created = new Date(content.date_created);
+        this.date_modified = new Date(content.date_modified);
+        this.last_played = new Date(content.last_played);
+        this.loader = content.loader;
+        this.vanilla_version = content.vanilla_version;
+        this.playtime = content.playtime;
+        this.locked = Boolean(content.locked);
+        this.downloaded = Boolean(content.downloaded);
+        this.group = content.group_id;
+        this.image = content.image;
+        this.instance_id = content.instance_id;
+        this.pid = content.pid;
+        this.current_log_file = content.current_log_file;
+        this.id = content.id;
+    }
+
+    changeOption(option, value) {
+        db.prepare("UPDATE instances SET ? = ? WHERE id = ?").run(option, value, this.id);
+    }
+
+    setName(name) {
+        this.changeOption("name", name);
+    }
+    setLastPlayed(last_played) {
+        this.changeOption("last_played", last_played.toISOString());
+    }
+    setDateCreated(date_created) {
+        this.changeOption("date_created", date_created.toISOString());
+    }
+    setDateModified(date_modified) {
+        this.changeOption("date_modified", date_modified.toISOString());
+    }
+    setLoader(loader) {
+        this.changeOption("loader", loader);
+    }
+    setVanillaVersion(vanilla_version) {
+        this.changeOption("vanilla_version", vanilla_version);
+    }
+    setLoaderVersion(loader_version) {
+        this.changeOption("loader_version", loader_version);
+    }
+    setPlaytime(playtime) {
+        this.changeOption("playtime", playtime);
+    }
+    setLocked(locked) {
+        this.changeOption("locked", Number(locked));
+    }
+    setDownloaded(downloaded) {
+        this.changeOption("downloaded", Number(downloaded));
+    }
+    setGroup(group) {
+        this.changeOption("group_id", group);
+    }
+    setImage(image) {
+        this.changeOption("image", image);
+    }
+    setPid(pid) {
+        this.changeOption("pid", pid);
+    }
+    setCurrentLogFile(current_log_file) {
+        this.changeOption("current_log_file", current_log_file);
+    }
+
+    addContent(name, author, image, file_name, source, type, version, source_info, disabled) {
+        db.prepare('INSERT into content (name,author,image,file_name,source,type,version,instance,source_info,disabled) VALUES (?,?,?,?,?,?,?,?,?,?)').run(name, author, image, file_name, source, type, version, this.instance_id, source_info, Number(disabled));
+        return new Content(this.instance_id, file_name);
+    }
+
+    getContent() {
+        let content = db.prepare("SELECT * FROM content WHERE instance_id = ?").all(this.instance_id);
+        return content.map(e => new Content(e.id));
+    }
+
+    delete() {
+        db.prepare("DELETE FROM instances WHERE id = ?").run(this.instance_id);
+        db.prepare("DELETE FROM content WHERE instance_id = ?").run(this.instance_id);
+    }
+}
+
+class Data {
+    getInstances() {
+        let instances = db.prepare("SELECT * FROM instances").all();
+        return instances.map(e => new Instance(e.instance_id));
+    }
+
+    addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, locked, downloaded, group, image, instance_id, playtime) {
+        db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, locked, downloaded, group_id, image, instance_id, playtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played.toISOString(), loader, vanilla_version, Number(locked), Number(downloaded), group, image, instance_id, playtime);
+        return new Instance(instance_id);
+    }
+
+    deleteInstance(instance_id) {
+        db.prepare("DELETE FROM instances WHERE instance_id = ?").run(instance_id);
+    }
+
+    getProfiles() {
+        let profiles = db.prepare("SELECT * FROM profiles").all();
+        return profiles.map(e => new Profile(e.id));
+    }
+
+    getDefaultProfile() {
+        let profile = db.prepare("SELECT * FROM profiles WHERE is_default = ?").get(true);
+        return new Profile(profile.id);
+    }
+
+    deleteProfile(uuid) {
+        db.prepare("DELETE FROM profiles WHERE uuid = ?").get(uuid);
+    }
+
+    addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
+        db.prepare("INSERT INTO profiles (access_token,client_id,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?,?)").run(access_token, client_id, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
+    }
+
+    getDefault(type) {
+        let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
+        return default_.value;
+    }
+
+    setDefault(type, value) {
+        db.prepare("UPDATE defaults SET value = ? WHERE default_type = ?").run(value, type);
+    }
+}
+
+class Profile {
+    constructor(id) {
+        let profile = db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").get(id);
+        if (!profile) throw new Error("Profile not found");
+        this.id = profile.id;
+        this.access_token = profile.access_token;
+        this.client_id = profile.client_id;
+        this.expires = new Date(profile.expires);
+        this.name = profile.name;
+        this.refresh_token = profile.refresh_token;
+        this.uuid = profile.uuid;
+        this.xuid = profile.xuid;
+        this.is_demo = Boolean(profile.is_demo);
+        this.is_default = Boolean(profile.is_default);
+    }
+    async getNewAccessToken(refresh_token) {
+        let date = new Date();
+        date.setHours(date.getHours() + 1);
+        const authManager = new Auth("select_account");
+        const xboxManager = await authManager.refresh(refresh_token);
+        const token = await xboxManager.getMinecraft();
+        this.access_token = token.mcToken;
+        this.uuid = token.profile.id;
+        this.refresh_token = token.parent.msToken.refresh_token;
+        this.name = token.profile.name;
+        this.is_demo = Number(token.profile.demo ?? false);
+        this.xuid = token.xuid;
+        this.client_id = getUUID();
+        this.expires = date.toISOString();
+    }
+    setDefault() {
+        let data = new Data();
+        let old_default_profile = data.getDefaultProfile();
+        db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(false), old_default_profile.id);
+        db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(true), this.id);
+    }
+}
+
+let data = new Data();
+
 class MinecraftAccountSwitcher {
     constructor(element, playerInfo) {
         element.classList.add("player-switch");
@@ -762,7 +1018,14 @@ class ContentList {
             if (features?.disable?.enabled) {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
-                let toggle = new Toggle(toggleElement, () => { }, !content[i].disabled);
+                let toggle = new Toggle(toggleElement, () => {
+                    toggleDisabledContent(content[i]);
+                    if (infoElement2Desc.innerHTML.endsWith(".disabled")) {
+                        infoElement2Desc.innerHTML = infoElement2Desc.innerHTML.slice(0, -9);
+                    } else {
+                        infoElement2Desc.innerHTML = infoElement2Desc.innerHTML + ".disabled";
+                    }
+                }, !content[i].disabled);
                 contentEle.appendChild(toggleElement);
             }
             if (features?.remove?.enabled) {
@@ -817,6 +1080,39 @@ class ContentList {
             if (isNotDisplayNone(e)) e.checked = false;
         });
     }
+}
+
+function toggleDisabledContent(contentInfo) {
+    let content;
+    for (let i = 0; i < contentInfo.instance_info.content.length; i++) {
+        let e = contentInfo.instance_info.content[i];
+        if (e.file_name == contentInfo.secondary_column.desc) {
+            let file_path = `./minecraft/instances/${contentInfo.instance_info.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + e.file_name;
+            if (e.disabled) {
+                let new_file_name = window.electronAPI.enableFile(file_path);
+                if (!new_file_name) {
+                    displayError("Failed to enable content.");
+                    return;
+                }
+                e.disabled = false;
+                e.file_name = new_file_name;
+                contentInfo.secondary_column.desc = new_file_name;
+                displaySuccess("Successfully enabled '" + e.name + "'");
+            } else {
+                let new_file_name = window.electronAPI.disableFile(file_path);
+                if (!new_file_name) {
+                    displayError("Failed to disable content.");
+                    return;
+                }
+                e.disabled = true;
+                e.file_name = new_file_name;
+                contentInfo.secondary_column.desc = new_file_name;
+                displaySuccess("Successfully disabled '" + e.name + "'");
+            }
+            break;
+        }
+    }
+    saveData();
 }
 
 let homeContent = new PageContent(showHomeContent, "home");
@@ -1454,7 +1750,8 @@ function setInstanceTabContentContent(instanceInfo, element) {
                     }
                 ])
             },
-            "disabled": e.disabled
+            "disabled": e.disabled,
+            "instance_info": instanceInfo
         })
     }
     let contentList = new ContentList(contentListWrap, content, searchBar, {
@@ -2042,29 +2339,37 @@ function displayScreenshot(name, file, instanceInfo, element, list, currentIndex
     screenshotPreview.showModal();
 }
 
-let hideError = (e) => {
-    document.getElementsByClassName("error")[0].hidePopover();
+let hideToast = (e) => {
+    e.classList.remove("shown");
+    setTimeout(() => {
+        e.remove();
+    }, 1000);
 }
-
-let hideSuccess = (e) => {
-    document.getElementsByClassName("success")[0].hidePopover();
-}
-
-let errorTimeout;
-let successTimeout;
 
 function displayError(error) {
-    document.getElementsByClassName("error")[0].showPopover();
-    document.getElementsByClassName("error")[0].innerHTML = error.toString();
-    clearTimeout(errorTimeout);
-    errorTimeout = setTimeout(hideError, 3000);
+    let element = document.createElement("div");
+    element.classList.add("error");
+    element.innerHTML = error.toString();
+    let toasts = document.getElementsByClassName("toasts")[0];
+    toasts.appendChild(element);
+    element.classList.add("shown");
+    element.onclick = () => {
+        hideToast(element);
+    }
+    setTimeout(() => { hideToast(element) }, 3000);
 }
 
 function displaySuccess(success) {
-    document.getElementsByClassName("success")[0].showPopover();
-    document.getElementsByClassName("success")[0].innerHTML = success.toString();
-    clearTimeout(successTimeout);
-    successTimeout = setTimeout(hideSuccess, 3000);
+    let element = document.createElement("div");
+    element.classList.add("success");
+    element.innerHTML = success.toString();
+    let toasts = document.getElementsByClassName("toasts")[0];
+    toasts.appendChild(element);
+    element.classList.add("shown");
+    element.onclick = () => {
+        hideToast(element);
+    }
+    setTimeout(() => { hideToast(element) }, 3000);
 }
 
 async function playInstance(instInfo, quickPlay = null) {
@@ -2078,8 +2383,6 @@ async function playInstance(instInfo, quickPlay = null) {
             if (data.instances[i].instance_id == instInfo.instance_id) {
                 data.instances[i].pid = pid.minecraft.pid;
                 data.instances[i].current_log_file = pid.minecraft.log;
-                data.instances[i].java_path = pid.minecraft.java_path;
-                data.instances[i].java_version = pid.minecraft.java_version;
             }
         }
         data.profile_info.default_player = pid.player_info;
@@ -2154,20 +2457,14 @@ function showWorldContent(e) {
     return ele;
 }
 
-let data = null;
-
-function loadFile() {
-    data = JSON.parse(window.electronAPI.readFile("data.json"));
-}
-
 function getLangFile(locale) {
     return JSON.parse(window.electronAPI.readFile(`./lang/${locale}.json`));
 }
 
-function saveData() {
-    let success = window.electronAPI.saveData(JSON.stringify(data));
+async function saveData() {
+    let success = await window.electronAPI.saveData(JSON.stringify(data));
     if (!success) {
-        console.error("Error saving data");
+        displayError("Failure saving data");
     }
 }
 
@@ -2193,8 +2490,6 @@ function translate(key) {
     }
     return lang[key];
 }
-
-loadFile();
 
 let accountSwitcher = new MinecraftAccountSwitcher(playerSwitch, data.profile_info);
 
