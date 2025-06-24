@@ -41,7 +41,7 @@ class Content {
 
         if (!content) throw new Error("Content not found");
 
-        this.id = id;
+        this.id = content.id;
         this.name = content.name;
         this.author = content.author;
         this.disabled = Boolean(content.disabled);
@@ -54,39 +54,45 @@ class Content {
         this.source_info = content.source_info;
     }
 
-    changeOption(option, value) {
-        db.prepare("UPDATE content SET ? = ? WHERE id = ?").run(option, value, this.id);
-    }
-
     setName(name) {
-        this.changeOption("name", name);
+        db.prepare("UPDATE content SET name = ? WHERE id = ?").run(name, this.id);
+        this.name = name;
     }
     setAuthor(author) {
-        this.changeOption("author", author);
+        db.prepare("UPDATE content SET author = ? WHERE id = ?").run(author, this.id);
+        this.author = author;
     }
     setDisabled(disabled) {
-        this.changeOption("disabled", Number(disabled));
+        db.prepare("UPDATE content SET disabled = ? WHERE id = ?").run(Number(disabled), this.id);
+        this.disabled = disabled;
     }
     setImage(image) {
-        this.changeOption("image", image);
+        db.prepare("UPDATE content SET image = ? WHERE id = ?").run(image, this.id);
+        this.image = image;
     }
     setFileName(file_name) {
-        this.changeOption("file_name", file_name);
+        db.prepare("UPDATE content SET file_name = ? WHERE id = ?").run(file_name, this.id);
+        this.file_name = file_name;
     }
     setSource(source) {
-        this.changeOption("source", source);
+        db.prepare("UPDATE content SET source = ? WHERE id = ?").run(source, this.id);
+        this.source = source;
     }
     setType(type) {
-        this.changeOption("type", type);
+        db.prepare("UPDATE content SET type = ? WHERE id = ?").run(type, this.id);
+        this.type = type;
     }
     setVersion(version) {
-        this.changeOption("version", version);
+        db.prepare("UPDATE content SET version = ? WHERE id = ?").run(version, this.id);
+        this.version = version;
     }
     setInstance(instance) {
-        this.changeOption("instance", instance);
+        db.prepare("UPDATE content SET instance = ? WHERE id = ?").run(instance, this.id);
+        this.instance = instance;
     }
     setSourceInfo(source_info) {
-        this.changeOption("source_info", source_info);
+        db.prepare("UPDATE content SET source_info = ? WHERE id = ?").run(source_info, this.id);
+        this.source_info = source_info;
     }
 
     delete() {
@@ -95,8 +101,8 @@ class Content {
 }
 
 class Instance {
-    constructor(id) {
-        let content = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(id);
+    constructor(instance_id) {
+        let content = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
         if (!content) throw new Error("Instance not found");
         this.name = content.name;
         this.date_created = new Date(content.date_created);
@@ -104,6 +110,7 @@ class Instance {
         this.last_played = new Date(content.last_played);
         this.loader = content.loader;
         this.vanilla_version = content.vanilla_version;
+        this.loader_version = content.loader_version;
         this.playtime = content.playtime;
         this.locked = Boolean(content.locked);
         this.downloaded = Boolean(content.downloaded);
@@ -113,53 +120,73 @@ class Instance {
         this.pid = content.pid;
         this.current_log_file = content.current_log_file;
         this.id = content.id;
-    }
-
-    changeOption(option, value) {
-        db.prepare("UPDATE instances SET ? = ? WHERE id = ?").run(option, value, this.id);
+        this.install_source = content.install_source;
+        this.install_id = content.install_id;
     }
 
     setName(name) {
-        this.changeOption("name", name);
+        db.prepare("UPDATE instances SET name = ? WHERE id = ?").run(name, this.id);
+        this.name = name;
     }
     setLastPlayed(last_played) {
-        this.changeOption("last_played", last_played.toISOString());
+        db.prepare("UPDATE instances SET last_played = ? WHERE id = ?").run(last_played ? last_played.toISOString() : null, this.id);
+        this.last_played = last_played;
     }
     setDateCreated(date_created) {
-        this.changeOption("date_created", date_created.toISOString());
+        db.prepare("UPDATE instances SET date_created = ? WHERE id = ?").run(date_created.toISOString(), this.id);
+        this.date_created = date_created;
     }
     setDateModified(date_modified) {
-        this.changeOption("date_modified", date_modified.toISOString());
+        db.prepare("UPDATE instances SET date_modified = ? WHERE id = ?").run(date_modified.toISOString(), this.id);
+        this.date_modified = date_modified;
     }
     setLoader(loader) {
-        this.changeOption("loader", loader);
+        db.prepare("UPDATE instances SET loader = ? WHERE id = ?").run(loader, this.id);
+        this.loader = loader;
     }
     setVanillaVersion(vanilla_version) {
-        this.changeOption("vanilla_version", vanilla_version);
+        db.prepare("UPDATE instances SET vanilla_version = ? WHERE id = ?").run(vanilla_version, this.id);
+        this.vanilla_version = vanilla_version;
     }
     setLoaderVersion(loader_version) {
-        this.changeOption("loader_version", loader_version);
+        db.prepare("UPDATE instances SET loader_version = ? WHERE id = ?").run(loader_version, this.id);
+        this.loader_version = loader_version;
     }
     setPlaytime(playtime) {
-        this.changeOption("playtime", playtime);
+        db.prepare("UPDATE instances SET playtime = ? WHERE id = ?").run(playtime, this.id);
+        this.playtime = playtime;
     }
     setLocked(locked) {
-        this.changeOption("locked", Number(locked));
+        db.prepare("UPDATE instances SET locked = ? WHERE id = ?").run(Number(locked), this.id);
+        this.locked = locked;
     }
     setDownloaded(downloaded) {
-        this.changeOption("downloaded", Number(downloaded));
+        db.prepare("UPDATE instances SET downloaded = ? WHERE id = ?").run(Number(downloaded), this.id);
+        this.downloaded = downloaded;
     }
     setGroup(group) {
-        this.changeOption("group_id", group);
+        db.prepare("UPDATE instances SET group_id = ? WHERE id = ?").run(group, this.id);
+        this.group = group;
     }
     setImage(image) {
-        this.changeOption("image", image);
+        db.prepare("UPDATE instances SET image = ? WHERE id = ?").run(image, this.id);
+        this.image = image;
     }
     setPid(pid) {
-        this.changeOption("pid", pid);
+        db.prepare("UPDATE instances SET pid = ? WHERE id = ?").run(pid, this.id);
+        this.pid = pid;
     }
     setCurrentLogFile(current_log_file) {
-        this.changeOption("current_log_file", current_log_file);
+        db.prepare("UPDATE instances SET current_log_file = ? WHERE id = ?").run(current_log_file, this.id);
+        this.current_log_file = current_log_file;
+    }
+    setInstallSource(install_source) {
+        db.prepare("UPDATE instances SET install_source = ? WHERE id = ?").run(install_source, this.id);
+        this.install_source = install_source;
+    }
+    setInstallId(install_id) {
+        db.prepare("UPDATE instances SET install_id = ? WHERE id = ?").run(install_id, this.id);
+        this.install_id = install_id;
     }
 
     addContent(name, author, image, file_name, source, type, version, source_info, disabled) {
@@ -168,13 +195,13 @@ class Instance {
     }
 
     getContent() {
-        let content = db.prepare("SELECT * FROM content WHERE instance_id = ?").all(this.instance_id);
+        let content = db.prepare("SELECT * FROM content WHERE instance = ?").all(this.instance_id);
         return content.map(e => new Content(e.id));
     }
 
     delete() {
-        db.prepare("DELETE FROM instances WHERE id = ?").run(this.instance_id);
-        db.prepare("DELETE FROM content WHERE instance_id = ?").run(this.instance_id);
+        db.prepare("DELETE FROM instances WHERE id = ?").run(this.id);
+        db.prepare("DELETE FROM content WHERE instance = ?").run(this.instance_id);
     }
 }
 
@@ -184,8 +211,8 @@ class Data {
         return instances.map(e => new Instance(e.instance_id));
     }
 
-    addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, locked, downloaded, group, image, instance_id, playtime) {
-        db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, locked, downloaded, group_id, image, instance_id, playtime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played.toISOString(), loader, vanilla_version, Number(locked), Number(downloaded), group, image, instance_id, playtime);
+    addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id) {
+        db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id);
         return new Instance(instance_id);
     }
 
@@ -199,7 +226,8 @@ class Data {
     }
 
     getDefaultProfile() {
-        let profile = db.prepare("SELECT * FROM profiles WHERE is_default = ?").get(true);
+        let profile = db.prepare("SELECT * FROM profiles WHERE is_default = ?").get(1);
+        if (!profile) return null;
         return new Profile(profile.id);
     }
 
@@ -208,15 +236,30 @@ class Data {
     }
 
     addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
-        db.prepare("INSERT INTO profiles (access_token,client_id,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?,?)").run(access_token, client_id, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
+        let result = db.prepare("INSERT INTO profiles (access_token,client_id,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?,?)").run(access_token, client_id, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
+        return new Profile(result.lastInsertRowid);
+    }
+
+    getProfileFromUUID(uuid) {
+        let result = db.prepare("SELECT * FROM profiles WHERE uuid = ?").get(uuid);
+        return new Profile(result.id);
     }
 
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
+        if (!default_) {
+            let defaults = { "default_sort": "name", "default_group": "none" };
+            let value = defaults[type];
+            db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
+            return value;
+        }
         return default_.value;
     }
 
     setDefault(type, value) {
+        if (!this.getDefault(type)) {
+            return null;
+        }
         db.prepare("UPDATE defaults SET value = ? WHERE default_type = ?").run(value, type);
     }
 }
@@ -236,43 +279,73 @@ class Profile {
         this.is_demo = Boolean(profile.is_demo);
         this.is_default = Boolean(profile.is_default);
     }
-    async getNewAccessToken(refresh_token) {
-        let date = new Date();
-        date.setHours(date.getHours() + 1);
-        const authManager = new Auth("select_account");
-        const xboxManager = await authManager.refresh(refresh_token);
-        const token = await xboxManager.getMinecraft();
-        this.access_token = token.mcToken;
-        this.uuid = token.profile.id;
-        this.refresh_token = token.parent.msToken.refresh_token;
-        this.name = token.profile.name;
-        this.is_demo = Number(token.profile.demo ?? false);
-        this.xuid = token.xuid;
-        this.client_id = getUUID();
-        this.expires = date.toISOString();
-    }
     setDefault() {
         let data = new Data();
         let old_default_profile = data.getDefaultProfile();
-        db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(false), old_default_profile.id);
+        if (old_default_profile) db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(false), old_default_profile.id);
         db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(true), this.id);
+    }
+
+    setAccessToken(access_token) {
+        db.prepare("UPDATE profiles SET access_token = ? WHERE id = ?").run(access_token, this.id);
+        this.access_token = access_token;
+    }
+
+    setClientId(client_id) {
+        db.prepare("UPDATE profiles SET client_id = ? WHERE id = ?").run(client_id, this.id);
+        this.client_id = client_id;
+    }
+
+    setExpires(expires) {
+        db.prepare("UPDATE profiles SET expires = ? WHERE id = ?").run(expires.toISOString(), this.id);
+        this.expires = expires;
+    }
+
+    setName(name) {
+        db.prepare("UPDATE profiles SET name = ? WHERE id = ?").run(name, this.id);
+        this.name = name;
+    }
+
+    setRefreshToken(refresh_token) {
+        db.prepare("UPDATE profiles SET refresh_token = ? WHERE id = ?").run(refresh_token, this.id);
+        this.refresh_token = refresh_token;
+    }
+
+    setUuid(uuid) {
+        db.prepare("UPDATE profiles SET uuid = ? WHERE id = ?").run(uuid, this.id);
+        this.uuid = uuid;
+    }
+
+    setXuid(xuid) {
+        db.prepare("UPDATE profiles SET xuid = ? WHERE id = ?").run(xuid, this.id);
+        this.xuid = xuid;
+    }
+
+    setIsDemo(is_demo) {
+        db.prepare("UPDATE profiles SET is_demo = ? WHERE id = ?").run(Number(is_demo), this.id);
+        this.is_demo = Boolean(is_demo);
+    }
+
+    delete() {
+        db.prepare("DELETE FROM profiles WHERE id = ?").run(this.id);
     }
 }
 
 let data = new Data();
 
 class MinecraftAccountSwitcher {
-    constructor(element, playerInfo) {
+    constructor(element, players) {
         element.classList.add("player-switch");
         this.element = element;
-        this.playerInfo = playerInfo;
+        this.players = players;
         this.setPlayerInfo();
     }
     setPlayerInfo() {
-        let playerInfo = this.playerInfo;
-        if (playerInfo?.default_player) {
+        let default_player = this.default_player ?? data.getDefaultProfile();
+        this.default_player = default_player;
+        if (default_player) {
             this.element.setAttribute("popovertarget", "player-dropdown");
-            this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${playerInfo.default_player.uuid}/40"><div class="player-info"><div class="player-name">${playerInfo.default_player.name}</div><div class="player-desc">${translate("app.players.minecraft_account")}</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
+            this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${default_player.uuid}/40"><div class="player-info"><div class="player-name">${default_player.name}</div><div class="player-desc">${translate("app.players.minecraft_account")}</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
             this.element.onclick = () => { };
             let dropdownElement;
             let alreadyThere = false;
@@ -287,21 +360,21 @@ class MinecraftAccountSwitcher {
                 this.dropdownElement = dropdownElement;
             }
             this.playerElements = [];
-            if (!playerInfo.players) playerInfo.players = [];
-            for (let i = 0; i < playerInfo.players.length; i++) {
+            if (!this.players) this.players = [];
+            for (let i = 0; i < this.players.length; i++) {
                 let playerElement = document.createElement("button");
-                let selected = playerInfo.default_player.uuid == playerInfo.players[i].uuid;
+                let selected = default_player.uuid == this.players[i].uuid;
                 playerElement.classList.add("player-switch");
                 if (!selected) playerElement.classList.add("not-selected");
                 let playerImg = document.createElement("img");
                 playerImg.classList.add("player-head");
-                playerImg.src = `https://mc-heads.net/avatar/${playerInfo.players[i].uuid}/40`;
+                playerImg.src = `https://mc-heads.net/avatar/${this.players[i].uuid}/40`;
                 playerElement.appendChild(playerImg);
                 let playerInfoEle = document.createElement("div");
                 playerInfoEle.classList.add("player-info");
                 let playerName = document.createElement("div");
                 playerName.classList.add("player-name");
-                playerName.innerHTML = playerInfo.players[i].name;
+                playerName.innerHTML = this.players[i].name;
                 playerInfoEle.appendChild(playerName);
                 let playerDesc = document.createElement("div");
                 playerDesc.classList.add("player-desc");
@@ -314,18 +387,18 @@ class MinecraftAccountSwitcher {
                 playerDelete.setAttribute("tabindex", "0");
                 playerDelete.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.onPlayerClickDelete(playerInfo.players[i]);
+                    this.onPlayerClickDelete(this.players[i]);
                 });
                 playerDelete.addEventListener('keydown', (e) => {
                     e.stopPropagation();
                     if (e.key == "Enter" || e.key == " ") {
-                        this.onPlayerClickDelete(playerInfo.players[i]);
+                        this.onPlayerClickDelete(this.players[i]);
                     }
                 });
-                playerDelete.setAttribute("data-uuid", playerInfo.players[i].uuid);
+                playerDelete.setAttribute("data-uuid", this.players[i].uuid);
                 playerElement.appendChild(playerDelete);
-                playerElement.addEventListener('click', (e) => this.onPlayerClick(playerInfo.players[i]));
-                playerElement.setAttribute("data-uuid", playerInfo.players[i].uuid);
+                playerElement.addEventListener('click', (e) => this.onPlayerClick(this.players[i]));
+                playerElement.setAttribute("data-uuid", this.players[i].uuid);
                 dropdownElement.appendChild(playerElement);
                 this.playerElements.push(playerElement);
             }
@@ -343,15 +416,15 @@ class MinecraftAccountSwitcher {
         }
     }
     addPlayer(newPlayerInfo) {
-        if (!this.playerInfo.players) this.playerInfo.players = [];
-        this.playerInfo.players.push(newPlayerInfo);
-        this.playerInfo.default_player = newPlayerInfo;
+        if (!this.players) this.players = [];
+        this.default_player = newPlayerInfo;
+        this.players.push(newPlayerInfo);
+        newPlayerInfo.setDefault();
         this.setPlayerInfo();
-        data.profile_info = this.playerInfo;
-        saveData();
     }
     selectPlayer(newPlayerInfo) {
-        this.playerInfo.default_player = newPlayerInfo;
+        this.default_player = newPlayerInfo;
+        newPlayerInfo.setDefault();
         this.element.innerHTML = `<img class="player-head" src="https://mc-heads.net/avatar/${newPlayerInfo.uuid}/40"><div class="player-info"><div class="player-name">${newPlayerInfo.name}</div><div class="player-desc">${translate("app.players.minecraft_account")}</div></div><div class="player-chevron"><i class="fa-solid fa-chevron-down"></i></div>`;
         for (let i = 0; i < this.playerElements.length; i++) {
             if (this.playerElements[i].getAttribute("data-uuid") != newPlayerInfo.uuid) {
@@ -360,36 +433,29 @@ class MinecraftAccountSwitcher {
                 this.playerElements[i].classList.remove("not-selected");
             }
         }
-        data.profile_info = this.playerInfo;
-        saveData();
-    }
-    get getPlayerInfo() {
-        return this.playerInfo;
     }
     onPlayerClick(e) {
         this.selectPlayer(e);
         if (this.dropdownElement) this.dropdownElement.hidePopover();
     }
     onPlayerClickDelete(e) {
-        for (let i = 0; i < this.playerInfo.players.length; i++) {
-            if (this.playerInfo.players[i].uuid == e.uuid) {
-                this.playerInfo.players.splice(i, 1);
+        for (let i = 0; i < this.players.length; i++) {
+            if (this.players[i].uuid == e.uuid) {
+                this.players[i].delete();
+                this.players.splice(i, 1);
                 break;
             }
         }
-        if (this.playerInfo.default_player.uuid == e.uuid) {
-            if (this.playerInfo.players.length >= 1) {
-                this.playerInfo.default_player = this.playerInfo.players[0];
+        if (this.default_player.uuid == e.uuid) {
+            if (this.players.length >= 1) {
+                this.default_player = this.players[0];
+                this.players[0].setDefault();
             } else {
-                this.playerInfo = {};
+                this.players = [];
+                this.default_player = null;
             }
         }
-        data.profile_info = this.playerInfo;
         this.setPlayerInfo();
-        saveData();
-    }
-    get getCurrentPlayer() {
-        return this.playerInfo.default_player;
     }
 }
 
@@ -397,12 +463,14 @@ class NavigationButton {
     constructor(element, title, icon, content) {
         this.element = element;
         this.title = title;
-        element.onclick = (e) => {
-            for (let i = 0; i < navButtons.length; i++) {
-                navButtons[i].removeSelected();
+        if (content) {
+            element.onclick = (e) => {
+                for (let i = 0; i < navButtons.length; i++) {
+                    navButtons[i].removeSelected();
+                }
+                this.setSelected();
+                content.displayContent();
             }
-            this.setSelected();
-            content.displayContent();
         }
         element.classList.add("menu-button");
         let navIcon = document.createElement("div");
@@ -435,7 +503,7 @@ class PageContent {
         content.innerHTML = "";
         content.appendChild(this.func());
         if (this.title == "instances") {
-            groupInstances(data.default_group);
+            groupInstances(data.getDefault("default_group"));
         }
     }
 }
@@ -481,7 +549,7 @@ class TabContent {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("tab-button");
             buttonElement.innerHTML = options[i].name;
-            buttonElement.setAttribute("data-color", options[i].color ?? "#0078d4");
+            buttonElement.setAttribute("data-color", options[i].color);
             buttonElement.onclick = (e) => {
                 this.selectOption(options[i].value);
                 let oldLeft = this.offset_left;
@@ -490,7 +558,8 @@ class TabContent {
                 element.style.setProperty("--left", this.offset_left + "px");
                 element.style.setProperty("--right", this.offset_right + "px");
                 element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
-                element.style.setProperty("--color", options[i].color ?? "#0078d4");
+                if (options[i].color) element.style.setProperty("--color", options[i].color);
+                else element.style.removeProperty("--color");
             }
             element.appendChild(buttonElement);
             options[i].element = buttonElement;
@@ -503,7 +572,8 @@ class TabContent {
         element.style.setProperty("--left", "4px");
         element.style.setProperty("--right", element.offsetWidth - options[0].element.offsetLeft - options[0].element.offsetWidth + "px");
         element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
-        element.style.setProperty("--color", options[0].color ?? "#0078d4");
+        if (options[0].color) element.style.setProperty("--color", options[0].color);
+        else element.style.removeProperty("--color");
         this.selected = options[0].value;
     }
     get getSelected() {
@@ -519,7 +589,7 @@ class TabContent {
                 this.options[i].element.classList.remove("selected");
             }
         }
-        opt.func();
+        opt.func(val);
         this.selected = val;
     }
     selectOptionAdvanced(val) {
@@ -528,11 +598,28 @@ class TabContent {
                 this.element.style.setProperty("--left", this.options[i].element.offset_left + "px");
                 this.element.style.setProperty("--right", this.options[i].element.offset_right + "px");
                 this.element.style.setProperty("--transition", "");
-                this.element.style.setProperty("--color", this.options[i].color ?? "#0078d4");
+                if (this.options[i].color) this.element.style.setProperty("--color", this.options[i].color);
+                else this.element.style.removeProperty("--color");
                 this.options[i].element.click();
             }
         }
         this.selected = val;
+    }
+}
+
+class MenuOption {
+    constructor(element, title, icon) {
+        this.element = element;
+        this.title = title;
+        this.icon = icon;
+    }
+    setTitle(title) {
+        this.title = title;
+        this.element.innerHTML = this.icon + this.title;
+    }
+    setIcon(icon) {
+        this.icon = icon;
+        this.element.innerHTML = this.icon + this.title;
     }
 }
 
@@ -560,7 +647,7 @@ class MoreMenu {
             }
             buttonElement.onclick = (e) => {
                 this.element.hidePopover();
-                buttons.buttons[i].func(e);
+                buttons.buttons[i].func(new MenuOption(buttonElement, buttons.buttons[i].title, buttons.buttons[i].icon));
             }
             this.element.appendChild(buttonElement);
         }
@@ -593,7 +680,7 @@ class ContextMenu {
             }
             buttonElement.onclick = (e) => {
                 this.element.hidePopover();
-                buttons.buttons[i].func(e);
+                buttons.buttons[i].func(new MenuOption(buttonElement, buttons.buttons[i].title, buttons.buttons[i].icon));
             }
             this.element.appendChild(buttonElement);
         }
@@ -638,6 +725,7 @@ class SearchBar {
         searchClear.onclick = (e) => {
             searchInput.value = "";
             this.oninput("");
+            this.onenter("");
         }
     }
     setOnInput(oninput) {
@@ -851,9 +939,11 @@ class Toggle {
         }
         if (startToggled) {
             this.toggled = true;
+            this.value = true;
             element.classList.add("toggled");
         } else {
             this.toggled = false;
+            this.value = false;
         }
     }
     processToggle() {
@@ -863,7 +953,20 @@ class Toggle {
             this.element.classList.add("toggled");
         }
         this.toggled = !this.toggled;
+        this.value = this.toggled;
         this.onchange(this.toggled);
+    }
+    setValueWithoutTrigger(v) {
+        this.toggled = v;
+        this.value = v;
+        if (!this.toggled) {
+            this.element.classList.remove("toggled");
+        } else {
+            this.element.classList.add("toggled");
+        }
+    }
+    toggle() {
+        this.processToggle();
     }
 }
 
@@ -974,11 +1077,6 @@ class ContentList {
             if (content[i].class) contentEle.classList.add(content[i].class);
             if (content[i].type) contentEle.setAttribute("data-type", content[i].type);
             this.items.push({ "name": [content[i].primary_column.title, content[i].primary_column.desc, content[i].secondary_column.title, content[i].secondary_column.desc].join("!!!!!!!!!!"), "element": contentEle, "type": content[i].type });
-            if (features?.more?.enabled) {
-                contentEle.oncontextmenu = (e) => {
-                    contextmenu.showContextMenu(content[i].more.actionsList, e.clientX, e.clientY);
-                }
-            }
             if (features?.checkbox?.enabled) {
                 let checkboxElement = document.createElement("input");
                 checkboxElement.type = "checkbox";
@@ -1015,11 +1113,16 @@ class ContentList {
             infoElement2Desc.className = "content-list-info-desc-2";
             infoElement2Desc.innerHTML = content[i].secondary_column.desc;
             infoElement2.appendChild(infoElement2Desc);
+            let toggle;
             if (features?.disable?.enabled) {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
-                let toggle = new Toggle(toggleElement, () => {
-                    toggleDisabledContent(content[i]);
+                toggle = new Toggle(toggleElement, (v) => {
+                    let result = toggleDisabledContent(content[i], theActionList, toggle, moreDropdown);
+                    if (!result) {
+                        toggle.setValueWithoutTrigger(!v);
+                        return;
+                    }
                     if (infoElement2Desc.innerHTML.endsWith(".disabled")) {
                         infoElement2Desc.innerHTML = infoElement2Desc.innerHTML.slice(0, -9);
                     } else {
@@ -1037,11 +1140,34 @@ class ContentList {
                 }
                 contentEle.appendChild(removeElement);
             }
+            let theActionList;
+            let moreDropdown;
             if (features?.more?.enabled) {
+                let actionList = content[i].more.actionsList;
+                actionList = actionList.map(e => {
+                    let func = () => { };
+                    if (e.func) func = e.func;
+                    if (e.func_id == "toggle") {
+                        func = () => {
+                            if (toggle) toggle.toggle();
+                        }
+                    }
+                    return {
+                        "title": e.title,
+                        "icon": e.icon,
+                        "func": func,
+                        "func_id": e.func_id,
+                        "danger": e.danger ?? false
+                    }
+                })
+                theActionList = new ContextMenuButtons(actionList);
+                contentEle.oncontextmenu = (e) => {
+                    contextmenu.showContextMenu(theActionList, e.clientX, e.clientY);
+                }
                 let moreElement = document.createElement("button");
                 moreElement.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
                 moreElement.className = 'content-list-more';
-                let moreDropdown = new MoreMenu(moreElement, content[i].more.actionsList);
+                moreDropdown = new MoreMenu(moreElement, theActionList);
                 contentEle.appendChild(moreElement);
             }
             contentMainElement.appendChild(contentEle);
@@ -1082,10 +1208,10 @@ class ContentList {
     }
 }
 
-function toggleDisabledContent(contentInfo) {
-    let content;
-    for (let i = 0; i < contentInfo.instance_info.content.length; i++) {
-        let e = contentInfo.instance_info.content[i];
+function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown) {
+    let content = contentInfo.instance_info.getContent();
+    for (let i = 0; i < content.length; i++) {
+        let e = content[i];
         if (e.file_name == contentInfo.secondary_column.desc) {
             let file_path = `./minecraft/instances/${contentInfo.instance_info.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + e.file_name;
             if (e.disabled) {
@@ -1094,8 +1220,8 @@ function toggleDisabledContent(contentInfo) {
                     displayError("Failed to enable content.");
                     return;
                 }
-                e.disabled = false;
-                e.file_name = new_file_name;
+                e.setDisabled(false);
+                e.setFileName(new_file_name);
                 contentInfo.secondary_column.desc = new_file_name;
                 displaySuccess("Successfully enabled '" + e.name + "'");
             } else {
@@ -1104,15 +1230,42 @@ function toggleDisabledContent(contentInfo) {
                     displayError("Failed to disable content.");
                     return;
                 }
-                e.disabled = true;
-                e.file_name = new_file_name;
+                e.setDisabled(true);
+                e.setFileName(new_file_name);
                 contentInfo.secondary_column.desc = new_file_name;
                 displaySuccess("Successfully disabled '" + e.name + "'");
             }
             break;
         }
     }
-    saveData();
+    if (!theActionList) return;
+    const toggleIndex = theActionList.buttons.findIndex(
+        btn => btn.func_id === "toggle"
+    );
+    if (toggleIndex !== -1) {
+        const isDisabled = !toggle.value;
+        theActionList.buttons[toggleIndex].title = isDisabled
+            ? translate("app.content.enable")
+            : translate("app.content.disable");
+        theActionList.buttons[toggleIndex].icon = isDisabled
+            ? '<i class="fa-solid fa-eye"></i>'
+            : '<i class="fa-solid fa-eye-slash"></i>';
+    }
+    moreDropdown.element.innerHTML = "";
+    for (let i = 0; i < theActionList.buttons.length; i++) {
+        let buttonElement = document.createElement("button");
+        buttonElement.classList.add("context-menu-button");
+        buttonElement.innerHTML = theActionList.buttons[i].icon + theActionList.buttons[i].title;
+        if (theActionList.buttons[i].danger) {
+            buttonElement.classList.add("danger");
+        }
+        buttonElement.onclick = (e) => {
+            moreDropdown.element.hidePopover();
+            theActionList.buttons[i].func(new MenuOption(buttonElement, theActionList.buttons[i].title, theActionList.buttons[i].icon));
+        }
+        moreDropdown.element.appendChild(buttonElement);
+    }
+    return true;
 }
 
 let homeContent = new PageContent(showHomeContent, "home");
@@ -1123,25 +1276,58 @@ let contextmenu = new ContextMenu();
 let homeButton = new NavigationButton(homeButtonEle, translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeContent);
 let instanceButton = new NavigationButton(instanceButtonEle, translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instanceContent);
 let worldButton = new NavigationButton(worldButtonEle, translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', worldContent);
+let settingsButton = new NavigationButton(settingsButtonEle, "Settings", '<i class="fa-solid fa-gear"></i>');
 let myAccountButton = new NavigationButton(myAccountButtonEle, translate("app.page.my_account"), '<i class="fa-solid fa-user"></i>', myAccountContent);
+
+settingsButtonEle.onclick = () => {
+    let dialog = new Dialog();
+    dialog.showDialog("Settings", "form", [
+        {
+            "type": "toggle",
+            "name": "Testing Stuff",
+            "tab": "appearance",
+            "default": true,
+            "id": "testing"
+        }
+    ], [
+        {
+            "type": "confirm",
+            "content": "Done"
+        }
+    ], [
+        {
+            "name": "Appearance",
+            "value": "appearance"
+        },
+        {
+            "name": "Defaults",
+            "value": "defaults"
+        },
+        {
+            "name": "Java",
+            "value": "java"
+        },
+        {
+            "name": "App Info",
+            "value": "app_info"
+        }
+    ], () => { });
+}
 
 let navButtons = [homeButton, instanceButton, worldButton, myAccountButton];
 
 async function toggleMicrosoftSignIn() {
     let newData = await window.electronAPI.triggerMicrosoftLogin();
-    if (data.profile_info?.players) {
-        for (let i = 0; i < data.profile_info.players.length; i++) {
-            if (newData.uuid == data.profile_info.players[i].uuid) {
-                // data.profile_info.players = newData;
-                accountSwitcher.selectPlayer(newData);
-                // saveData();
-                return;
-            }
-        }
+    let players = data.getProfiles().map(e => e.uuid);
+    if (players.includes(newData.uuid)) {
+        let player = data.getProfileFromUUID(newData.uuid);
+        player.setDefault();
+        accountSwitcher.selectPlayer(player);
+    } else {
+        let newPlayer = data.addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
+        newPlayer.setDefault();
+        accountSwitcher.addPlayer(newPlayer);
     }
-    // data.profile_info.players.push(newData);
-    accountSwitcher.addPlayer(newData);
-    // saveData();
 }
 
 function showHomeContent(e) {
@@ -1157,7 +1343,7 @@ function showMyAccountContent(e) {
 }
 
 function sortInstances(how) {
-    data.default_sort = how;
+    data.setDefault("default_sort", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
     let groups = document.getElementsByClassName("group");
@@ -1195,25 +1381,21 @@ function sortInstances(how) {
             groups[i].appendChild(frag);
         }
     }
-    saveData();
 }
 
 function groupInstances(how) {
-    data.default_group = how;
+    data.setDefault("default_group", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
     let instances = Array.from(document.querySelectorAll(".group-list .instance-item"));
-    // Build group map in one pass
     let groupMap = {};
     instances.forEach(inst => {
         let key = inst.getAttribute(attrhow) || "";
         if (!groupMap[key]) groupMap[key] = [];
         groupMap[key].push(inst);
     });
-    // Remove old groups
     let groupList = document.getElementsByClassName("group-list")[0];
     while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
-    // Add new groups with DocumentFragment
     Object.keys(groupMap).forEach(groupKey => {
         let newElement = document.createElement("div");
         newElement.classList.add("group");
@@ -1263,12 +1445,14 @@ function showInstanceContent(e) {
             {
                 "type": "image-upload",
                 "id": "icon",
+                "tab": "custom",
                 "name": "Icon" //TODO: replace with translate
             },
             {
                 "type": "text",
                 "name": "Name", //TODO
-                "id": "name"
+                "id": "name",
+                "tab": "custom"
             },
             {
                 "type": "multi-select",
@@ -1280,7 +1464,8 @@ function showInstanceContent(e) {
                     { "name": loaders["neoforge"], "value": "neoforge" },
                     { "name": loaders["quilt"], "value": "quilt" }
                 ],
-                "id": "loader"
+                "id": "loader",
+                "tab": "custom"
             },
             {
                 "type": "dropdown",
@@ -1288,7 +1473,8 @@ function showInstanceContent(e) {
                 "options": [],
                 "id": "game_version",
                 "input_source": "loader",
-                "source": (new VersionList).getVersions
+                "source": (new VersionList).getVersions,
+                "tab": "custom"
             }
         ], [
             { "content": "Cancel", "type": "cancel" },
@@ -1309,33 +1495,32 @@ function showInstanceContent(e) {
         ], async (e) => {
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
-            let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+            let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[#<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
             let loader_version = "";
             if (info.loader == "fabric") {
                 loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
             } else if (info.loader == "forge") {
                 loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
             }
-            let newInstanceInfo = {
-                "name": info.name,
-                "last_played": "",
-                "date_created": (new Date()).toString(),
-                "date_modified": (new Date()).toString(),
-                "playtime": 0,
-                "loader": info.loader,
-                "vanilla_version": info.game_version,
-                "loader_version": loader_version,
-                "instance_id": instance_id,
-                "image": info.icon,
-                "downloaded": false,
-                "locked": false,
-                "content": [],
-                "group": ""
-            }
-            data.instances.push(newInstanceInfo);
-            showSpecificInstanceContent(newInstanceInfo);
+            // let newInstanceInfo = {
+            //     "name": info.name,
+            //     "last_played": "",
+            //     "date_created": (new Date()).toString(),
+            //     "date_modified": (new Date()).toString(),
+            //     "playtime": 0,
+            //     "loader": info.loader,
+            //     "vanilla_version": info.game_version,
+            //     "loader_version": loader_version,
+            //     "instance_id": instance_id,
+            //     "image": info.icon,
+            //     "downloaded": false,
+            //     "locked": false,
+            //     "content": [],
+            //     "group": ""
+            // }
+            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "");
+            showSpecificInstanceContent(instance);
             window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
-            saveData();
         })
     }
     title.appendChild(createButton);
@@ -1351,9 +1536,9 @@ function showInstanceContent(e) {
     { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
     { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
     { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
-    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.default_sort, sortInstances);
+    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.getDefault("default_sort"), sortInstances);
     let group = document.createElement('div');
-    let groupBy = new SearchDropdown(translate("app.instances.group.by"), [{ "name": translate("app.instances.group.none"), "value": "none" }, { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" }, { "name": translate("app.instances.group.loader"), "value": "loader" }, { "name": translate("app.instances.group.game_version"), "value": "game_version" }], group, data.default_group, groupInstances);
+    let groupBy = new SearchDropdown(translate("app.instances.group.by"), [{ "name": translate("app.instances.group.none"), "value": "none" }, { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" }, { "name": translate("app.instances.group.loader"), "value": "loader" }, { "name": translate("app.instances.group.game_version"), "value": "game_version" }], group, data.getDefault("default_group"), groupInstances);
     searchAndFilter.appendChild(search);
     searchAndFilter.appendChild(sort);
     searchAndFilter.appendChild(group);
@@ -1364,33 +1549,34 @@ function showInstanceContent(e) {
     groupOne.classList.add("group");
     instanceGrid.appendChild(groupOne);
     ele.appendChild(instanceGrid);
-    for (let i = 0; i < data.instances.length; i++) {
-        let running = checkForProcess(data.instances[i].pid);
-        if (!running) data.instances[i].pid = null;
+    let instances = data.getInstances();
+    for (let i = 0; i < instances.length; i++) {
+        let running = checkForProcess(instances[i].pid);
+        if (!running) instances[i].setPid(null);
         if (running) {
-            window.electronAPI.watchProcessForExit(data.instances[i].pid, () => {
+            window.electronAPI.watchProcessForExit(instances[i].pid, () => {
                 instanceContent.displayContent();
             });
         }
         let instanceElement = document.createElement("button");
-        instanceElement.setAttribute("data-name", data.instances[i].name);
-        instanceElement.setAttribute("data-last-played", data.instances[i].last_played);
-        instanceElement.setAttribute("data-date-created", data.instances[i].date_created);
-        instanceElement.setAttribute("data-date-modified", data.instances[i].date_modified);
-        instanceElement.setAttribute("data-play-time", data.instances[i].playtime);
-        instanceElement.setAttribute("data-game-version", data.instances[i].vanilla_version);
-        instanceElement.setAttribute("data-custom-groups", data.instances[i].group);
-        instanceElement.setAttribute("data-loader", data.instances[i].loader);
+        instanceElement.setAttribute("data-name", instances[i].name);
+        instanceElement.setAttribute("data-last-played", instances[i].last_played);
+        instanceElement.setAttribute("data-date-created", instances[i].date_created);
+        instanceElement.setAttribute("data-date-modified", instances[i].date_modified);
+        instanceElement.setAttribute("data-play-time", instances[i].playtime);
+        instanceElement.setAttribute("data-game-version", instances[i].vanilla_version);
+        instanceElement.setAttribute("data-custom-groups", instances[i].group);
+        instanceElement.setAttribute("data-loader", instances[i].loader);
         instanceElement.setAttribute("data-none", "");
         instanceElement.onclick = (e) => {
-            showSpecificInstanceContent(data.instances[i]);
+            showSpecificInstanceContent(instances[i]);
         }
         instanceElement.classList.add("instance-item");
         if (running) instanceElement.classList.add("running");
         let instanceImage = document.createElement("img");
         instanceImage.classList.add("instance-image");
-        if (data.instances[i].image) {
-            instanceImage.src = data.instances[i].image;
+        if (instances[i].image) {
+            instanceImage.src = instances[i].image;
         } else {
             instanceImage.src = "default.png";
         }
@@ -1399,11 +1585,11 @@ function showInstanceContent(e) {
         instanceInfoEle.classList.add("instance-info");
         let instanceName = document.createElement("div");
         instanceName.classList.add("instance-name");
-        instanceName.innerHTML = data.instances[i].name;
+        instanceName.innerHTML = instances[i].name;
         instanceInfoEle.appendChild(instanceName);
         let instanceDesc = document.createElement("div");
         instanceDesc.classList.add("instance-desc");
-        instanceDesc.innerHTML = loaders[data.instances[i].loader] + " " + data.instances[i].vanilla_version;
+        instanceDesc.innerHTML = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
         instanceInfoEle.appendChild(instanceDesc);
         instanceElement.appendChild(instanceInfoEle);
         let buttons = new ContextMenuButtons([
@@ -1411,10 +1597,10 @@ function showInstanceContent(e) {
                 "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
                 "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
                 "func": running ? async (e) => {
-                    await stopInstance(data.instances[i]);
+                    await stopInstance(instances[i]);
                     instanceContent.displayContent();
                 } : async (e) => {
-                    await playInstance(data.instances[i]);
+                    await playInstance(instances[i]);
                     instanceContent.displayContent();
                 }
             },
@@ -1422,14 +1608,14 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-plus"></i>',
                 "title": translate("app.button.content.add"),
                 "func": (e) => {
-                    showAddContent(data.instances[i].instance_id, data.instances[i].vanilla_version, data.instances[i].loader);
+                    showAddContent(instances[i].instance_id, instances[i].vanilla_version, instances[i].loader);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-eye"></i>',
                 "title": translate("app.button.instances.view"),
                 "func": (e) => {
-                    showSpecificInstanceContent(data.instances[i]);
+                    showSpecificInstanceContent(instances[i]);
                 }
             },
             {
@@ -1441,7 +1627,7 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.electronAPI.openFolder(`./minecraft/instances/${data.instances[i].instance_id}`);
+                    window.electronAPI.openFolder(`./minecraft/instances/${instances[i].instance_id}`);
                 }
             },
             {
@@ -1459,7 +1645,7 @@ function showInstanceContent(e) {
                 "title": translate("app.button.instances.delete"),
                 "func": (e) => {
                     let dialog = new Dialog();
-                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the instance '" + data.instances[i].name + "'?", [ // TODO
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the instance '" + instances[i].name + "'?", [ // TODO
                         {
                             "type": "cancel",
                             "content": "Cancel"
@@ -1469,8 +1655,7 @@ function showInstanceContent(e) {
                             "content": "Confirm Deletion"
                         }
                     ], [], () => {
-                        data.instances.splice(i, 1);
-                        saveData();
+                        instances[i].delete();
                         instanceContent.displayContent();
                     });
                 },
@@ -1486,7 +1671,7 @@ function showInstanceContent(e) {
 }
 function showSpecificInstanceContent(instanceInfo, default_tab) {
     let running = checkForProcess(instanceInfo.pid);
-    if (!running) instanceInfo.pid = null;
+    if (!running) instanceInfo.setPid(null);
     content.innerHTML = "";
     let ele = document.createElement("div");
     content.appendChild(ele);
@@ -1694,15 +1879,20 @@ function setInstanceTabContentContent(instanceInfo, element) {
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
     let contentListWrap = document.createElement("div");
-    let old_file_names = instanceInfo.content.map((e) => e.file_name);
+    let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
     let newContent = getInstanceContent(instanceInfo);
     let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
-    instanceInfo.content = instanceInfo.content.concat(newContentAdd);
-    saveData();
+    newContentAdd.forEach(e => {
+        instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled);
+    });
     let deleteContent = newContent.deleteContent;
-    instanceInfo.content = instanceInfo.content.filter(e => !deleteContent.includes(e.file_name));
+    deleteContent.forEach(e => {
+        let content = new Content(instanceInfo.instance_id, e);
+        content.delete();
+    });
     let content = [];
-    instanceInfo.content.sort((a, b) => {
+    let instance_content = instanceInfo.getContent();
+    instance_content.sort((a, b) => {
         if (a.name.toLowerCase() > b.name.toLowerCase()) {
             return 1;
         }
@@ -1711,8 +1901,8 @@ function setInstanceTabContentContent(instanceInfo, element) {
         }
         return 0;
     });
-    for (let i = 0; i < instanceInfo.content.length; i++) {
-        let e = instanceInfo.content[i];
+    for (let i = 0; i < instance_content.length; i++) {
+        let e = instance_content[i];
         content.push({
             "primary_column": {
                 "title": e.name,
@@ -1726,29 +1916,31 @@ function setInstanceTabContentContent(instanceInfo, element) {
             "class": e.source,
             "image": e.image,
             "more": {
-                "actionsList": new ContextMenuButtons([
+                "actionsList": [
                     {
                         "title": translate("app.content.open"),
                         "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
-                        "func": () => { }
+                        "func": () => {
+                            window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`)
+                        }
                     },
                     {
                         "title": translate("app.content.update"),
                         "icon": '<i class="fa-solid fa-download"></i>',
-                        "func": () => { }
+                        "func_id": "update"
                     },
                     {
                         "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
                         "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
-                        "func": () => { }
+                        "func_id": "toggle"
                     },
                     {
                         "title": translate("app.content.delete"),
                         "icon": '<i class="fa-solid fa-trash-can"></i>',
                         "danger": true,
-                        "func": () => { }
+                        "func_id": "delete"
                     }
-                ])
+                ]
             },
             "disabled": e.disabled,
             "instance_info": instanceInfo
@@ -1854,7 +2046,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     });
                 },
                 "more": {
-                    "actionsList": new ContextMenuButtons([
+                    "actionsList": [
                         minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") ? {
                             "title": translate("app.worlds.play"),
                             "icon": '<i class="fa-solid fa-play"></i>',
@@ -1895,7 +2087,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 });
                             }
                         }
-                    ].filter(e => e))
+                    ].filter(e => e)
                 }
             });
     }
@@ -2039,7 +2231,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         let log_path = instanceInfo.current_log_file;
         let running = checkForProcess(instanceInfo.pid);
         if (!running) {
-            instanceInfo.pid = null;
+            instanceInfo.setPid(null);
             logs = [];
             let lineElement = document.createElement("span");
             lineElement.innerHTML = "No live game detected for this instance."; //TODO
@@ -2373,27 +2565,23 @@ function displaySuccess(success) {
 }
 
 async function playInstance(instInfo, quickPlay = null) {
-    instInfo.last_played = (new Date()).toString();
+    instInfo.setLastPlayed(new Date());
     // loader,version,loaderVersion,instance_id,player_info
     let pid;
     try {
-        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, accountSwitcher.getPlayerInfo.default_player, quickPlay);
+        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay);
         if (!pid) return;
-        for (let i = 0; i < data.instances.length; i++) {
-            if (data.instances[i].instance_id == instInfo.instance_id) {
-                data.instances[i].pid = pid.minecraft.pid;
-                data.instances[i].current_log_file = pid.minecraft.log;
-            }
-        }
-        data.profile_info.default_player = pid.player_info;
-        if (data.profile_info.players) {
-            for (let i = 0; i < data.profile_info.players.length; i++) {
-                if (pid.player_info.uuid == data.profile_info.players[i].uuid) {
-                    data.profile_info.players[i] = pid.player_info;
-                }
-            }
-        }
-        saveData();
+        instInfo.setPid(pid.minecraft.pid);
+        instInfo.setCurrentLogFile(pid.minecraft.log);
+        let default_player = data.getDefaultProfile();
+        default_player.setAccessToken(pid.player_info.access_token);
+        default_player.setClientId(pid.player_info.client_id);
+        default_player.setExpires(pid.player_info.expires);
+        default_player.setName(pid.player_info.name);
+        default_player.setRefreshToken(pid.player_info.refresh_token);
+        default_player.setUuid(pid.player_info.uuid);
+        default_player.setXuid(pid.player_info.xuid);
+        default_player.setIsDemo(pid.player_info.is_demo);
     } catch (e) {
         displayError(e);
     }
@@ -2461,13 +2649,6 @@ function getLangFile(locale) {
     return JSON.parse(window.electronAPI.readFile(`./lang/${locale}.json`));
 }
 
-async function saveData() {
-    let success = await window.electronAPI.saveData(JSON.stringify(data));
-    if (!success) {
-        displayError("Failure saving data");
-    }
-}
-
 function checkForProcess(pid) {
     return window.electronAPI.checkForProcess(pid);
 }
@@ -2481,7 +2662,7 @@ async function getInstanceWorldsMulti(instanceInfo) {
 }
 
 function getInstanceContent(instanceInfo) {
-    return window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.content);
+    return window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent());
 }
 
 function translate(key) {
@@ -2491,7 +2672,7 @@ function translate(key) {
     return lang[key];
 }
 
-let accountSwitcher = new MinecraftAccountSwitcher(playerSwitch, data.profile_info);
+let accountSwitcher = new MinecraftAccountSwitcher(playerSwitch, data.getProfiles());
 
 const colorCodes = {
     '0': 'mc-black',
@@ -2763,25 +2944,52 @@ class Dialog {
         dialogTop.appendChild(dialogTitle);
         dialogTop.appendChild(dialogX);
         element.appendChild(dialogTop);
-        let dialogContent = document.createElement("div");
-        dialogContent.className = "dialog-content";
-        element.appendChild(dialogContent);
+        let realDialogContent = document.createElement("div");
+        realDialogContent.className = "dialog-content";
+        let contents = {};
+        element.appendChild(realDialogContent);
         document.body.appendChild(element);
         element.showModal();
         let tabElement = document.createElement("div");
         this.values = [];
+        let selectedTab = tabs ? tabs[0]?.value ?? "" : "";
         if (tabs && tabs.length) {
-            dialogContent.appendChild(tabElement);
-            new TabContent(tabElement, tabs.map(e => ({ "name": e.name, "value": e.value, "func": () => { } })))
+            realDialogContent.appendChild(tabElement);
+            new TabContent(tabElement, tabs.map(e => ({
+                "name": e.name, "value": e.value, "func": (v) => {
+                    let keys = Object.keys(contents);
+                    keys.forEach(e => {
+                        contents[e].style.display = "none";
+                    });
+                    contents[v].style.display = "grid";
+                    selectedTab = v;
+                }
+            })))
         }
+        if (tabs && tabs.length) {
+            for (let i = 0; i < tabs.length; i++) {
+                let dialogContent = document.createElement("div");
+                dialogContent.className = "dialog-content-inner";
+                contents[tabs[i].value] = dialogContent;
+                realDialogContent.appendChild(dialogContent);
+                dialogContent.style.display = "none";
+            }
+        } else {
+            let dialogContent = document.createElement("div");
+            dialogContent.className = "dialog-content-inner";
+            contents["default"] = dialogContent;
+            realDialogContent.appendChild(dialogContent);
+        }
+        if (selectedTab) contents[selectedTab].style.display = "grid";
         if (type == "notice") {
-            dialogContent.innerHTML = info;
+            realDialogContent.innerHTML = info;
         } else if (type == "form") {
             for (let i = 0; i < info.length; i++) {
+                let tab = info[i].tab ?? "default";
                 if (info[i].type == "notice") {
                     let textElement = document.createElement("div");
                     textElement.innerHTML = info[i].content;
-                    dialogContent.appendChild(textElement);
+                    contents[tab].appendChild(textElement);
                 } else if (info[i].type == "text") {
                     let id = createId();
                     let label = document.createElement("label");
@@ -2796,10 +3004,22 @@ class Dialog {
                     if (info[i].default) textInput.value = info[i].default;
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
-                    dialogContent.appendChild(wrapper);
+                    contents[tab].appendChild(wrapper);
                     wrapper.appendChild(label);
                     wrapper.appendChild(textInput);
                     this.values.push({ "id": info[i].id, "element": textInput });
+                } else if (info[i].type == "toggle") {
+                    let label = document.createElement("label");
+                    label.innerHTML = info[i].name;
+                    label.className = "dialog-label";
+                    let toggleEle = document.createElement("bottom");
+                    let toggle = new Toggle(toggleEle, () => { }, info[i].default ?? false);
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper-horizontal";
+                    contents[tab].appendChild(wrapper);
+                    wrapper.appendChild(toggleEle);
+                    wrapper.appendChild(label);
+                    this.values.push({ "id": info[i].id, "element": toggleEle });
                 } else if (info[i].type == "image-upload") {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
@@ -2810,7 +3030,7 @@ class Dialog {
                     let element = document.createElement("div");
                     let imageUpload = new ImageUpload(element, info[i].default);
                     wrapper.appendChild(element);
-                    dialogContent.appendChild(wrapper);
+                    contents[tab].appendChild(wrapper);
                     this.values.push({ "id": info[i].id, "element": imageUpload });
                 } else if (info[i].type == "multi-select") {
                     let wrapper = document.createElement("div");
@@ -2821,7 +3041,7 @@ class Dialog {
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
                     wrapper.appendChild(element);
-                    dialogContent.appendChild(wrapper);
+                    contents[tab].appendChild(wrapper);
                     let multiSelect = new MultiSelect(element, info[i].options);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "dropdown") {
@@ -2833,7 +3053,7 @@ class Dialog {
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
                     wrapper.appendChild(element);
-                    dialogContent.appendChild(wrapper);
+                    contents[tab].appendChild(wrapper);
                     let multiSelect;
                     if (info[i].options.length >= 10 || info[i].source) {
                         multiSelect = new DialogDropdown("", info[i].options, element, info[i].options[0]?.value);
@@ -2877,6 +3097,7 @@ class Dialog {
                 buttonElement.classList.add("confirm");
                 buttonElement.onclick = () => {
                     let info = this.values.map(e => ({ "id": e.id, "value": e.element.value }));
+                    info.push({ "id": "selected_tab", "value": selectedTab });
                     onsubmit(info);
                     this.element.close();
                     setTimeout(() => {
@@ -2891,6 +3112,8 @@ class Dialog {
 }
 
 function showAddContent(instance_id, vanilla_version, loader) {
+    added_vt_dp_packs = [];
+    added_vt_rp_packs = [];
     content.innerHTML = "";
     let title = document.createElement("h1");
     title.innerHTML = "Add Content";
@@ -3036,32 +3259,28 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
         sources.push({
             "name": "Modrinth",
             "value": "modrinth",
-            "func": () => { },
-            "color": "#1bd96a"
+            "func": () => { }
         });
     }
     if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "world" || tab == "datapack") {
         sources.push({
             "name": "CurseForge",
             "value": "curseforge",
-            "func": () => { },
-            "color": "#f16436"
+            "func": () => { }
         });
     }
     if (tab == "resourcepack" || tab == "datapack") {
         sources.push({
             "name": "Vanilla Tweaks",
             "value": "vanilla_tweaks",
-            "func": () => { },
-            "color": "#f1c218"
+            "func": () => { }
         });
     }
     if (tab == "world") {
         sources.push({
             "name": "Minecraft Maps",
             "value": "minecraft_maps",
-            "func": () => { },
-            "color": "#c6c5c1"
+            "func": () => { }
         });
     }
     // let tabs = new TabContent(tabsElement,sources);
@@ -3073,10 +3292,10 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
     let searchElement = document.createElement("div");
     searchElement.style.flexGrow = 2;
     let searchContents = "";
-    let s = new SearchBar(searchElement, (v) => {
+    let s = new SearchBar(searchElement, () => { }, (v) => {
         searchContents = v;
         getContent(discoverList, instance_id, d.getSelected, v, loader, version, tab);
-    }, () => { });
+    });
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
     let d = new SearchDropdown("Content Source", sources, dropdownElement, sources[0].value, () => {
@@ -3141,7 +3360,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 ], [], async (e) => {
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
-                    let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+                    let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[#<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
                     let res = await fetch(`https://api.modrinth.com/v2/project/${i.project_id}/version`);
                     let version_json = await res.json();
                     let version = {};
@@ -3157,28 +3376,30 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     }
                     await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, i.title);
                     let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, i.title);
-                    let newInstanceInfo = {
-                        "name": info.name,
-                        "last_played": "",
-                        "date_created": (new Date()).toString(),
-                        "date_modified": (new Date()).toString(),
-                        "playtime": 0,
-                        "loader": info.loader,
-                        "vanilla_version": info.game_version,
-                        "loader_version": mr_pack_info.loader_version,
-                        "instance_id": instance_id,
-                        "image": info.icon,
-                        "downloaded": false,
-                        "locked": false,
-                        "content": mr_pack_info.content,
-                        "group": "",
-                        "install_source": "modrinth",
-                        "install_project_id": i.project_id
-                    }
-                    data.instances.push(newInstanceInfo);
-                    showSpecificInstanceContent(newInstanceInfo);
+                    // let newInstanceInfo = {
+                    //     "name": info.name,
+                    //     "last_played": "",
+                    //     "date_created": (new Date()).toString(),
+                    //     "date_modified": (new Date()).toString(),
+                    //     "playtime": 0,
+                    //     "loader": info.loader,
+                    //     "vanilla_version": info.game_version,
+                    //     "loader_version": mr_pack_info.loader_version,
+                    //     "instance_id": instance_id,
+                    //     "image": info.icon,
+                    //     "downloaded": false,
+                    //     "locked": false,
+                    //     "content": mr_pack_info.content,
+                    //     "group": "",
+                    //     "install_source": "modrinth",
+                    //     "install_project_id": i.project_id
+                    // }
+                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, mr_pack_info.loader_version, false, true, "", info.icon, instance_id, 0, "modrinth", i.project_id);
+                    mr_pack_info.content.forEach(e => {
+                        instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                    });
+                    showSpecificInstanceContent(instance);
                     window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-                    saveData();
                 })
             } : instance_id ? async (i, button) => {
                 button.innerHTML = '<i class="spinner"></i>Installing...';
@@ -3188,12 +3409,13 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 button.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
             } : (i) => {
                 let dialog = new Dialog();
+                let instances = data.getInstances();
                 dialog.showDialog(`Select Instance to install ${i.title}`, "form", [
                     {
                         "type": "dropdown",
                         "name": "Instance",
                         "id": "instance",
-                        "options": project_type == "mod" ? data.instances.filter(e => i.categories.includes(e.loader)).map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? data.instances.map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "shader" ? data.instances.filter(e => e.loader != "vanilla").map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : data.instances.map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id }))
+                        "options": project_type == "mod" ? instances.filter(e => i.categories.includes(e.loader)).map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : instances.map(e => ({ "name": i.versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id }))
                     }
                 ], [
                     { "content": "Cancel", "type": "cancel" },
@@ -3202,8 +3424,96 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
                     await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
+                    displaySuccess(`${i.title} installed to instance ${(new Instance(info.instance)).name}`);
                 });
             }, e.categories.map(e => formatCategory(e)), e);
+            element.appendChild(entry.element);
+        }
+    } else if (source == "curseforge") {
+        //query, loader, project_type, version
+        let apiresult = await window.electronAPI.curseforgeSearch(query, loader, project_type, version);
+        element.innerHTML = "";
+        for (let i = 0; i < apiresult.data.length; i++) {
+            let e = apiresult.data[i];
+            let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
+                let options = [];
+                let dialog = new Dialog();
+                dialog.showDialog(translate("app.button.instances.create"), "form", [
+                    {
+                        "type": "image-upload",
+                        "id": "icon",
+                        "name": "Icon", //TODO: replace with translate
+                        "default": e.thumbnailUrl
+                    },
+                    {
+                        "type": "text",
+                        "name": "Name", //TODO
+                        "id": "name",
+                        "default": e.name
+                    }
+                ], [
+                    { "content": "Cancel", "type": "cancel" },
+                    { "content": "Submit", "type": "confirm" }
+                ], [], async (ed) => {
+                    let info = {};
+                    ed.forEach(ed => { info[ed.id] = ed.value });
+                    let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[#<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+                    let res = await fetch(`https://www.curseforge.com/api/v1/mods/${e.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true`);
+                    let version_json = await res.json();
+                    let version = version_json.data[0];
+                    await window.electronAPI.downloadCurseforgePack(instance_id, `https://mediafilez.forgecdn.net/files/${version.id.toString().substring(0,4)}/${version.id.toString().substring(4,7)}/${version.fileName}`, e.name);
+                    let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, e.id, e.name);
+                    // let newInstanceInfo = {
+                    //     "name": info.name,
+                    //     "last_played": "",
+                    //     "date_created": (new Date()).toString(),
+                    //     "date_modified": (new Date()).toString(),
+                    //     "playtime": 0,
+                    //     "loader": info.loader,
+                    //     "vanilla_version": info.game_version,
+                    //     "loader_version": mr_pack_info.loader_version,
+                    //     "instance_id": instance_id,
+                    //     "image": info.icon,
+                    //     "downloaded": false,
+                    //     "locked": false,
+                    //     "content": mr_pack_info.content,
+                    //     "group": "",
+                    //     "install_source": "modrinth",
+                    //     "install_project_id": i.project_id
+                    // }
+                    let instance = data.addInstance(info.name, new Date(), new Date(), "", mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version, false, true, "", info.icon, instance_id, 0, "curseforge", e.id);
+                    mr_pack_info.content.forEach(e => {
+                        instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                    });
+                    showSpecificInstanceContent(instance);
+                    window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
+                })
+            } : instance_id ? async (i, button) => {
+                button.innerHTML = '<i class="spinner"></i>Installing...';
+                button.classList.add("disabled");
+                button.onclick = () => { };
+                await installContent("curseforge", i.id, instance_id, project_type, i.name, i.author.username, i.thumbnailUrl);
+                button.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+            } : (i) => {
+                let dialog = new Dialog();
+                let instances = data.getInstances();
+                dialog.showDialog(`Select Instance to install ${i.name}`, "form", [
+                    {
+                        "type": "dropdown",
+                        "name": "Instance",
+                        "id": "instance",
+                        "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
+                    }
+                ], [
+                    { "content": "Cancel", "type": "cancel" },
+                    { "content": "Submit", "type": "confirm" }
+                ], null, async (e) => {
+                    let info = {};
+                    e.forEach(e => { info[e.id] = e.value });
+                    await installContent("curseforge", i.id, info.instance, project_type, i.name, i.author.username, i.thumbnailUrl);
+                    displaySuccess(`${i.name} installed to instance ${(new Instance(info.instance)).name}`);
+                });
+            }, e.categories.map(e => e.name), e);
             element.appendChild(entry.element);
         }
     } else if (source == "vanilla_tweaks") {
@@ -3278,24 +3588,22 @@ async function getContent(element, instance_id, source, query, loader, version, 
             submitButton.innerHTML = '<i class="spinner"></i>Installing';
             submitButton.onclick = () => { };
             await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
-            let initialContent = {
-                "name": "Vanilla Tweaks Resource Pack",
-                "file_name": "vanilla_tweaks.zip",
-                "source": "vanilla_tweaks",
-                "source_id": added_vt_rp_packs,
-                "disabled": false,
-                "type": "resource_pack",
-                "image": "https://vanillatweaks.net/assets/images/logo.png",
-                "version": "",
-                "author": "Vanilla Tweaks"
-            }
-            for (let i = 0; i < data.instances.length; i++) {
-                if (data.instances[i].instance_id == instance_id) {
-                    data.instances[i].content.push(initialContent);
-                }
-            }
+            // let initialContent = {
+            //     "name": "Vanilla Tweaks Resource Pack",
+            //     "file_name": "vanilla_tweaks.zip",
+            //     "source": "vanilla_tweaks",
+            //     "source_id": added_vt_rp_packs,
+            //     "disabled": false,
+            //     "type": "resource_pack",
+            //     "image": "https://vanillatweaks.net/assets/images/logo.png",
+            //     "version": "",
+            //     "author": "Vanilla Tweaks"
+            // }
+            let instance = new Instance(instance_id);
+            instance.addContent("Vanilla Tweaks Resource Pack", "Vanilla Tweaks", "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
             submitButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
         } : () => {
+            let instances = data.getInstances();
             let dialog = new Dialog();
             dialog.showDialog(`Select Instance to install the selected packs`, "form", [
                 {
@@ -3306,7 +3614,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     "type": "dropdown",
                     "name": "Instance",
                     "id": "instance",
-                    "options": data.instances.map(e => ({ "name": e.name, "value": e.instance_id }))
+                    "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
                 }
             ], [
                 { "content": "Cancel", "type": "cancel" },
@@ -3315,79 +3623,89 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 let info = {};
                 e.forEach(e => { info[e.id] = e.value });
                 await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
-                let initialContent = {
-                    "name": "Vanilla Tweaks Resource Pack",
-                    "file_name": "vanilla_tweaks.zip",
-                    "source": "vanilla_tweaks",
-                    "source_id": added_vt_rp_packs,
-                    "disabled": false,
-                    "type": "resource_pack",
-                    "image": "https://vanillatweaks.net/assets/images/logo.png",
-                    "version": "",
-                    "author": "Vanilla Tweaks"
-                }
-                for (let i = 0; i < data.instances.length; i++) {
-                    if (data.instances[i].instance_id == info.instance) {
-                        data.instances[i].content.push(initialContent);
-                    }
-                }
-                // await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
+                // let initialContent = {
+                //     "name": "Vanilla Tweaks Resource Pack",
+                //     "file_name": "vanilla_tweaks.zip",
+                //     "source": "vanilla_tweaks",
+                //     "source_id": added_vt_rp_packs,
+                //     "disabled": false,
+                //     "type": "resource_pack",
+                //     "image": "https://vanillatweaks.net/assets/images/logo.png",
+                //     "version": "",
+                //     "author": "Vanilla Tweaks"
+                // }
+                let instance = new Instance(instance_id);
+                instance.addContent("Vanilla Tweaks Resource Pack", "Vanilla Tweaks", "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
             });
         }
         buttonWrapper.append(submitButton);
         element.appendChild(buttonWrapper);
         for (let i = 0; i < result.hits.length; i++) {
             let e = result.hits[i];
-            let added_vt_packs = project_type == "resourcepack" ? added_vt_rp_packs : added_vt_dp_packs;
             let onAddPack = (info, button) => {
                 button.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Pack';
                 button.onclick = () => {
                     onRemovePack(info, button);
                 }
-                displaySuccess(`${e.title} added.<br>Click the button at the top or bottom of the page to add the selected packs to an instance.`);
-                added_vt_packs.push({ "id": info.vt_id, "name": e.title });
-                console.log(added_vt_packs);
+                displaySuccess(`${e.title} added.<br>Click the button at the top of the page to add the selected packs to an instance.`);
+                if (project_type == "resourcepack") {
+                    added_vt_rp_packs.push({ "id": info.vt_id, "name": e.title });
+                    console.log(added_vt_rp_packs);
+                } else if (project_type == "datapack") {
+                    added_vt_dp_packs.push({ "id": info.vt_id, "name": e.title });
+                    console.log(added_vt_dp_packs);
+                }
             }
             let onRemovePack = (info, button) => {
                 button.innerHTML = '<i class="fa-solid fa-plus"></i>Add Pack';
                 button.onclick = () => {
                     onAddPack(info, button);
                 }
-                displaySuccess(`${e.title} removed.<br>Click the button at the top or bottom of the page to add the selected packs to an instance.`);
-                added_vt_packs.filter(e => e.id != info.vt_id);
-                console.log(added_vt_packs);
+                displaySuccess(`${e.title} removed.<br>Click the button at the top of the page to add the selected packs to an instance.`);
+                console.log("VT ID: ", info.vt_id)
+                if (project_type == "resourcepack") {
+                    added_vt_rp_packs = added_vt_rp_packs.filter(e => e.id != info.vt_id);
+                    console.log(added_vt_rp_packs);
+                } else if (project_type == "datapack") {
+                    added_vt_dp_packs = added_vt_dp_packs.filter(e => e.id != info.vt_id);
+                    console.log(added_vt_dp_packs);
+                }
             }
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, added_vt_packs.map(e => e.id).includes(e.vt_id) ? '<i class="fa-solid fa-minus"></i>Remove Pack' : '<i class="fa-solid fa-plus"></i>Add Pack', added_vt_packs.map(e => e.id).includes(e.vt_id) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id);
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>Remove Pack' : '<i class="fa-solid fa-plus"></i>Add Pack', (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id);
             element.appendChild(entry.element);
         }
-        // element.appendChild();
     }
 }
 
 async function installContent(source, project_id, instance_id, project_type, title, author, icon_url) {
-    let instance = {};
-    for (let j = 0; j < data.instances.length; j++) {
-        if (data.instances[j].instance_id == instance_id) {
-            instance = data.instances[j];
-            break;
-        }
-    }
+    let instance = new Instance(instance_id);
     let version_json;
     if (source == "modrinth") {
         let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version`);
         version_json = await res.json();
+    } else if (source == "curseforge") {
+        let res = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=100&sort=dateCreated&sortDescending=true&removeAlphas=true`);
+        version_json = await res.json();
+        version_json = version_json.data.map(e => ({
+            "game_versions": e.gameVersions,
+            "files": [
+                {
+                    "filename": e.fileName,
+                    "url": `https://mediafilez.forgecdn.net/files/${e.id.toString().substring(0,4)}/${e.id.toString().substring(4,7)}/${e.fileName}`
+                }
+            ],
+            "loaders": e.gameVersions.map(e => {
+                return e.toLowerCase();
+            }),
+            "version_number": e.id,
+            "dependencies": null // we dont support dependencies using cf
+        }));
     }
-    console.log(version_json);
-    console.log(instance);
     let initialContent = {};
     let version;
-    for (let i = 0; i < data.instances.length; i++) {
-        if (data.instances[i].instance_id == instance_id) {
-            if (data.instances[i].content.map(e => e.source_id).includes(project_id)) {
-                return;
-            }
-            break;
-        }
+    if (instance.getContent().map(e => e.source_id).includes(project_id)) {
+        // update content instead
+        return;
     }
     let dependencies;
     for (let j = 0; j < version_json.length; j++) {
@@ -3398,7 +3716,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
             break;
         }
     }
-    if (!initialContent.type) {
+    if (!initialContent.type && project_type != "mod") {
         for (let j = 0; j < version_json.length; j++) {
             if (project_type != "mod" || version_json[j].loaders.includes(instance.loader)) {
                 initialContent = await addContent(instance_id, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
@@ -3438,27 +3756,20 @@ async function installContent(source, project_id, instance_id, project_type, tit
                         "type": "confirm",
                         "content": "Yes"
                     }
-                ], [], async () => {
-                    await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
+                ], [], () => {
+                    installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
                 });
             }
         }
     }
-    initialContent.name = title;
-    initialContent.source = source;
-    initialContent.version = version;
-    initialContent.disabled = false;
-    initialContent.author = author;
-    initialContent.image = icon_url;
-    initialContent.source_id = project_id;
-    console.log(initialContent);
-    for (let i = 0; i < data.instances.length; i++) {
-        if (data.instances[i].instance_id == instance_id) {
-            console.log("FOUND INSTANCE, ADDING CONTENT NAMED " + title.toUpperCase());
-            data.instances[i].content.push(initialContent);
-        }
-    }
-    saveData();
+    // initialContent.name = title;
+    // initialContent.source = source;
+    // initialContent.version = version;
+    // initialContent.disabled = false;
+    // initialContent.author = author;
+    // initialContent.image = icon_url;
+    // initialContent.source_id = project_id;
+    instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false);
 }
 
 function formatCategory(e) {

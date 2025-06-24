@@ -4,6 +4,52 @@
     box-sizing: border-box;
 }
 
+body {
+    --background-color: #0a0a0a;
+    --text-color: white;
+    --subtle-text-color: #aaa;
+    --accent-color: #0078d4;
+    --danger-color: #d93e5d;
+    --go-color: #22ff84;
+    --success-color: rgb(0, 170, 0);
+    --error-color: rgb(200, 0, 0);
+    --dialog-background: #0005;
+    --dialog-backdrop: #00000088;
+    --color-1: color-mix(in srgb, 7.8% var(--text-color), var(--background-color));
+    --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
+    --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
+    --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
+    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), var(--background-color));
+    color-scheme: dark;
+}
+
+body.light {
+    --background-color: white;
+    --text-color: black;
+    --subtle-text-color: #444;
+    --accent-color: color-mix(in srgb, #0078d4, white);
+    --danger-color: #d93e5d;
+    --go-color: #22ff84;
+    --success-color: rgb(180, 255, 180);
+    --error-color: rgb(255, 180, 180);
+    --dialog-background: #fff5;
+    --dialog-backdrop: #00000088;
+    --color-1: color-mix(in srgb, 7.8% var(--text-color), var(--background-color));
+    --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
+    --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
+    --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
+    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), var(--background-color));
+    color-scheme: light;
+}
+
+body {
+    background: var(--background-color);
+    display: flex;
+    margin: 0;
+    font-family: "Arial Rounded", Arial, Helvetica, sans-serif;
+    color: var(--text-color);
+}
+
 button {
     border: 0;
     padding: 0;
@@ -19,20 +65,20 @@ button {
     padding: 10px;
     gap: 10px;
     width: 300px;
-    background-color: #0078d420;
+    background-color: var(--sidebar);
     height: 100%;
     position: fixed;
     top: 0;
     left: 0;
     border-right-style: solid;
-    border-color: #353535;
+    border-color: var(--color-2);
     border-width: 1px;
 }
 
 .player-switch {
     display: flex;
     padding: 8px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     border-radius: 10px;
     cursor: pointer;
     gap: 8px;
@@ -53,7 +99,7 @@ button {
     transition: background-color .25s, scale .1s;
     align-items: center;
     gap: 8px;
-    color: white;
+    color: var(--text-color);
     text-decoration: none;
 }
 
@@ -62,15 +108,15 @@ button {
 }
 
 .menu-button.selected {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .menu-button.selected .menu-icon {
-    background-color: #0078d4;
+    background-color: var(--accent-color);
 }
 
 .menu-button:hover .menu-icon {
-    background-color: #0078d4;
+    background-color: var(--accent-color);
 }
 
 .player-switch.not-selected {
@@ -82,11 +128,11 @@ button {
 }
 
 .player-switch:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .menu-button:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .player-head {
@@ -98,27 +144,19 @@ button {
 
 .player-name {
     font-size: 1rem;
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
 }
 
 .player-desc {
     font-size: .8rem;
-    color: #aaa;
+    color: var(--subtle-text-color);
 }
 
-body {
-    background: #0a0a0a;
-    display: flex;
-    margin: 0;
-    font-family: "Arial Rounded", Arial, Helvetica, sans-serif;
-    color: white;
-    color-scheme: dark;
-}
 
 .player-chevron {
     font-size: .8rem;
-    color: #aaa;
+    color: var(--subtle-text-color);
     margin-left: auto;
     transition: rotate .25s;
     margin-right: 8px;
@@ -126,14 +164,14 @@ body {
 
 .player-chevron:has(.fa-arrow-right-to-bracket) {
     font-size: 1.2rem;
-    color: white;
+    color: var(--text-color);
 }
 
 .player-delete {
     font-size: .8rem;
-    color: #fff;
+    color: var(--text-color);
     margin-left: auto;
-    background-color: #fff2;
+    background-color: var(--color-1t);
     height: 32px;
     aspect-ratio: 1;
     border-radius: 8px;
@@ -144,7 +182,7 @@ body {
 }
 
 .player-delete:hover {
-    background-color: #d93e5d;
+    background-color: var(--danger-color);
 }
 
 #player-dropdown:popover-open {
@@ -164,7 +202,7 @@ body {
 
 #player-dropdown {
     inset: unset;
-    background-color: #222;
+    background-color: var(--color-1);
     backdrop-filter: blur(10px);
     border: 0;
     padding: 8px;
@@ -180,14 +218,14 @@ body {
     interpolate-size: allow-keywords;
     transition: padding-block .25s, height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
-    border-color: #353535;
+    border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
 }
 
 .context-menu {
     inset: unset;
-    background-color: #222;
+    background-color: var(--color-1);
     backdrop-filter: blur(10px);
     border: 0;
     padding: 0px;
@@ -198,7 +236,7 @@ body {
     interpolate-size: allow-keywords;
     transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
-    border-color: #353535;
+    border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
     width: max-content;
@@ -215,7 +253,7 @@ body {
 
 .more-menu {
     inset: unset;
-    background-color: #222;
+    background-color: var(--color-1);
     backdrop-filter: blur(10px);
     border: 0;
     padding: 0px;
@@ -228,7 +266,7 @@ body {
     interpolate-size: allow-keywords;
     transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
-    border-color: #353535;
+    border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
     width: max-content;
@@ -254,19 +292,24 @@ body {
 }
 
 .context-menu-button:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .context-menu-button.danger:hover {
-    background-color: #d93e5d90;
+    /* background-color: color-mix(in srgb, 35% var(--danger-color), transparent); */
+    background-color: var(--danger-color);
+}
+
+.context-menu-button.danger>i {
+    transition: color .25s
 }
 
 .context-menu-button.danger:hover>i {
-    color: white;
+    color: var(--text-color);
 }
 
 .context-menu-button i {
-    color: #aaa;
+    color: var(--subtle-text-color);
     width: 24px;
     display: flex;
     justify-content: center;
@@ -274,10 +317,9 @@ body {
 }
 
 .add-player {
-    background-color: #222;
     border-radius: 10px;
     padding: 8px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     width: max-content;
     cursor: pointer;
     transition: background-color .25s;
@@ -287,14 +329,13 @@ body {
 }
 
 .add-player:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .add-content-button {
-    background-color: #222;
     border-radius: 10px;
     padding: 8px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     width: max-content;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
@@ -306,7 +347,7 @@ body {
 }
 
 .add-content-button:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .add-content-button:active {
@@ -314,10 +355,9 @@ body {
 }
 
 .create-button {
-    background-color: #222;
     border-radius: 10px;
     padding: 8px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     width: max-content;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
@@ -334,7 +374,7 @@ body {
 }
 
 .create-button:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .title-top {
@@ -345,7 +385,7 @@ body {
 *:focus-visible,
 .search-bar:has(.search-input:focus-visible) {
     outline-style: solid;
-    outline-color: #0078d4;
+    outline-color: var(--accent-color);
     outline-width: 3.5px;
     z-index: 100000;
 }
@@ -353,11 +393,11 @@ body {
 .menu-icon {
     height: 40px;
     border-radius: 5px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     display: flex;
     justify-content: center;
     align-items: center;
-    color: white;
+    color: var(--text-color);
     aspect-ratio: 1;
     font-size: 1.2rem;
     transition: background-color .25s;
@@ -400,7 +440,7 @@ h1 {
 }
 
 .search {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     border-radius: 8px;
     padding: 8px;
     padding-left: 30px;
@@ -443,8 +483,8 @@ h1 {
     position: absolute;
     font-size: 1.1rem;
     font-weight: bold;
-    background-color: #0a0a0a;
-    color: white;
+    background-color: var(--background-color);
+    color: var(--text-color);
     padding-right: 10px;
 }
 
@@ -455,7 +495,7 @@ h1 {
     font-size: 1.1rem;
     height: 2px;
     position: absolute;
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .group-list {
@@ -464,7 +504,7 @@ h1 {
 }
 
 .instance-item {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     border-radius: 10px;
     display: flex;
     padding: 8px;
@@ -475,7 +515,7 @@ h1 {
 }
 
 .instance-item.running {
-    background-color: #0078d4;
+    background-color: var(--accent-color);
 }
 
 .instance-item:active {
@@ -483,11 +523,11 @@ h1 {
 }
 
 .instance-item:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .instance-item.running:hover {
-    background-color: color-mix(in srgb, 85% #0078d4, white);
+    background-color: color-mix(in srgb, 85% var(--accent-color), var(--text-color));
 }
 
 .instance-image {
@@ -500,7 +540,7 @@ h1 {
 
 .instance-name {
     font-size: 1rem;
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -513,12 +553,12 @@ h1 {
 }
 
 .instance-item.running .instance-desc {
-    color: #eee;
+    color: var(--text-color);
 }
 
 .instance-desc {
     font-size: .8rem;
-    color: #aaa;
+    color: var(--subtle-text-color);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -527,7 +567,7 @@ h1 {
 
 .search-bar {
     display: flex;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     border-radius: 8px;
     align-items: center;
     grid-column: span 2;
@@ -543,7 +583,7 @@ h1 {
 }
 
 .search-icon {
-    color: #aaa;
+    color: var(--subtle-text-color);
     padding: 8px;
     height: 100%;
     aspect-ratio: 1;
@@ -554,7 +594,7 @@ h1 {
 }
 
 .search-input {
-    color: white;
+    color: var(--text-color);
     padding-block: 8px;
     flex-grow: 1;
     min-width: 0;
@@ -571,7 +611,7 @@ h1 {
 
 
 .search-clear {
-    color: #aaa;
+    color: var(--subtle-text-color);
     cursor: pointer;
     padding: 8px;
     height: 32px;
@@ -583,13 +623,13 @@ h1 {
 }
 
 .search-clear:hover {
-    color: white;
-    background-color: #ffffff20;
+    color: var(--text-color);
+    background-color: var(--color-1t);
 }
 
 .search-dropdown {
     position: relative;
-    background-color: #292929;
+    background-color: var(--color-1);
     border-radius: 8px 8px 8px 8px;
     transition: border-radius .25s;
 }
@@ -612,12 +652,12 @@ h1 {
 }
 
 .dropdown-title {
-    color: #aaa;
+    color: var(--subtle-text-color);
     font-size: .8rem;
 }
 
 .dropdown-selected {
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
     font-size: 1rem;
 }
@@ -640,27 +680,27 @@ h1 {
 }
 
 .dropdown-item.selected {
-    background-color: #0078d4;
+    background-color: var(--accent-color);
     font-weight: bold;
 }
 
 .dropdown-item:focus-visible {
-    background-color: #0078d4;
+    background-color: var(--accent-color);
     font-weight: bold;
 }
 
 .dropdown-item:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .dropdown-item.selected:hover {
-    background-color: color-mix(in srgb, 85% #0078d4, white);
+    background-color: color-mix(in srgb, 85% var(--accent-color), var(--text-color));
 }
 
 .dropdown-list {
     margin: 0;
     inset: unset;
-    background-color: #222;
+    background-color: var(--color-1);
     backdrop-filter: blur(10px);
     border: 0;
     padding: 0px;
@@ -676,7 +716,7 @@ h1 {
     interpolate-size: allow-keywords;
     transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
-    border-color: #353535;
+    border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
 }
@@ -693,7 +733,7 @@ h1 {
 .dropdown-list-dialog {
     margin: 0;
     inset: unset;
-    background-color: #222;
+    background-color: var(--color-1);
     backdrop-filter: blur(10px);
     border: 0;
     padding: 0px;
@@ -709,7 +749,7 @@ h1 {
     interpolate-size: allow-keywords;
     transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
-    border-color: #353535;
+    border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
 }
@@ -729,7 +769,7 @@ h1 {
     align-items: center;
     border-bottom-style: solid;
     border-width: 2px;
-    border-color: #ffffff40;
+    border-color: var(--color-2t);
     padding-bottom: 10px;
 }
 
@@ -738,8 +778,8 @@ h1 {
     width: 98px;
     border-radius: 12px;
     image-rendering: pixelated;
-    background-color: #292929;
-    border-color: #444;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
     border-width: 1px;
     border-style: solid;
     object-fit: contain;
@@ -761,7 +801,7 @@ h1 {
 .instance-top-sub-info-specific {
     display: flex;
     gap: 10px;
-    color: white;
+    color: var(--text-color);
     font-size: 1.2rem;
     font-weight: bold;
     position: relative;
@@ -769,12 +809,12 @@ h1 {
 }
 
 .instance-top-sub-info-specific i {
-    color: #aaa;
+    color: var(--subtle-text-color);
 }
 
 .instance-top-sub-info-specific:not(:last-of-type)::after {
     width: 2px;
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
     height: 100%;
     left: calc(100% + 9px);
     top: 0px;
@@ -784,7 +824,7 @@ h1 {
 
 .instance-top-play-button {
     border-radius: 10px;
-    background-color: #22ff84;
+    background-color: var(--go-color);
     padding: 10px;
     font-size: 1.5rem;
     color: black;
@@ -802,12 +842,12 @@ h1 {
 }
 
 .instance-top-play-button:hover {
-    background-color: color-mix(in srgb, 70% #22ff84, white);
+    background-color: color-mix(in srgb, 70% var(--go-color), var(--text-color));
 }
 
 .instance-top-loading-button {
     border-radius: 10px;
-    background-color: color-mix(in srgb, #22ff84, black);
+    background-color: color-mix(in srgb, var(--go-color), black);
     padding: 10px;
     font-size: 1.5rem;
     color: black;
@@ -844,7 +884,7 @@ h1 {
 
 .instance-top-stop-button {
     border-radius: 10px;
-    background-color: #d93e5d;
+    background-color: var(--danger-color);
     padding: 10px;
     font-size: 1.5rem;
     color: black;
@@ -862,7 +902,7 @@ h1 {
 }
 
 .instance-top-stop-button:hover {
-    background-color: color-mix(in srgb, 70% #d93e5d, white);
+    background-color: color-mix(in srgb, 70% var(--danger-color), var(--text-color));
 }
 
 .instance-top-more:active {
@@ -874,7 +914,7 @@ h1 {
     height: calc(1lh + 20px);
     aspect-ratio: 1;
     cursor: pointer;
-    color: white;
+    color: var(--text-color);
     font-size: 1.5rem;
     transition: background-color .25s, scale .1s;
     border-radius: 50%;
@@ -883,7 +923,7 @@ h1 {
 }
 
 .instance-top-more:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .instance-top-title {
@@ -891,7 +931,7 @@ h1 {
 }
 
 .tab-list {
-    background-color: #292929;
+    background-color: var(--color-1);
     border-radius: 10000px;
     display: flex;
     padding: 4px;
@@ -911,10 +951,6 @@ h1 {
     z-index: 2;
 }
 
-.tab-button:hover {
-    background-color: #ffffff00;
-}
-
 .tab-button:active {
     scale: .9;
 }
@@ -925,7 +961,7 @@ h1 {
     bottom: 4px;
     left: var(--left);
     right: var(--right);
-    background-color: var(--color);
+    background-color: var(--color, var(--accent-color));
     border-radius: 10000px;
     content: "";
     transition: var(--transition);
@@ -952,7 +988,7 @@ i {
 
 .content-list {
     display: grid;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     border-radius: 10px;
 }
 
@@ -965,7 +1001,7 @@ i {
 
 .content-list-title {
     font-size: 1rem;
-    color: white;
+    color: var(--text-color);
     width: 10px;
     flex-grow: 1;
     display: none;
@@ -994,7 +1030,7 @@ i {
 }
 
 .content-list-refresh:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .content-list-update-all {
@@ -1008,7 +1044,7 @@ i {
     font-size: 1rem;
     align-items: center;
     align-self: stretch;
-    color: color-mix(in srgb, #0078d4, white);
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
 }
 
 .content-list-update-all:active {
@@ -1016,7 +1052,7 @@ i {
 }
 
 .content-list-update-all:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .content-list-item {
@@ -1025,7 +1061,7 @@ i {
     padding: 10px;
     align-items: center;
     position: relative;
-    --accent-color: transparent;
+    --content-accent-color: transparent;
 }
 
 .content-list-item::after {
@@ -1035,7 +1071,7 @@ i {
     top: 25%;
     width: 4px;
     border-radius: 2px;
-    background-color: var(--accent-color);
+    background-color: var(--content-accent-color);
     content: "";
 }
 
@@ -1049,7 +1085,7 @@ i {
 
 .content-list-item:not(.hidden):not(:last-of-type) {
     border-bottom-style: solid;
-    border-bottom-color: #ffffff20;
+    border-bottom-color: var(--color-1t);
     border-bottom-width: 1px;
 }
 
@@ -1066,7 +1102,7 @@ i {
 
 .content-list-info-title-1 {
     font-size: 1rem;
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -1076,7 +1112,7 @@ i {
 
 .content-list-info-title-2 {
     font-size: 1rem;
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -1086,7 +1122,7 @@ i {
 
 .content-list-info-desc-1 {
     font-size: .8rem;
-    color: #aaa;
+    color: var(--subtle-text-color);
     font-weight: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -1096,7 +1132,7 @@ i {
 
 .content-list-info-desc-2 {
     font-size: .8rem;
-    color: #aaa;
+    color: var(--subtle-text-color);
     font-weight: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -1106,8 +1142,8 @@ i {
 
 .content-list-remove {
     font-size: .8rem;
-    color: #fff;
-    background-color: #fff2;
+    color: var(--text-color);
+    background-color: var(--color-1t);
     height: 32px;
     aspect-ratio: 1;
     border-radius: 8px;
@@ -1123,13 +1159,13 @@ i {
 }
 
 .content-list-remove:hover {
-    background-color: #d93e5d;
+    background-color: var(--danger-color);
 }
 
 .content-list-more {
     font-size: .8rem;
-    color: #fff;
-    background-color: #fff2;
+    color: var(--text-color);
+    background-color: var(--color-1t);
     height: 32px;
     aspect-ratio: 1;
     cursor: pointer;
@@ -1145,7 +1181,7 @@ i {
 }
 
 .content-list-more:hover {
-    background-color: #0078d4;
+    background-color: var(--accent-color);
 }
 
 .content-list-toggle {
@@ -1156,7 +1192,7 @@ i {
     padding: 4px;
     width: 44px;
     height: 26px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     position: relative;
     cursor: pointer;
     border-radius: 1000px;
@@ -1170,11 +1206,11 @@ i {
 
 .toggle.toggled {
     --left: 22px;
-    background-color: #0078d4;
+    background-color: var(--accent-color);
 }
 
 .toggle-inside {
-    background-color: white;
+    background-color: var(--text-color);
     width: 18px;
     height: 18px;
     border-radius: 50%;
@@ -1184,32 +1220,32 @@ i {
     transition: left .125s;
 }
 
-.content-list-item:has(.content-list-toggle:not(.toggled))>* {
+.content-list-item:has(.content-list-toggle:not(.toggled))>*, .content-list-item:has(.content-list-toggle:not(.toggled))::after {
     opacity: .3;
 }
 
 .modrinth {
-    --accent-color: #1bd96a;
+    --content-accent-color: #1bd96a;
 }
 
 .curseforge {
-    --accent-color: #f16436;
+    --content-accent-color: #f16436;
 }
 
 .vanilla_tweaks {
-    --accent-color: #f1c218;
+    --content-accent-color: #f1c218;
 }
 
 .minecraft_maps {
-    --accent-color: #c6c5c1;
+    --content-accent-color: #c6c5c1;
 }
 
 .planet_minecraft {
-    --accent-color: #3da2ff;
+    --content-accent-color: #3da2ff;
 }
 
 .player_install {
-    --accent-color: #666;
+    --content-accent-color: #666;
 }
 
 .mc-black {
@@ -1310,7 +1346,7 @@ i {
     display: flex;
     border-style: solid;
     border-width: 1px;
-    border-color: #ffffff20;
+    border-color: var(--color-1t);
     align-items: center;
     height: 40px;
     border-radius: 8px;
@@ -1319,7 +1355,7 @@ i {
 .live-name {
     flex-grow: 1;
     font-size: 1rem;
-    color: white;
+    color: var(--text-color);
     margin-right: 8px;
     overflow: hidden;
 }
@@ -1338,13 +1374,13 @@ i {
     cursor: pointer;
     place-items: center;
     transition: background-color .25s;
-    color: #d93e5d;
+    color: var(--danger-color);
     border-radius: 8px;
     flex-shrink: 0;
 }
 
 .live-stop:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .live-log {
@@ -1359,7 +1395,7 @@ i {
 }
 
 .live-log:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .live:not(.minecraft-live) .live-stop {
@@ -1373,7 +1409,7 @@ i {
 .live-indicator {
     width: 10px;
     height: 10px;
-    background-color: #aaa;
+    background-color: var(--subtle-text-color);
     border-radius: 50%;
     margin-inline: 10px;
     margin-block: 15px;
@@ -1382,17 +1418,17 @@ i {
 }
 
 .live.minecraft-live .live-indicator {
-    background-color: #22ff84;
+    background-color: var(--go-color);
 }
 
 .download-log {
     margin-top: auto;
     display: flex;
     flex-direction: column;
-    background-color: #222;
+    background-color: var(--color-1);
     border-width: 1px;
     border-style: solid;
-    border-color: #333;
+    border-color: var(--color-2);
     border-radius: 8px;
     padding-inline: 8px;
 }
@@ -1410,7 +1446,7 @@ i {
 
 .download-item:not(:last-child) {
     border-bottom-style: solid;
-    border-color: #333;
+    border-color: var(--color-2);
     border-width: 1px;
 }
 
@@ -1424,7 +1460,7 @@ i {
 }
 
 .download-progress {
-    background-color: #aaa;
+    background-color: var(--subtle-text-color);
     border-radius: 100px;
     height: 12px;
     width: 100%;
@@ -1437,7 +1473,7 @@ i {
     top: 0;
     height: 100%;
     width: var(--percent);
-    background-color: #0078d4;
+    background-color: var(--accent-color);
     transition: width .1s;
     content: "";
     border-radius: 100px;
@@ -1466,7 +1502,7 @@ i {
 }
 
 .logs-copy:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .logs-share {
@@ -1480,7 +1516,7 @@ i {
     font-size: 1rem;
     align-items: center;
     align-self: stretch;
-    color: color-mix(in srgb, #0078d4, white);
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
 }
 
 .logs-share:active {
@@ -1488,7 +1524,7 @@ i {
 }
 
 .logs-share:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .logs-delete {
@@ -1502,7 +1538,7 @@ i {
     font-size: 1rem;
     align-items: center;
     align-self: stretch;
-    color: color-mix(in srgb, #d93e5d, white);
+    color: color-mix(in srgb, var(--danger-color), var(--text-color));
 }
 
 .logs-delete:active {
@@ -1510,7 +1546,7 @@ i {
 }
 
 .logs-delete:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .logs-top {
@@ -1565,7 +1601,7 @@ dialog[open] {
 }
 
 dialog::backdrop {
-    background-color: #00000088;
+    background-color: var(--dialog-backdrop);
     transition-property: overlay display opacity;
     transition-duration: .5s;
     transition-behavior: allow-discrete;
@@ -1590,7 +1626,7 @@ dialog[open]::backdrop {
     align-items: center;
     border-bottom-style: solid;
     border-width: 1px;
-    border-color: #444444;
+    border-color: var(--color-2);
 }
 
 .dialog-title {
@@ -1609,7 +1645,7 @@ dialog[open]::backdrop {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--text-color);
     font-size: 1.2rem;
     border-radius: 5px;
     transition: background-color .25s, scale .1s;
@@ -1617,7 +1653,7 @@ dialog[open]::backdrop {
 }
 
 .dialog-x:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .dialog-x:active {
@@ -1626,9 +1662,9 @@ dialog[open]::backdrop {
 
 .dialog {
     border-radius: 10px;
-    background-color: #0005;
+    background-color: var(--dialog-background);
     backdrop-filter: blur(30px);
-    border-color: #444444;
+    border-color: var(--color-2);
     border-width: 1px;
     border-style: solid;
     min-width: 400px;
@@ -1642,21 +1678,26 @@ dialog[open]::backdrop {
     gap: 10px;
 }
 
+.dialog-content-inner {
+    display: grid;
+    gap: 10px;
+}
+
 .dialog-buttons {
     display: flex;
     gap: 10px;
     padding: 10px;
     border-top-style: solid;
     border-width: 1px;
-    border-color: #444;
+    border-color: var(--color-2);
 }
 
 .dialog-button {
     padding: 10px;
     cursor: pointer;
     border-radius: 10px;
-    background-color: white;
-    color: black;
+    background-color: var(--text-color);
+    color: var(--background-color);
     transition: background-color .25s, scale .1s;
     font-size: 1rem;
 }
@@ -1670,26 +1711,26 @@ dialog[open]::backdrop {
 }
 
 .dialog-button:hover {
-    background-color: #ddd;
+    background-color: color-mix(in srgb, 85% var(--text-color), var(--text-color));
 }
 
 .dialog-button.confirm {
-    background-color: #0078d4;
-    color: white;
+    background-color: var(--accent-color);
+    color: var(--text-color);
 }
 
 .dialog-button.confirm:hover {
-    background-color: color-mix(in srgb, 85% #0078d4, white);
+    background-color: color-mix(in srgb, 85% var(--accent-color), var(--text-color));
 }
 
 .dialog-text-input {
-    color: white;
+    color: var(--text-color);
     padding: 8px;
     flex-grow: 1;
     min-width: 0;
     border: 0;
     border-radius: 5px;
-    background: #292929;
+    background: var(--color-1);
     font-size: 1.1rem;
 }
 
@@ -1701,6 +1742,12 @@ dialog[open]::backdrop {
 .dialog-text-label-wrapper {
     display: grid;
     gap: 4px;
+}
+
+.dialog-text-label-wrapper-horizontal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .image-upload-wrapper {
@@ -1716,8 +1763,8 @@ dialog[open]::backdrop {
     image-rendering: pixelated;
     object-fit: contain;
     flex-shrink: 0;
-    background-color: #292929;
-    border-color: #444;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
     border-width: 1px;
     border-style: solid;
 }
@@ -1736,17 +1783,13 @@ dialog[open]::backdrop {
     transition: background-color .25s, scale .1s;
     align-items: center;
     gap: 8px;
-    color: white;
-    background-color: #292929;
+    color: var(--text-color);
+    background-color: var(--color-1);
     text-decoration: none;
 }
 
 .image-upload-button:active {
     scale: .95;
-}
-
-.image-upload-buttonn.selected {
-    background-color: #474747;
 }
 
 .log-info {
@@ -1781,7 +1824,7 @@ dialog[open]::backdrop {
 
 .discover-item {
     display: flex;
-    background-color: #292929;
+    background-color: var(--color-1);
     border-radius: 10px;
     padding: 10px;
     gap: 10px;
@@ -1793,8 +1836,8 @@ dialog[open]::backdrop {
     width: 98px;
     border-radius: 12px;
     image-rendering: pixelated;
-    background-color: #292929;
-    border-color: #444;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
     border-width: 1px;
     border-style: solid;
     object-fit: contain;
@@ -1809,7 +1852,7 @@ dialog[open]::backdrop {
 
 .discover-item-title {
     font-size: 1.4rem;
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -1819,7 +1862,7 @@ dialog[open]::backdrop {
     flex-shrink: 1;
 }
 
-.discover-item-title > div {
+.discover-item-title>div {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1827,7 +1870,7 @@ dialog[open]::backdrop {
 }
 
 .discover-item-author {
-    color: #aaa;
+    color: var(--subtle-text-color);
     font-size: 1rem;
     white-space: nowrap;
     overflow: hidden;
@@ -1838,7 +1881,7 @@ dialog[open]::backdrop {
 }
 
 .discover-item-desc {
-    color: #aaa;
+    color: var(--subtle-text-color);
     font-size: 1rem;
     margin-top: 10px;
     white-space: nowrap;
@@ -1855,7 +1898,7 @@ dialog[open]::backdrop {
 }
 
 .discover-item-downloads {
-    color: #aaa;
+    color: var(--subtle-text-color);
     font-size: 1rem;
 }
 
@@ -1873,9 +1916,9 @@ dialog[open]::backdrop {
     font-size: 1rem;
     font-weight: bold;
     border-style: solid;
-    border-color: color-mix(in srgb, #0078d4, white);
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     border-width: 2px;
-    color: color-mix(in srgb, #0078d4, white);
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
     margin-top: auto;
 }
 
@@ -1884,7 +1927,7 @@ dialog[open]::backdrop {
 }
 
 .discover-item-install:hover {
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
 }
 
 .discover-item-install.disabled {
@@ -1910,10 +1953,10 @@ dialog[open]::backdrop {
 
 .discover-item-tag {
     font-size: .9rem;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     padding: 4px;
     border-radius: 100px;
-    color: #ccc;
+    color: var(--subtle-text-color);
     padding-inline: 8px;
     white-space: nowrap;
     display: flex;
@@ -1932,8 +1975,8 @@ dialog[open]::backdrop {
 
 .error {
     max-width: calc(100svw - 20px);
-    color: white;
-    background-color: rgb(200, 0, 0);
+    color: var(--text-color);
+    background-color: var(--error-color);
     padding: 8px;
     font-weight: bold;
     border-radius: 8px;
@@ -1945,7 +1988,7 @@ dialog[open]::backdrop {
     margin-block: 0;
     font-size: 1rem;
     border-width: 2px;
-    border-color: white;
+    border-color: var(--text-color);
     border-style: solid;
     margin-left: auto;
     box-shadow: 0px 0px 10px black;
@@ -1962,8 +2005,8 @@ dialog[open]::backdrop {
 
 .success {
     max-width: calc(100svw - 20px);
-    color: white;
-    background-color: rgb(0, 170, 0);
+    color: var(--text-color);
+    background-color: var(--success-color);
     padding: 8px;
     font-weight: bold;
     border-radius: 8px;
@@ -1975,7 +2018,7 @@ dialog[open]::backdrop {
     margin-block: 0;
     font-size: 1rem;
     border-width: 2px;
-    border-color: white;
+    border-color: var(--text-color);
     border-style: solid;
     margin-left: auto;
     box-shadow: 0px 0px 10px black;
@@ -2000,7 +2043,7 @@ dialog[open]::backdrop {
     gap: 10px;
     width: max-content;
     overflow: hidden;
-    
+
 }
 
 .vt-button-wrapper {
@@ -2008,10 +2051,9 @@ dialog[open]::backdrop {
 }
 
 .vt-submit-button {
-    background-color: #222;
     border-radius: 10px;
     padding: 8px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     width: max-content;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
@@ -2028,13 +2070,13 @@ dialog[open]::backdrop {
 }
 
 .vt-submit-button:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .gallery-screenshot {
     border-radius: 12px;
-    background-color: #292929;
-    border-color: #444;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
     border-width: 1px;
     border-style: solid;
     background-position: center;
@@ -2061,20 +2103,20 @@ dialog[open]::backdrop {
     bottom: 0;
     right: 0;
     left: 0;
-    color: white;
-    background-color: #00000080;
+    color: var(--text-color);
+    background-color: var(--dialog-backdrop);
     padding: 8px;
     font-weight: bold;
     font-size: 1rem;
     content: attr(data-title);
-    text-align:center;
+    text-align: center;
 }
 
 .screenshot-preview {
     border-radius: 10px;
-    background-color: #0005;
+    background-color: var(--dialog-background);
     backdrop-filter: blur(30px);
-    border-color: #444444;
+    border-color: var(--color-2);
     border-width: 1px;
     border-style: solid;
     box-shadow: 0px 0px 10px black;
@@ -2082,7 +2124,7 @@ dialog[open]::backdrop {
 
 .screenshot-wrapper {
     display: flex;
-    align-items:center;
+    align-items: center;
     gap: 10px;
     width: calc(100svw - 100px);
     height: calc(100svh - 100px);
@@ -2093,11 +2135,11 @@ dialog[open]::backdrop {
     width: 40px;
     height: 40px;
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
     cursor: pointer;
-    color: black;
-    background-color: #fff;
+    color: var(--background-color);
+    background-color: var(--text-color);
     border-radius: 50%;
     flex-shrink: 0;
     transition: background-color .25s, scale .1s;
@@ -2109,13 +2151,13 @@ dialog[open]::backdrop {
 }
 
 .screenshot-arrow:hover {
-    background-color: #aaa;
+    background-color: var(--subtle-text-color);
 }
 
 .screenshot-info {
-    background-color: #0005;
+    background-color: var(--dialog-background);
     backdrop-filter: blur(30px);
-    border-color: #444;
+    border-color: var(--color-2);
     border-width: 1px;
     border-left-style: solid;
     display: flex;
@@ -2126,12 +2168,12 @@ dialog[open]::backdrop {
 }
 
 .screenshot-title {
-    color: white;
+    color: var(--text-color);
     font-weight: bold;
     font-size: 1.5rem;
     padding-block: 10px;
     border-block-style: solid;
-    border-color: #444;
+    border-color: var(--color-2);
     border-width: 1px;
 }
 
@@ -2143,7 +2185,7 @@ dialog[open]::backdrop {
 .screenshot-action {
     border-radius: 10px;
     padding: 8px;
-    background-color: #ffffff20;
+    background-color: var(--color-1t);
     cursor: pointer;
     transition: background-color .25s, scale .1s;
     display: flex;
@@ -2158,7 +2200,7 @@ dialog[open]::backdrop {
 }
 
 .screenshot-action:hover {
-    background-color: #ffffff40;
+    background-color: var(--color-2t);
 }
 
 .screenshot-display {
@@ -2168,7 +2210,11 @@ dialog[open]::backdrop {
     max-height: 100%;
 }
 
-.screenshot-action > i {
+.screenshot-action>i {
     width: 20px;
-    text-align:center;
+    text-align: center;
+}
+
+#settingsButtonEle {
+    background-color: var(--color-1t);
 }

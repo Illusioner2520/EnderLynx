@@ -14,7 +14,7 @@ const toml = require('toml');
 const Database = require('better-sqlite3');
 const db = new Database('app.db');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -53,14 +53,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return content;
         } catch (err) {
             return `Error reading file: ${err.message}`;
-        }
-    },
-    saveData: async (data) => {
-        try {
-            await fsa.writeFile("data.json", data, 'utf-8');
-            return true;
-        } catch (err) {
-            return false;
         }
     },
     playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay) => {
@@ -236,10 +228,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "capes": token.profile.capes,
             "skins": token.profile.skins,
             "name": token.profile.name,
-            "is_demo": token.profile.demo,
+            "is_demo": token.profile.demo ?? false,
             "xuid": token.xuid,
             "client_id": getUUID(),
-            "expires": date.toString()
+            "expires": date
         }
     },
     getInstanceLogs: (instance_id) => {
@@ -707,6 +699,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let res = await fetch(url);
         return await res.json();
     },
+    curseforgeSearch: async (query, loader, project_type, version) => {
+        let gv = "";
+        if (version) gv = "&gameVersion=" + version;
+        let gf = "";
+        if (loader) gf = "&gameFlavors[0]=" + ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
+        let ci = "";
+        let id = 0;
+        if (project_type == "mod") id = 6;
+        if (project_type == "modpack") id = 4471;
+        if (project_type == "resourcepack") id = 12;
+        if (project_type == "shader") id = 6552;
+        if (project_type == "world") id = 17;
+        if (project_type == "datapack") id = 6945;
+        if (project_type) ci = "&classId=" + id;
+        let url = `https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&filterText=${query}${gv}&pageSize=100&sortField=1${gf}${ci}`;
+        let res = await fetch(url);
+        return await res.json();
+    },
     addContent: async (instance_id, project_type, project_url, filename) => {
         let install_path = "";
         if (project_type == "mod") {
@@ -736,6 +746,84 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
         await urlToFile(url, `./minecraft/instances/${instance_id}/pack.mrpack`);
         ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
+    },
+    downloadCurseforgePack: async (instance_id, url, title) => {
+        ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
+        await urlToFile(url, `./minecraft/instances/${instance_id}/pack.zip`);
+        ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
+    },
+    processCfZip: async (instance_id, zip_path, cf_id, title = ".zip file") => {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        const zip = new AdmZip(zip_path);
+
+        let extractToPath = `./minecraft/instances/${instance_id}`;
+
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
+        }
+
+        zip.extractAllTo(extractToPath, true);
+
+        let srcDir = `./minecraft/instances/${instance_id}/overrides`;
+        let destDir = `./minecraft/instances/${instance_id}`;
+
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const files = fs.readdirSync(srcDir);
+
+        for (const file of files) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                const stats = fs.lstatSync(destPath);
+                if (stats.isDirectory()) {
+                    fs.rmSync(destPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(destPath);
+                }
+            }
+
+            fs.renameSync(srcPath, destPath);
+        }
+
+        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        manifest_json = JSON.parse(manifest_json);
+
+        let dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`);
+        let dependency_json = await dependency_res.json();
+
+        let content = [];
+
+        for (let i = 0; i < manifest_json.files.length; i++) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+            let file_name = manifest_json.files[i].projectID + "-" + manifest_json.files[i].fileID + ".jar";
+            
+            await urlToFile(`https://www.curseforge.com/api/v1/mods/${manifest_json.files[i].projectID}/files/${manifest_json.files[i].fileID}/download`, path.resolve(extractToPath, "mods", file_name));
+
+            let dependency_item = dependency_json.data.find(dep => dep.id === manifest_json.files[i].projectID);
+
+            content.push({
+                "author": dependency_item?.authorName ?? "",
+                "disabled": false,
+                "file_name": file_name,
+                "image": dependency_item?.logoUrl ?? "",
+                "source": "curseforge",
+                "source_id": manifest_json.files[i].projectID,
+                "type": "mod",
+                "version": manifest_json.files[i].fileID,
+                "name": dependency_item?.name ?? file_name
+            })
+        }
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
+        return ({
+            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
+            "content": content,
+            "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
+            "vanilla_version": manifest_json.minecraft.version
+        })
     },
     processMrPack: async (instance_id, mrpack_path, loader = "minecraft", title = ".mrpack file") => {
         ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
@@ -904,3 +992,22 @@ function getUUID() {
     return result;
 }
 
+async function getNewAccessToken(refresh_token) {
+    let date = new Date();
+    date.setHours(date.getHours() + 1);
+    const authManager = new Auth("select_account");
+    const xboxManager = await authManager.refresh(refresh_token);
+    const token = await xboxManager.getMinecraft();
+    return {
+        "access_token": token.mcToken,
+        "uuid": token.profile.id,
+        "refresh_token": token.parent.msToken.refresh_token,
+        "capes": token.profile.capes,
+        "skins": token.profile.skins,
+        "name": token.profile.name,
+        "is_demo": token.profile.demo,
+        "xuid": token.xuid,
+        "client_id": getUUID(),
+        "expires": date
+    }
+}
