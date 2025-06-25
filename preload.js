@@ -14,7 +14,7 @@ const toml = require('toml');
 const Database = require('better-sqlite3');
 const db = new Database('app.db');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -613,6 +613,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             await mc.installFabric(vanilla_version, loader_version);
         } else if (loader == "forge") {
             await mc.installForge(vanilla_version, loader_version);
+        } else if (loader == "neoforge") {
+            await mc.installNeoForge(vanilla_version, loader_version);
         }
     },
     getForgeVersion: async (mcversion) => {
@@ -622,6 +624,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getFabricVersion: async (mcversion) => {
         let fabric = new Fabric();
         return (await fabric.getVersions(mcversion))[0];
+    },
+    getNeoForgeVersion: async (mcversion) => {
+        let neoforge = new NeoForge();
+        return (await neoforge.getVersions(mcversion))[0];
+    },
+    getQuiltVersion: async (mcversion) => {
+        let quilt = new Quilt();
+        return (await quilt.getVersions(mcversion))[0];
     },
     watchFile: (filepath, callback) => {
         let lastSize = 0;
@@ -690,16 +700,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     // mod, modpack, resourcepack, shader, datapack
-    modrinthSearch: async (query, loader, project_type, version) => {
+    modrinthSearch: async (query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") => {
+        let sort = sortBy;
         let facets = [];
         if (loader && ["modpack", "mod"].includes(project_type)) facets.push([`categories:${loader}`]);
         if (version) facets.push([`versions:${version}`]);
         facets.push([`project_type:${project_type}`]);
-        let url = `https://api.modrinth.com/v2/search?query=${query}&facets=${JSON.stringify(facets)}&limit=100`;
+        let url = `https://api.modrinth.com/v2/search?query=${query}&facets=${JSON.stringify(facets)}&limit=${pageSize}&offset=${(page - 1) * pageSize}&index=${sort}`;
         let res = await fetch(url);
         return await res.json();
     },
-    curseforgeSearch: async (query, loader, project_type, version) => {
+    curseforgeSearch: async (query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") => {
+        let sort = 1;
+        if (sortBy == "downloads") sort = 6;
+        if (sortBy == "newest") sort = 5;
+        if (sortBy == "updated") sort = 3;
         let gv = "";
         if (version) gv = "&gameVersion=" + version;
         let gf = "";
@@ -713,7 +728,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (project_type == "world") id = 17;
         if (project_type == "datapack") id = 6945;
         if (project_type) ci = "&classId=" + id;
-        let url = `https://www.curseforge.com/api/v1/mods/search?gameId=432&index=0&filterText=${query}${gv}&pageSize=100&sortField=1${gf}${ci}`;
+        let url = `https://www.curseforge.com/api/v1/mods/search?gameId=432&index=${page - 1}&filterText=${query}${gv}&pageSize=${pageSize}&sortField=${sort}${gf}${ci}`;
         let res = await fetch(url);
         return await res.json();
     },
@@ -785,8 +800,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     fs.unlinkSync(destPath);
                 }
             }
-
-            fs.renameSync(srcPath, destPath);
+            try {
+                fs.cpSync(srcPath, destPath, { recursive: true });
+                fs.rmSync(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                return "Unable to enable overrides for folder " + file;
+            }
         }
 
         let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
@@ -800,10 +819,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         for (let i = 0; i < manifest_json.files.length; i++) {
             ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
             let file_name = manifest_json.files[i].projectID + "-" + manifest_json.files[i].fileID + ".jar";
-            
-            await urlToFile(`https://www.curseforge.com/api/v1/mods/${manifest_json.files[i].projectID}/files/${manifest_json.files[i].fileID}/download`, path.resolve(extractToPath, "mods", file_name));
 
             let dependency_item = dependency_json.data.find(dep => dep.id === manifest_json.files[i].projectID);
+
+            let folder = "mods";
+            if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
+            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shaderpacks";
+            let type = "mod";
+            if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
+            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shader";
+
+            await urlToFile(`https://www.curseforge.com/api/v1/mods/${manifest_json.files[i].projectID}/files/${manifest_json.files[i].fileID}/download`, path.resolve(extractToPath, folder, file_name));
+
 
             content.push({
                 "author": dependency_item?.authorName ?? "",
@@ -812,7 +839,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 "image": dependency_item?.logoUrl ?? "",
                 "source": "curseforge",
                 "source_id": manifest_json.files[i].projectID,
-                "type": "mod",
+                "type": type,
                 "version": manifest_json.files[i].fileID,
                 "name": dependency_item?.name ?? file_name
             })
@@ -859,7 +886,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 }
             }
 
-            fs.renameSync(srcPath, destPath);
+            try {
+                fs.cpSync(srcPath, destPath, { recursive: true });
+                fs.rmSync(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                return "Unable to enable overrides for folder " + file;
+            }
         }
 
         let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));

@@ -195,6 +195,87 @@ class Minecraft {
 
         ipcRenderer.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
     }
+    async installNeoForge(mcversion, neoforgeversion) {
+        ipcRenderer.send('progress-update', "Downloading NeoForge", 0, "Downloading NeoForge installer...");
+        const neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeversion}/neoforge-${neoforgeversion}-installer.jar`;
+        const neoForgeMetaDir = path.resolve(__dirname, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}`);
+        const neoForgeLibDir = `./minecraft/meta/libraries`;
+        fs.mkdirSync(neoForgeMetaDir, { recursive: true });
+        fs.mkdirSync(neoForgeLibDir, { recursive: true });
+
+        const installerPath = `${neoForgeMetaDir}/neoforge-installer.jar`;
+        await urlToFile(neoForgeInstallerUrl, installerPath);
+
+        let zip = new AdmZip(installerPath);
+        let version_json_entry = zip.getEntry("version.json");
+        let install_profile_entry = zip.getEntry("install_profile.json");
+        let version_json, install_profile_json;
+        if (version_json_entry) {
+            version_json = JSON.parse(version_json_entry.getData().toString('utf8'));
+        } else {
+            version_json = {};
+        }
+        if (install_profile_entry) {
+            install_profile_json = JSON.parse(install_profile_entry.getData().toString('utf8'));
+        } else {
+            install_profile_json = {};
+        }
+
+        fs.writeFileSync(`./minecraft/meta/neoforge/${mcversion}/${neoforgeversion}/neoforge-${mcversion}-${neoforgeversion}.json`, JSON.stringify(version_json));
+        fs.writeFileSync(`./minecraft/meta/neoforge/${mcversion}/${neoforgeversion}/neoforge-${mcversion}-${neoforgeversion}-install-profile.json`, JSON.stringify(install_profile_json));
+
+        this.modded_args_game = version_json?.arguments?.game ? version_json.arguments.game : [];
+        this.modded_args_jvm = version_json?.arguments?.jvm ? version_json.arguments.jvm.map(e => {
+            e = e.replaceAll("${library_directory}", path.resolve(__dirname, `minecraft/instances/${this.instance_id}/libraries`));
+            e = e.replaceAll("${classpath_separator}", ";");
+            e = e.replaceAll("${version_name}", `${mcversion}-neoforge-${neoforgeversion}`);
+            return e;
+        }) : [];
+
+        let java = new Java();
+        let installation = await java.getJavaInstallation(21);
+
+        fs.mkdirSync(`./minecraft/instances/${this.instance_id}`, { recursive: true });
+
+        fs.writeFileSync(path.resolve(__dirname, `minecraft/instances/${this.instance_id}/launcher_profiles.json`), "{}");
+        fs.writeFileSync(path.resolve(__dirname, `minecraft/instances/${this.instance_id}/launcher_profiles_microsoft_store.json`), "{}");
+
+        ipcRenderer.send('progress-update', "Downloading NeoForge", 20, "Running NeoForge Installer");
+
+        let args = ["-jar", installerPath];
+
+        args = args.concat("--installClient", path.resolve(__dirname, `minecraft/instances/${this.instance_id}`));
+        await new Promise((resolve, reject) => {
+            const installer = spawn(installation, args, {
+                "cwd": `./minecraft/instances/${this.instance_id}`
+            });
+
+            installer.stdout.on('data', data => {
+                console.log(`${data}`);
+            });
+            installer.stderr.on('data', data => console.error(`Installer Error: ${data}`));
+
+            installer.on('close', code => {
+                if (code === 0) resolve();
+                else reject(new Error(`NeoForge installer exited with code ${code}`));
+            });
+        });
+        let forge_version_info = fs.readFileSync(`./minecraft/instances/${this.instance_id}/versions/neoforge-${neoforgeversion}/neoforge-${neoforgeversion}.json`)
+        forge_version_info = JSON.parse(forge_version_info);
+        let libraries = forge_version_info.libraries;
+        let lib_paths = libraries.map(e => path.resolve(__dirname, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+        this.libs = [...(new Set(this.libs))];
+        this.libs = lib_paths.join(";") + ";";
+        this.libNames = libraries.map(e => {
+            let libName = e.name.split(":");
+            libName.splice(libName.length - 1, 1);
+            return libName.join(":");
+        });
+        this.main_class = version_json.mainClass;
+        this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/neoforge-${neoforgeversion}/neoforge-${neoforgeversion}.jar`)
+
+        ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
+    }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo) {
         let newJava = new Java();
         this.libs = "";
@@ -255,8 +336,8 @@ class Minecraft {
                     let name_items = install_profile_json.install.path.split(":");
                     let package_ = name_items[0];
                     let name = name_items[1];
-                    let version = name_items[2].split("@")[0];
-                    let installation_path = `${package_.replace(".", "/")}/${name}/${version}`;
+                    let version_ = name_items[2].split("@")[0];
+                    let installation_path = `${package_.replace(".", "/")}/${name}/${version_}`;
                     installation_path = path.resolve(__dirname, "minecraft/meta/libraries", installation_path);
                     let installation_path_w_file = path.resolve(installation_path, forge_library_path);
 
@@ -318,6 +399,31 @@ class Minecraft {
                     }) : [];
                 }
             }
+        } else if (loader == "neoforge") {
+            if (!fs.existsSync(`./minecraft/meta/neoforge/${version}/${loaderVersion}/neoforge-${version}-${loaderVersion}.json`)) {
+                await this.installNeoForge(version, loaderVersion);
+            } else {
+                let neo_forge_version_info = fs.readFileSync(`./minecraft/instances/${this.instance_id}/versions/neoforge-${loaderVersion}/neoforge-${loaderVersion}.json`)
+                neo_forge_version_info = JSON.parse(neo_forge_version_info);
+                let libraries = neo_forge_version_info.libraries;
+                let lib_paths = libraries.map(e => path.resolve(__dirname, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+                this.libs = [...(new Set(this.libs))];
+                this.libs = lib_paths.join(";") + ";";
+                this.libNames = libraries.map(e => {
+                    let libName = e.name.split(":");
+                    libName.splice(libName.length - 1, 1);
+                    return libName.join(":");
+                });
+                this.main_class = neo_forge_version_info.mainClass;
+                this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/neoforge-${loaderVersion}/neoforge-${loaderVersion}.jar`);
+                this.modded_args_game = neo_forge_version_info?.arguments?.game ? neo_forge_version_info.arguments.game : [];
+                this.modded_args_jvm = neo_forge_version_info?.arguments?.jvm ? neo_forge_version_info.arguments.jvm.map(e => {
+                    e = e.replaceAll("${library_directory}", path.resolve(__dirname, `minecraft/instances/${this.instance_id}/libraries`));
+                    e = e.replaceAll("${classpath_separator}", ";");
+                    e = e.replaceAll("${version_name}", `${version}-neoforge-${loaderVersion}`);
+                    return e;
+                }) : [];
+            }
         }
         if (!fs.existsSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`)) {
             console.log("Needing to download game.");
@@ -373,7 +479,7 @@ class Minecraft {
                 this.asset_dir = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`);
             }
         }
-        if (loader == "forge") {
+        if (loader == "forge" || loader == "neoforge") {
             this.jarfile = this.modded_jarfile;
         }
         if (loader == "vanilla") {
@@ -542,6 +648,7 @@ class Minecraft {
         console.log(this.libNames);
         console.log("Executing: " + this.java_installation + " " + args.join(" "));
         let LOG_PATH = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/logs/${fileFormatDate(new Date())}.log`);
+        fs.mkdirSync(path.dirname(LOG_PATH), {recursive:true});
         let fd = fs.openSync(LOG_PATH, 'w');
         fs.closeSync(fd);
         const child = spawn(this.java_installation, args, {
@@ -906,48 +1013,38 @@ class Forge {
 
         // The manifest contains an array of versions, filter out non-standard ones
         // Only include versions that look like vanilla Minecraft versions (e.g., "1.20.1")
-        const versions = Object.keys(data)
+        let versions = Object.keys(data)
             .filter(v => /^\d+\.\d+(\.\d+)?$/.test(v));
+        versions = versions.filter(e => !["1.5.1", "1.5", "1.4.7", "1.4.6", "1.4.5", "1.4.4", "1.4.3", "1.4.2", "1.4.1", "1.4.0", "1.3.2", "1.2.5", "1.2.4", "1.2.3", "1.1"].includes(e));
         return versions.reverse();
     }
 
     // Returns a list of Forge loader versions for a given vanilla version
     async getVersions(mcVersion) {
-        // Forge provides a JSON per vanilla version
-        const url = `https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json`;
+
+        const url = `https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json`;
         const res = await fetch(url);
         const data = await res.json();
-        // The "promos" object contains keys like "1.20.1-latest", "1.20.1-recommended"
-        // We'll extract all Forge versions for the given mcVersion
-        const forgeVersions = [];
-        for (const key in data.promos) {
-            if (key.startsWith(mcVersion + '-')) {
-                const version = data.promos[key];
-                if (!forgeVersions.includes(version)) {
-                    forgeVersions.push(version);
-                }
-            }
-        }
-        // Additionally, the "number" object contains all available Forge versions
-        // if (data.number && data.number[mcVersion]) {
-        //     forgeVersions.push(...data.number[mcVersion]);
-        // }
+
+        const forgeVersions = data[mcVersion].map(e => {
+            let split = e.split("-");
+            split.splice(0, 1);
+            return split.join("-");
+        });
+
         return forgeVersions;
     }
 }
 class Quilt {
     constructor() { }
     async getSupportedVanillaVersions() {
-        // Fetch supported Minecraft versions for Quilt
         const res = await fetch('https://meta.quiltmc.org/v3/versions/game');
         const data = await res.json();
-        // Filter out non-standard versions
         let versions = data.map(e => e.version);
         versions = versions.filter(e => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original"));
         return versions;
     }
     async getVersions(mcVersion) {
-        // Fetch Quilt loader versions for a given Minecraft version
         const res = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcVersion}`);
         const data = await res.json();
         return data.map(e => e.version);
@@ -957,27 +1054,47 @@ class Quilt {
 class NeoForge {
     constructor() { }
     async getSupportedVanillaVersions() {
-        return [];
-        // Use NeoForged API to fetch supported Minecraft versions for NeoForge
-        // const res = await fetch('https://maven.neoforged.net/api/maven/versions/net.neoforged/neoforge');
-        // const data = await res.json();
-        // // Extract unique Minecraft versions from NeoForge version strings (format: <mcversion>-<neoforgeversion>)
-        // const versions = new Set();
-        // for (const v of data.versions) {
-        //     const match = v.match(/^(\d+\.\d+(?:\.\d+)?)-/);
-        //     if (match) {
-        //         versions.add(match[1]);
-        //     }
-        // }
-        // return Array.from(versions).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+
+        const res = await fetch('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge');
+        const data = (await res.json()).versions;
+
+        let versions = [];
+
+        for (let i = 0; i < data.length; i++) {
+            let versionNumber = "";
+            let split = data[i].split(".");
+            if (split[0] == "0") {
+                if (!versions.includes(split[1])) versions.push(split[1]);
+            } else {
+                versionNumber += "1." + split[0];
+                if (split[1] != "0") {
+                    versionNumber += "." + split[1];
+                }
+                if (!versions.includes(versionNumber)) versions.push(versionNumber);
+            }
+        }
+
+        return versions.reverse();
     }
+
     async getVersions(mcVersion) {
-        return [];
-        // // Fetch NeoForge loader versions for a given Minecraft version
-        // const res = await fetch('https://maven.neoforged.net/api/maven/versions/net.neoforged/neoforge');
-        // const data = await res.json();
-        // // Filter for versions matching the MC version prefix
-        // return data.versions.filter(v => v.startsWith(mcVersion + '-'));
+        let start0 = "0";
+        let start1 = mcVersion;
+        let split = mcVersion.split(".");
+        if (split.length >= 2) {
+            start0 = split[1];
+            start1 = split[2] ?? "0";
+        }
+        const res = await fetch('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge');
+        const data = (await res.json()).versions;
+        let versions = [];
+        for (let i = 0; i < data.length; i++) {
+            let split = data[i].split(".");
+            if (split[0] == start0 && split[1] == start1) {
+                versions.push(data[i]);
+            }
+        }
+        return versions.reverse();
     }
 }
 

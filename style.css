@@ -1220,7 +1220,8 @@ i {
     transition: left .125s;
 }
 
-.content-list-item:has(.content-list-toggle:not(.toggled))>*, .content-list-item:has(.content-list-toggle:not(.toggled))::after {
+.content-list-item:has(.content-list-toggle:not(.toggled))>*,
+.content-list-item:has(.content-list-toggle:not(.toggled))::after {
     opacity: .3;
 }
 
@@ -1829,6 +1830,7 @@ dialog[open]::backdrop {
     padding: 10px;
     gap: 10px;
     min-width: 0;
+    align-items:center;
 }
 
 .discover-item-image {
@@ -1842,6 +1844,7 @@ dialog[open]::backdrop {
     border-style: solid;
     object-fit: contain;
     flex-shrink: 0;
+    align-self: flex-start;
 }
 
 .discover-item-info {
@@ -1884,7 +1887,7 @@ dialog[open]::backdrop {
     color: var(--subtle-text-color);
     font-size: 1rem;
     margin-top: 10px;
-    white-space: nowrap;
+    /* white-space: nowrap; */
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
@@ -1895,6 +1898,7 @@ dialog[open]::backdrop {
     flex-direction: column;
     margin-left: auto;
     flex-shrink: 0;
+    align-self: stretch;
 }
 
 .discover-item-downloads {
@@ -2217,4 +2221,140 @@ dialog[open]::backdrop {
 
 #settingsButtonEle {
     background-color: var(--color-1t);
+}
+
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--color-1t);
+    gap: 20px;
+    padding: 45px;
+    border-radius: 20px;
+}
+
+.loading-container-spinner {
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+    border-color: var(--text-color) transparent transparent transparent;
+    border-width: 5px;
+    border-style: solid;
+    animation-name: spin;
+    animation-iteration-count: infinite;
+    animation-duration: 1s;
+}
+
+.loading-container-error {
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, 20% var(--danger-color), transparent);
+    color: var(--danger-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+}
+
+.loading-container-question {
+    height: 60px;
+    width: 60px;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, 20% var(--accent-color), transparent);
+    color: var(--accent-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+}
+
+.loading-container-text {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: var(--text-color);
+    overflow-wrap: anywhere;
+    max-width: 100%;
+    text-align: center;
+}
+
+.loading-container-refresh {
+    background-color: var(--color-1t);
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.loading-container-refresh:active {
+    scale: .95;
+}
+
+.loading-container-refresh:hover {
+    background-color: var(--color-2t);
+}
+
+.page-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.page {
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+    align-items:center;
+    color: var(--text-color);
+    background-color: var(--color-1);
+    cursor: pointer;
+    border-radius: 100px;
+    font-size: 1rem;
+    transition: background-color .25s, scale .1s;
+    min-width: calc(1lh + 16px);
+}
+
+.page.disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+.page.selected {
+    background-color: var(--accent-color);
+    font-weight: bold;
+}
+
+.page:active {
+    scale: .9;
+}
+
+.page.disabled:active {
+    scale: 1;
+}
+
+.page:hover {
+    background-color: var(--color-2);
+}
+
+.page.disabled:hover {
+    background-color: var(--color-1);
+}
+
+.page.selected:hover {
+    background-color: color-mix(in srgb, 85% var(--accent-color), var(--text-color));
+}
+
+.page-collapse {
+    display: flex;
+    justify-content: center;
+    align-items:center;
+    color: var(--text-color);
 }

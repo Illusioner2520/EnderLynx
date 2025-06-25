@@ -15,3 +15,5 @@ Vanilla Tweaks: https://vanillatweaks.net/
 
 Artists:
 Fruit Salad
+
+ChatGPT and Github Copilot assisted in the creation of this code

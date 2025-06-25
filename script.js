@@ -100,6 +100,8 @@ class Content {
     }
 }
 
+let instance_watches = {};
+
 class Instance {
     constructor(instance_id) {
         let content = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
@@ -122,71 +124,105 @@ class Instance {
         this.id = content.id;
         this.install_source = content.install_source;
         this.install_id = content.install_id;
+        this.installing = Boolean(content.installing);
+        this.mc_installed = Boolean(content.mc_installed);
+        if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
 
     setName(name) {
         db.prepare("UPDATE instances SET name = ? WHERE id = ?").run(name, this.id);
         this.name = name;
+        if (instance_watches[this.instance_id].onchangename) instance_watches[this.instance_id].onchangename(name);
     }
     setLastPlayed(last_played) {
         db.prepare("UPDATE instances SET last_played = ? WHERE id = ?").run(last_played ? last_played.toISOString() : null, this.id);
         this.last_played = last_played;
+        if (instance_watches[this.instance_id].onchangelast_played) instance_watches[this.instance_id].onchangelast_played(last_played);
     }
     setDateCreated(date_created) {
         db.prepare("UPDATE instances SET date_created = ? WHERE id = ?").run(date_created.toISOString(), this.id);
         this.date_created = date_created;
+        if (instance_watches[this.instance_id].onchangedate_created) instance_watches[this.instance_id].onchangedate_created(date_created);
     }
     setDateModified(date_modified) {
         db.prepare("UPDATE instances SET date_modified = ? WHERE id = ?").run(date_modified.toISOString(), this.id);
         this.date_modified = date_modified;
+        if (instance_watches[this.instance_id].onchangedate_modified) instance_watches[this.instance_id].onchangedate_modified(date_modified);
     }
     setLoader(loader) {
         db.prepare("UPDATE instances SET loader = ? WHERE id = ?").run(loader, this.id);
         this.loader = loader;
+        if (instance_watches[this.instance_id].onchangeloader) instance_watches[this.instance_id].onchangeloader(loader);
     }
     setVanillaVersion(vanilla_version) {
         db.prepare("UPDATE instances SET vanilla_version = ? WHERE id = ?").run(vanilla_version, this.id);
         this.vanilla_version = vanilla_version;
+        if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
     }
     setLoaderVersion(loader_version) {
         db.prepare("UPDATE instances SET loader_version = ? WHERE id = ?").run(loader_version, this.id);
         this.loader_version = loader_version;
+        if (instance_watches[this.instance_id].onchangeloader_version) instance_watches[this.instance_id].onchangeloader_version(loader_version);
     }
     setPlaytime(playtime) {
         db.prepare("UPDATE instances SET playtime = ? WHERE id = ?").run(playtime, this.id);
         this.playtime = playtime;
+        if (instance_watches[this.instance_id].onchangeplaytime) instance_watches[this.instance_id].onchangeplaytime(playtime);
     }
     setLocked(locked) {
         db.prepare("UPDATE instances SET locked = ? WHERE id = ?").run(Number(locked), this.id);
         this.locked = locked;
+        if (instance_watches[this.instance_id].onchangelocked) instance_watches[this.instance_id].onchangelocked(locked);
     }
     setDownloaded(downloaded) {
         db.prepare("UPDATE instances SET downloaded = ? WHERE id = ?").run(Number(downloaded), this.id);
         this.downloaded = downloaded;
+        if (instance_watches[this.instance_id].onchangedownloaded) instance_watches[this.instance_id].onchangedownloaded(downloaded);
     }
     setGroup(group) {
         db.prepare("UPDATE instances SET group_id = ? WHERE id = ?").run(group, this.id);
         this.group = group;
+        if (instance_watches[this.instance_id].onchangegroup) instance_watches[this.instance_id].onchangegroup(group);
     }
     setImage(image) {
         db.prepare("UPDATE instances SET image = ? WHERE id = ?").run(image, this.id);
         this.image = image;
+        if (instance_watches[this.instance_id].onchangeimage) instance_watches[this.instance_id].onchangeimage(image);
     }
     setPid(pid) {
         db.prepare("UPDATE instances SET pid = ? WHERE id = ?").run(pid, this.id);
         this.pid = pid;
+        if (instance_watches[this.instance_id].onchangepid) instance_watches[this.instance_id].onchangepid(pid);
     }
     setCurrentLogFile(current_log_file) {
         db.prepare("UPDATE instances SET current_log_file = ? WHERE id = ?").run(current_log_file, this.id);
         this.current_log_file = current_log_file;
+        if (instance_watches[this.instance_id].onchangecurrent_log_file) instance_watches[this.instance_id].onchangecurrent_log_file(current_log_file);
     }
     setInstallSource(install_source) {
         db.prepare("UPDATE instances SET install_source = ? WHERE id = ?").run(install_source, this.id);
         this.install_source = install_source;
+        if (instance_watches[this.instance_id].onchangeinstall_source) instance_watches[this.instance_id].onchangeinstall_source(install_source);
     }
     setInstallId(install_id) {
         db.prepare("UPDATE instances SET install_id = ? WHERE id = ?").run(install_id, this.id);
         this.install_id = install_id;
+        if (instance_watches[this.instance_id].onchangeinstall_id) instance_watches[this.instance_id].onchangeinstall_id(install_id);
+    }
+    setInstalling(installing) {
+        db.prepare("UPDATE instances SET installing = ? WHERE id = ?").run(Number(installing), this.id);
+        this.installing = installing;
+        if (instance_watches[this.instance_id].onchangeinstalling) instance_watches[this.instance_id].onchangeinstalling(installing);
+    }
+    setMcInstalled(mc_installed) {
+        db.prepare("UPDATE instances SET mc_installed = ? WHERE id = ?").run(Number(mc_installed), this.id);
+        this.mc_installed = mc_installed;
+        if (instance_watches[this.instance_id].onchangemc_installed) instance_watches[this.instance_id].onchangemc_installed(mc_installed);
+    }
+
+    watchForChange(name, func) {
+        if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
+        instance_watches[this.instance_id]["onchange" + name] = func;
     }
 
     addContent(name, author, image, file_name, source, type, version, source_info, disabled) {
@@ -211,8 +247,8 @@ class Data {
         return instances.map(e => new Instance(e.instance_id));
     }
 
-    addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id) {
-        db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id);
+    addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
+        db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed));
         return new Instance(instance_id);
     }
 
@@ -1501,6 +1537,10 @@ function showInstanceContent(e) {
                 loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
             } else if (info.loader == "forge") {
                 loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+            } else if (info.loader == "neoforge") {
+                loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+            } else if (info.loader == "quilt") {
+                loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
             }
             // let newInstanceInfo = {
             //     "name": info.name,
@@ -1518,9 +1558,10 @@ function showInstanceContent(e) {
             //     "content": [],
             //     "group": ""
             // }
-            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "");
+            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
             showSpecificInstanceContent(instance);
-            window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+            await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+            instance.setMcInstalled(true);
         })
     }
     title.appendChild(createButton);
@@ -1697,6 +1738,16 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
     let instTopVersions = document.createElement("div");
     instTopVersions.classList.add("instance-top-sub-info-specific");
     instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${loaders[instanceInfo.loader] + " " + instanceInfo.vanilla_version}`;
+    let loader_text = loaders[instanceInfo.loader];
+    let version_text = instanceInfo.vanilla_version;
+    instanceInfo.watchForChange("loader", (l) => {
+        loader_text = loaders[l];
+        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${loader_text + " " + version_text}`;
+    })
+    instanceInfo.watchForChange("vanilla_version", (v) => {
+        version_text = v;
+        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${loader_text + " " + version_text}`;
+    })
     let instTopPlaytime = document.createElement("div");
     instTopPlaytime.classList.add("instance-top-sub-info-specific");
     instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(instanceInfo.playtime)}`;
@@ -1737,7 +1788,20 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         playButton.classList.add("instance-top-play-button");
         playButton.onclick = playButtonClick;
     }
-    if (!running) {
+    if (!instanceInfo.mc_installed) {
+        playButton.innerHTML = '<i class="spinner"></i>' + "Installing"; //TODO
+        playButton.classList.remove("instance-top-play-button");
+        playButton.classList.add("instance-top-loading-button");
+        playButton.onclick = () => { };
+        instanceInfo.watchForChange("mc_installed", (v) => {
+            if (v) {
+                playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+                playButton.classList.remove("instance-top-loading-button");
+                playButton.classList.add("instance-top-play-button");
+                playButton.onclick = playButtonClick;
+            }
+        });
+    } else if (!running) {
         playButton.classList.add("instance-top-play-button");
         playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
         playButton.onclick = playButtonClick
@@ -1879,101 +1943,115 @@ function setInstanceTabContentContent(instanceInfo, element) {
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
     let contentListWrap = document.createElement("div");
-    let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
-    let newContent = getInstanceContent(instanceInfo);
-    let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
-    newContentAdd.forEach(e => {
-        instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled);
-    });
-    let deleteContent = newContent.deleteContent;
-    deleteContent.forEach(e => {
-        let content = new Content(instanceInfo.instance_id, e);
-        content.delete();
-    });
-    let content = [];
-    let instance_content = instanceInfo.getContent();
-    instance_content.sort((a, b) => {
-        if (a.name.toLowerCase() > b.name.toLowerCase()) {
-            return 1;
-        }
-        if (a.name.toLowerCase() < b.name.toLowerCase()) {
-            return -1;
-        }
-        return 0;
-    });
-    for (let i = 0; i < instance_content.length; i++) {
-        let e = instance_content[i];
-        content.push({
-            "primary_column": {
-                "title": e.name,
-                "desc": e.author ? "by " + e.author : ""
-            },
-            "secondary_column": {
-                "title": e.version,
-                "desc": e.file_name
-            },
-            "type": e.type,
-            "class": e.source,
-            "image": e.image,
-            "more": {
-                "actionsList": [
-                    {
-                        "title": translate("app.content.open"),
-                        "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
-                        "func": () => {
-                            window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`)
+    let showContent = () => {
+        contentListWrap.innerHTML = '';
+        let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
+        let newContent = getInstanceContent(instanceInfo);
+        let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
+        newContentAdd.forEach(e => {
+            instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled);
+        });
+        let deleteContent = newContent.deleteContent;
+        deleteContent.forEach(e => {
+            let content = new Content(instanceInfo.instance_id, e);
+            content.delete();
+        });
+        let content = [];
+        let instance_content = instanceInfo.getContent();
+        instance_content.sort((a, b) => {
+            if (a.name.toLowerCase() > b.name.toLowerCase()) {
+                return 1;
+            }
+            if (a.name.toLowerCase() < b.name.toLowerCase()) {
+                return -1;
+            }
+            return 0;
+        });
+        for (let i = 0; i < instance_content.length; i++) {
+            let e = instance_content[i];
+            content.push({
+                "primary_column": {
+                    "title": e.name,
+                    "desc": e.author ? "by " + e.author : ""
+                },
+                "secondary_column": {
+                    "title": e.version,
+                    "desc": e.file_name
+                },
+                "type": e.type,
+                "class": e.source,
+                "image": e.image,
+                "more": {
+                    "actionsList": [
+                        {
+                            "title": translate("app.content.open"),
+                            "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
+                            "func": () => {
+                                window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`)
+                            }
+                        },
+                        {
+                            "title": translate("app.content.update"),
+                            "icon": '<i class="fa-solid fa-download"></i>',
+                            "func_id": "update"
+                        },
+                        {
+                            "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
+                            "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
+                            "func_id": "toggle"
+                        },
+                        {
+                            "title": translate("app.content.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "func_id": "delete"
                         }
-                    },
-                    {
-                        "title": translate("app.content.update"),
-                        "icon": '<i class="fa-solid fa-download"></i>',
-                        "func_id": "update"
-                    },
-                    {
-                        "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
-                        "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
-                        "func_id": "toggle"
-                    },
-                    {
-                        "title": translate("app.content.delete"),
-                        "icon": '<i class="fa-solid fa-trash-can"></i>',
-                        "danger": true,
-                        "func_id": "delete"
-                    }
-                ]
+                    ]
+                },
+                "disabled": e.disabled,
+                "instance_info": instanceInfo
+            })
+        }
+        let contentList = new ContentList(contentListWrap, content, searchBar, {
+            "checkbox": {
+                "enabled": true,
+                "actionsList": null
             },
-            "disabled": e.disabled,
-            "instance_info": instanceInfo
+            "disable": {
+                "enabled": true
+            },
+            "remove": {
+                "enabled": true
+            },
+            "more": {
+                "enabled": true
+            },
+            "second_column_centered": false,
+            "primary_column_name": translate("app.content.name"),
+            "secondary_column_name": translate("app.content.file_info"),
+            "refresh": {
+                "enabled": true,
+                "func": () => {
+                    setInstanceTabContentContent(instanceInfo, element)
+                }
+            },
+            "update_all": {
+                "enabled": true,
+                "func": () => { }
+            }
+        }, dropdownInfo);
+    }
+    if (!instanceInfo.installing) {
+        showContent();
+    } else {
+        let currently_installing = new CurrentlyInstalling();
+        contentListWrap.appendChild(currently_installing.element);
+        instanceInfo.watchForChange("installing",(v) => {
+            if (!v) {
+                showContent();
+            }
         })
     }
-    let contentList = new ContentList(contentListWrap, content, searchBar, {
-        "checkbox": {
-            "enabled": true,
-            "actionsList": null
-        },
-        "disable": {
-            "enabled": true
-        },
-        "remove": {
-            "enabled": true
-        },
-        "more": {
-            "enabled": true
-        },
-        "second_column_centered": false,
-        "primary_column_name": translate("app.content.name"),
-        "secondary_column_name": translate("app.content.file_info"),
-        "refresh": {
-            "enabled": true,
-            "func": () => {
-                setInstanceTabContentContent(instanceInfo, element)
-            }
-        },
-        "update_all": {
-            "enabled": true,
-            "func": () => { }
-        }
-    }, dropdownInfo);
     element.appendChild(contentListWrap);
 }
 function isNotDisplayNone(element) {
@@ -3312,13 +3390,151 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
 let added_vt_rp_packs = [];
 let added_vt_dp_packs = [];
 let selected_vt_version = "1.21";
+let pages = 0;
 
-async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version) {
+class Pagination {
+    constructor(currentPage, totalPages, change_page_function, d1opt, d1def, d1func, d2opt, d2def, d2func) {
+        let element = document.createElement("div");
+        element.className = "page-container";
+        this.element = element;
+        let leftArrow = document.createElement("button");
+        leftArrow.className = "page";
+        leftArrow.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+        if (currentPage <= 1) {
+            leftArrow.classList.add("disabled");
+        } else {
+            leftArrow.onclick = () => {
+                change_page_function(currentPage - 1);
+            }
+        }
+        let rightArrow = document.createElement("button");
+        rightArrow.className = "page";
+        rightArrow.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        if (currentPage >= totalPages) {
+            rightArrow.classList.add("disabled");
+        } else {
+            rightArrow.onclick = () => {
+                change_page_function(currentPage + 1);
+            }
+        }
+        let currentPageEle = document.createElement("button");
+        currentPageEle.innerHTML = currentPage;
+        currentPageEle.className = "page";
+        currentPageEle.classList.add("selected");
+        let gap = 0;
+        if (d1opt) {
+            let dropdownEle = document.createElement("div");
+            dropdownEle.style.width = "150px";
+            let dropdown = new SearchDropdown("Sort by", d1opt, dropdownEle, d1def, d1func);
+            element.appendChild(dropdownEle);
+        }
+        if (d2opt) {
+            let dropdownEle = document.createElement("div");
+            dropdownEle.style.marginRight = "auto";
+            dropdownEle.style.width = "75px";
+            let dropdown = new SearchDropdown("View", d2opt, dropdownEle, d2def, d2func);
+            element.appendChild(dropdownEle);
+        }
+        element.appendChild(leftArrow);
+        for (let i = 1; i <= totalPages; i++) {
+            if (i == currentPage) {
+                element.appendChild(currentPageEle);
+            } else if (i == 1 || i == totalPages || i == currentPage + 1 || i == currentPage - 1 || totalPages <= 6) {
+                let pageElement = document.createElement("button");
+                pageElement.innerHTML = i;
+                pageElement.className = "page";
+                pageElement.onclick = () => {
+                    change_page_function(i);
+                }
+                element.appendChild(pageElement);
+                gap = 0;
+            } else {
+                if (gap == 0) {
+                    let pageCollapse = document.createElement("div");
+                    pageCollapse.className = "page-collapse";
+                    pageCollapse.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+                    element.appendChild(pageCollapse);
+                }
+                gap = 1;
+            }
+        }
+        element.appendChild(rightArrow);
+    }
+}
+
+async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version, page = 1, pageSize = 20, sortBy = "relevance") {
+    element.innerHTML = "";
+    let loading = new LoadingContainer();
+    element.appendChild(loading.element);
     console.log("getting content for source", source);
     if (source == "modrinth") {
-        //query, loader, project_type, version
-        let apiresult = await window.electronAPI.modrinthSearch(query, loader, project_type, version);
-        element.innerHTML = "";
+        let apiresult;
+        try {
+            apiresult = await window.electronAPI.modrinthSearch(query, loader, project_type, version, page, pageSize, sortBy);
+            element.innerHTML = "";
+        } catch (err) {
+            loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
+            return;
+        }
+        pages = Math.ceil(apiresult.total_hits / pageSize);
+        let paginationTop = new Pagination(page, pages, (new_page) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+        }, [
+            {
+                "name": "Relevance",
+                "value": "relevance"
+            },
+            {
+                "name": "Downloads",
+                "value": "downloads"
+            },
+            {
+                "name": "Created",
+                "value": "newest"
+            },
+            {
+                "name": "Last Updated",
+                "value": "updated"
+            }
+        ], sortBy, (v) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v);
+        }, [
+            {
+                "name": "5",
+                "value": "5"
+            },
+            {
+                "name": "10",
+                "value": "10"
+            },
+            {
+                "name": "15",
+                "value": "15"
+            },
+            {
+                "name": "20",
+                "value": "20"
+            },
+            {
+                "name": "50",
+                "value": "50"
+            },
+            {
+                "name": "100",
+                "value": "100"
+            }
+        ], pageSize.toString(), (v) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
+        });
+        let paginationBottom = new Pagination(page, pages, (new_page) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+        });
+        if (!apiresult.hits || !apiresult.hits.length) {
+            let noresults = new NoResultsFound();
+            element.appendChild(noresults.element);
+            return;
+        }
+        element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.hits.length; i++) {
             let e = apiresult.hits[i];
             let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
@@ -3374,32 +3590,21 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         displayError(`Error: Could not find version of '${i.title}' that is version ${info.game_version} and uses loader ${loaders[info.loader]}`);
                         return;
                     }
+                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, true, "", info.icon, instance_id, 0, "modrinth", i.project_id, true, false);
+                    showSpecificInstanceContent(instance);
                     await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, i.title);
                     let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, i.title);
-                    // let newInstanceInfo = {
-                    //     "name": info.name,
-                    //     "last_played": "",
-                    //     "date_created": (new Date()).toString(),
-                    //     "date_modified": (new Date()).toString(),
-                    //     "playtime": 0,
-                    //     "loader": info.loader,
-                    //     "vanilla_version": info.game_version,
-                    //     "loader_version": mr_pack_info.loader_version,
-                    //     "instance_id": instance_id,
-                    //     "image": info.icon,
-                    //     "downloaded": false,
-                    //     "locked": false,
-                    //     "content": mr_pack_info.content,
-                    //     "group": "",
-                    //     "install_source": "modrinth",
-                    //     "install_project_id": i.project_id
-                    // }
-                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, mr_pack_info.loader_version, false, true, "", info.icon, instance_id, 0, "modrinth", i.project_id);
+                    if (!mr_pack_info.loader_version) {
+                        displayError(mr_pack_info);
+                        return;
+                    }
+                    instance.setLoaderVersion(mr_pack_info.loader_version);
                     mr_pack_info.content.forEach(e => {
                         instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
                     });
-                    showSpecificInstanceContent(instance);
-                    window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                    instance.setInstalling(false);
+                    await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                    instance.setMcInstalled(true);
                 })
             } : instance_id ? async (i, button) => {
                 button.innerHTML = '<i class="spinner"></i>Installing...';
@@ -3429,10 +3634,75 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }, e.categories.map(e => formatCategory(e)), e);
             element.appendChild(entry.element);
         }
+        element.appendChild(paginationBottom.element);
     } else if (source == "curseforge") {
-        //query, loader, project_type, version
-        let apiresult = await window.electronAPI.curseforgeSearch(query, loader, project_type, version);
-        element.innerHTML = "";
+        let apiresult;
+        try {
+            apiresult = await window.electronAPI.curseforgeSearch(query, loader, project_type, version, page, pageSize, sortBy);
+            element.innerHTML = "";
+        } catch (err) {
+            loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
+            return;
+        }
+        pages = Math.ceil(apiresult.pagination.totalCount / pageSize);
+        let paginationTop = new Pagination(page, pages, (new_page) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+        }, [
+            {
+                "name": "Relevance",
+                "value": "relevance"
+            },
+            {
+                "name": "Downloads",
+                "value": "downloads"
+            },
+            {
+                "name": "Created",
+                "value": "newest"
+            },
+            {
+                "name": "Last Updated",
+                "value": "updated"
+            }
+        ], sortBy, (v) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v);
+        }, [
+            {
+                "name": "5",
+                "value": "5"
+            },
+            {
+                "name": "10",
+                "value": "10"
+            },
+            {
+                "name": "15",
+                "value": "15"
+            },
+            {
+                "name": "20",
+                "value": "20"
+            },
+            {
+                "name": "50",
+                "value": "50"
+            },
+            {
+                "name": "100",
+                "value": "100"
+            }
+        ], pageSize.toString(), (v) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
+        });
+        let paginationBottom = new Pagination(page, pages, (new_page) => {
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+        });
+        if (!apiresult.data || !apiresult.data.length) {
+            let noresults = new NoResultsFound();
+            element.appendChild(noresults.element);
+            return;
+        }
+        element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.data.length; i++) {
             let e = apiresult.data[i];
             let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
@@ -3461,32 +3731,23 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     let res = await fetch(`https://www.curseforge.com/api/v1/mods/${e.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true`);
                     let version_json = await res.json();
                     let version = version_json.data[0];
-                    await window.electronAPI.downloadCurseforgePack(instance_id, `https://mediafilez.forgecdn.net/files/${version.id.toString().substring(0,4)}/${version.id.toString().substring(4,7)}/${version.fileName}`, e.name);
+                    let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", false, true, "", info.icon, instance_id, 0, "curseforge", e.id, true, false);
+                    showSpecificInstanceContent(instance);
+                    await window.electronAPI.downloadCurseforgePack(instance_id, `https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${version.fileName}`, e.name);
                     let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, e.id, e.name);
-                    // let newInstanceInfo = {
-                    //     "name": info.name,
-                    //     "last_played": "",
-                    //     "date_created": (new Date()).toString(),
-                    //     "date_modified": (new Date()).toString(),
-                    //     "playtime": 0,
-                    //     "loader": info.loader,
-                    //     "vanilla_version": info.game_version,
-                    //     "loader_version": mr_pack_info.loader_version,
-                    //     "instance_id": instance_id,
-                    //     "image": info.icon,
-                    //     "downloaded": false,
-                    //     "locked": false,
-                    //     "content": mr_pack_info.content,
-                    //     "group": "",
-                    //     "install_source": "modrinth",
-                    //     "install_project_id": i.project_id
-                    // }
-                    let instance = data.addInstance(info.name, new Date(), new Date(), "", mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version, false, true, "", info.icon, instance_id, 0, "curseforge", e.id);
+                    if (!mr_pack_info.loader_version) {
+                        displayError(mr_pack_info);
+                        return;
+                    }
+                    instance.setLoader(mr_pack_info.loader);
+                    instance.setVanillaVersion(mr_pack_info.vanilla_version);
+                    instance.setLoaderVersion(mr_pack_info.loader_version);
                     mr_pack_info.content.forEach(e => {
                         instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
                     });
-                    showSpecificInstanceContent(instance);
-                    window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
+                    instance.setInstalling(false);
+                    await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
+                    instance.setMcInstalled(true);
                 })
             } : instance_id ? async (i, button) => {
                 button.innerHTML = '<i class="spinner"></i>Installing...';
@@ -3516,14 +3777,23 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }, e.categories.map(e => e.name), e);
             element.appendChild(entry.element);
         }
+        element.appendChild(paginationBottom.element);
     } else if (source == "vanilla_tweaks") {
         let result;
-        if (project_type == "resourcepack") {
-            result = await window.electronAPI.getVanillaTweaksResourcePacks(query, version ? version : vt_version);
-        } else if (project_type == "datapack") {
-            result = await window.electronAPI.getVanillaTweaksDataPacks(query, version ? version : vt_version);
+        if (project_type == "datapack" && (vt_version == "1.11" || vt_version == "1.12")) {
+            vt_version = "1.13";
         }
-        element.innerHTML = "";
+        try {
+            if (project_type == "resourcepack") {
+                result = await window.electronAPI.getVanillaTweaksResourcePacks(query, version ? version : vt_version);
+            } else if (project_type == "datapack") {
+                result = await window.electronAPI.getVanillaTweaksDataPacks(query, version ? version : vt_version);
+            }
+            element.innerHTML = "";
+        } catch (err) {
+            loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version, page, pageSize, sortBy) });
+            return;
+        }
         let buttonWrapper = document.createElement("div");
         buttonWrapper.className = "vt-button-wrapper";
         if (!version) {
@@ -3574,7 +3844,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     "value": "1.11"
                 } : null
             ].filter(e => e), dropdownElement, vt_version, (s) => {
-                getContent(element, instance_id, source, query, loader, version, project_type, s);
+                getContent(element, instance_id, source, query, loader, version, project_type, s, page, pageSize, sortBy);
                 selected_vt_version = s;
                 added_vt_rp_packs = [];
                 added_vt_dp_packs = [];
@@ -3640,6 +3910,11 @@ async function getContent(element, instance_id, source, query, loader, version, 
         }
         buttonWrapper.append(submitButton);
         element.appendChild(buttonWrapper);
+        if (!result.hits || !result.hits.length) {
+            let noresults = new NoResultsFound();
+            element.appendChild(noresults.element);
+            return;
+        }
         for (let i = 0; i < result.hits.length; i++) {
             let e = result.hits[i];
             let onAddPack = (info, button) => {
@@ -3691,7 +3966,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
             "files": [
                 {
                     "filename": e.fileName,
-                    "url": `https://mediafilez.forgecdn.net/files/${e.id.toString().substring(0,4)}/${e.id.toString().substring(4,7)}/${e.fileName}`
+                    "url": `https://mediafilez.forgecdn.net/files/${e.id.toString().substring(0, 4)}/${e.id.toString().substring(4, 7)}/${e.fileName}`
                 }
             ],
             "loaders": e.gameVersions.map(e => {
@@ -3784,4 +4059,74 @@ function toTitleCase(str) {
 
 async function addContent(instance_id, project_type, project_url, filename) {
     return await window.electronAPI.addContent(instance_id, project_type, project_url, filename);
+}
+
+class LoadingContainer {
+    constructor() {
+        let element = document.createElement("div");
+        element.className = "loading-container";
+        let spinner = document.createElement("div");
+        spinner.className = "loading-container-spinner";
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        element.appendChild(spinner);
+        element.appendChild(text);
+        text.innerHTML = "Loading"; //TODO
+        this.element = element;
+        let index = 1;
+        let interval = setInterval(() => {
+            text.innerHTML = "Loading" + ".".repeat(index);
+            index++;
+        }, 400)
+        this.interval = interval;
+    }
+    errorOut(e, refresh_func) {
+        let error = document.createElement("div");
+        error.className = "loading-container-error";
+        error.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        text.innerHTML = e.message;
+        this.element.innerHTML = '';
+        this.element.appendChild(error);
+        this.element.appendChild(text);
+        let refresh = document.createElement("button");
+        refresh.className = "loading-container-refresh";
+        refresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>Try Again';
+        refresh.onclick = refresh_func;
+        this.element.appendChild(refresh);
+        clearInterval(this.interval);
+    }
+}
+
+class NoResultsFound {
+    constructor() {
+        let element = document.createElement("div");
+        element.className = "loading-container";
+        let question = document.createElement("div");
+        question.className = "loading-container-question";
+        question.innerHTML = '<i class="fa-solid fa-question"></i>';
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        element.appendChild(question);
+        element.appendChild(text);
+        text.innerHTML = "No Results Found"; //TODO
+        this.element = element;
+    }
+}
+
+class CurrentlyInstalling {
+    constructor() {
+        let element = document.createElement("div");
+        element.className = "loading-container";
+        element.style.marginTop = "10px";
+        let spinner = document.createElement("div");
+        spinner.className = "loading-container-spinner";
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        element.appendChild(spinner);
+        element.appendChild(text);
+        text.innerHTML = "Installation in Progress"; //TODO
+        this.element = element;
+    }
 }
