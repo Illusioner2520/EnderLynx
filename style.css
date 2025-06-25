@@ -1830,7 +1830,7 @@ dialog[open]::backdrop {
     padding: 10px;
     gap: 10px;
     min-width: 0;
-    align-items:center;
+    align-items: center;
 }
 
 .discover-item-image {
@@ -2312,7 +2312,7 @@ dialog[open]::backdrop {
     padding: 8px;
     display: flex;
     justify-content: center;
-    align-items:center;
+    align-items: center;
     color: var(--text-color);
     background-color: var(--color-1);
     cursor: pointer;
@@ -2355,6 +2355,93 @@ dialog[open]::backdrop {
 .page-collapse {
     display: flex;
     justify-content: center;
-    align-items:center;
+    align-items: center;
     color: var(--text-color);
+}
+
+.skin-render-canvas {
+    border-color: var(--color-2);
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 8px;
+    height: 400px;
+    max-height: 100%;
+    background: repeating-conic-gradient(var(--color-1) 0 25%, color-mix(in srgb, var(--color-2), var(--color-1)) 0 50%) 50% / 50px 50px;
+    cursor: move;
+}
+
+.skin-render-container {
+    grid-column: 2;
+    position: relative;
+}
+
+.my-account-grid {
+    padding: 10px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr 300px;
+    height: 100%;
+}
+
+.my-account-options {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.my-account-option-box {
+    display: grid;
+    gap: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.my-account-option-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.my-account-option {
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--color-1t);
+    transition: background-color .25s, scale .1s;
+}
+
+.my-account-option:active {
+    scale: .95;
+}
+
+.my-account-option:hover {
+    background-color: var(--color-2t);
+}
+
+.skin-render-pause {
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 30px;
+    width: 30px;
+    background-color: var(--color-2);
+    transition: scale .1s;
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1rem;
+    box-shadow: 0px 0px 10px black;
+}
+
+.skin-render-pause:active {
+    scale: .95;
 }

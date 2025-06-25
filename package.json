@@ -18,6 +18,8 @@
     "lzma-native": "^8.0.6",
     "msmc": "^5.0.5",
     "prismarine-nbt": "^2.7.0",
+    "skinview3d": "^3.4.1",
+    "three": "^0.177.0",
     "toml": "^3.0.0"
   }
 }

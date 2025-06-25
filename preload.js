@@ -18,16 +18,12 @@ db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name T
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, uuid TEXT, file_name TEXT, last_used TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name TEXT, last_used TEXT, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 
 db.pragma('journal_mode = WAL');
 
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
-
-if (!fs.existsSync("./data.json")) {
-    fs.writeFileSync("./data.json", JSON.stringify(default_data));
-}
 
 let processWatches = {};
 
@@ -61,7 +57,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let date = new Date();
         date.setHours(date.getHours() - 1);
         if (new Date(player_info.expires) < date) {
-            player_info = await getNewAccessToken(player_info.refresh_token);
+            try {
+                player_info = await getNewAccessToken(player_info.refresh_token);
+            } catch (err) {
+                throw new Error("Unable to update access token.");
+            }
         }
         let mc = new Minecraft(instance_id);
         try {
@@ -1004,6 +1004,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } catch (err) {
             return false;
         }
+    },
+    downloadSkin: async (url, id) => {
+        if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
+        await urlToFile(url,`./minecraft/skins/${id}.png`);
+    },
+    downloadCape: async (url, id) => {
+        if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
+        await urlToFile(url,`./minecraft/capes/${id}.png`);
     }
 });
 
