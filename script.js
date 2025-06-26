@@ -470,7 +470,15 @@ class Profile {
 
     getActiveCape() {
         let result = db.prepare("SELECT * FROM capes WHERE uuid = ? AND active = ? LIMIT 1").get(this.uuid, Number(true));
+        if (!result) return null;
         return new Cape(result.id);
+    }
+
+    removeActiveCape() {
+        let old = db.prepare("SELECT * FROM capes WHERE uuid = ? AND active = ?").all(this.uuid, Number(true));
+        old.forEach((e) => {
+            db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(Number(false), e.id);
+        });
     }
 }
 
@@ -1506,7 +1514,10 @@ function showHomeContent(e) {
     return ele;
 }
 
+let skinViewer;
+
 function showMyAccountContent(e) {
+    if (skinViewer) skinViewer.dispose();
     let ele = document.createElement("div");
     ele.className = "my-account-grid";
     let skinRenderContainer = document.createElement("div");
@@ -1516,7 +1527,7 @@ function showMyAccountContent(e) {
     skinRenderContainer.appendChild(skinRenderCanvas);
     ele.appendChild(skinRenderContainer);
     const dpr = window.devicePixelRatio || 1;
-    const skinViewer = new skinview3d.SkinViewer({
+    skinViewer = new skinview3d.SkinViewer({
         canvas: skinRenderCanvas,
         width: 298 * dpr,
         height: 498 * dpr
@@ -1524,9 +1535,12 @@ function showMyAccountContent(e) {
     skinRenderCanvas.style.width = "300px";
     skinRenderCanvas.style.height = "500px";
     let default_profile = data.getDefaultProfile();
-    skinViewer.renderer.setPixelRatio(dpr);
-    skinViewer.loadSkin(`minecraft/skins/${default_profile.getActiveSkin().skin_id}.png`);
-    skinViewer.loadCape(`minecraft/capes/${default_profile.getActiveCape().cape_id}.png`);
+    skinViewer.pixelRatio = 2
+    skinViewer.loadSkin(`minecraft/skins/${default_profile.getActiveSkin().skin_id}.png`, {
+        model: default_profile.getActiveSkin().model == "wide" ? "default" : "slim",
+    });
+    let activeCape = default_profile.getActiveCape();
+    skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
     skinViewer.zoom = 0.7;
     let walkingAnimation = new skinview3d.WalkingAnimation();
     walkingAnimation.headBobbing = false;
@@ -1536,18 +1550,22 @@ function showMyAccountContent(e) {
     let pauseButton = document.createElement("button");
     pauseButton.className = 'skin-render-pause';
     pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
-    onPause = () => {
+    let onPause = () => {
         skinViewer.animation.paused = true;
         pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
         pauseButton.onclick = onResume;
     }
-    onResume = () => {
+    let onResume = () => {
         skinViewer.animation.paused = false;
         pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
         pauseButton.onclick = onPause;
     }
     pauseButton.onclick = onPause;
+    let viewerInfo = document.createElement("div");
+    viewerInfo.innerHTML = 'Current Skin';
+    viewerInfo.className = 'skin-render-info';
     skinRenderContainer.appendChild(pauseButton);
+    skinRenderContainer.appendChild(viewerInfo);
     let optionsContainer = document.createElement("div");
     optionsContainer.className = "my-account-options";
     ele.appendChild(optionsContainer);
@@ -1571,29 +1589,243 @@ function showMyAccountContent(e) {
     skins.forEach((e) => {
         let skinEle = document.createElement("button");
         skinEle.className = "my-account-option";
+        skinEle.classList.add("skin");
         let skinImg = document.createElement("img");
-        skinImg.src = `https://mc-heads.net/body/bedbdec6f125cb5fb28cc717fd37260f7395c0ac60152d1758aab966c3539825/50`;
+        renderSkinToDataUrl(`minecraft/skins/${e.skin_id}.png`, (v) => {
+            skinImg.src = v;
+        });
+        skinImg.classList.add("option-image");
+        let loader = document.createElement("div");
+        loader.className = "loading-container-spinner";
+        loader.style.display = "none";
         let skinName = document.createElement("div");
         skinEle.appendChild(skinImg);
+        skinEle.appendChild(loader);
         skinEle.appendChild(skinName);
         skinName.innerHTML = sanitize(e.name);
         skinList.appendChild(skinEle);
+        skinEle.onmouseenter = () => {
+            skinViewer.loadSkin(`minecraft/skins/${e.skin_id}.png`, {
+                model: e.model == "wide" ? "default" : "slim",
+            });
+            viewerInfo.innerHTML = 'Skin Preview';
+        }
+        skinEle.onfocus = () => {
+            skinViewer.loadSkin(`minecraft/skins/${e.skin_id}.png`, {
+                model: e.model == "wide" ? "default" : "slim",
+            });
+            viewerInfo.innerHTML = 'Skin Preview';
+        }
+        skinEle.onmouseleave = () => {
+            skinViewer.loadSkin(`minecraft/skins/${default_profile.getActiveSkin().skin_id}.png`, {
+                model: default_profile.getActiveSkin().model == "wide" ? "default" : "slim",
+            });
+            viewerInfo.innerHTML = 'Current Skin';
+        }
+        skinEle.onblur = (e) => {
+            if (e.relatedTarget?.matches(".my-account-option.skin")) return;
+            skinViewer.loadSkin(`minecraft/skins/${default_profile.getActiveSkin().skin_id}.png`, {
+                model: default_profile.getActiveSkin().model == "wide" ? "default" : "slim",
+            });
+            viewerInfo.innerHTML = 'Current Skin';
+        }
+        if (e.active_uuid == default_profile.uuid) {
+            skinEle.classList.add("selected");
+        }
+        skinEle.onclick = async (event) => {
+            loader.style.display = "block";
+            skinImg.style.display = "none";
+            let currentEle = event.currentTarget;
+            let success = await applySkin(default_profile, e);
+            if (success) {
+                let oldEle = document.querySelector(".my-account-option.skin.selected");
+                oldEle.classList.remove("selected");
+                currentEle.classList.add("selected");
+                e.setActive(default_profile.uuid);
+                skinViewer.loadSkin(`minecraft/skins/${e.skin_id}.png`, {
+                    model: e.model == "wide" ? "default" : "slim",
+                });
+                viewerInfo.innerHTML = 'Current Skin';
+            }
+            loader.style.display = "none";
+            skinImg.style.display = "block";
+        }
     });
     let capes = default_profile.getCapes();
     capes.forEach((e) => {
         let capeEle = document.createElement("button");
         capeEle.className = "my-account-option";
+        capeEle.classList.add("cape");
         let capeImg = document.createElement("img");
-        capeImg.src = e.cape_url;
+        extractImageRegionToDataURL(`minecraft/capes/${e.cape_id}.png`, 1, 1, 10, 16, (e) => {
+            if (e) capeImg.src = e;
+        });
+        capeImg.classList.add("option-image");
+        let loader = document.createElement("div");
+        loader.className = "loading-container-spinner";
+        loader.style.display = "none";
         let capeName = document.createElement("div");
         capeEle.appendChild(capeImg);
+        capeEle.appendChild(loader);
         capeEle.appendChild(capeName);
         capeName.innerHTML = sanitize(e.cape_name);
         capeList.appendChild(capeEle);
+        capeEle.onmouseenter = () => {
+            skinViewer.loadCape(`minecraft/capes/${e.cape_id}.png`);
+            viewerInfo.innerHTML = 'Cape Preview';
+        }
+        capeEle.onfocus = () => {
+            skinViewer.loadCape(`minecraft/capes/${e.cape_id}.png`);
+            viewerInfo.innerHTML = 'Cape Preview';
+        }
+        capeEle.onmouseleave = () => {
+            skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+            viewerInfo.innerHTML = 'Current Skin';
+        }
+        capeEle.onblur = (e) => {
+            if (e.relatedTarget?.matches(".my-account-option.cape")) return;
+            skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+            viewerInfo.innerHTML = 'Current Skin';
+        }
+        if (e.active) {
+            capeEle.classList.add("selected");
+        }
+        capeEle.onclick = async (event) => {
+            loader.style.display = "block";
+            capeImg.style.display = "none";
+            let currentEle = event.currentTarget;
+            let success = await applyCape(default_profile, e);
+            if (success) {
+                let oldEle = document.querySelector(".my-account-option.cape.selected");
+                oldEle.classList.remove("selected");
+                currentEle.classList.add("selected");
+                e.setActive();
+                skinViewer.loadCape(`minecraft/capes/${e.cape_id}.png`);
+                viewerInfo.innerHTML = 'Current Skin';
+                activeCape = e;
+            }
+            loader.style.display = "none";
+            capeImg.style.display = "block";
+        }
     });
+    let capeEle = document.createElement("button");
+    capeEle.className = "my-account-option";
+    capeEle.classList.add("cape");
+    let capeImg = document.createElement("div");
+    capeImg.classList.add("option-image");
+    capeImg.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+    let loader = document.createElement("div");
+    loader.className = "loading-container-spinner";
+    loader.style.display = "none";
+    let capeName = document.createElement("div");
+    capeEle.appendChild(capeImg);
+    capeEle.appendChild(loader);
+    capeEle.appendChild(capeName);
+    capeName.innerHTML = "No Cape";
+    capeList.appendChild(capeEle);
+    capeEle.onmouseenter = () => {
+        skinViewer.loadCape(null);
+        viewerInfo.innerHTML = 'Cape Preview';
+    }
+    capeEle.onfocus = () => {
+        skinViewer.loadCape(null);
+        viewerInfo.innerHTML = 'Cape Preview';
+    }
+    capeEle.onmouseleave = () => {
+        skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+        viewerInfo.innerHTML = 'Current Skin';
+    }
+    capeEle.onblur = (e) => {
+        if (e.relatedTarget?.matches(".my-account-option.cape")) return;
+        skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+        viewerInfo.innerHTML = 'Current Skin';
+    }
+    if (!activeCape) {
+        capeEle.classList.add("selected");
+    }
+    capeEle.onclick = async (event) => {
+        loader.style.display = "block";
+        capeImg.style.display = "none";
+        let currentEle = event.currentTarget;
+        let success = await applyCape(default_profile, null);
+        if (success) {
+            let oldEle = document.querySelector(".my-account-option.cape.selected");
+            oldEle.classList.remove("selected");
+            currentEle.classList.add("selected");
+            default_profile.removeActiveCape();
+            skinViewer.loadCape(null);
+            viewerInfo.innerHTML = 'Current Skin';
+            activeCape = null;
+        }
+        loader.style.display = "none";
+        capeImg.style.display = "block";
+    }
     optionsContainer.appendChild(skinOptions);
     optionsContainer.appendChild(capeOptions);
     return ele;
+}
+
+function extractImageRegionToDataURL(imageSrc, x, y, width, height, callback) {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+
+    img.onload = () => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+
+        const ctx = tempCanvas.getContext('2d');
+        ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
+
+        const dataURL = tempCanvas.toDataURL();
+        callback(dataURL);
+    };
+
+    img.onerror = (err) => {
+        console.error("Failed to load image:", err);
+        callback(null);
+    };
+
+    img.src = imageSrc;
+}
+
+function renderSkinToDataUrl(skinPath, callback) {
+    const skin = new Image();
+    skin.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+
+        function drawPart(sx, sy, sw, sh, dx, dy, dw = sw, dh = sh) {
+            ctx.drawImage(skin, sx, sy, sw, sh, dx, dy, dw, dh);
+        }
+
+        // first layer
+        drawPart(8, 8, 8, 8, 4, 0); // head
+        drawPart(20, 20, 8, 12, 4, 8); // torso
+        drawPart(4, 20, 4, 12, 4, 20); // right leg
+        drawPart(20, 52, 4, 12, 8, 20); // left leg
+        drawPart(44, 20, 4, 12, 0, 8); // right arm
+        drawPart(36, 52, 4, 12, 12, 8); // left arm
+
+        // second layer
+        drawPart(40, 8, 8, 8, 4, 0); // head
+        drawPart(20, 36, 8, 12, 4, 8); // torso
+        drawPart(4, 36, 4, 12, 4, 20); // right leg
+        drawPart(4, 52, 4, 12, 8, 20); // left leg
+        drawPart(44, 36, 4, 12, 0, 8); // right arm
+        drawPart(52, 52, 4, 12, 12, 8); // left arm
+
+        callback(canvas.toDataURL())
+    }
+
+    skin.onerror = (err) => {
+        console.error("Failed to load image:", err);
+        callback(null);
+    };
+
+    skin.src = skinPath;
 }
 
 function sortInstances(how) {
@@ -2237,7 +2469,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                 });
                             }
                         }
-                    ].filter(e=>e)
+                    ].filter(e => e)
                 },
                 "disabled": e.disabled,
                 "instance_info": instanceInfo
@@ -2463,7 +2695,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 });
                             }
                         }
-                    ].filter(e=>e)
+                    ].filter(e => e)
                 }
             });
     }
@@ -3316,7 +3548,7 @@ class Dialog {
                 let tab = info[i].tab ?? "default";
                 if (info[i].type == "notice") {
                     let textElement = document.createElement("div");
-                    textElement.innerHTML = sanitize(info[i].content);
+                    textElement.innerHTML = (info[i].content);
                     contents[tab].appendChild(textElement);
                 } else if (info[i].type == "text") {
                     let id = createId();
@@ -4407,3 +4639,40 @@ function sanitize(input) {
 
 homeButton.setSelected();
 content.appendChild(showHomeContent());
+
+async function applyCape(profile, cape) {
+    try {
+        let res = await window.electronAPI.setCape(profile, cape ? cape.cape_id : null);
+        profile.setAccessToken(res.player_info.access_token);
+        profile.setClientId(res.player_info.client_id);
+        profile.setExpires(res.player_info.expires);
+        profile.setName(res.player_info.name);
+        profile.setRefreshToken(res.player_info.refresh_token);
+        profile.setUuid(res.player_info.uuid);
+        profile.setXuid(res.player_info.xuid);
+        profile.setIsDemo(res.player_info.is_demo);
+        return true;
+    } catch (e) {
+        displayError(e.message);
+        return false;
+    }
+}
+
+async function applySkin(profile, skin) {
+    try {
+        let res = await window.electronAPI.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
+        profile.setAccessToken(res.player_info.access_token);
+        profile.setClientId(res.player_info.client_id);
+        profile.setExpires(res.player_info.expires);
+        profile.setName(res.player_info.name);
+        profile.setRefreshToken(res.player_info.refresh_token);
+        profile.setUuid(res.player_info.uuid);
+        profile.setXuid(res.player_info.xuid);
+        profile.setIsDemo(res.player_info.is_demo);
+        return true;
+    } catch (e) {
+        throw e;
+        displayError(e.message);
+        return false;
+    }
+}

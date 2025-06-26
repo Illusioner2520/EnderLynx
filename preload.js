@@ -1,6 +1,5 @@
 const { contextBridge, ipcRenderer, clipboard, nativeImage } = require('electron');
 const fs = require('fs');
-const fsa = require('fs').promises;
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, Forge, NeoForge, Quilt } = require('./launch.js');
 const { spawn, exec } = require('child_process');
@@ -12,6 +11,8 @@ const https = require('https');
 const querystring = require('querystring');
 const toml = require('toml');
 const Database = require('better-sqlite3');
+const axios = require('axios');
+const FormData = require('form-data');
 const db = new Database('app.db');
 
 db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER)').run();
@@ -1007,11 +1008,86 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     downloadSkin: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-        await urlToFile(url,`./minecraft/skins/${id}.png`);
+        await urlToFile(url, `./minecraft/skins/${id}.png`);
     },
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-        await urlToFile(url,`./minecraft/capes/${id}.png`);
+        await urlToFile(url, `./minecraft/capes/${id}.png`);
+    },
+    setCape: async (player_info, cape_id) => {
+        let date = new Date();
+        date.setHours(date.getHours() - 1);
+        if (new Date(player_info.expires) < date) {
+            try {
+                player_info = await getNewAccessToken(player_info.refresh_token);
+            } catch (err) {
+                throw new Error("Unable to update access token.");
+            }
+        }
+        if (cape_id) {
+            const res = await axios.put(
+                'https://api.minecraftservices.com/minecraft/profile/capes/active',
+                { capeId: cape_id },
+                {
+                    headers: {
+                        Authorization: `Bearer ${player_info.access_token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (res.status != 200) {
+                throw new Error("Unable to set cape");
+            }
+            return { "status": res.status, "player_info": player_info };
+        } else {
+            const res = await axios.delete(
+                'https://api.minecraftservices.com/minecraft/profile/capes/active',
+                {
+                    headers: {
+                        Authorization: `Bearer ${player_info.access_token}`
+                    }
+                }
+            );
+
+            if (res.status != 200) {
+                throw new Error("Unable to set cape");
+            }
+            return { "status": res.status, "player_info": player_info };
+        }
+    },
+    setSkin: async (player_info, skin_id, variant) => {
+        console.log(skin_id);
+        console.log(variant);
+        let date = new Date();
+        date.setHours(date.getHours() - 1);
+        if (new Date(player_info.expires) < date) {
+            try {
+                player_info = await getNewAccessToken(player_info.refresh_token);
+            } catch (err) {
+                throw new Error("Unable to update access token.");
+            }
+        }
+        let filePath = `./minecraft/skins/${skin_id}.png`;
+        const form = new FormData();
+        form.append('variant', variant);
+        form.append('file', fs.createReadStream(filePath));
+
+        const res = await axios.post(
+            'https://api.minecraftservices.com/minecraft/profile/skins',
+            form,
+            {
+                headers: {
+                    ...form.getHeaders(),
+                    Authorization: `Bearer ${player_info.access_token}`
+                }
+            }
+        );
+
+        if (res.status != 204) {
+            throw new Error("Unable to set skin");
+        }
+        return { "status": res.status, "player_info": player_info };
     }
 });
 

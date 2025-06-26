@@ -2245,6 +2245,10 @@ dialog[open]::backdrop {
     animation-duration: 1s;
 }
 
+.my-account-option > .loading-container-spinner {
+    margin-block: auto;
+}
+
 .loading-container-error {
     height: 60px;
     width: 60px;
@@ -2372,7 +2376,9 @@ dialog[open]::backdrop {
 
 .skin-render-container {
     grid-column: 2;
-    position: relative;
+    position: sticky;
+    top: 10px;
+    align-self: start;
 }
 
 .my-account-grid {
@@ -2389,6 +2395,8 @@ dialog[open]::backdrop {
     gap: 15px;
     grid-column: 1;
     grid-row: 1;
+    max-height: 100%;
+    padding-bottom: 10px;
 }
 
 .my-account-option-box {
@@ -2414,6 +2422,12 @@ dialog[open]::backdrop {
     gap: 8px;
     background-color: var(--color-1t);
     transition: background-color .25s, scale .1s;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.my-account-option.selected {
+    background-color: var(--accent-color);
 }
 
 .my-account-option:active {
@@ -2422,6 +2436,10 @@ dialog[open]::backdrop {
 
 .my-account-option:hover {
     background-color: var(--color-2t);
+}
+
+.my-account-option.selected:hover {
+    background-color: color-mix(in srgb, var(--accent-color), var(--text-color));;
 }
 
 .skin-render-pause {
@@ -2444,4 +2462,26 @@ dialog[open]::backdrop {
 
 .skin-render-pause:active {
     scale: .95;
+}
+
+.skin-render-info {
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--color-2);
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    font-size: 1rem;
+    box-shadow: 0px 0px 10px black;
+}
+
+.option-image {
+    margin-block: auto;
+    font-size: 2rem;
+    color: var(--subtle-text-color);
+    image-rendering: pixelated;
+    width: 40px;
 }
