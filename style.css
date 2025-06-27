@@ -229,25 +229,29 @@ button {
     backdrop-filter: blur(10px);
     border: 0;
     padding: 0px;
-    overflow-y: hidden;
+    overflow: hidden;
     position: fixed;
     border-radius: 10px;
-    height: 0px;
+    height: max-content;
     interpolate-size: allow-keywords;
-    transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
+    transition: opacity .25s, scale .25s, overlay .25s allow-discrete, display .25s allow-discrete, left .1s, top .1s, translate .1s;
     border-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
     width: max-content;
+    scale: .8;
+    opacity: 0;
 }
 
 .context-menu:popover-open {
-    height: max-content;
     display: grid;
+    scale: 1;
+    opacity: 1;
 
     @starting-style {
-        height: 0px;
+        scale: .8;
+        opacity: 0;
     }
 }
 
@@ -259,25 +263,29 @@ button {
     padding: 0px;
     overflow-y: hidden;
     position: absolute;
-    top: calc(anchor(bottom) + 5px);
+    top: calc(anchor(bottom) + var(--menu-padding));
     right: anchor(right);
     border-radius: 10px;
-    height: 0px;
+    height: max-content;
     interpolate-size: allow-keywords;
-    transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
+    transition: opacity .25s, scale .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
     width: max-content;
+    scale: .8;
+    opacity: 0;
 }
 
 .more-menu:popover-open {
-    height: max-content;
     display: grid;
+    scale: 1;
+    opacity: 1;
 
     @starting-style {
-        height: 0px;
+        scale: .8;
+        opacity: 0;
     }
 }
 
@@ -289,6 +297,7 @@ button {
     transition: background-color .25s;
     align-items: center;
     font-size: 1rem;
+    white-space: nowrap;
 }
 
 .context-menu-button:hover {
@@ -2245,7 +2254,7 @@ dialog[open]::backdrop {
     animation-duration: 1s;
 }
 
-.my-account-option > .loading-container-spinner {
+.my-account-option>.loading-container-spinner {
     margin-block: auto;
 }
 
@@ -2386,13 +2395,13 @@ dialog[open]::backdrop {
     display: grid;
     gap: 10px;
     grid-template-columns: 1fr 300px;
-    height: 100%;
+    min-height: 100%;
 }
 
 .my-account-options {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
     grid-column: 1;
     grid-row: 1;
     max-height: 100%;
@@ -2424,22 +2433,39 @@ dialog[open]::backdrop {
     transition: background-color .25s, scale .1s;
     font-size: 1rem;
     text-align: center;
+    position: relative;
+}
+
+.skin-more {
+    border-radius: 8px;
+    height: 30px;
+    width: 30px;
+    display: flex;
+    justify-content: center;
+    align-items:center;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color .25s;
+    position: absolute;
+    right: 0px;
+    top: 0px;
+}
+
+.skin-more:hover {
+    background-color: var(--color-1t);
 }
 
 .my-account-option.selected {
     background-color: var(--accent-color);
 }
 
-.my-account-option:active {
-    scale: .95;
-}
-
-.my-account-option:hover {
+.my-account-option:not(:has(.skin-more:hover)):hover {
     background-color: var(--color-2t);
 }
 
-.my-account-option.selected:hover {
-    background-color: color-mix(in srgb, var(--accent-color), var(--text-color));;
+.my-account-option.selected:not(:has(.skin-more:hover)):hover {
+    background-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    ;
 }
 
 .skin-render-pause {
@@ -2484,4 +2510,54 @@ dialog[open]::backdrop {
     color: var(--subtle-text-color);
     image-rendering: pixelated;
     width: 40px;
+}
+
+.info {
+    background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
+    border-style: solid;
+    border-color: var(--accent-color);
+    border-width: 1px;
+    display: flex;
+    padding: 8px;
+    border-radius: 8px;
+    gap: 8px;
+    color: var(--accent-color);
+    align-items: center;
+    font-size: 1rem;
+}
+
+.skin-button-container {
+    display: flex;
+}
+
+.skin-button {
+    border-radius: 10px;
+    padding: 8px;
+    background-color: var(--color-1t);
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.skin-button:active {
+    scale: .95;
+}
+
+.skin-button:hover {
+    background-color: var(--color-2t);
+}
+
+.skin-button:last-child {
+    margin-left: auto;
+}
+
+.spinning {
+    animation-name: spin;
+    animation-iteration-count: infinite;
+    animation-duration: 1s;
 }

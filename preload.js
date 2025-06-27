@@ -14,6 +14,8 @@ const Database = require('better-sqlite3');
 const axios = require('axios');
 const FormData = require('form-data');
 const db = new Database('app.db');
+const sharp = require("sharp");
+const crypto = require('crypto');
 
 db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
@@ -1006,9 +1008,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    downloadSkin: async (url, id) => {
+    downloadSkin: async (url) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-        await urlToFile(url, `./minecraft/skins/${id}.png`);
+
+        const response = await axios.get(url, { responseType: "arraybuffer" });
+        const imageBuffer = Buffer.from(response.data);
+
+        const { data, info } = await sharp(imageBuffer)
+            .ensureAlpha()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        const hash = crypto.createHash('sha256')
+            .update(data)
+            .digest('hex');
+        
+        fs.writeFileSync(`./minecraft/skins/${hash}.png`, imageBuffer);
+
+        return hash;
     },
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
@@ -1036,10 +1053,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 }
             );
 
-            if (res.status != 200) {
+            if (res.status < 200 || res.status >= 300) {
                 throw new Error("Unable to set cape");
             }
-            return { "status": res.status, "player_info": player_info };
+            return { "status": res.status, "player_info": player_info, "skin_info": res.data };
         } else {
             const res = await axios.delete(
                 'https://api.minecraftservices.com/minecraft/profile/capes/active',
@@ -1050,15 +1067,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 }
             );
 
-            if (res.status != 200) {
+            if (res.status < 200 || res.status >= 300) {
                 throw new Error("Unable to set cape");
             }
-            return { "status": res.status, "player_info": player_info };
+            return { "status": res.status, "player_info": player_info, "skin_info": res.data };
         }
     },
     setSkin: async (player_info, skin_id, variant) => {
-        console.log(skin_id);
-        console.log(variant);
         let date = new Date();
         date.setHours(date.getHours() - 1);
         if (new Date(player_info.expires) < date) {
@@ -1068,28 +1083,95 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 throw new Error("Unable to update access token.");
             }
         }
-        let filePath = `./minecraft/skins/${skin_id}.png`;
+        let filePath = path.resolve(__dirname, `minecraft/skins/${skin_id}.png`);
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`Skin file not found at ${filePath}`);
+        }
         const form = new FormData();
         form.append('variant', variant);
-        form.append('file', fs.createReadStream(filePath));
+        form.append('file', fs.createReadStream(filePath), {
+            filename: `${skin_id}.png`,
+            contentType: 'image/png',
+        });
 
-        const res = await axios.post(
-            'https://api.minecraftservices.com/minecraft/profile/skins',
-            form,
-            {
+        const formHeaders = form.getHeaders();
+
+        const targetUrl = new URL('https://api.minecraftservices.com/minecraft/profile/skins');
+
+        return await new Promise((resolve, reject) => {
+            const req = https.request({
+                hostname: targetUrl.hostname,
+                port: targetUrl.port,
+                path: targetUrl.pathname,
+                method: 'POST',
                 headers: {
-                    ...form.getHeaders(),
-                    Authorization: `Bearer ${player_info.access_token}`
+                    ...formHeaders,
+                    'Authorization': `Bearer ${player_info.access_token}`
                 }
-            }
-        );
+            }, (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    if (res.statusCode < 200 || res.statusCode >= 300) {
+                        reject(new Error("Unable to set skin"));
+                    } else {
+                        resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": JSON.parse(data) });
+                    }
+                });
+            });
 
-        if (res.status != 204) {
-            throw new Error("Unable to set skin");
+            req.on('error', (e) => {
+                console.error('Native HTTP Request Error:', e);
+                reject(new Error("Unable to set skin"));
+            });
+
+            form.pipe(req);
+        });
+    },
+    getProfile: async (player_info) => {
+        let date = new Date();
+        date.setHours(date.getHours() - 1);
+        if (new Date(player_info.expires) < date) {
+            try {
+                player_info = await getNewAccessToken(player_info.refresh_token);
+            } catch (err) {
+                throw new Error("Unable to update access token.");
+            }
         }
-        return { "status": res.status, "player_info": player_info };
+        const res = await axios.get('https://api.minecraftservices.com/minecraft/profile', {
+            headers: {
+                Authorization: `Bearer ${player_info.access_token}`
+            }
+        });
+        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+    },
+    importSkin: async (dataurl) => {
+        const hash = await hashImageFromDataUrl(dataurl);
+        const base64Data = dataurl.split(',')[1];
+        if (!base64Data) throw new Error("Invalid data URL");
+        const buffer = Buffer.from(base64Data, "base64");
+        fs.writeFileSync(`./minecraft/skins/${hash.hash}.png`, buffer);
+        return hash.hash;
     }
 });
+
+async function hashImageFromDataUrl(dataUrl) {
+    const base64Data = dataUrl.split(',')[1];
+    if (!base64Data) throw new Error("Invalid data URL");
+
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    const { data, info } = await sharp(imageBuffer)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+    console.log(data);
+    const hash = crypto.createHash('sha256').update(data).digest('hex');
+    return { "hash": hash, "buffer": data };
+}
 
 function folderExists(folderPath) {
     try {

@@ -589,7 +589,7 @@ class Minecraft {
                     if (e.includes("${classpath}")) {
                         let theargs = [this.libs + this.jarfile];
                         theargs = theargs.concat(this.modded_args_jvm);
-                        theargs = theargs.concat(["-Xmx4G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"), this.main_class]);
+                        theargs = theargs.concat(["-Xmx6G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"), this.main_class]);
                         args = args.concat(theargs);
                     } else {
                         args.push(e);
@@ -616,7 +616,7 @@ class Minecraft {
             args.push("-Dminecraft.client.jar=" + this.jarfile);
             args.push("-cp");
             args.push(this.libs + this.jarfile);
-            args = args.concat("-Xmx4G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
+            args = args.concat("-Xmx6G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
             args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"));
             args.push(this.main_class);
             this.args = this.args.map((e) => {
