@@ -25,3 +25,12 @@ app.whenReady().then(() => {
 ipcMain.on('progress-update', (event, title, progress, desc) => {
     win.webContents.send('progress-update', title, progress, desc);
 });
+
+ipcMain.on('display-error', (event, message) => {
+    win.webContents.send('display-error', message);
+});
+
+ipcMain.handle('show-open-dialog', async (event, options) => {
+    const result = await dialog.showOpenDialog(win, options);
+    return result;
+});

@@ -1,12 +1,12 @@
 let lang = null;
 document.getElementsByTagName("title")[0].innerHTML = sanitize(translate("app.name"));
 let minecraftVersions = []
-let getVersions = async () => {
+let getMCVersions = async () => {
     try {
         minecraftVersions = (await window.electronAPI.getVanillaVersions()).reverse();
     } catch (e) { }
 }
-getVersions();
+getMCVersions();
 
 class SQL {
     constructor(sql) {
@@ -211,9 +211,38 @@ class Instance {
         this.install_id = content.install_id;
         this.installing = Boolean(content.installing);
         this.mc_installed = Boolean(content.mc_installed);
+        this.window_width = content.window_width;
+        this.window_height = content.window_height;
+        this.allocated_ram = content.allocated_ram;
+        this.java_version = content.java_version;
+        this.java_path = content.java_path;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
-
+    setJavaVersion(java_version) {
+        db.prepare("UPDATE instances SET java_version = ? WHERE id = ?").run(java_version, this.id);
+        this.java_version = java_version;
+        if (instance_watches[this.instance_id].onchangejava_version) instance_watches[this.instance_id].onchangejava_version(java_version);
+    }
+    setJavaPath(java_path) {
+        db.prepare("UPDATE instances SET java_path = ? WHERE id = ?").run(java_path, this.id);
+        this.java_path = java_path;
+        if (instance_watches[this.instance_id].onchangejava_path) instance_watches[this.instance_id].onchangejava_path(java_path);
+    }
+    setWindowWidth(window_width) {
+        db.prepare("UPDATE instances SET window_width = ? WHERE id = ?").run(window_width, this.id);
+        this.window_width = window_width;
+        if (instance_watches[this.instance_id].onchangewindow_width) instance_watches[this.instance_id].onchangewindow_width(window_width);
+    }
+    setWindowHeight(window_height) {
+        db.prepare("UPDATE instances SET window_height = ? WHERE id = ?").run(window_height, this.id);
+        this.window_height = window_height;
+        if (instance_watches[this.instance_id].onchangewindow_height) instance_watches[this.instance_id].onchangewindow_height(window_height);
+    }
+    setAllocatedRam(allocated_ram) {
+        db.prepare("UPDATE instances SET allocated_ram = ? WHERE id = ?").run(allocated_ram, this.id);
+        this.allocated_ram = allocated_ram;
+        if (instance_watches[this.instance_id].onchangeallocated_ram) instance_watches[this.instance_id].onchangeallocated_ram(allocated_ram);
+    }
     setName(name) {
         db.prepare("UPDATE instances SET name = ? WHERE id = ?").run(name, this.id);
         this.name = name;
@@ -689,13 +718,13 @@ class MinecraftAccountSwitcher {
 }
 
 function getPlayerHead(profile, callback) {
-    if (!profile) { 
+    if (!profile) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
         return;
     }
     let skin = profile.getActiveSkin();
     // if no skin is set, just display steve for now
-    if (!skin) { 
+    if (!skin) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
         return;
     }
@@ -878,8 +907,8 @@ class MoreMenu {
         if (switchSides) {
             element.style.right = "";
             element.style.left = "anchor(left)";
-            element.style.setProperty("--menu-padding", menuPadding + "px")
         }
+        element.style.setProperty("--menu-padding", menuPadding + "px")
         element.setAttribute("popover", "");
         document.body.appendChild(element);
         ele.style.anchorName = "--" + id;
@@ -1089,6 +1118,9 @@ class SearchDropdown {
     setOnChange(onchange) {
         this.onchange = onchange;
     }
+    addOnChange(onchange) {
+        this.onchange = onchange;
+    }
 }
 
 class DialogDropdown {
@@ -1173,9 +1205,103 @@ class DialogDropdown {
         this.selected = option;
         this.value = option;
         this.popover.hidePopover();
+        if (this.onchange) this.onchange();
     }
     get getSelected() {
         return this.selected;
+    }
+    addOnChange(onchange) {
+        this.onchange = onchange;
+    }
+}
+
+class Slider {
+    constructor(element, min, max, initial, increment, unit) {
+        element.classList.add("slider-wrapper");
+        let slider = document.createElement("div");
+        slider.className = "slider";
+        let sliderInput = document.createElement("input");
+        sliderInput.className = "slider-text-box";
+        sliderInput.type = "number";
+        element.appendChild(slider);
+        element.appendChild(sliderInput);
+        let initialPercentage = (initial - min) / (max - min) * 100;
+        slider.style.setProperty('--slider-percentage', initialPercentage + "%");
+        this.value = initial;
+
+        let lowerBound = document.createElement("div");
+        lowerBound.className = "slider-label-left";
+        lowerBound.innerHTML = sanitize(min + " " + unit);
+
+        let upperBound = document.createElement("div");
+        upperBound.className = "slider-label-right";
+        upperBound.innerHTML = sanitize(max + " " + unit);
+
+        slider.appendChild(lowerBound);
+        slider.appendChild(upperBound);
+
+        sliderInput.value = initial;
+        sliderInput.step = increment;
+        slider.style.setProperty("--slider-transition", "width .1s, left .1s, scale .2s");
+        sliderInput.oninput = () => {
+            let rawValue = Number(sliderInput.value);
+            if (rawValue < min) rawValue = min;
+            if (rawValue > max) rawValue = max;
+            let percentage = (rawValue - min) / (max - min) * 100;
+            slider.style.setProperty('--slider-percentage', percentage + "%");
+            this.value = rawValue;
+        }
+        sliderInput.onchange = () => {
+            let rawValue = Number(sliderInput.value);
+            if (rawValue < min) rawValue = min;
+            if (rawValue > max) rawValue = max;
+            sliderInput.value = rawValue;
+            let percentage = (rawValue - min) / (max - min) * 100;
+            slider.style.setProperty('--slider-percentage', percentage + "%");
+            this.value = rawValue;
+        }
+        slider.onclick = (event) => {
+            slider.style.setProperty("--slider-transition", "width .1s, left .1s, scale .2s");
+            const rect = slider.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(1, x / rect.width));
+            let value = min + percentage * (max - min);
+            let snappedValue = Math.round(value / increment) * increment;
+            snappedValue = Math.max(min, Math.min(max, snappedValue));
+            sliderInput.value = snappedValue;
+            slider.style.setProperty('--slider-percentage', ((snappedValue - min) / (max - min) * 100) + "%");
+            this.value = snappedValue;
+            sliderInput.dispatchEvent(new Event('input'));
+        };
+        let isDragging = false;
+
+        slider.onmousedown = (event) => {
+            isDragging = true;
+            document.body.style.userSelect = "none";
+            slider.style.setProperty("--slider-transition", "scale .2s");
+        };
+
+        document.addEventListener("mousemove", (event) => {
+            if (!isDragging) return;
+            const rect = slider.getBoundingClientRect();
+            let x = event.clientX - rect.left;
+            x = Math.max(0, Math.min(rect.width, x));
+            const percentage = x / rect.width;
+            let value = min + percentage * (max - min);
+            let snappedValue = Math.round(value / increment) * increment;
+            snappedValue = Math.max(min, Math.min(max, snappedValue));
+            sliderInput.value = snappedValue;
+            slider.style.setProperty('--slider-percentage', ((snappedValue - min) / (max - min) * 100) + "%");
+            this.value = snappedValue;
+            sliderInput.dispatchEvent(new Event('input'));
+        });
+
+        document.addEventListener("mouseup", () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.userSelect = "";
+            }
+        });
     }
 }
 
@@ -2112,6 +2238,7 @@ function renderSkinToDataUrl(skinPath, callback, model) {
 }
 
 function sortInstances(how) {
+    if (!document.getElementsByClassName("group-list")[0]) return;
     data.setDefault("default_sort", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
@@ -2153,6 +2280,7 @@ function sortInstances(how) {
 }
 
 function groupInstances(how) {
+    if (!document.getElementsByClassName("group-list")[0]) return;
     data.setDefault("default_group", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
@@ -2165,7 +2293,13 @@ function groupInstances(how) {
     });
     let groupList = document.getElementsByClassName("group-list")[0];
     while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
-    Object.keys(groupMap).forEach(groupKey => {
+    let groups = Object.keys(groupMap);
+    groups.sort((a, b) => {
+        if (a === "" && b !== "") return -1;
+        if (a !== "" && b === "") return 1;
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    });
+    groups.forEach(groupKey => {
         let newElement = document.createElement("div");
         newElement.classList.add("group");
         newElement.setAttribute("data-group-title", how == "loader" ? loaders[groupKey] : groupKey);
@@ -2277,7 +2411,9 @@ function showInstanceContent(e) {
             }
             let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
             showSpecificInstanceContent(instance);
-            await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+            let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+            instance.setJavaPath(r.java_installation);
+            instance.setJavaVersion(r.java_version);
             instance.setMcInstalled(true);
         })
     }
@@ -2327,7 +2463,7 @@ function showInstanceContent(e) {
         instanceElement.setAttribute("data-loader", instances[i].loader);
         instanceElement.setAttribute("data-none", "");
         instanceElement.onclick = (e) => {
-            showSpecificInstanceContent(instances[i]);
+            showSpecificInstanceContent(new Instance(instances[i].instance_id));
         }
         instanceElement.classList.add("instance-item");
         if (running) instanceElement.classList.add("running");
@@ -2338,16 +2474,42 @@ function showInstanceContent(e) {
         } else {
             instanceImage.src = "default.png";
         }
+        instances[i].watchForChange("image", (i) => {
+            instanceImage.src = i ? i : "default.png";
+        });
         instanceElement.appendChild(instanceImage);
         let instanceInfoEle = document.createElement("div");
         instanceInfoEle.classList.add("instance-info");
         let instanceName = document.createElement("div");
+        instances[i].watchForChange("name", (t) => {
+            instanceName.innerHTML = sanitize(t);
+            instanceElement.setAttribute("data-name", t);
+            sortInstances(data.getDefault("default_sort"));
+        });
         instanceName.classList.add("instance-name");
         instanceName.innerHTML = sanitize(instances[i].name);
         instanceInfoEle.appendChild(instanceName);
         let instanceDesc = document.createElement("div");
         instanceDesc.classList.add("instance-desc");
         instanceDesc.innerHTML = sanitize(loaders[instances[i].loader] + " " + instances[i].vanilla_version);
+        let loader_text = loaders[instances[i].loader];
+        let version_text = instances[i].vanilla_version;
+        instances[i].watchForChange("loader", (l) => {
+            loader_text = loaders[l];
+            instanceDesc.innerHTML = sanitize(loader_text + " " + version_text);
+            instanceElement.setAttribute("data-loader", l);
+            groupInstances(data.getDefault("default_group"));
+        });
+        instances[i].watchForChange("vanilla_version", (v) => {
+            version_text = v;
+            instanceDesc.innerHTML = sanitize(loader_text + " " + version_text);
+            instanceElement.setAttribute("data-game-version", v);
+            groupInstances(data.getDefault("default_group"));
+        });
+        instances[i].watchForChange("group", (g) => {
+            instanceElement.setAttribute("data-custom-groups", g);
+            groupInstances(data.getDefault("default_group"));
+        });
         instanceInfoEle.appendChild(instanceDesc);
         instanceElement.appendChild(instanceInfoEle);
         let buttons = new ContextMenuButtons([
@@ -2373,7 +2535,7 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-eye"></i>',
                 "title": translate("app.button.instances.view"),
                 "func": (e) => {
-                    showSpecificInstanceContent(instances[i]);
+                    showSpecificInstanceContent(new Instance(instances[i].instance_id));
                 }
             },
             {
@@ -2396,7 +2558,9 @@ function showInstanceContent(e) {
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
-                "func": (e) => { }
+                "func": (e) => {
+                    showInstanceSettings(new Instance(instances[i].instance_id));
+                }
             },
             {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
@@ -2443,11 +2607,17 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
     } else {
         instImg.src = "default.png";
     }
+    instanceInfo.watchForChange("image", (i) => {
+        instImg.src = i ? i : "default.png";
+    })
     topBar.appendChild(instImg);
     let instTopInfo = document.createElement("div");
     instTopInfo.classList.add("instance-top-info");
     let instTopTitle = document.createElement("h1");
     instTopTitle.innerHTML = sanitize(instanceInfo.name);
+    instanceInfo.watchForChange("name", (t) => {
+        instTopTitle.innerHTML = sanitize(t);
+    })
     instTopTitle.classList.add("instance-top-title");
     instTopInfo.appendChild(instTopTitle);
     let instTopSubInfo = document.createElement("div");
@@ -2491,7 +2661,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             setInstanceTabContentLogs(instanceInfo, tabsInfo);
         }
         window.electronAPI.clearProcessWatches();
-        window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+        window.electronAPI.watchProcessForExit((new Instance(instanceInfo.instance_id)).pid, () => {
             playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
             playButton.classList.remove("instance-top-stop-button");
             playButton.classList.add("instance-top-play-button");
@@ -2538,15 +2708,6 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
     let buttons = new ContextMenuButtons([
         {
-            "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-            "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-            "func": running ? (e) => {
-                stopInstance(instanceInfo);
-            } : (e) => {
-                playInstance(instanceInfo);
-            }
-        },
-        {
             "icon": '<i class="fa-solid fa-plus"></i>',
             "title": translate("app.button.content.add"),
             "func": (e) => {
@@ -2573,12 +2734,29 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         {
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
-            "func": (e) => { }
+            "func": (e) => {
+                showInstanceSettings(new Instance(instanceInfo.instance_id));
+            }
         },
         {
             "icon": '<i class="fa-solid fa-trash-can"></i>',
             "title": translate("app.button.instances.delete"),
-            "func": (e) => { },
+            "func": (e) => {
+                let dialog = new Dialog();
+                dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the instance '" + instanceInfo.name + "'?", [ // TODO
+                    {
+                        "type": "cancel",
+                        "content": "Cancel"
+                    },
+                    {
+                        "type": "confirm",
+                        "content": "Confirm Deletion"
+                    }
+                ], [], () => {
+                    instanceInfo.delete();
+                    instanceContent.displayContent();
+                });
+            },
             "danger": true
         }
     ]);
@@ -2620,6 +2798,191 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         }
     ]);
     tabs.selectOptionAdvanced(default_tab ?? "content");
+}
+
+function showInstanceSettings(instanceInfo) {
+    let dialog = new Dialog();
+    dialog.showDialog("Instance Settings", "form", [
+        {
+            "type": "image-upload",
+            "name": "Icon",
+            "id": "icon",
+            "default": instanceInfo.image,
+            "tab": "general"
+        },
+        {
+            "type": "text",
+            "name": "Name",
+            "id": "name",
+            "default": instanceInfo.name,
+            "tab": "general"
+        },
+        {
+            "type": "text",
+            "name": "Library Group",
+            "id": "group",
+            "default": instanceInfo.group,
+            "tab": "general",
+            "desc": "Library Groups help to organize your instance list. Any instances in the same group will be displayed together when they are grouped by custom groups."
+        },
+        {
+            "type": "multi-select",
+            "name": "Loader",
+            "options": [
+                { "name": "Vanilla", "value": "vanilla" },
+                { "name": "Fabric", "value": "fabric" },
+                { "name": "Forge", "value": "forge" },
+                { "name": "NeoForge", "value": "neoforge" },
+                { "name": "Quilt", "value": "quilt" }
+            ],
+            "id": "loader",
+            "default": instanceInfo.loader,
+            "tab": "installation"
+        },
+        {
+            "type": "dropdown",
+            "name": "Game Version",
+            "options": [],
+            "id": "game_version",
+            "default": instanceInfo.vanilla_version,
+            "tab": "installation",
+            "input_source": "loader",
+            "source": (new VersionList).getVersions
+        },
+        {
+            "type": "loader-version-dropdown",
+            "name": "",
+            "options": [],
+            "id": "loader_version",
+            "default": instanceInfo.loader_version,
+            "tab": "installation",
+            "loader_source": "loader",
+            "game_version_source": "game_version"
+        },
+        {
+            "type": "number",
+            "name": "Width",
+            "id": "width",
+            "default": instanceInfo.window_width ?? 854,
+            "tab": "window",
+            "desc": "The width of the game when launched. (Default is 854)"
+        },
+        {
+            "type": "number",
+            "name": "Height",
+            "id": "height",
+            "default": instanceInfo.window_height ?? 480,
+            "tab": "window",
+            "desc": "The height of the game when launched. (Default is 480)"
+        },
+        {
+            "type": "slider",
+            "name": "Allocated RAM",
+            "id": "allocated_ram",
+            "default": instanceInfo.allocated_ram ?? 4096,
+            "tab": "java",
+            "min": 512,
+            "max": window.electronAPI.getTotalRAM(),
+            "increment": 64,
+            "unit": "MB",
+            "desc": "How much RAM your game can use. (in MB)"
+        },
+        {
+            "type": "text",
+            "name": "Java Installation",
+            "id": "java_path",
+            "default": instanceInfo.java_path,
+            "tab": "java",
+            "desc": "Use this to change the java installation that launches the game. It is not recommended to change this unless you know what you are doing. If you do change this, please make sure that it is at least version " + instanceInfo.java_version + " and is javaw.exe instead of java.exe. Please note that when you run the test, it will execute the .exe file you selected to make sure it is a java executable.",
+            "buttons": [
+                {
+                    "name": "Detect",
+                    "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
+                    "func": async (v, b, i) => {
+                        b.innerHTML = '<i class="spinner"></i>Searching...';
+                        let dialog = new Dialog();
+                        let results = await window.electronAPI.detectJavaInstallations(instanceInfo.java_version);
+                        dialog.showDialog("Select Java Installation", "form", [
+                            {
+                                "type": "dropdown",
+                                "id": "java_path",
+                                "name": "Java Path",
+                                "options": results.map(e => ({ "name": e.path, "value": e.path }))
+                            }
+                        ], [
+                            { "type": "cancel", "content": "Cancel" },
+                            { "type": "confirm", "content": "Select" }
+                        ], [], (e) => {
+                            let info = {};
+                            e.forEach(e => { info[e.id] = e.value });
+                            i.value = info.java_path;
+                        });
+                        b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>Detect';
+                    }
+                },
+                {
+                    "name": "Browse",
+                    "icon": '<i class="fa-solid fa-folder"></i>',
+                    "func": async (v, b, i) => {
+                        let newValue = await window.electronAPI.triggerFileBrowse(v);
+                        if (newValue) i.value = newValue;
+                    }
+                },
+                {
+                    "name": "Test",
+                    "icon": '<i class="fa-solid fa-play"></i>',
+                    "func": async (v, b) => {
+                        let num = Math.floor(Math.random() * 10000);
+                        b.setAttribute("data-num", num);
+                        b.classList.remove("failed");
+                        b.innerHTML = '<i class="spinner"></i>Testing...';
+                        let success = await window.electronAPI.testJavaInstallation(v);
+                        if (success) {
+                            b.innerHTML = '<i class="fa-solid fa-check"></i>Test Successful';
+                        } else {
+                            b.innerHTML = '<i class="fa-solid fa-xmark"></i>Test Failed';
+                            b.classList.add("failed");
+                        }
+                        setTimeout(() => {
+                            if (b.getAttribute("data-num") == num) {
+                                b.innerHTML = '<i class="fa-solid fa-play"></i>Test';
+                                b.classList.remove("failed");
+                            }
+                        }, 3000);
+                    }
+                },
+                {
+                    "name": "Reset",
+                    "icon": '<i class="fa-solid fa-rotate-left"></i>',
+                    "func": async (v, b, i) => {
+                        b.innerHTML = '<i class="spinner"></i>Resetting...';
+                        let java_path = await window.electronAPI.getJavaInstallation(instanceInfo.java_version);
+                        i.value = java_path;
+                        b.innerHTML = '<i class="fa-solid fa-rotate-left"></i>Reset'
+                    }
+                }
+            ]
+        }
+    ], [
+        { "type": "cancel", "content": "Cancel" },
+        { "type": "confirm", "content": "Save" }
+    ], [
+        { "name": "General", "value": "general" },
+        { "name": "Installation", "value": "installation" },
+        { "name": "Window", "value": "window" },
+        { "name": "Java", "value": "java" },
+        { "name": "Launch Hooks", "value": "launch_hooks" }
+    ], (e) => {
+        let info = {};
+        e.forEach(e => { info[e.id] = e.value });
+        instanceInfo.setName(info.name);
+        instanceInfo.setImage(info.icon);
+        instanceInfo.setGroup(info.group);
+        instanceInfo.setWindowWidth(info.width);
+        instanceInfo.setWindowHeight(info.height);
+        instanceInfo.setAllocatedRam(info.allocated_ram);
+        instanceInfo.setJavaPath(info.java_path);
+    });
 }
 
 function setInstanceTabContentContent(instanceInfo, element) {
@@ -3389,11 +3752,11 @@ function displaySuccess(success) {
 }
 
 async function playInstance(instInfo, quickPlay = null) {
+    instInfo = new Instance(instInfo.instance_id);
     instInfo.setLastPlayed(new Date());
-    // loader,version,loaderVersion,instance_id,player_info
     let pid;
     try {
-        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay);
+        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path);
         if (!pid) return;
         instInfo.setPid(pid.minecraft.pid);
         instInfo.setCurrentLogFile(pid.minecraft.log);
@@ -3439,7 +3802,7 @@ function formatTime(secs) {
 function formatDate(dateString) {
     let months = [translate("app.date.jan"), translate("app.date.feb"), translate("app.date.mar"), translate("app.date.apr"), translate("app.date.may"), translate("app.date.jun"), translate("app.date.jul"), translate("app.date.aug"), translate("app.date.sep"), translate("app.date.oct"), translate("app.date.nov"), translate("app.date.dec")];
     let date = new Date(dateString);
-    if (isNaN(date.getTime())) {
+    if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
         return "Never Played";
     }
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
@@ -3645,6 +4008,10 @@ window.electronAPI.onProgressUpdate((a, b, c) => {
     ]);
 });
 
+window.electronAPI.onErrorMessage((message) => {
+    displayError(message);
+});
+
 class MultiSelect {
     constructor(element, list) {
         this.onchange = () => { };
@@ -3659,21 +4026,65 @@ class MultiSelect {
     addOnChange(onchange) {
         this.onchange = onchange;
     }
+    selectOption(opt) {
+        this.tabs.selectOptionAdvanced(opt);
+    }
+}
+
+let version_cache = {};
+
+async function getVersions(loader, mcVersion) {
+    if (loader == "fabric") {
+        if (version_cache["fabric-" + mcVersion]) return version_cache["fabric-" + mcVersion];
+        let v = await window.electronAPI.getFabricLoaderVersions(mcVersion);
+        version_cache["fabric-" + mcVersion] = v;
+        return v;
+    } else if (loader == "forge") {
+        if (version_cache["forge-" + mcVersion]) return version_cache["forge-" + mcVersion];
+        let v = await window.electronAPI.getForgeLoaderVersions(mcVersion);
+        version_cache["forge-" + mcVersion] = v;
+        return v;
+    } else if (loader == "neoforge") {
+        if (version_cache["neoforge-" + mcVersion]) return version_cache["neoforge-" + mcVersion];
+        let v = await window.electronAPI.getNeoForgeLoaderVersions(mcVersion);
+        version_cache["neoforge-" + mcVersion] = v;
+        return v;
+    } else if (loader == "quilt") {
+        if (version_cache["quilt-" + mcVersion]) return version_cache["quilt-" + mcVersion];
+        let v = await window.electronAPI.getQuiltLoaderVersions(mcVersion);
+        version_cache["quilt-" + mcVersion] = v;
+        return v;
+    }
 }
 
 class VersionList {
     constructor() { }
     async getVersions(loader) {
         if (loader == "vanilla") {
-            return await window.electronAPI.getVanillaVersions();
+            if (version_cache["vanilla"]) return version_cache["vanilla"];
+            let v = await window.electronAPI.getVanillaVersions();
+            version_cache["vanilla"] = v;
+            return v;
         } else if (loader == "fabric") {
-            return await window.electronAPI.getFabricVersions();
+            if (version_cache["fabric"]) return version_cache["fabric"];
+            let v = await window.electronAPI.getFabricVersions();
+            version_cache["fabric"] = v;
+            return v;
         } else if (loader == "forge") {
-            return await window.electronAPI.getForgeVersions();
+            if (version_cache["forge"]) return version_cache["forge"];
+            let v = await window.electronAPI.getForgeVersions();
+            version_cache["forge"] = v;
+            return v;
         } else if (loader == "neoforge") {
-            return await window.electronAPI.getNeoForgeVersions();
+            if (version_cache["neoforge"]) return version_cache["neoforge"];
+            let v = await window.electronAPI.getNeoForgeVersions();
+            version_cache["neoforge"] = v;
+            return v;
         } else if (loader == "quilt") {
-            return await window.electronAPI.getQuiltVersions();
+            if (version_cache["quilt"]) return version_cache["quilt"];
+            let v = await window.electronAPI.getQuiltVersions();
+            version_cache["quilt"] = v;
+            return v;
         }
     }
 }
@@ -3683,7 +4094,7 @@ class ImageUpload {
         element.className = "image-upload-wrapper";
         let preview = document.createElement("img");
         preview.className = "image-preview";
-        preview.src = defaultImage ?? "default.png"
+        preview.src = defaultImage ? defaultImage : "default.png"
         this.previewElement = preview;
         element.appendChild(preview);
         let containButtons = document.createElement("div");
@@ -3697,7 +4108,7 @@ class ImageUpload {
         containButtons.appendChild(uploadButton);
         containButtons.appendChild(removeButton);
         element.appendChild(containButtons);
-        this.value = defaultImage ?? "";
+        this.value = defaultImage ? defaultImage : "";
         uploadButton.onclick = () => {
             let temp = document.createElement("input");
             temp.setAttribute("type", "file");
@@ -3798,7 +4209,7 @@ class Dialog {
                 dialogContent.className = "dialog-content-inner";
                 contents[tabs[i].value] = dialogContent;
                 realDialogContent.appendChild(dialogContent);
-                dialogContent.style.display = "none";
+                // dialogContent.style.display = "none";
             }
         } else {
             let dialogContent = document.createElement("div");
@@ -3822,6 +4233,12 @@ class Dialog {
                     label.innerHTML = sanitize(info[i].name);
                     label.className = "dialog-label";
                     label.setAttribute("for", id);
+                    let labelDesc = document.createElement("label");
+                    if (info[i].desc) {
+                        labelDesc.innerHTML = info[i].desc;
+                        labelDesc.className = "dialog-label-desc";
+                        labelDesc.setAttribute("for", id);
+                    }
                     let textInput = document.createElement("input");
                     textInput.type = "text";
                     textInput.className = "dialog-text-input";
@@ -3832,6 +4249,49 @@ class Dialog {
                     wrapper.className = "dialog-text-label-wrapper";
                     contents[tab].appendChild(wrapper);
                     wrapper.appendChild(label);
+                    if (info[i].desc) wrapper.appendChild(labelDesc);
+                    wrapper.appendChild(textInput);
+                    if (info[i].buttons) {
+                        let buttonWrapper = document.createElement("div");
+                        buttonWrapper.className = 'sub-button-container';
+                        for (let j = 0; j < info[i].buttons.length; j++) {
+                            let buttonEle = document.createElement("button");
+                            buttonEle.innerHTML = info[i].buttons[j].icon + info[i].buttons[j].name
+                            buttonEle.className = "sub-button";
+                            let buttonClick = async () => {
+                                buttonEle.onclick = () => { }
+                                await info[i].buttons[j].func(textInput.value, buttonEle, textInput);
+                                buttonEle.onclick = buttonClick;
+                            }
+                            buttonEle.onclick = buttonClick;
+                            buttonWrapper.appendChild(buttonEle);
+                        }
+                        wrapper.appendChild(buttonWrapper);
+                    }
+                    this.values.push({ "id": info[i].id, "element": textInput });
+                } else if (info[i].type == "number") {
+                    let id = createId();
+                    let label = document.createElement("label");
+                    label.innerHTML = sanitize(info[i].name);
+                    label.className = "dialog-label";
+                    label.setAttribute("for", id);
+                    let labelDesc = document.createElement("label");
+                    if (info[i].desc) {
+                        labelDesc.innerHTML = sanitize(info[i].desc);
+                        labelDesc.className = "dialog-label-desc";
+                        labelDesc.setAttribute("for", id);
+                    }
+                    let textInput = document.createElement("input");
+                    textInput.type = "number";
+                    textInput.className = "dialog-text-input";
+                    textInput.setAttribute("placeholder", info[i].name);
+                    textInput.id = id;
+                    if (info[i].default) textInput.value = info[i].default;
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    contents[tab].appendChild(wrapper);
+                    wrapper.appendChild(label);
+                    if (info[i].desc) wrapper.appendChild(labelDesc);
                     wrapper.appendChild(textInput);
                     this.values.push({ "id": info[i].id, "element": textInput });
                 } else if (info[i].type == "toggle") {
@@ -3846,6 +4306,27 @@ class Dialog {
                     wrapper.appendChild(toggleEle);
                     wrapper.appendChild(label);
                     this.values.push({ "id": info[i].id, "element": toggleEle });
+                } else if (info[i].type == "slider") {
+                    let id = createId();
+                    let label = document.createElement("label");
+                    label.innerHTML = sanitize(info[i].name);
+                    label.className = "dialog-label";
+                    label.setAttribute("for", id);
+                    let labelDesc = document.createElement("label");
+                    if (info[i].desc) {
+                        labelDesc.innerHTML = sanitize(info[i].desc);
+                        labelDesc.className = "dialog-label-desc";
+                        labelDesc.setAttribute("for", id);
+                    }
+                    let sliderElement = document.createElement("div");
+                    let slider = new Slider(sliderElement, info[i].min, info[i].max, info[i].default ?? info[i].min, info[i].increment, info[i].unit);
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    contents[tab].appendChild(wrapper);
+                    wrapper.appendChild(label);
+                    if (info[i].desc) wrapper.appendChild(labelDesc);
+                    wrapper.appendChild(sliderElement);
+                    this.values.push({ "id": info[i].id, "element": slider });
                 } else if (info[i].type == "image-upload") {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
@@ -3869,6 +4350,7 @@ class Dialog {
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);
                     let multiSelect = new MultiSelect(element, info[i].options);
+                    if (info[i].default) multiSelect.selectOption(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "dropdown") {
                     let wrapper = document.createElement("div");
@@ -3890,14 +4372,68 @@ class Dialog {
                         for (let j = 0; j < this.values.length; j++) {
                             if (this.values[j].id != info[i].input_source) continue;
                             this.values[j].element.addOnChange(async (e) => {
+                                let oldValue = multiSelect.value;
                                 let value = this.values[j].element.value;
+                                label.innerHTML = "Loading...";
+                                multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
                                 let list = await info[i].source(value);
-                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list[0]);
+                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                if (multiSelect.onchange) multiSelect.onchange();
+                                label.innerHTML = sanitize(info[i].name);
                             });
                             let setInitialValues = async () => {
+                                let oldValue = multiSelect.value;
                                 let value = this.values[j].element.value;
+                                label.innerHTML = "Loading...";
+                                multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
                                 let list = await info[i].source(value);
-                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list[0]);
+                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                if (multiSelect.onchange) multiSelect.onchange();
+                                label.innerHTML = sanitize(info[i].name);
+                            }
+                            setInitialValues();
+                        }
+                    }
+                    this.values.push({ "id": info[i].id, "element": multiSelect });
+                } else if (info[i].type == "loader-version-dropdown") {
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    let label = document.createElement("div");
+                    label.innerHTML = "Loading...";
+                    label.className = "dialog-label";
+                    wrapper.appendChild(label);
+                    let element = document.createElement("div");
+                    wrapper.appendChild(element);
+                    contents[tab].appendChild(wrapper);
+                    let loaderElement;
+                    let multiSelect = new DialogDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
+                    for (let j = 0; j < this.values.length; j++) {
+                        if (this.values[j].id == info[i].loader_source) {
+                            loaderElement = this.values[j].element;
+                        }
+                        if (this.values[j].id == info[i].game_version_source) {
+                            this.values[j].element.addOnChange(async () => {
+                                wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
+                                if (loaderElement.value == "vanilla") return;
+                                let oldValue = multiSelect.value;
+                                let value = this.values[j].element.value;
+                                label.innerHTML = "Loading...";
+                                multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
+                                let list = await getVersions(loaderElement.value, value);
+                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                label.innerHTML = loaders[loaderElement.value] + " Version";
+                            });
+                            let setInitialValues = async () => {
+                                wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
+                                if (loaderElement.value == "vanilla") return;
+                                let oldValue = multiSelect.value;
+                                let value = this.values[j].element.value;
+                                if (value == "loading") return;
+                                label.innerHTML = "Loading...";
+                                multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
+                                let list = await getVersions(loaderElement.value, value);
+                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                label.innerHTML = loaders[loaderElement.value] + " Version";
                             }
                             setInitialValues();
                         }
@@ -3906,6 +4442,11 @@ class Dialog {
                 }
             }
         }
+        let keys = Object.keys(contents);
+        keys.forEach(e => {
+            contents[e].style.display = "none";
+        });
+        contents[keys[0]].style.display = "grid";
         let dialogButtons = document.createElement("div");
         dialogButtons.className = "dialog-buttons";
         for (let i = 0; i < buttons.length; i++) {
@@ -4351,7 +4892,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
                     });
                     instance.setInstalling(false);
-                    await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                    let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                    instance.setJavaPath(r.java_installation);
+                    instance.setJavaVersion(r.java_version);
                     instance.setMcInstalled(true);
                 })
             } : instance_id ? async (i, button) => {
@@ -4494,7 +5037,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
                     });
                     instance.setInstalling(false);
-                    await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
+                    let r = await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
+                    instance.setJavaPath(r.java_installation);
+                    instance.setJavaVersion(r.java_version);
                     instance.setMcInstalled(true);
                 })
             } : instance_id ? async (i, button) => {

@@ -276,7 +276,7 @@ class Minecraft {
 
         ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
     }
-    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo) {
+    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath) {
         let newJava = new Java();
         this.libs = "";
         this.libNames = [];
@@ -462,7 +462,7 @@ class Minecraft {
             this.libs += paths;
             this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             let java = new Java();
-            this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion);
+            this.java_installation = javaPath ? javaPath : await java.getJavaInstallation(version_json.javaVersion.majorVersion);
             this.java_version = version_json.javaVersion.majorVersion;
             if (version_json?.arguments?.game) {
                 this.args = version_json.arguments;
@@ -589,7 +589,7 @@ class Minecraft {
                     if (e.includes("${classpath}")) {
                         let theargs = [this.libs + this.jarfile];
                         theargs = theargs.concat(this.modded_args_jvm);
-                        theargs = theargs.concat(["-Xmx6G", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"), this.main_class]);
+                        theargs = theargs.concat(["-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"), this.main_class]);
                         args = args.concat(theargs);
                     } else {
                         args.push(e);
@@ -616,7 +616,7 @@ class Minecraft {
             args.push("-Dminecraft.client.jar=" + this.jarfile);
             args.push("-cp");
             args.push(this.libs + this.jarfile);
-            args = args.concat("-Xmx6G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
+            args = args.concat("-Xmx" + allocatedRam + "M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
             args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"));
             args.push(this.main_class);
             this.args = this.args.map((e) => {
@@ -648,13 +648,21 @@ class Minecraft {
         console.log(this.libNames);
         console.log("Executing: " + this.java_installation + " " + args.join(" "));
         let LOG_PATH = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/logs/${fileFormatDate(new Date())}.log`);
-        fs.mkdirSync(path.dirname(LOG_PATH), {recursive:true});
+        fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
         let fd = fs.openSync(LOG_PATH, 'w');
         fs.closeSync(fd);
         const child = spawn(this.java_installation, args, {
             cwd: `./minecraft/instances/${this.instance_id}`,
             detached: true,
             stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')]
+        });
+
+        child.once('error', (err) => {
+            if (err.code === 'ENOENT') {
+                ipcRenderer.send('display-error',"Unable to launch Minecraft");
+            } else {
+                ipcRenderer.send('display-error',"Unable to launch Minecraft (" + err + ")");
+            }
         });
         child.unref();
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
@@ -793,6 +801,7 @@ class Minecraft {
                 }
             }
             this.libs += paths;
+            return { "java_installation": this.java_installation, "java_version": this.java_version };
         } catch (err) {
             console.error('Error in download chain:', err);
         }

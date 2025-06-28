@@ -1,7 +1,8 @@
-const { contextBridge, ipcRenderer, clipboard, nativeImage } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, nativeImage, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, Forge, NeoForge, Quilt } = require('./launch.js');
+const { JavaSearch } = require('./java_scan.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
@@ -13,11 +14,13 @@ const toml = require('toml');
 const Database = require('better-sqlite3');
 const axios = require('axios');
 const FormData = require('form-data');
-const db = new Database('app.db');
 const sharp = require("sharp");
 const crypto = require('crypto');
+const os = require('os');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER)').run();
+const db = new Database('app.db');
+
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -54,7 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return `Error reading file: ${err.message}`;
         }
     },
-    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay) => {
+    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath) => {
         if (!player_info) throw new LoginError("Please sign in to your Microsoft account to play Minecraft.");
 
         let date = new Date();
@@ -73,15 +76,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     "accessToken": player_info.access_token,
                     "xuid": player_info.xuid,
                     "clientId": player_info.client_id
-                }, null, quickPlay, false), "player_info": player_info
+                }, customResolution, quickPlay, false, allocatedRam, javaPath), "player_info": player_info
             };
         } catch (err) {
-            throw err;
+            throw new Error("Unable to launch Minecraft");
         }
     },
     getJavaInstallation: async (v) => {
         let java = new Java();
-        java.getJavaInstallation(v);
+        return java.getJavaInstallation(v);
     },
     getFabricVanillaVersions: async () => {
         let fabric = new Fabric();
@@ -578,6 +581,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             callback(title, progress, desc);
         });
     },
+    onErrorMessage: (callback) => {
+        ipcRenderer.on('display-error', (_event, message) => {
+            callback(message);
+        });
+    },
     getVanillaVersions: async () => {
         let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
         let json = await res.json();
@@ -611,7 +619,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
         let mc = new Minecraft(instance_id);
-        await mc.downloadGame(loader, vanilla_version);
+        let r = await mc.downloadGame(loader, vanilla_version);
         if (loader == "fabric") {
             await mc.installFabric(vanilla_version, loader_version);
         } else if (loader == "forge") {
@@ -619,6 +627,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } else if (loader == "neoforge") {
             await mc.installNeoForge(vanilla_version, loader_version);
         }
+        return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
     },
     getForgeVersion: async (mcversion) => {
         let forge = new Forge();
@@ -635,6 +644,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getQuiltVersion: async (mcversion) => {
         let quilt = new Quilt();
         return (await quilt.getVersions(mcversion))[0];
+    },
+    getForgeLoaderVersions: async (mcversion) => {
+        let forge = new Forge();
+        return (await forge.getVersions(mcversion)).reverse();
+    },
+    getFabricLoaderVersions: async (mcversion) => {
+        let fabric = new Fabric();
+        return (await fabric.getVersions(mcversion));
+    },
+    getNeoForgeLoaderVersions: async (mcversion) => {
+        let neoforge = new NeoForge();
+        return (await neoforge.getVersions(mcversion));
+    },
+    getQuiltLoaderVersions: async (mcversion) => {
+        let quilt = new Quilt();
+        return (await quilt.getVersions(mcversion));
     },
     watchFile: (filepath, callback) => {
         let lastSize = 0;
@@ -1022,7 +1047,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const hash = crypto.createHash('sha256')
             .update(data)
             .digest('hex');
-        
+
         fs.writeFileSync(`./minecraft/skins/${hash}.png`, imageBuffer);
 
         return hash;
@@ -1154,6 +1179,68 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const buffer = Buffer.from(base64Data, "base64");
         fs.writeFileSync(`./minecraft/skins/${hash.hash}.png`, buffer);
         return hash.hash;
+    },
+    getTotalRAM: () => {
+        return Math.floor(os.totalmem() / (1024 * 1024));
+    },
+    testJavaInstallation: async (file_path) => {
+        try {
+            if (!fs.existsSync(file_path)) return false;
+            const stat = fs.statSync(file_path);
+            if (!stat.isFile()) return false;
+
+            const ext = path.extname(file_path).toLowerCase();
+            if (process.platform === "win32" && ext !== ".exe") return false;
+
+            return await new Promise((resolve) => {
+                const result = spawn(file_path, ["-version"]);
+                let output = "";
+                let error = "";
+
+                result.stdout?.on("data", (data) => { output += data.toString(); });
+                result.stderr?.on("data", (data) => { error += data.toString(); });
+
+                result.on("close", (code) => {
+                    const combined = (output + error).toLowerCase();
+                    if (
+                        code === 0 &&
+                        (combined.includes("java version") || combined.includes("openjdk version"))
+                    ) {
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                });
+
+                result.on("error", () => resolve(false));
+            });
+        } catch {
+            return false;
+        }
+    },
+    triggerFileBrowse: async (file_path) => {
+        let startDir = file_path;
+        if (fs.existsSync(file_path)) {
+            const stat = fs.statSync(file_path);
+            if (stat.isFile()) {
+                startDir = path.dirname(file_path);
+            }
+        }
+        console.log(startDir);
+        const result = await ipcRenderer.invoke('show-open-dialog', {
+            title: "Select Java Executable",
+            defaultPath: startDir,
+            properties: ['openFile'],
+            filters: [{ name: 'Executables', extensions: ['exe'] }]
+        });
+        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
+            return null;
+        }
+        return result.filePaths[0];
+    },
+    detectJavaInstallations: async (v) => {
+        let javaSearch = new JavaSearch();
+        return javaSearch.findJavaInstallations(v);
     }
 });
 
