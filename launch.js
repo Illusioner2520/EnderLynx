@@ -994,6 +994,60 @@ function urlToFile(url, filepath, redirectCount = 0) {
     });
 }
 
+// New function: downloads a file from a URL to a folder, using the filename from the URL
+function urlToFolder(url, folder, redirectCount = 0) {
+    return new Promise((resolve, reject) => {
+        if (redirectCount > 5) {
+            return reject(new Error('Too many redirects'));
+        }
+
+        const parsedUrl = urlModule.parse(url);
+        const protocol = parsedUrl.protocol === 'https:' ? https : http;
+        const fileName = path.basename(parsedUrl.pathname);
+        const filepath = path.join(folder, fileName);
+
+        fs.mkdirSync(folder, { recursive: true });
+
+        const file = fs.createWriteStream(filepath);
+
+        const request = protocol.get(url, (response) => {
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                // Handle redirect
+                const redirectUrl = new URL(response.headers.location, url).href;
+                file.close();
+                fs.unlink(filepath, () => {
+                    urlToFolder(redirectUrl, folder, redirectCount + 1)
+                        .then(resolve)
+                        .catch(reject);
+                });
+                return;
+            }
+
+            if (response.statusCode !== 200) {
+                file.close();
+                fs.unlink(filepath, () => { });
+                return reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
+            }
+
+            response.pipe(file);
+
+            file.on('finish', () => {
+                file.close(() => resolve(fileName));
+            });
+        });
+
+        request.on('error', (err) => {
+            fs.unlink(filepath, () => { });
+            reject(err);
+        });
+
+        file.on('error', (err) => {
+            fs.unlink(filepath, () => { });
+            reject(err);
+        });
+    });
+}
+
 function fileFormatDate(date) {
     let m = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
     let d = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"];
@@ -1119,5 +1173,6 @@ module.exports = {
     Forge,
     Quilt,
     NeoForge,
-    urlToFile
+    urlToFile,
+    urlToFolder
 }

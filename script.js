@@ -31,6 +31,45 @@ class DB {
 
 const db = new DB();
 
+class DefaultOptions {
+    checkDefault(key) {
+        let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key);
+        if (!default_) {
+            db.prepare("INSERT INTO options_defaults (key, value) VALUES (?, ?)").run(key, "");
+            return true;
+        }
+        return true;
+    }
+
+    getDefault(key) {
+        let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key);
+        if (!default_) {
+            return null;
+        }
+        return default_.value;
+    }
+
+    setDefault(key, value) {
+        if (!this.checkDefault(key)) {
+            return null;
+        }
+        db.prepare("UPDATE options_defaults SET value = ? WHERE key = ?").run(value, key);
+    }
+
+    deleteDefault(key) {
+        db.prepare("DELETE FROM options_defaults WHERE key = ?").run(key);
+    }
+
+    getOptionsTXT() {
+        let r = db.prepare("SELECT * FROM options_defaults").all();
+        let content = "";
+        r.forEach(e => {
+            content += e.key + ":" + e.value + "\n"
+        });
+        return content;
+    }
+}
+
 class Skin {
     constructor(id) {
         let skin = db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(id);
@@ -2542,7 +2581,8 @@ let loaders = {
     "fabric": translate("app.loader.fabric"),
     "forge": translate("app.loader.forge"),
     "neoforge": translate("app.loader.neoforge"),
-    "quilt": translate("app.loader.quilt")
+    "quilt": translate("app.loader.quilt"),
+    "": "Unknown"
 }
 function showInstanceContent(e) {
     let ele = document.createElement("div");
@@ -2605,11 +2645,30 @@ function showInstanceContent(e) {
                 "name": "Name"
             },
             {
-                "type": "file",
+                "type": "text",
                 "id": "file",
                 "tab": "file",
                 "name": "File",
-                "desc": "Select a Modrinth .mrpack file, a CurseForge .zip file or a Folder"
+                "desc": "Select a Modrinth .mrpack file or a CurseForge .zip file",
+                "default": "",
+                "buttons": [
+                    {
+                        "name": "Browse Files",
+                        "icon": '<i class="fa-solid fa-file"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 0);
+                            if (newValue) i.value = newValue;
+                        }
+                    }/*,
+                    {
+                        "name": "Browse Folders",
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 1);
+                            if (newValue) i.value = newValue;
+                        }
+                    }*/
+                ]
             },
             {
                 "type": "dropdown",
@@ -2685,7 +2744,26 @@ function showInstanceContent(e) {
                 instance.setJavaVersion(r.java_version);
                 instance.setMcInstalled(true);
             } else if (info.selected_tab == "file") {
-
+                let instance_id = window.electronAPI.getInstanceFolderName(info.name_f.toLowerCase());
+                let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
+                showSpecificInstanceContent(instance);
+                let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
+                console.log(packInfo);
+                if (!packInfo.loader_version) {
+                    displayError(packInfo);
+                    return;
+                }
+                instance.setLoader(packInfo.loader);
+                instance.setVanillaVersion(packInfo.vanilla_version);
+                instance.setLoaderVersion(packInfo.loader_version);
+                packInfo.content.forEach(e => {
+                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                });
+                instance.setInstalling(false);
+                let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
             } else if (info.selected_tab == "launcher") {
 
             }
@@ -3830,7 +3908,427 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     element.appendChild(logWrapper);
 }
 function setInstanceTabContentOptions(instanceInfo, element) {
+    let searchAndFilter = document.createElement("div");
+    searchAndFilter.classList.add("search-and-filter-v2");
+    let contentSearch = document.createElement("div");
+    contentSearch.style.flexGrow = 2;
+    new SearchBar(contentSearch, () => { }, null);
+    let typeDropdown = document.createElement("div");
+    let dropdownInfo = new SearchDropdown("Option Type", [
+        {
+            "name": "All",
+            "value": "all"
+        },
+        {
+            "name": "Number",
+            "value": "number"
+        },
+        {
+            "name": "Text",
+            "value": "text"
+        },
+        {
+            "name": "Boolean",
+            "value": "boolean"
+        },
+        {
+            "name": "Key",
+            "value": "key"
+        },
+        {
+            "name": "Other",
+            "value": "unknown"
+        }
+    ], typeDropdown, "all", () => { });
+    typeDropdown.style.minWidth = "200px";
+    searchAndFilter.appendChild(contentSearch);
+    searchAndFilter.appendChild(typeDropdown);
     element.innerHTML = "";
+    element.appendChild(searchAndFilter);
+    let optionList = document.createElement("div");
+    optionList.className = "option-list";
+    element.appendChild(optionList);
+    let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
+    let selectedKeySelect;
+    let keys = {
+        "key.keyboard.apostrophe": "'",
+        "key.keyboard.backslash": "\\",
+        "key.keyboard.backspace": "Backspace",
+        "key.keyboard.caps.lock": "Caps Lock",
+        "key.keyboard.comma": ",",
+        "key.keyboard.delete": "Delete",
+        "key.keyboard.down": "Down Arrow",
+        "key.keyboard.end": "End",
+        "key.keyboard.enter": "Enter",
+        "key.keyboard.equal": "=",
+        "key.keyboard.f1": "F1",
+        "key.keyboard.f2": "F2",
+        "key.keyboard.f3": "F3",
+        "key.keyboard.f4": "F4",
+        "key.keyboard.f5": "F5",
+        "key.keyboard.f6": "F6",
+        "key.keyboard.f7": "F7",
+        "key.keyboard.f8": "F8",
+        "key.keyboard.f9": "F9",
+        "key.keyboard.f10": "F10",
+        "key.keyboard.f11": "F11",
+        "key.keyboard.f12": "F12",
+        "key.keyboard.f13": "F13",
+        "key.keyboard.f14": "F14",
+        "key.keyboard.f15": "F15",
+        "key.keyboard.f16": "F16",
+        "key.keyboard.f17": "F17",
+        "key.keyboard.f18": "F18",
+        "key.keyboard.f19": "F19",
+        "key.keyboard.f20": "F20",
+        "key.keyboard.f21": "F21",
+        "key.keyboard.f22": "F22",
+        "key.keyboard.f23": "F23",
+        "key.keyboard.f24": "F24",
+        "key.keyboard.f25": "F25",
+        "key.keyboard.grave.accent": "`",
+        "key.keyboard.home": "Home",
+        "key.keyboard.insert": "Insert",
+        "key.keyboard.keypad.0": "Keypad 0",
+        "key.keyboard.keypad.1": "Keypad 1",
+        "key.keyboard.keypad.2": "Keypad 2",
+        "key.keyboard.keypad.3": "Keypad 3",
+        "key.keyboard.keypad.4": "Keypad 4",
+        "key.keyboard.keypad.5": "Keypad 5",
+        "key.keyboard.keypad.6": "Keypad 6",
+        "key.keyboard.keypad.7": "Keypad 7",
+        "key.keyboard.keypad.8": "Keypad 8",
+        "key.keyboard.keypad.9": "Keypad 9",
+        "key.keyboard.keypad.add": "Keypad +",
+        "key.keyboard.keypad.decimal": "Keypad Decimal",
+        "key.keyboard.keypad.divide": "Keypad /",
+        "key.keyboard.keypad.enter": "Keypad Enter",
+        "key.keyboard.keypad.equal": "Keypad =",
+        "key.keyboard.keypad.multiply": "Keypad *",
+        "key.keyboard.keypad.subtract": "Keypad -",
+        "key.keyboard.left": "Left Arrow",
+        "key.keyboard.left.alt": "Left Alt",
+        "key.keyboard.left.bracket": "[",
+        "key.keyboard.left.control": "Left Control",
+        "key.keyboard.left.shift": "Left Shift",
+        "key.keyboard.left.win": "Left Win",
+        "key.keyboard.menu": "Menu",
+        "key.keyboard.minus": "-",
+        "key.keyboard.num.lock": "Num Lock",
+        "key.keyboard.page.down": "Page Down",
+        "key.keyboard.page.up": "Page Up",
+        "key.keyboard.pause": "Pause",
+        "key.keyboard.period": ".",
+        "key.keyboard.print.screen": "Print Screen",
+        "key.keyboard.right": "Right Arrow",
+        "key.keyboard.right.alt": "Right Alt",
+        "key.keyboard.right.bracket": "]",
+        "key.keyboard.right.control": "Right Control",
+        "key.keyboard.right.shift": "Right Shift",
+        "key.keyboard.right.win": "Right Win",
+        "key.keyboard.scroll.lock": "Scroll Lock",
+        "key.keyboard.semicolon": ";",
+        "key.keyboard.slash": "/",
+        "key.keyboard.space": "Space",
+        "key.keyboard.tab": "Tab",
+        "key.keyboard.unknown": "Not Bound",
+        "key.keyboard.up": "Up Arrow",
+        "key.keyboard.a": "A",
+        "key.keyboard.b": "B",
+        "key.keyboard.c": "C",
+        "key.keyboard.d": "D",
+        "key.keyboard.e": "E",
+        "key.keyboard.f": "F",
+        "key.keyboard.g": "G",
+        "key.keyboard.h": "H",
+        "key.keyboard.i": "I",
+        "key.keyboard.j": "J",
+        "key.keyboard.k": "K",
+        "key.keyboard.l": "L",
+        "key.keyboard.m": "M",
+        "key.keyboard.n": "N",
+        "key.keyboard.o": "O",
+        "key.keyboard.p": "P",
+        "key.keyboard.q": "Q",
+        "key.keyboard.r": "R",
+        "key.keyboard.s": "S",
+        "key.keyboard.t": "T",
+        "key.keyboard.u": "U",
+        "key.keyboard.v": "V",
+        "key.keyboard.w": "W",
+        "key.keyboard.x": "X",
+        "key.keyboard.y": "Y",
+        "key.keyboard.z": "Z",
+        "key.keyboard.0": "0",
+        "key.keyboard.1": "1",
+        "key.keyboard.2": "2",
+        "key.keyboard.3": "3",
+        "key.keyboard.4": "4",
+        "key.keyboard.5": "5",
+        "key.keyboard.6": "6",
+        "key.keyboard.7": "7",
+        "key.keyboard.8": "8",
+        "key.keyboard.9": "9",
+        "key.mouse.left": "Left Button",
+        "key.mouse.middle": "Middle Button",
+        "key.mouse.right": "Right Button",
+        "key.mouse.1": "Button 1",
+        "key.mouse.2": "Button 2",
+        "key.mouse.3": "Button 3",
+        "key.mouse.4": "Button 4",
+        "key.mouse.5": "Button 5",
+        "key.mouse.6": "Button 6",
+        "key.mouse.7": "Button 7",
+        "key.mouse.8": "Button 8",
+        "key.mouse.9": "Button 9",
+        "key.mouse.10": "Button 10",
+        "key.mouse.11": "Button 11",
+        "key.mouse.12": "Button 12",
+        "key.mouse.13": "Button 13",
+        "key.mouse.14": "Button 14",
+        "key.mouse.15": "Button 15",
+        "key.mouse.16": "Button 16",
+        "key.mouse.17": "Button 17",
+        "key.mouse.18": "Button 18",
+        "key.mouse.19": "Button 19",
+        "key.mouse.20": "Button 20"
+    }
+    let codeToKey = {
+        "Backquote": "key.keyboard.grave.accent",
+        "Backslash": "key.keyboard.backslash",
+        "Backspace": "key.keyboard.backspace",
+        "BracketLeft": "key.keyboard.left.bracket",
+        "BracketRight": "key.keyboard.right.bracket",
+        "Comma": "key.keyboard.comma",
+        "Delete": "key.keyboard.delete",
+        "Digit0": "key.keyboard.0",
+        "Digit1": "key.keyboard.1",
+        "Digit2": "key.keyboard.2",
+        "Digit3": "key.keyboard.3",
+        "Digit4": "key.keyboard.4",
+        "Digit5": "key.keyboard.5",
+        "Digit6": "key.keyboard.6",
+        "Digit7": "key.keyboard.7",
+        "Digit8": "key.keyboard.8",
+        "Digit9": "key.keyboard.9",
+        "End": "key.keyboard.end",
+        "Enter": "key.keyboard.enter",
+        "Equal": "key.keyboard.equal",
+        "Escape": "key.keyboard.unknown",
+        "F1": "key.keyboard.f1",
+        "F2": "key.keyboard.f2",
+        "F3": "key.keyboard.f3",
+        "F4": "key.keyboard.f4",
+        "F5": "key.keyboard.f5",
+        "F6": "key.keyboard.f6",
+        "F7": "key.keyboard.f7",
+        "F8": "key.keyboard.f8",
+        "F9": "key.keyboard.f9",
+        "F10": "key.keyboard.f10",
+        "F11": "key.keyboard.f11",
+        "F12": "key.keyboard.f12",
+        "F13": "key.keyboard.f13",
+        "F14": "key.keyboard.f14",
+        "F15": "key.keyboard.f15",
+        "F16": "key.keyboard.f16",
+        "F17": "key.keyboard.f17",
+        "F18": "key.keyboard.f18",
+        "F19": "key.keyboard.f19",
+        "F20": "key.keyboard.f20",
+        "F21": "key.keyboard.f21",
+        "F22": "key.keyboard.f22",
+        "F23": "key.keyboard.f23",
+        "F24": "key.keyboard.f24",
+        "Home": "key.keyboard.home",
+        "Insert": "key.keyboard.insert",
+        "KeyA": "key.keyboard.a",
+        "KeyB": "key.keyboard.b",
+        "KeyC": "key.keyboard.c",
+        "KeyD": "key.keyboard.d",
+        "KeyE": "key.keyboard.e",
+        "KeyF": "key.keyboard.f",
+        "KeyG": "key.keyboard.g",
+        "KeyH": "key.keyboard.h",
+        "KeyI": "key.keyboard.i",
+        "KeyJ": "key.keyboard.j",
+        "KeyK": "key.keyboard.k",
+        "KeyL": "key.keyboard.l",
+        "KeyM": "key.keyboard.m",
+        "KeyN": "key.keyboard.n",
+        "KeyO": "key.keyboard.o",
+        "KeyP": "key.keyboard.p",
+        "KeyQ": "key.keyboard.q",
+        "KeyR": "key.keyboard.r",
+        "KeyS": "key.keyboard.s",
+        "KeyT": "key.keyboard.t",
+        "KeyU": "key.keyboard.u",
+        "KeyV": "key.keyboard.v",
+        "KeyW": "key.keyboard.w",
+        "KeyX": "key.keyboard.x",
+        "KeyY": "key.keyboard.y",
+        "KeyZ": "key.keyboard.z",
+        "Minus": "key.keyboard.minus",
+        "PageDown": "key.keyboard.page.down",
+        "PageUp": "key.keyboard.page.up",
+        "Pause": "key.keyboard.pause",
+        "Period": "key.keyboard.period",
+        "Quote": "key.keyboard.apostrophe",
+        "ScrollLock": "key.keyboard.scroll.lock",
+        "Semicolon": "key.keyboard.semicolon",
+        "ShiftLeft": "key.keyboard.left.shift",
+        "ShiftRight": "key.keyboard.right.shift",
+        "Slash": "key.keyboard.slash",
+        "Space": "key.keyboard.space",
+        "Tab": "key.keyboard.tab",
+        "ArrowDown": "key.keyboard.down",
+        "ArrowLeft": "key.keyboard.left",
+        "ArrowRight": "key.keyboard.right",
+        "ArrowUp": "key.keyboard.up",
+        "AltLeft": "key.keyboard.left.alt",
+        "AltRight": "key.keyboard.right.alt",
+        "ControlLeft": "key.keyboard.left.control",
+        "ControlRight": "key.keyboard.right.control",
+        "MetaLeft": "key.keyboard.left.win",
+        "MetaRight": "key.keyboard.right.win",
+        "ContextMenu": "key.keyboard.menu",
+        "NumLock": "key.keyboard.num.lock",
+        "Numpad0": "key.keyboard.keypad.0",
+        "Numpad1": "key.keyboard.keypad.1",
+        "Numpad2": "key.keyboard.keypad.2",
+        "Numpad3": "key.keyboard.keypad.3",
+        "Numpad4": "key.keyboard.keypad.4",
+        "Numpad5": "key.keyboard.keypad.5",
+        "Numpad6": "key.keyboard.keypad.6",
+        "Numpad7": "key.keyboard.keypad.7",
+        "Numpad8": "key.keyboard.keypad.8",
+        "Numpad9": "key.keyboard.keypad.9",
+        "NumpadAdd": "key.keyboard.keypad.add",
+        "NumpadDecimal": "key.keyboard.keypad.decimal",
+        "NumpadDivide": "key.keyboard.keypad.divide",
+        "NumpadEnter": "key.keyboard.keypad.enter",
+        "NumpadEqual": "key.keyboard.keypad.equal",
+        "NumpadMultiply": "key.keyboard.keypad.multiply",
+        "NumpadSubtract": "key.keyboard.keypad.subtract",
+        "CapsLock": "key.keyboard.caps.lock",
+        "PrintScreen": "key.keyboard.print.screen"
+    }
+    document.body.addEventListener("keydown", (e) => {
+        if (selectedKeySelect) {
+            e.preventDefault();
+            e.stopPropagation();
+            let keyCode = codeToKey[e.code];
+            if (e.key == "NumLock") {
+                keyCode = codeToKey["NumLock"];
+            }
+            if (keyCode) {
+                selectedKeySelect.innerHTML = keyCode;
+                thevalue = keyCode;
+            } else {
+                selectedKeySelect.innerHTML = "key.keyboard.unknown";
+                thevalue = "key.keyboard.unknown";
+            }
+            selectedKeySelect.classList.remove("selected");
+            selectedKeySelect = null;
+        }
+        console.log(e);
+    });
+    let defaultOptions = new DefaultOptions();
+    values.forEach((e) => {
+        let item = document.createElement("div");
+        item.className = "option-item";
+
+        let titleElement = document.createElement("div");
+        titleElement.className = "option-title";
+        titleElement.innerHTML = e.key;
+        item.appendChild(titleElement);
+
+        let thevalue = e.value;
+
+        let type = "unknown";
+        if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
+            type = "number";
+        }
+        if (e.value == "false" || e.value == "true") {
+            type = "boolean";
+        }
+        if (e.value.startsWith('"') && e.value.endsWith('"')) {
+            type = "text";
+        }
+        if (e.value.startsWith("key.")) {
+            type = "key";
+        }
+        if (type == "text") {
+            let inputElement = document.createElement("input");
+            inputElement.className = "option-input";
+            inputElement.value = e.value.slice(1, -1);
+            inputElement.oninput = () => {
+                thevalue = '"' + inputElement.value + '"';
+            }
+            item.appendChild(inputElement);
+        } else if (type == "number") {
+            let inputElement = document.createElement("input");
+            inputElement.className = "option-input";
+            inputElement.value = e.value;
+            inputElement.type = "number";
+            inputElement.oninput = () => {
+                thevalue = inputElement.value;
+            }
+            item.appendChild(inputElement);
+        } else if (type == "boolean") {
+            let inputElement = document.createElement("div");
+            inputElement.className = "option-input";
+            new SearchDropdown("", [{ "name": "True", "value": "true" }, { "name": "False", "value": "false" }], inputElement, e.value, (v) => {
+                thevalue = v;
+            });
+            item.appendChild(inputElement);
+        } else if (type == "unknown") {
+            let inputElement = document.createElement("input");
+            inputElement.className = "option-input";
+            inputElement.value = e.value;
+            item.appendChild(inputElement);
+        } else if (type == "key") {
+            let inputElement = document.createElement("button");
+            inputElement.className = "option-key-input";
+            inputElement.innerHTML = keys[e.value] ? keys[e.value] : e.value;
+            inputElement.onclick = () => {
+                [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
+                    e.classList.remove("selected");
+                });
+                inputElement.classList.add("selected");
+                selectedKeySelect = inputElement;
+            }
+            item.appendChild(inputElement);
+        }
+
+        let setDefaultButton = document.createElement("button");
+        setDefaultButton.className = "option-button";
+        setDefaultButton.innerHTML = "Set Default";
+
+        let onSet = () => {
+            defaultOptions.setDefault(e.key, thevalue);
+            setDefaultButton.innerHTML = "Remove Default";
+            setDefaultButton.onclick = onRemove;
+            displaySuccess("Default value of " + e.key + " set to " + thevalue);
+        }
+
+        setDefaultButton.onclick = onSet;
+
+        let onRemove = () => {
+            defaultOptions.deleteDefault(e.key);
+            setDefaultButton.innerHTML = "Set Default";
+            setDefaultButton.onclick = onSet;
+            displaySuccess("Default value of " + e.key + " removed");
+        }
+
+        if (defaultOptions.getDefault(e.key) == e.value) {
+            setDefaultButton.innerHTML = "Remove Default";
+            setDefaultButton.onclick = onRemove;
+        }
+
+        item.appendChild(setDefaultButton);
+
+        optionList.appendChild(item);
+    });
 }
 function setInstanceTabContentScreenshots(instanceInfo, element) {
     element.innerHTML = "";
@@ -5575,6 +6073,10 @@ async function installContent(source, project_id, instance_id, project_type, tit
         let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instance.loader);
         let res = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=100&sort=dateCreated&sortDescending=true&removeAlphas=true${project_type == "mod" ? "&gameFlavorId=" + game_flavor : ""}`);
         version_json = await res.json();
+        let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
+        let dependencies_json = await dependencies.json();
+        let dependency_list = dependencies_json.data;
+        console.log(dependency_list);
         version_json = version_json.data.map(e => ({
             "game_versions": e.gameVersions,
             "files": [
@@ -5587,7 +6089,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
                 return e.toLowerCase();
             }),
             "version_number": e.id,
-            "dependencies": null // we dont support dependencies using cf rn
+            "dependencies": dependency_list
         }));
     }
     let initialContent = {};
@@ -5619,7 +6121,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
         displayError("Error: Unable to install " + title);
         return;
     }
-    if (dependencies) {
+    if (dependencies && source == "modrinth") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
             let res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}`);
@@ -5647,6 +6149,32 @@ async function installContent(source, project_id, instance_id, project_type, tit
                     }
                 ], [], () => {
                     installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
+                });
+            }
+        }
+    } else if (dependencies && source == "curseforge") {
+        console.log("Checking cf dependencies");
+        for (let j = 0; j < dependencies.length; j++) {
+            let dependency = dependencies[j];
+            console.log(dependency.name);
+            let project_type = "mod";
+            if (dependency.categoryClass.slug == "texture-packs") project_type = "resourcepack";
+            if (dependency.categoryClass.slug == "shaders") project_type = "shader";
+            if (dependency.type == "RequiredDependency") {
+                await installContent(source, dependency.id, instance_id, project_type, dependency.name, dependency.authorName, dependency.logoUrl);
+            } else if (dependency.type == "OptionalDependency") {
+                let dialog = new Dialog();
+                dialog.showDialog("Would you like to install this optional dependency?", "notice", `The content '${title}' that you just installed has an optional dependency. The name of this dependency is '${dependency.name}'. Would you like to install this extra content to the same instance?`, [
+                    {
+                        "type": "cancel",
+                        "content": "No"
+                    },
+                    {
+                        "type": "confirm",
+                        "content": "Yes"
+                    }
+                ], [], () => {
+                    installContent(source, dependency.id, instance_id, project_type, dependency.name, dependency.authorName, dependency.logoUrl);
                 });
             }
         }

@@ -644,7 +644,8 @@ h1 {
 }
 
 .search-dropdown:has(:popover-open) {
-    border-radius: 8px 8px 0 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
 }
 
 .dropdown-button {
@@ -1108,6 +1109,7 @@ i {
     height: 40px;
     width: 40px;
     border-radius: 5px;
+    object-fit: contain;
 }
 
 .content-list-info-title-1 {
@@ -2691,4 +2693,111 @@ dialog[open]::backdrop {
 
 .sub-button.failed:hover {
     background-color: var(--danger-color);
+}
+
+.option-list {
+    display: grid;
+    background-color: var(--color-1t);
+    border-radius: 10px;
+    margin-top: 10px;
+    grid-template-columns: 1fr 1fr auto;
+}
+
+.option-item {
+    display: grid;
+    grid-template-columns: subgrid;
+    gap: 10px;
+    padding: 10px;
+    align-items: center;
+    position: relative;
+    grid-column: span 3;
+}
+
+.option-item:not(.hidden):not(:last-of-type) {
+    border-bottom-style: solid;
+    border-bottom-color: var(--color-1t);
+    border-bottom-width: 1px;
+}
+
+.option-title {
+    font-weight: bold;
+    font-size: 1.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.option-input {
+    color: var(--text-color);
+    padding: 8px;
+    min-width: 0;
+    border: 0;
+    border-radius: 5px;
+    background: var(--color-1t);
+    font-size: 1.1rem;
+}
+
+.option-input:has(.dropdown-button) {
+    padding: 0;
+}
+
+.option-key-input {
+    color: var(--text-color);
+    padding: 8px;
+    align-items: center;
+    min-width: 0;
+    border: 0;
+    border-radius: 5px;
+    background-color: var(--color-1t);
+    font-size: 1.1rem;
+    transition: background-color .25s, scale .1s;
+    cursor: pointer;
+    text-align: center;
+}
+
+.option-key-input.selected {
+    background-color: var(--accent-color);
+}
+
+.option-key-input.selected:hover {
+    background-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+}
+
+.option-key-input.selected::before {
+    color: yellow;
+    content: "> "
+}
+
+.option-key-input.selected::after {
+    color: yellow;
+    content: " <"
+}
+
+.option-key-input:hover {
+    background-color: var(--color-2t);
+}
+
+.option-key-input:active {
+    scale: .95;
+}
+
+.option-button {
+    color: var(--text-color);
+    padding: 8px;
+    min-width: 0;
+    border: 0;
+    border-radius: 5px;
+    background-color: var(--color-1t);
+    font-size: 1.1rem;
+    transition: background-color .25s, scale .1s;
+    cursor: pointer;
+    text-align: center;
+}
+
+.option-button:hover {
+    background-color: var(--color-2t);
+}
+
+.option-button:active {
+    scale: .95;
 }
