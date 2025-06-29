@@ -28,17 +28,17 @@ body.light {
     --text-color: black;
     --subtle-text-color: #444;
     --accent-color: color-mix(in srgb, #0078d4, white);
-    --danger-color: #d93e5d;
+    --danger-color: color-mix(in srgb, #d93e5d, white);
     --go-color: #22ff84;
     --success-color: rgb(180, 255, 180);
     --error-color: rgb(255, 180, 180);
-    --dialog-background: #fff5;
+    --dialog-background: #fff9;
     --dialog-backdrop: #00000088;
     --color-1: color-mix(in srgb, 7.8% var(--text-color), var(--background-color));
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
     --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
-    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), var(--background-color));
+    --sidebar: color-mix(in srgb, 15.6% var(--accent-color), var(--background-color));
     color-scheme: light;
 }
 
@@ -686,6 +686,7 @@ h1 {
     padding: 8px;
     cursor: pointer;
     transition: background-color .25s;
+    color: var(--text-color);
 }
 
 .dropdown-item.selected {
@@ -1379,14 +1380,16 @@ i {
 
 .live-stop {
     display: grid;
-    height: 38px;
-    width: 38px;
+    height: 30px;
+    width: 30px;
     cursor: pointer;
     place-items: center;
     transition: background-color .25s;
     color: var(--danger-color);
-    border-radius: 8px;
+    border-radius: 4px;
     flex-shrink: 0;
+    margin: 4px;
+    margin-right: 0;
 }
 
 .live-stop:hover {
@@ -1395,13 +1398,15 @@ i {
 
 .live-log {
     display: grid;
-    height: 38px;
-    width: 38px;
+    height: 30px;
+    width: 30px;
     cursor: pointer;
     place-items: center;
     transition: background-color .25s;
-    border-radius: 8px;
+    border-radius: 4px;
     flex-shrink: 0;
+    margin: 4px;
+    margin-left: 0;
 }
 
 .live-log:hover {
@@ -1686,6 +1691,8 @@ dialog[open]::backdrop {
     padding: 10px;
     display: grid;
     gap: 10px;
+    max-height: calc(90vh - 2 * 4rem);
+    overflow-y: auto;
 }
 
 .dialog-content-inner {
@@ -2520,13 +2527,13 @@ dialog[open]::backdrop {
 .info {
     background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
     border-style: solid;
-    border-color: var(--accent-color);
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     border-width: 1px;
     display: flex;
     padding: 8px;
     border-radius: 8px;
     gap: 8px;
-    color: var(--accent-color);
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
     align-items: center;
     font-size: 1rem;
 }

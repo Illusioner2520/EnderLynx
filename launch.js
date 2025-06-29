@@ -616,7 +616,7 @@ class Minecraft {
             args.push("-Dminecraft.client.jar=" + this.jarfile);
             args.push("-cp");
             args.push(this.libs + this.jarfile);
-            args = args.concat("-Xmx" + allocatedRam + "M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M".split(" "));
+            args = args.concat(("-Xmx" + allocatedRam + "M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M").split(" "));
             args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"));
             args.push(this.main_class);
             this.args = this.args.map((e) => {
@@ -935,6 +935,11 @@ class Java {
             await this.downloadJava(version);
         }
         return this.versions["java-" + version];
+    }
+    async setJavaInstallation(version,file_path) {
+        if (this.versions["java-" + version] == file_path) return;
+        this.versions["java-" + version] = file_path;
+        fs.writeFileSync("./java/versions.json", JSON.stringify(this.versions), 'utf-8');
     }
 }
 

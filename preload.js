@@ -86,6 +86,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let java = new Java();
         return java.getJavaInstallation(v);
     },
+    setJavaInstallation: async (v,f) => {
+        let java = new Java();
+        java.setJavaInstallation(v,f);
+    },
     getFabricVanillaVersions: async () => {
         let fabric = new Fabric();
         return await fabric.getSupportedVanillaVersions();
@@ -608,6 +612,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await quilt.getSupportedVanillaVersions();
     },
     getInstanceFolderName: (instance_id) => {
+        for (let i = 0; i < instance_id.length; i++) {
+            if (!instance_id[i].matches("")) {
+                instance_id[i] = "_";
+            }
+        }
         let baseInstanceId = instance_id;
         let counter = 1;
         while (folderExists(`./minecraft/instances/${instance_id}`)) {
@@ -746,7 +755,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let gv = "";
         if (version) gv = "&gameVersion=" + version;
         let gf = "";
-        if (loader) gf = "&gameFlavors[0]=" + ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
+        if (loader && project_type == "mod") gf = "&gameFlavors[0]=" + ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
         let ci = "";
         let id = 0;
         if (project_type == "mod") id = 6;
@@ -839,8 +848,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
         manifest_json = JSON.parse(manifest_json);
 
-        let dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`);
-        let dependency_json = await dependency_res.json();
+        let dependency_res;
+        if (cf_id) dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`)
+        let dependency_json;
+        if (cf_id) dependency_json = await dependency_res.json()
 
         let content = [];
 
@@ -848,7 +859,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
             let file_name = manifest_json.files[i].projectID + "-" + manifest_json.files[i].fileID + ".jar";
 
-            let dependency_item = dependency_json.data.find(dep => dep.id === manifest_json.files[i].projectID);
+            let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === manifest_json.files[i].projectID) : null;
 
             let folder = "mods";
             if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
@@ -1241,6 +1252,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectJavaInstallations: async (v) => {
         let javaSearch = new JavaSearch();
         return javaSearch.findJavaInstallations(v);
+    },
+    getJavaInstallations: () => {
+        let javaPaths = [];
+        const versionsJsonPath = path.join(__dirname, "java", "versions.json");
+        if (fs.existsSync(versionsJsonPath)) {
+            try {
+                const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");
+                const paths = JSON.parse(versionsData);
+                if (paths && typeof paths === "object") {
+                    for (const key of Object.keys(paths)) {
+                        const p = paths[key];
+                        if (typeof p === "string") {
+                            javaPaths.push({"version":key.replace("java-",""),"path":p});
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+        return javaPaths;
     }
 });
 

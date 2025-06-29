@@ -22,7 +22,8 @@ const COMMON_JAVA_DIRS = [
     "C:\\Program Files\\Java",
     "C:\\Program Files (x86)\\Java",
     "C:\\Program Files\\Eclipse Adoptium",
-    "C:\\Program Files (x86)\\Eclipse Adoptium"
+    "C:\\Program Files (x86)\\Eclipse Adoptium",
+    path.resolve(__dirname,"java")
 ];
 
 async function getJavaVersion(javawPath) {
@@ -92,32 +93,41 @@ async function findJavaInstallations(v) {
                     if (fs.existsSync(path.join(fullPath, "javaw.exe"))) {
                         jrePaths.add(fullPath);
                     }
+                    const subdirs2 = fs.readdirSync(path.join(javaDir, dirent.name), { withFileTypes: true });
+                    for (const dirent2 of subdirs2) {
+                        if (dirent2.isDirectory()) {
+                            const fullPath = path.join(javaDir, dirent.name, dirent2.name, "bin");
+                            if (fs.existsSync(path.join(fullPath, "javaw.exe"))) {
+                                jrePaths.add(fullPath);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    const versionsJsonPath = path.join(__dirname, "java", "versions.json");
-    if (fs.existsSync(versionsJsonPath)) {
-        try {
-            const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");
-            const paths = JSON.parse(versionsData);
-            if (paths && typeof paths === "object") {
-                for (const key of Object.keys(paths)) {
-                    const p = paths[key];
-                    if (typeof p === "string") {
-                        let cleanedPath = p;
-                        if (cleanedPath.toLowerCase().endsWith("javaw.exe")) {
-                            cleanedPath = path.dirname(cleanedPath);
-                        }
-                        jrePaths.add(cleanedPath);
-                    }
-                }
-            }
-        } catch (e) {
-            // Ignore JSON errors
-        }
-    }
+    // const versionsJsonPath = path.join(__dirname, "java", "versions.json");
+    // if (fs.existsSync(versionsJsonPath)) {
+    //     try {
+    //         const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");
+    //         const paths = JSON.parse(versionsData);
+    //         if (paths && typeof paths === "object") {
+    //             for (const key of Object.keys(paths)) {
+    //                 const p = paths[key];
+    //                 if (typeof p === "string") {
+    //                     let cleanedPath = p;
+    //                     if (cleanedPath.toLowerCase().endsWith("javaw.exe")) {
+    //                         cleanedPath = path.dirname(cleanedPath);
+    //                     }
+    //                     jrePaths.add(cleanedPath);
+    //                 }
+    //             }
+    //         }
+    //     } catch (e) {
+    //         // Ignore JSON errors
+    //     }
+    // }
 
     // From registry (both 32-bit and 64-bit views)
     const [reg32, reg64] = await Promise.all([
