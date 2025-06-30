@@ -19,7 +19,7 @@ body {
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
     --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
-    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), var(--background-color));
+    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), transparent);
     color-scheme: dark;
 }
 
@@ -38,7 +38,7 @@ body.light {
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
     --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
-    --sidebar: color-mix(in srgb, 15.6% var(--accent-color), var(--background-color));
+    --sidebar: color-mix(in srgb, 15.6% var(--accent-color), transparent);
     color-scheme: light;
 }
 
@@ -73,6 +73,8 @@ button {
     border-right-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
+    z-index: 4;
+    backdrop-filter: blur(15px);
 }
 
 .player-switch {
@@ -2420,6 +2422,7 @@ dialog[open]::backdrop {
     grid-row: 1;
     max-height: 100%;
     padding-bottom: 10px;
+    overflow: hidden;
 }
 
 .my-account-option-box {
@@ -2520,16 +2523,16 @@ dialog[open]::backdrop {
 
 .option-image {
     margin-block: auto;
-    font-size: 2rem;
+    font-size: 3rem;
     color: var(--subtle-text-color);
     image-rendering: pixelated;
-    width: 40px;
+    width: 48px;
 }
 
 .info {
     background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--accent-color);
     border-width: 1px;
     display: flex;
     padding: 8px;
@@ -2538,6 +2541,7 @@ dialog[open]::backdrop {
     color: color-mix(in srgb, var(--accent-color), var(--text-color));
     align-items: center;
     font-size: 1rem;
+    width: fit-content;
 }
 
 .skin-button-container {
@@ -2782,16 +2786,21 @@ dialog[open]::backdrop {
 }
 
 .option-button {
-    color: var(--text-color);
+    background-color: transparent;
+    border-radius: 10px;
     padding: 8px;
-    min-width: 0;
-    border: 0;
-    border-radius: 5px;
-    background-color: var(--color-1t);
-    font-size: 1.1rem;
-    transition: background-color .25s, scale .1s;
+    justify-content: center;
     cursor: pointer;
-    text-align: center;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-width: 2px;
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
 }
 
 .option-button:hover {

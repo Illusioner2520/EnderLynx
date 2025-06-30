@@ -26,7 +26,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name TEXT, last_used TEXT, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
 
 db.pragma('journal_mode = WAL');
 
@@ -44,6 +44,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setOptionsTXT: (instance_id, content) => {
         const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
         fs.writeFileSync(optionsPath, content, "utf-8");
+    },
+    updateOptionsTXT: (instance_id, key, value) => {
+        console.log("Updating " + key + " to " + value);
+        const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
+        let lines = [];
+        if (fs.existsSync(optionsPath)) {
+            lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
+        }
+        let found = false;
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].trim().startsWith(key + ":")) {
+                lines[i] = `${key}:${value}`;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            lines.push(`${key}: ${value}`);
+        }
+        fs.writeFileSync(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
     },
     urlToFolder,
     databaseGet: (sql, ...params) => {

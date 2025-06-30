@@ -549,6 +549,7 @@ class Minecraft {
                 return e;
             });
             if (this.modded_args_jvm_top) args = args.concat(this.modded_args_jvm_top);
+            args.push("-Dlog4j2.formatMsgNoLookups=true");
             args: for (let i = 0; i < this.args.jvm.length; i++) {
                 let e = this.args.jvm[i];
                 if (e.value && e.rules) {
@@ -610,6 +611,7 @@ class Minecraft {
             if (arch == "x86") {
                 args.push("-Xss1M");
             }
+            args.push("-Dlog4j2.formatMsgNoLookups=true");
             args.push("-Djava.library.path=" + path.resolve(__dirname, `minecraft/meta/natives/${this.instance_id}-${version}`));
             args.push("-Dminecraft.launcher.brand=" + launchername);
             args.push("-Dminecraft.launcher.version=" + launcherversion);

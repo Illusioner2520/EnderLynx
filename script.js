@@ -32,7 +32,24 @@ class DB {
 const db = new DB();
 
 class DefaultOptions {
+    constructor(v) {
+        this.version = v;
+    }
+
+    getVersions() {
+        let v = db.prepare("SELECT * FROM options_defaults WHERE key = ?").all("version");
+        return v.map(e => e.version).filter(e => e);
+    }
+
     checkDefault(key) {
+        if (key == "version") {
+            let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ? AND version = ?").get(key, this.version);
+            if (!default_) {
+                db.prepare("INSERT INTO options_defaults (key, value, version) VALUES (?, ?, ?)").run(key, "", this.version);
+                return true;
+            }
+            return true;
+        }
         let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key);
         if (!default_) {
             db.prepare("INSERT INTO options_defaults (key, value) VALUES (?, ?)").run(key, "");
@@ -53,6 +70,10 @@ class DefaultOptions {
         if (!this.checkDefault(key)) {
             return null;
         }
+        if (key == "version") {
+            db.prepare("UPDATE options_defaults SET value = ? WHERE key = ? AND version = ?").run(value, key, this.version);
+            return;
+        }
         db.prepare("UPDATE options_defaults SET value = ? WHERE key = ?").run(value, key);
     }
 
@@ -60,9 +81,31 @@ class DefaultOptions {
         db.prepare("DELETE FROM options_defaults WHERE key = ?").run(key);
     }
 
-    getOptionsTXT() {
-        let r = db.prepare("SELECT * FROM options_defaults").all();
+    getOptionsTXT(dataVersion) {
+        let v;
+        if (!dataVersion) {
+            let thisIndex = minecraftVersions.indexOf(this.version);
+            let versions = this.getVersions();
+            let min_distance = 10000;
+            let version_to_use = "something_not_null";
+            if (versions.includes(this.version)) {
+                version_to_use = this.version;
+            } else {
+                versions.forEach(e => {
+                    let vIndex = minecraftVersions.indexOf(e);
+                    if (vIndex > thisIndex) return;
+                    if (thisIndex - vIndex < min_distance) {
+                        min_distance = thisIndex - vIndex;
+                        version_to_use = e;
+                    }
+                });
+            }
+            console.log("Using option version " + version_to_use);
+            v = db.prepare("SELECT * FROM options_defaults WHERE key = ? AND version = ?").get("version", version_to_use);
+        }
+        let r = db.prepare("SELECT * FROM options_defaults WHERE NOT key = ?").all("version");
         let content = "";
+        content = "version:" + (dataVersion ? dataVersion : (v?.value ? v?.value : "100")) + "\n";
         r.forEach(e => {
             content += e.key + ":" + e.value + "\n"
         });
@@ -311,6 +354,8 @@ class Instance {
         db.prepare("UPDATE instances SET vanilla_version = ? WHERE id = ?").run(vanilla_version, this.id);
         this.vanilla_version = vanilla_version;
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
+        let default_options = new DefaultOptions(vanilla_version);
+        window.electronAPI.setOptionsTXT(this.id, default_options.getOptionsTXT());
     }
     setLoaderVersion(loader_version) {
         db.prepare("UPDATE instances SET loader_version = ? WHERE id = ?").run(loader_version, this.id);
@@ -406,6 +451,8 @@ class Data {
 
     addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
         db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(data.getDefault("default_width")), Number(data.getDefault("default_height")), Number(data.getDefault("default_ram")));
+        let default_options = new DefaultOptions(vanilla_version);
+        window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT());
         return new Instance(instance_id);
     }
 
@@ -581,6 +628,20 @@ class MinecraftAccountSwitcher {
         this.element = element;
         this.players = players;
         this.setPlayerInfo();
+    }
+    reloadHeads() {
+        if (!this.players) return;
+        this.playerElements = this.playerElements || [];
+        for (let i = 0; i < this.players.length; i++) {
+            if (this.playerElements[i]) {
+                getPlayerHead(this.players[i], (e) => {
+                    this.playerElements[i].querySelector('.player-head').src = e;
+                });
+            }
+        }
+        getPlayerHead(this.default_player, (e) => {
+            this.element.querySelector('.player-head').src = e;
+        });
     }
     setPlayerInfo() {
         let default_player = this.default_player ?? data.getDefaultProfile();
@@ -2245,7 +2306,7 @@ function showMyAccountContent(e) {
         capeEle.classList.add("cape");
         let capeImg = document.createElement("div");
         capeImg.classList.add("option-image");
-        capeImg.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+        capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
         let loader = document.createElement("div");
         loader.className = "loading-container-spinner";
         loader.style.display = "none";
@@ -3945,11 +4006,22 @@ function setInstanceTabContentOptions(instanceInfo, element) {
     searchAndFilter.appendChild(typeDropdown);
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
+    let info = document.createElement("div");
+    info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>Changing these settings while the game is open may not function correctly.';
+    info.className = "info";
+    info.style.marginTop = "10px";
+    element.appendChild(info);
+    let info2 = document.createElement("div");
+    info2.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>The launcher will attempt to apply any default settings to any new instance you create, regardless of version. It is then up to Minecraft to correctly parse and use those settings.';
+    info2.className = "info";
+    info2.style.marginTop = "10px";
+    element.appendChild(info2);
     let optionList = document.createElement("div");
     optionList.className = "option-list";
     element.appendChild(optionList);
     let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
     let selectedKeySelect;
+    let selectedKeySelectFunction;
     let keys = {
         "key.keyboard.apostrophe": "'",
         "key.keyboard.backslash": "\\",
@@ -4220,19 +4292,63 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             if (e.key == "NumLock") {
                 keyCode = codeToKey["NumLock"];
             }
+            let oldInnerHtml = selectedKeySelect.innerHTML;
+            let oldValue = selectedKeySelect.value;
+            let tempSelected = selectedKeySelect;
             if (keyCode) {
-                selectedKeySelect.innerHTML = keyCode;
-                thevalue = keyCode;
+                selectedKeySelect.innerHTML = keys[keyCode] || keyCode;
+                selectedKeySelect.value = keyCode;
             } else {
-                selectedKeySelect.innerHTML = "key.keyboard.unknown";
-                thevalue = "key.keyboard.unknown";
+                selectedKeySelect.innerHTML = keys["key.keyboard.unknown"];
+                selectedKeySelect.value = "key.keyboard.unknown";
             }
             selectedKeySelect.classList.remove("selected");
+            let key = selectedKeySelect.getAttribute("data-key")
             selectedKeySelect = null;
+            try {
+                console.log(key, keyCode ? keyCode : "key.keyboard.unknown");
+                window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, key, keyCode ? keyCode : "key.keyboard.unknown");
+                displaySuccess("Updated options.txt!");
+                if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
+            } catch (e) {
+                displayError("Unable to update options.txt");
+                tempSelected.innerHTML = oldInnerHtml;
+                tempSelected.value = oldValue;
+            }
         }
-        console.log(e);
     });
-    let defaultOptions = new DefaultOptions();
+
+    // Mouse button support
+    document.body.addEventListener("mousedown", (e) => {
+        if (selectedKeySelect) {
+            e.preventDefault();
+            e.stopPropagation();
+            let mouseKey;
+            if (e.button === 0) mouseKey = "key.mouse.left";
+            else if (e.button === 1) mouseKey = "key.mouse.middle";
+            else if (e.button === 2) mouseKey = "key.mouse.right";
+            else if (e.button >= 3 && e.button <= 20) mouseKey = `key.mouse.${e.button + 1}`;
+            else mouseKey = "key.keyboard.unknown";
+            let oldInnerHtml = selectedKeySelect.innerHTML;
+            let oldValue = selectedKeySelect.value;
+            let tempSelected = selectedKeySelect;
+            selectedKeySelect.innerHTML = keys[mouseKey] || mouseKey;
+            selectedKeySelect.classList.remove("selected");
+            selectedKeySelect.value = mouseKey;
+            let key = selectedKeySelect.getAttribute("data-key")
+            selectedKeySelect = null;
+            try {
+                window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, key, mouseKey);
+                displaySuccess("Updated options.txt!");
+                if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
+            } catch (e) {
+                displayError("Unable to update options.txt");
+                tempSelected.innerHTML = oldInnerHtml;
+                tempSelected.value = oldValue;
+            }
+        }
+    });
+    let defaultOptions = new DefaultOptions(instanceInfo.vanilla_version);
     values.forEach((e) => {
         let item = document.createElement("div");
         item.className = "option-item";
@@ -4242,7 +4358,17 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         titleElement.innerHTML = e.key;
         item.appendChild(titleElement);
 
-        let thevalue = e.value;
+        let onChange = (v) => {
+            if (defaultOptions.getDefault(e.key) == v) {
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Default';
+                setDefaultButton.onclick = onRemove;
+            } else {
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>Set Default';
+                setDefaultButton.onclick = onSet;
+            }
+        }
+
+        let oldvalue = e.value;
 
         let type = "unknown";
         if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
@@ -4257,38 +4383,76 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         if (e.value.startsWith("key.")) {
             type = "key";
         }
+        let inputElement;
         if (type == "text") {
-            let inputElement = document.createElement("input");
+            inputElement = document.createElement("input");
             inputElement.className = "option-input";
             inputElement.value = e.value.slice(1, -1);
-            inputElement.oninput = () => {
-                thevalue = '"' + inputElement.value + '"';
+            inputElement.onchange = () => {
+                try {
+                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, '"' + inputElement.value + '"');
+                    displaySuccess("Updated options.txt!");
+                    oldvalue = inputElement.value;
+                    onChange(inputElement.value);
+                } catch (e) {
+                    displayError("Unable to update options.txt");
+                    inputElement.value = oldvalue;
+                }
             }
             item.appendChild(inputElement);
         } else if (type == "number") {
-            let inputElement = document.createElement("input");
+            inputElement = document.createElement("input");
             inputElement.className = "option-input";
             inputElement.value = e.value;
             inputElement.type = "number";
-            inputElement.oninput = () => {
-                thevalue = inputElement.value;
+            inputElement.onchange = () => {
+                try {
+                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
+                    displaySuccess("Updated options.txt!");
+                    oldvalue = inputElement.value;
+                    onChange(inputElement.value);
+                } catch (e) {
+                    displayError("Unable to update options.txt");
+                    inputElement.value = oldvalue;
+                }
             }
             item.appendChild(inputElement);
         } else if (type == "boolean") {
-            let inputElement = document.createElement("div");
-            inputElement.className = "option-input";
-            new SearchDropdown("", [{ "name": "True", "value": "true" }, { "name": "False", "value": "false" }], inputElement, e.value, (v) => {
-                thevalue = v;
+            let inputElement1 = document.createElement("div");
+            inputElement1.className = "option-input";
+            inputElement = new SearchDropdown("", [{ "name": "True", "value": "true" }, { "name": "False", "value": "false" }], inputElement1, e.value, (v) => {
+                try {
+                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, v);
+                    displaySuccess("Updated options.txt!");
+                    oldvalue = v;
+                    onChange(v);
+                } catch (e) {
+                    displayError("Unable to update options.txt");
+                    inputElement.selectOption(oldvalue);
+                }
             });
-            item.appendChild(inputElement);
+            item.appendChild(inputElement1);
         } else if (type == "unknown") {
-            let inputElement = document.createElement("input");
+            inputElement = document.createElement("input");
             inputElement.className = "option-input";
             inputElement.value = e.value;
+            inputElement.onchange = () => {
+                try {
+                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
+                    displaySuccess("Updated options.txt!");
+                    oldvalue = inputElement.value;
+                    onChange(inputElement.value);
+                } catch (e) {
+                    displayError("Unable to update options.txt");
+                    inputElement.value = oldvalue;
+                }
+            }
             item.appendChild(inputElement);
         } else if (type == "key") {
-            let inputElement = document.createElement("button");
+            inputElement = document.createElement("button");
             inputElement.className = "option-key-input";
+            inputElement.value = e.value;
+            inputElement.setAttribute("data-key", e.key);
             inputElement.innerHTML = keys[e.value] ? keys[e.value] : e.value;
             inputElement.onclick = () => {
                 [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
@@ -4296,36 +4460,48 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 });
                 inputElement.classList.add("selected");
                 selectedKeySelect = inputElement;
+                selectedKeySelectFunction = (v) => {
+                    onChange(v);
+                }
             }
             item.appendChild(inputElement);
         }
 
         let setDefaultButton = document.createElement("button");
         setDefaultButton.className = "option-button";
-        setDefaultButton.innerHTML = "Set Default";
+        setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>Set Default';
 
         let onSet = () => {
-            defaultOptions.setDefault(e.key, thevalue);
-            setDefaultButton.innerHTML = "Remove Default";
+            defaultOptions.setDefault(e.key, inputElement.value);
+            setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Default';
             setDefaultButton.onclick = onRemove;
-            displaySuccess("Default value of " + e.key + " set to " + thevalue);
+            displaySuccess("Default value of " + e.key + " set to " + inputElement.value + " for version " + instanceInfo.vanilla_version);
         }
 
         setDefaultButton.onclick = onSet;
 
         let onRemove = () => {
             defaultOptions.deleteDefault(e.key);
-            setDefaultButton.innerHTML = "Set Default";
+            setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>Set Default';
             setDefaultButton.onclick = onSet;
-            displaySuccess("Default value of " + e.key + " removed");
+            displaySuccess("Default value of " + e.key + " removed for version " + instanceInfo.vanilla_version);
         }
 
         if (defaultOptions.getDefault(e.key) == e.value) {
-            setDefaultButton.innerHTML = "Remove Default";
+            setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Default';
             setDefaultButton.onclick = onRemove;
         }
 
         item.appendChild(setDefaultButton);
+
+        if (e.key == "version") {
+            defaultOptions.setDefault(e.key, e.value);
+            setDefaultButton.remove();
+            inputElement.style.gridColumn = "span 2";
+            inputElement.style.opacity = ".5";
+            inputElement.style.cursor = "not-allowed";
+            inputElement.disabled = true;
+        }
 
         optionList.appendChild(item);
     });
@@ -6331,6 +6507,7 @@ async function applySkin(profile, skin) {
         profile.setIsDemo(res.player_info.is_demo);
         await updateSkinsAndCapes(res.skin_info);
         console.log(res.skin_info.skins[0]);
+        accountSwitcher.reloadHeads();
         displaySuccess("Successfully changed skin.");
         return true;
     } catch (e) {
