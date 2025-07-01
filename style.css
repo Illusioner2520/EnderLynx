@@ -391,6 +391,7 @@ button {
 .title-top {
     display: flex;
     align-items: center;
+    gap: 10px;
 }
 
 *:focus-visible,
@@ -1010,6 +1011,7 @@ i {
     height: 20px;
     width: 20px;
     cursor: pointer;
+    accent-color: var(--accent-color);
 }
 
 .content-list-title {
@@ -1371,7 +1373,6 @@ i {
     flex-grow: 1;
     font-size: 1rem;
     color: var(--text-color);
-    margin-right: 8px;
     overflow: hidden;
 }
 
@@ -1929,6 +1930,7 @@ dialog[open]::backdrop {
 .discover-item-downloads {
     color: var(--subtle-text-color);
     font-size: 1rem;
+    margin-left: auto;
 }
 
 .discover-item-install {
@@ -2715,6 +2717,11 @@ dialog[open]::backdrop {
     align-items: center;
     position: relative;
     grid-column: span 3;
+    transition: background-color .25s;
+}
+
+.option-item:has(.fa-minus) {
+    background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
 }
 
 .option-item:not(.hidden):not(:last-of-type) {
@@ -2809,4 +2816,77 @@ dialog[open]::backdrop {
 
 .option-button:active {
     scale: .95;
+}
+
+.back-button {
+    border-radius: 10px;
+    padding: 8px;
+    background-color: var(--color-1t);
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-left: auto;
+}
+
+.back-button:active {
+    scale: .95;
+}
+
+.back-button:hover {
+    background-color: var(--color-2t);
+}
+
+.multiple-select-wrapper {
+    display: grid;
+    max-height: 300px;
+    overflow-y: auto;
+    grid-template-columns: auto 1fr;
+}
+
+.multiple-select { 
+    border-radius: 8px;
+    background-color: var(--color-1);
+    grid-template-columns: subgrid;
+    grid-column: span 2;
+    display: grid;
+}
+
+.multiple-select-top {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: span 2;
+    padding: 10px;
+    gap: 10px;
+    align-items:center;
+}
+
+.multiple-select-item {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: span 2;
+    padding: 10px;
+    gap: 10px;
+    align-items:center;
+}
+
+.multiple-select-title {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.multiple-select-item:nth-child(2n) {
+    background-color: var(--color-1t);
+}
+
+.multiple-select-checkbox {
+    height: 15px;
+    width: 15px;
+    cursor: pointer;
+    margin: 0;
+    accent-color: var(--accent-color);
 }

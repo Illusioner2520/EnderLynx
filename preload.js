@@ -20,7 +20,7 @@ const os = require('os');
 
 const db = new Database('app.db');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -43,7 +43,50 @@ class LoginError extends Error {
 contextBridge.exposeInMainWorld('electronAPI', {
     setOptionsTXT: (instance_id, content) => {
         const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
-        fs.writeFileSync(optionsPath, content, "utf-8");
+        fs.writeFileSync(optionsPath, content.content, "utf-8");
+        return content.version;
+    },
+    deleteWorld: (instance_id, world_id) => {
+        const savesPath = path.resolve(`./minecraft/instances/${instance_id}/saves`);
+        const worldPath = path.join(savesPath, world_id);
+
+        try {
+            if (fs.existsSync(worldPath)) {
+                fs.rmSync(worldPath, { recursive: true, force: true });
+                return true;
+            }
+            return false;
+        } catch (err) {
+            return false;
+        }
+    },
+    deleteContent: (instance_id, project_type, file_name) => {
+        let folder;
+        if (project_type === "mod") {
+            folder = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`);
+        } else if (project_type === "resource_pack") {
+            folder = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`);
+        } else if (project_type === "shader") {
+            folder = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`);
+        } else {
+            return false;
+        }
+
+        const filePath = path.join(folder, file_name);
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                return true;
+            }
+            // Try with .disabled extension if not found
+            if (fs.existsSync(filePath + ".disabled")) {
+                fs.unlinkSync(filePath + ".disabled");
+                return true;
+            }
+            return false;
+        } catch (err) {
+            return false;
+        }
     },
     updateOptionsTXT: (instance_id, key, value) => {
         console.log("Updating " + key + " to " + value);
@@ -179,6 +222,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     })(),
                     hardcore: !!levelData.hardcore?.value,
                     commands: !!levelData.allowCommands?.value,
+                    flat: levelData?.WorldGenSettings?.value?.dimensions?.value["minecraft:overworld"]?.value?.generator?.value?.type?.value == "minecraft:flat",
                     difficulty: (() => {
                         const diffId = levelData.Difficulty?.value ?? 2;
                         switch (diffId) {
@@ -815,16 +859,67 @@ contextBridge.exposeInMainWorld('electronAPI', {
             install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`, filename);
         } else if (project_type == "shader") {
             install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`, filename);
+        } else if (project_type == "world") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/temp_worlds`, filename);
         }
 
         console.log("Installing", project_url, "to", install_path);
 
         await urlToFile(project_url, install_path);
 
+        if (project_type === "world") {
+            const savesPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
+            fs.mkdirSync(savesPath, { recursive: true });
+            const zip = new AdmZip(install_path);
+
+            // Get all top-level folders in the zip
+            const entries = zip.getEntries();
+            const topLevelFolders = new Set();
+            entries.forEach(entry => {
+                const parts = entry.entryName.split('/');
+                if (parts.length > 1) {
+                    topLevelFolders.add(parts[0]);
+                }
+            });
+
+            // For each top-level folder, check for conflicts and rename if needed
+            const folderRenameMap = {};
+            for (const folder of topLevelFolders) {
+                let targetFolder = folder;
+                let counter = 1;
+                while (fs.existsSync(path.join(savesPath, targetFolder))) {
+                    targetFolder = `${folder}_${counter}`;
+                    counter++;
+                }
+                folderRenameMap[folder] = targetFolder;
+            }
+
+            // Extract each entry, renaming top-level folders if needed
+            entries.forEach(entry => {
+                let entryName = entry.entryName;
+                const parts = entryName.split('/');
+                if (parts.length > 1 && folderRenameMap[parts[0]]) {
+                    parts[0] = folderRenameMap[parts[0]];
+                    entryName = parts.join('/');
+                }
+                const destPath = path.join(savesPath, entryName);
+                if (entry.isDirectory) {
+                    fs.mkdirSync(destPath, { recursive: true });
+                } else {
+                    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+                    fs.writeFileSync(destPath, entry.getData());
+                }
+            });
+
+            // Optionally delete the temp world zip after extraction
+            fs.unlinkSync(install_path);
+        }
+
         let type_convert = {
             "mod": "mod",
             "resourcepack": "resource_pack",
-            "shader": "shader"
+            "shader": "shader",
+            "world": "world"
         }
 
         return {

@@ -109,7 +109,7 @@ class DefaultOptions {
         r.forEach(e => {
             content += e.key + ":" + e.value + "\n"
         });
-        return content;
+        return { "content": content, "version": Number((dataVersion ? dataVersion : (v?.value ? v?.value : "100"))) };
     }
 }
 
@@ -298,6 +298,7 @@ class Instance {
         this.allocated_ram = content.allocated_ram;
         this.java_version = content.java_version;
         this.java_path = content.java_path;
+        this.attempted_options_txt_version = content.attempted_options_txt_version;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
     setJavaVersion(java_version) {
@@ -355,7 +356,12 @@ class Instance {
         this.vanilla_version = vanilla_version;
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         let default_options = new DefaultOptions(vanilla_version);
-        window.electronAPI.setOptionsTXT(this.id, default_options.getOptionsTXT());
+        let v = window.electronAPI.setOptionsTXT(this.id, default_options.getOptionsTXT());
+        this.setAttemptedOptionsTxtVersion(v);
+    }
+    setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
+        db.prepare("UPDATE instance SET attempted_options_txt_version = ? WHERE id = ?").run(attempted_options_txt_version, this.id);
+        this.attempted_options_txt_version = attempted_options_txt_version;
     }
     setLoaderVersion(loader_version) {
         db.prepare("UPDATE instances SET loader_version = ? WHERE id = ?").run(loader_version, this.id);
@@ -452,8 +458,10 @@ class Data {
     addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
         db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(data.getDefault("default_width")), Number(data.getDefault("default_height")), Number(data.getDefault("default_ram")));
         let default_options = new DefaultOptions(vanilla_version);
-        window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT());
-        return new Instance(instance_id);
+        let v = window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT());
+        let instance = new Instance(instance_id);
+        instance.setAttemptedOptionsTxtVersion(v);
+        return instance;
     }
 
     deleteInstance(instance_id) {
@@ -1152,13 +1160,16 @@ class SearchBar {
         searchIcon.onclick = (e) => {
             searchInput.focus();
         }
+        this.value = "";
         searchInput.oninput = (e) => {
-            if (this.oninput) this.oninput(searchInput.value)
+            if (this.oninput) this.oninput(searchInput.value);
+            this.value = searchInput.value;
         };
         searchInput.onkeydown = (e) => {
             if (e.key == "Enter") {
                 if (this.onenter) this.onenter(searchInput.value);
             }
+            this.value = searchInput.value;
         }
         searchClear.onclick = (e) => {
             searchInput.value = "";
@@ -1584,9 +1595,9 @@ class ContentList {
             contentListTop.appendChild(updateAllButton);
         }
 
-        searchBar.setOnInput((val) => {
+        let applyFilters = (search, dropdown) => {
             for (let i = 0; i < this.items.length; i++) {
-                if (this.items[i].name.toLowerCase().includes(val.toLowerCase().trim())) {
+                if (this.items[i].name.toLowerCase().includes(search.toLowerCase().trim()) && (this.items[i].type == dropdown || dropdown == "all")) {
                     this.items[i].element.style.display = "flex";
                     this.items[i].element.classList.remove("hidden");
                 } else {
@@ -1595,19 +1606,14 @@ class ContentList {
                 }
             }
             this.figureOutMainCheckedState();
+        }
+
+        searchBar.setOnInput((v) => {
+            applyFilters(v, filter.value);
         });
 
-        filter.setOnChange((val) => {
-            for (let i = 0; i < this.items.length; i++) {
-                if (this.items[i].type == val || val == "all") {
-                    this.items[i].element.style.display = "flex";
-                    this.items[i].element.classList.remove("hidden");
-                } else {
-                    this.items[i].element.style.display = "none";
-                    this.items[i].element.classList.add("hidden");
-                }
-            }
-            this.figureOutMainCheckedState();
+        filter.setOnChange((v) => {
+            applyFilters(searchBar.value, v);
         });
 
         let contentMainElement = document.createElement("div");
@@ -1654,7 +1660,7 @@ class ContentList {
             infoElement2.appendChild(infoElement2Title);
             let infoElement2Desc = document.createElement("div");
             infoElement2Desc.className = "content-list-info-desc-2";
-            infoElement2Desc.innerHTML = sanitize(content[i].secondary_column.desc);
+            infoElement2Desc.innerHTML = (content[i].secondary_column.desc);
             infoElement2.appendChild(infoElement2Desc);
             let toggle;
             if (features?.disable?.enabled) {
@@ -1679,7 +1685,7 @@ class ContentList {
                 removeElement.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
                 removeElement.className = 'content-list-remove';
                 removeElement.onclick = () => {
-                    content[i].onremove();
+                    content[i].onremove(contentEle);
                 }
                 contentEle.appendChild(removeElement);
             }
@@ -1693,6 +1699,11 @@ class ContentList {
                     if (e.func_id == "toggle") {
                         func = () => {
                             if (toggle) toggle.toggle();
+                        }
+                    }
+                    if (e.func_id == "delete") {
+                        func = () => {
+                            e.func(contentEle);
                         }
                     }
                     return {
@@ -3482,7 +3493,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                 "type": e.type,
                 "class": e.source,
                 "image": e.image,
-                "onremove": () => {
+                "onremove": (ele) => {
                     let dialog = new Dialog();
                     dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the content '" + e.name + "'?", [
                         {
@@ -3493,8 +3504,14 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "type": "confirm",
                             "content": "Confirm Deletion"
                         }
-                    ], [], () => {
-                        // DELETE CONTENT HERE
+                    ], [], async () => {
+                        let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
+                        if (success) {
+                            ele.remove();
+                            displaySuccess("Deleted " + e.name);
+                        } else {
+                            displayError("Unable to delete " + e.name);
+                        }
                     });
                 },
                 "more": {
@@ -3520,7 +3537,8 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "title": translate("app.content.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
-                            "func": () => {
+                            "func_id": "delete",
+                            "func": (ele) => {
                                 let dialog = new Dialog();
                                 dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the content '" + e.name + "'?", [
                                     {
@@ -3531,8 +3549,14 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                         "type": "confirm",
                                         "content": "Confirm Deletion"
                                     }
-                                ], [], () => {
-                                    // DELETE CONTENT HERE
+                                ], [], async () => {
+                                    let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
+                                    if (success) {
+                                        ele.remove();
+                                        displaySuccess("Deleted " + e.name);
+                                    } else {
+                                        displayError("Unable to delete " + e.name);
+                                    }
                                 });
                             }
                         }
@@ -3590,9 +3614,82 @@ function isNotDisplayNone(element) {
 async function setInstanceTabContentWorlds(instanceInfo, element) {
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
+    let importWorlds = document.createElement("button");
+    importWorlds.classList.add("add-content-button");
+    importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>Import Worlds'
+    importWorlds.onclick = () => {
+        let getInstances = () => {
+            return data.getInstances().map(e => ({"name":e.name,"value":e.instance_id}));
+        }
+        let dialog = new Dialog();
+        dialog.showDialog("Select Worlds to Import", "form", [
+            {
+                "type": "dropdown",
+                "id": "launcher",
+                "name": "Launcher",
+                "options": [
+                    {
+                        "name": "EnderGate",
+                        "value": "current"
+                    },
+                    {
+                        "name": "Minecraft Launcher",
+                        "value": "vanilla"
+                    },
+                    {
+                        "name": "Modrinth App",
+                        "value": "modrinth"
+                    },
+                    {
+                        "name": "CurseForge App",
+                        "value": "curseforge"
+                    },
+                    {
+                        "name": "MultiMC",
+                        "value": "multimc"
+                    },
+                    {
+                        "name": "PrismLauncher",
+                        "value": "prism"
+                    },
+                    {
+                        "name": "ATLauncher",
+                        "value": "atlauncher"
+                    },
+                    {
+                        "name": "GDLauncher",
+                        "value": "gdlauncher"
+                    }
+                ]
+            },
+            {
+                "type": "dropdown",
+                "name": "Instance",
+                "input_source": "launcher",
+                "id": "instance",
+                "source": getInstances,
+                "options": []
+            }
+        ],[
+            {
+                "type": "cancel",
+                "content": "Cancel"
+            },
+            {
+                "type": "confirm",
+                "content": "Import"
+            }
+        ],[],(v) => {
+            let info = {};
+            v.forEach(e => info[e.id] = e.value);
+        })
+    }
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.add")
+    addContent.onclick = () => {
+        showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, "world");
+    }
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
     let searchBar = new SearchBar(contentSearch, () => { }, null);
@@ -3618,6 +3715,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
+    searchAndFilter.appendChild(importWorlds);
     searchAndFilter.appendChild(addContent);
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
@@ -3634,11 +3732,11 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 },
                 "secondary_column": {
                     "title": translate("app.worlds.description.singleplayer"),
-                    "desc": translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - " + translate("app.worlds.description.hardcore") : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "")
+                    "desc": translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "") + (worlds[i].flat ? " - " + translate("app.worlds.description.flat") : "")
                 },
                 "type": "singleplayer",
                 "image": worlds[i].icon ?? "default.png",
-                "onremove": () => {
+                "onremove": (ele) => {
                     let dialog = new Dialog();
                     dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
                         {
@@ -3649,8 +3747,14 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "type": "confirm",
                             "content": "Confirm Deletion"
                         }
-                    ], [], () => {
-                        // DELETE WORLD HERE
+                    ], [], async () => {
+                        let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
+                        if (success) {
+                            ele.remove();
+                            displaySuccess("Deleted " + worlds[i].name);
+                        } else {
+                            displayError("Unable to delete " + worlds[i].name);
+                        }
                     });
                 },
                 "more": {
@@ -3679,7 +3783,8 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
-                            "func": () => {
+                            "func_id": "delete",
+                            "func": (ele) => {
                                 let dialog = new Dialog();
                                 dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
                                     {
@@ -3690,8 +3795,14 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                         "type": "confirm",
                                         "content": "Confirm Deletion"
                                     }
-                                ], [], () => {
-                                    // DELETE WORLD HERE
+                                ], [], async () => {
+                                    let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
+                                    if (success) {
+                                        ele.remove();
+                                        displaySuccess("Deleted " + worlds[i].name);
+                                    } else {
+                                        displayError("Unable to delete " + worlds[i].name);
+                                    }
                                 });
                             }
                         }
@@ -3864,7 +3975,11 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                 logs.push({ "element": lineElement, "content": e });
             });
             spacer.style.height = logs.length * 15 + "px";
-            logDisplay.scrollTo(0, logDisplay.scrollHeight);
+            console.log("scrolling to bottom");
+            console.log(logDisplay.scrollHeight);
+            setTimeout(() => {
+                logDisplay.scrollTo(0, logDisplay.scrollHeight);
+            }, 0);
             window.electronAPI.watchFile(log_path, (log) => {
                 let logInfo = log.split("\n");
                 let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
@@ -3918,8 +4033,6 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         }
         render();
     });
-    setUpLiveLog();
-    render();
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -3927,9 +4040,13 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     element.appendChild(searchAndFilter);
     let logWrapper = document.createElement("div");
     logWrapper.className = "logs";
+    element.appendChild(logWrapper);
     let logTop = document.createElement("div");
     logTop.className = "logs-top";
     logWrapper.appendChild(logTop);
+    logWrapper.appendChild(logDisplay);
+    setUpLiveLog();
+    render();
     // let wordWrapToggle = document.createElement("button");
     // let actualToggle = new Toggle(wordWrapToggle, (e) => {
     //     if (e) {
@@ -3965,15 +4082,22 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     logTop.appendChild(deleteButton);
     logDisplay.className = "logs-display";
     // logDisplay.classList.add("word-wrap");
-    logWrapper.appendChild(logDisplay);
-    element.appendChild(logWrapper);
 }
 function setInstanceTabContentOptions(instanceInfo, element) {
+    let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
-    new SearchBar(contentSearch, () => { }, null);
+    let searchBar = new SearchBar(contentSearch, (v) => {
+        for (let i = 0; i < values.length; i++) {
+            if (values[i].key.toLowerCase().includes(v.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == dropdownInfo.value || dropdownInfo.value == "all")) {
+                values[i].element.style.display = "grid";
+            } else {
+                values[i].element.style.display = "none";
+            }
+        }
+    }, null);
     let typeDropdown = document.createElement("div");
     let dropdownInfo = new SearchDropdown("Option Type", [
         {
@@ -4000,7 +4124,15 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             "name": "Other",
             "value": "unknown"
         }
-    ], typeDropdown, "all", () => { });
+    ], typeDropdown, "all", (v) => {
+        for (let i = 0; i < values.length; i++) {
+            if (values[i].key.toLowerCase().includes(searchBar.value.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == v || v == "all")) {
+                values[i].element.style.display = "grid";
+            } else {
+                values[i].element.style.display = "none";
+            }
+        }
+    });
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -4019,7 +4151,6 @@ function setInstanceTabContentOptions(instanceInfo, element) {
     let optionList = document.createElement("div");
     optionList.className = "option-list";
     element.appendChild(optionList);
-    let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
     let selectedKeySelect;
     let selectedKeySelectFunction;
     let keys = {
@@ -4318,7 +4449,6 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         }
     });
 
-    // Mouse button support
     document.body.addEventListener("mousedown", (e) => {
         if (selectedKeySelect) {
             e.preventDefault();
@@ -4349,9 +4479,11 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         }
     });
     let defaultOptions = new DefaultOptions(instanceInfo.vanilla_version);
-    values.forEach((e) => {
+    for (let i = 0; i < values.length; i++) {
+        let e = values[i];
         let item = document.createElement("div");
         item.className = "option-item";
+        values[i].element = item;
 
         let titleElement = document.createElement("div");
         titleElement.className = "option-title";
@@ -4359,7 +4491,8 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         item.appendChild(titleElement);
 
         let onChange = (v) => {
-            if (defaultOptions.getDefault(e.key) == v) {
+            values[i].value = (type == "text" ? '"' + v + '"' : v);
+            if (defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Default';
                 setDefaultButton.onclick = onRemove;
             } else {
@@ -4384,6 +4517,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             type = "key";
         }
         let inputElement;
+        item.setAttribute("data-type", type);
         if (type == "text") {
             inputElement = document.createElement("input");
             inputElement.className = "option-input";
@@ -4392,11 +4526,13 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 try {
                     window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, '"' + inputElement.value + '"');
                     displaySuccess("Updated options.txt!");
+                    values[i].value = '"' + inputElement.value + '"';
                     oldvalue = inputElement.value;
                     onChange(inputElement.value);
                 } catch (e) {
                     displayError("Unable to update options.txt");
-                    inputElement.value = oldvalue;
+                    values[i].value = oldvalue;
+                    inputElement.value = '"' + oldvalue + '"';
                 }
             }
             item.appendChild(inputElement);
@@ -4409,11 +4545,13 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 try {
                     window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
                     displaySuccess("Updated options.txt!");
+                    values[i].value = inputElement.value;
                     oldvalue = inputElement.value;
                     onChange(inputElement.value);
                 } catch (e) {
                     displayError("Unable to update options.txt");
                     inputElement.value = oldvalue;
+                    values[i].value = oldvalue;
                 }
             }
             item.appendChild(inputElement);
@@ -4424,11 +4562,13 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 try {
                     window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, v);
                     displaySuccess("Updated options.txt!");
+                    values[i].value = v;
                     oldvalue = v;
                     onChange(v);
                 } catch (e) {
                     displayError("Unable to update options.txt");
                     inputElement.selectOption(oldvalue);
+                    values[i].value = oldvalue;
                 }
             });
             item.appendChild(inputElement1);
@@ -4440,11 +4580,13 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 try {
                     window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
                     displaySuccess("Updated options.txt!");
+                    values[i].value = inputElement.value;
                     oldvalue = inputElement.value;
                     onChange(inputElement.value);
                 } catch (e) {
                     displayError("Unable to update options.txt");
                     inputElement.value = oldvalue;
+                    values[i].value = oldvalue;
                 }
             }
             item.appendChild(inputElement);
@@ -4472,10 +4614,10 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>Set Default';
 
         let onSet = () => {
-            defaultOptions.setDefault(e.key, inputElement.value);
+            defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
             setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>Remove Default';
             setDefaultButton.onclick = onRemove;
-            displaySuccess("Default value of " + e.key + " set to " + inputElement.value + " for version " + instanceInfo.vanilla_version);
+            displaySuccess("Default value of " + e.key + " set to " + inputElement.value);
         }
 
         setDefaultButton.onclick = onSet;
@@ -4484,7 +4626,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             defaultOptions.deleteDefault(e.key);
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>Set Default';
             setDefaultButton.onclick = onSet;
-            displaySuccess("Default value of " + e.key + " removed for version " + instanceInfo.vanilla_version);
+            displaySuccess("Default value of " + e.key + " removed");
         }
 
         if (defaultOptions.getDefault(e.key) == e.value) {
@@ -4494,7 +4636,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
 
         item.appendChild(setDefaultButton);
 
-        if (e.key == "version") {
+        if (e.key == "version" && Number(e.value) != instanceInfo.attempted_options_txt_version) {
             defaultOptions.setDefault(e.key, e.value);
             setDefaultButton.remove();
             inputElement.style.gridColumn = "span 2";
@@ -4504,7 +4646,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         }
 
         optionList.appendChild(item);
-    });
+    };
 }
 function setInstanceTabContentScreenshots(instanceInfo, element) {
     element.innerHTML = "";
@@ -5114,6 +5256,68 @@ class ImageUpload {
     }
 }
 
+class MultipleSelect {
+    constructor(element, options) {
+        element.className = "multiple-select-wrapper";
+        let topElement = document.createElement("div");
+        topElement.className = "multiple-select-top";
+        let topCheckbox = document.createElement("input");
+        topCheckbox.className = "multiple-select-checkbox";
+        topCheckbox.type = "checkbox";
+        this.checkBox = topCheckbox;
+        let topSearch = document.createElement("div");
+        let searchBar = new SearchBar(topSearch,()=>{
+
+        },()=>{});
+        topElement.appendChild(topCheckbox);
+        topElement.appendChild(topSearch);
+        element.appendChild(topElement);
+
+        let itemList = document.createElement("div");
+        itemList.className = "multiple-select";
+        element.appendChild(itemList);
+
+        this.checkBoxes = [];
+
+        options.forEach(e => {
+            let itemElement = document.createElement("div");
+            itemElement.className = "multiple-select-item";
+            itemList.appendChild(itemElement);
+            let itemCheckbox = document.createElement("input");
+            itemCheckbox.className = "multiple-select-checkbox";
+            itemCheckbox.type = "checkbox";
+            itemElement.appendChild(itemCheckbox);
+            let itemTitle = document.createElement("div");
+            itemTitle.innerHTML = e.name;
+            itemTitle.className = "multiple-select-title";
+            itemElement.appendChild(itemTitle);
+            this.checkBoxes.push(itemCheckbox);
+        });
+    }
+    figureOutMainCheckedState() {
+        let total = 0;
+        let checked = 0;
+        for (let i = 0; i < this.checkBoxes.length; i++) {
+            if (this.checkBoxes[i].checked && isNotDisplayNone(this.checkBoxes[i])) {
+                checked++;
+            }
+            if (isNotDisplayNone(this.checkBoxes[i])) {
+                total++;
+            }
+        }
+        if (total == checked && total != 0) {
+            this.checkBox.checked = true;
+            this.checkBox.indeterminate = false;
+        } else if (checked > 0) {
+            this.checkBox.checked = false;
+            this.checkBox.indeterminate = true;
+        } else {
+            this.checkBox.checked = false;
+            this.checkBox.indeterminate = false;
+        }
+    }
+}
+
 class Dialog {
     constructor() { }
     showDialog(title, type, info, buttons, tabs, onsubmit) {
@@ -5322,6 +5526,8 @@ class Dialog {
                     let multiSelect = new MultiSelect(element, info[i].options);
                     if (info[i].default) multiSelect.selectOption(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
+                } else if (info[i].type == "checkboxes") {
+
                 } else if (info[i].type == "dropdown") {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
@@ -5356,7 +5562,11 @@ class Dialog {
                                 label.innerHTML = "Loading...";
                                 multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
                                 let list = await info[i].source(value);
-                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
+                                    multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
+                                } else {
+                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                }
                                 if (multiSelect.onchange) multiSelect.onchange();
                                 label.innerHTML = sanitize(info[i].name);
                             });
@@ -5366,7 +5576,11 @@ class Dialog {
                                 label.innerHTML = "Loading...";
                                 multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
                                 let list = await info[i].source(value);
-                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
+                                    multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
+                                } else {
+                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                }
                                 if (multiSelect.onchange) multiSelect.onchange();
                                 label.innerHTML = sanitize(info[i].name);
                             }
@@ -5457,16 +5671,26 @@ class Dialog {
     }
 }
 
-function showAddContent(instance_id, vanilla_version, loader) {
+function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     added_vt_dp_packs = [];
     added_vt_rp_packs = [];
     content.innerHTML = "";
+    let titleTop = document.createElement("div");
+    titleTop.className = "title-top";
+    let backButton = document.createElement("button");
+    backButton.innerHTML = '<i class="fa-solid fa-arrow-left"></i>Back to Instance';
+    backButton.className = "back-button";
+    backButton.onclick = () => {
+        showSpecificInstanceContent(new Instance(instance_id), default_tab == "world" ? "worlds" : "content");
+    }
     let title = document.createElement("h1");
     title.innerHTML = "Add Content";
+    titleTop.appendChild(title);
+    if (instance_id) titleTop.appendChild(backButton);
     if (!instance_id) title.innerHTML = "Discover";
     let ele = document.createElement("div");
     ele.classList.add("instance-content");
-    ele.appendChild(title);
+    ele.appendChild(titleTop);
     content.appendChild(ele);
     let tabsElement = document.createElement("div");
     ele.appendChild(tabsElement);
@@ -5506,6 +5730,13 @@ function showAddContent(instance_id, vanilla_version, loader) {
                 contentTabSelect("world", tabInfo, loader, vanilla_version, instance_id);
             }
         },
+        // {
+        //     "name": "Servers",
+        //     "value": "servers",
+        //     "func": () => {
+        //         contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id);
+        //     }
+        // },
         {
             "name": "Data Packs",
             "value": "datapack",
@@ -5517,7 +5748,10 @@ function showAddContent(instance_id, vanilla_version, loader) {
     let tabInfo = document.createElement("div");
     tabInfo.className = "tab-info";
     ele.appendChild(tabInfo);
-    if (!instance_id) {
+    if (default_tab) {
+        tabs.selectOptionAdvanced(default_tab);
+        contentTabSelect(default_tab, tabInfo, loader, vanilla_version, instance_id);
+    } else if (!instance_id) {
         contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id);
     } else if (!loader || loader != "vanilla") {
         contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id);
@@ -5608,7 +5842,7 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
             "func": () => { }
         });
     }
-    if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "world" || tab == "datapack") {
+    if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "world" || tab == "datapack" || tab == "server") {
         sources.push({
             "name": "CurseForge",
             "value": "curseforge",
@@ -5622,13 +5856,13 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
             "func": () => { }
         });
     }
-    if (tab == "world") {
-        sources.push({
-            "name": "Minecraft Maps",
-            "value": "minecraft_maps",
-            "func": () => { }
-        });
-    }
+    // if (tab == "world") {
+    //     sources.push({
+    //         "name": "Minecraft Maps",
+    //         "value": "minecraft_maps",
+    //         "func": () => { }
+    //     });
+    // }
     // let tabs = new TabContent(tabsElement,sources);
 
     let searchAndFilter = document.createElement("div");
@@ -6283,7 +6517,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
             break;
         }
     }
-    if (!initialContent.type && project_type != "mod") {
+    if (!initialContent.type && project_type != "mod" && project_type != "world") {
         for (let j = 0; j < version_json.length; j++) {
             if (project_type != "mod" || version_json[j].loaders.includes(instance.loader)) {
                 initialContent = await addContent(instance_id, project_type, version_json[j].files[0].url, version_json[j].files[0].filename);
@@ -6355,14 +6589,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
             }
         }
     }
-    // initialContent.name = title;
-    // initialContent.source = source;
-    // initialContent.version = version;
-    // initialContent.disabled = false;
-    // initialContent.author = author;
-    // initialContent.image = icon_url;
-    // initialContent.source_id = project_id;
-    instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false);
+    if (project_type != "world") instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false);
 }
 
 function formatCategory(e) {
