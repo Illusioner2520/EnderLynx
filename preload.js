@@ -27,6 +27,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEX
 db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name TEXT, last_used TEXT, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
 
 db.pragma('journal_mode = WAL');
 
@@ -41,8 +42,73 @@ class LoginError extends Error {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    setOptionsTXT: (instance_id, content) => {
+    getPinnedWorlds: async () => {
+        let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");
+        let allWorlds = [];
+        for (const world of worlds) {
+            if (world.world_type == "singleplayer") {
+                const worldPath = path.resolve(__dirname, "minecraft/instances", world.instance_id || "", "saves", world.world_id, "level.dat");
+                if (fs.existsSync(worldPath)) {
+                    try {
+                        const worldInfo = getWorld(worldPath);
+                        allWorlds.push({
+                            ...worldInfo,
+                            pinned: true,
+                            type: "singleplayer",
+                            instance_id: world.instance_id
+                        });
+                    } catch (e) { }
+                } else { }
+            } else {
+                // Multiplayer: find the server info from servers.dat in the instance
+                const serversDatPath = path.resolve(__dirname, "minecraft/instances", world.instance_id || "", "servers.dat");
+                if (fs.existsSync(serversDatPath)) {
+                    console.log("FOUND servers.dat");
+                    try {
+                        const buffer = fs.readFileSync(serversDatPath);
+                        const data = await nbt.parse(buffer);
+                        const servers = data.parsed?.value?.servers?.value?.value || [];
+                        const server = servers.find(s => (s.ip?.value || "") === world.world_id);
+                        if (server) {
+                            console.log("Found server");
+                            allWorlds.push({
+                                type: "multiplayer",
+                                name: server.name?.value || "Unknown",
+                                ip: server.ip?.value || "",
+                                icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
+                                pinned: true,
+                                instance_id: world.instance_id
+                            });
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+            }
+        }
+        return allWorlds;
+    },
+    getRecentlyPlayedWorlds: (instance_ids) => {
+        if (!Array.isArray(instance_ids) || instance_ids.length === 0) return [];
+        const instancesPath = path.resolve(__dirname, "minecraft/instances");
+        let allWorlds = [];
+        for (const instanceId of instance_ids) {
+            const savesPath = path.join(instancesPath, instanceId, "saves");
+            if (!fs.existsSync(savesPath)) continue;
+            const worlds = getWorlds(savesPath).map(world => ({
+                ...world,
+                instance_id: instanceId
+            }));
+            allWorlds = allWorlds.concat(worlds);
+        }
+        allWorlds.sort((a, b) => (b.last_played || 0) - (a.last_played || 0));
+        return allWorlds.slice(0, 5);
+    },
+    setOptionsTXT: (instance_id, content, dont_complete_if_already_exists) => {
         const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
+        if (dont_complete_if_already_exists && fs.existsSync(optionsPath)) {
+            return content.version;
+        }
         fs.writeFileSync(optionsPath, content.content, "utf-8");
         return content.version;
     },
@@ -59,6 +125,91 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } catch (err) {
             return false;
         }
+    },
+    deleteInstanceFiles: async (instance_id) => {
+        const instancePath = path.resolve(__dirname, `minecraft/instances/${instance_id}`);
+        if (!fs.existsSync(instancePath)) {
+            return false;
+        }
+        // Recursively collect all files and folders for progress calculation
+        async function getAllFiles(dir) {
+            let files = [];
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    files = files.concat(await getAllFiles(fullPath));
+                } else {
+                    files.push(fullPath);
+                }
+            }
+            return files;
+        }
+
+        try {
+            const allFiles = await getAllFiles(instancePath);
+            let deleted = 0;
+            for (const file of allFiles) {
+                await fs.promises.unlink(file);
+                deleted++;
+                const percent = Math.round((deleted / allFiles.length) * 100);
+                ipcRenderer.send('progress-update', 'Deleting Instance', percent, `Deleting ${path.basename(file)} (${deleted} of ${allFiles.length})`);
+            }
+            // Remove directories (bottom-up)
+            async function removeDirs(dir) {
+                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        await removeDirs(fullPath);
+                    }
+                }
+                await fs.promises.rmdir(dir);
+            }
+            await removeDirs(instancePath);
+            ipcRenderer.send('progress-update', 'Deleting Instance', 100, 'Instance deleted');
+            return true;
+        } catch (err) {
+            ipcRenderer.send('progress-update', 'Deleting Instance', 100, 'Error deleting instance');
+            throw err;
+        }
+    },
+    duplicateInstanceFiles: async (old_instance_id, new_instance_id) => {
+        const src = path.resolve(__dirname, `minecraft/instances/${old_instance_id}`);
+        const dest = path.resolve(__dirname, `minecraft/instances/${new_instance_id}`);
+        if (!fs.existsSync(src)) return false;
+        await fs.promises.mkdir(dest, { recursive: true });
+        // Get all files and folders in the source directory
+        const entries = await fs.promises.readdir(src, { withFileTypes: true });
+        const total = entries.length;
+        let completed = 0;
+
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+
+            if (entry.isDirectory()) {
+                await fs.promises.mkdir(destPath, { recursive: true });
+                // Recursively copy subdirectory
+                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
+                for (const subEntry of subEntries) {
+                    const subSrcPath = path.join(srcPath, subEntry.name);
+                    const subDestPath = path.join(destPath, subEntry.name);
+                    if (subEntry.isDirectory()) {
+                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
+                    } else {
+                        await fs.promises.copyFile(subSrcPath, subDestPath);
+                    }
+                }
+            } else {
+                await fs.promises.copyFile(srcPath, destPath);
+            }
+
+            completed++;
+            const percent = Math.round((completed / total) * 100);
+            ipcRenderer.send('progress-update', `Duplicating Instance`, percent, `Copying ${entry.name} (${completed} of ${total})`);
+        }
+        return true;
     },
     deleteContent: (instance_id, project_type, file_name) => {
         let folder;
@@ -640,12 +791,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await quilt.getSupportedVanillaVersions();
     },
     getInstanceFolderName: (instance_id) => {
+        let reserved_names = ["con", "prn", "aux", "nul", "com0", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt0", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9", ""]
         for (let i = 0; i < instance_id.length; i++) {
-            if (!/^[a-zA-Z_\-\s]$/.test(instance_id[i])) {
+            if (!/^[0-9a-zA-Z_\-\s]$/.test(instance_id[i])) {
                 instance_id = instance_id.substring(0, i) + "_" + instance_id.substring(i + 1);
             }
         }
-        let baseInstanceId = instance_id;
+        if (reserved_names.includes(instance_id.toLowerCase())) {
+            instance_id += "_";
+        }
+        let baseInstanceId = instance_id.trim();
         let counter = 1;
         while (folderExists(`./minecraft/instances/${instance_id}`)) {
             instance_id = `${baseInstanceId}_${counter}`;
@@ -653,6 +808,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         fs.mkdirSync(`./minecraft/instances/${instance_id}`, { recursive: true });
         return instance_id;
+    },
+    getInstanceFolders: (instance_id) => {
+        const instancePath = path.resolve(__dirname, `minecraft/instances/${instance_id}`);
+        if (!fs.existsSync(instancePath)) return [];
+        const entries = fs.readdirSync(instancePath).map(name => {
+            const fullPath = path.join(instancePath, name);
+            const stat = fs.statSync(fullPath);
+            return {
+                name: stat.isDirectory() ? '<i class="fa-solid fa-folder"></i> ' + name : '<i class="fa-solid fa-file"></i> ' + name,
+                isDirectory: stat.isDirectory(),
+                isFile: stat.isFile(),
+                path: fullPath,
+                value: fullPath
+            };
+        });
+        // Folders first, then files
+        return [
+            ...entries.filter(e => e.isDirectory),
+            ...entries.filter(e => e.isFile)
+        ];
     },
     downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
         let mc = new Minecraft(instance_id);
@@ -859,6 +1034,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
             // Optionally delete the temp world zip after extraction
             fs.unlinkSync(install_path);
+            const tempWorldPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/temp_worlds`);
+            if (fs.existsSync(tempWorldPath)) {
+                fs.rmSync(tempWorldPath, { recursive: true, force: true });
+            }
         }
 
         let type_convert = {
@@ -1220,7 +1399,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let the_path = path.resolve(instance_path, "saves");
         console.log(the_path)
         if (!fs.existsSync(the_path)) return [];
-        return getWorlds(the_path).map(e => ({"name":e.name, "value": path.resolve(the_path, e.id)}));
+        return getWorlds(the_path).map(e => ({ "name": e.name, "value": path.resolve(the_path, e.id) }));
     },
     transferWorld: (old_world_path, instance_id, delete_previous_files) => {
         const savesPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
@@ -1248,7 +1427,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getLauncherInstances: async (instance_path) => {
         console.log(instance_path);
-        if (!fs.existsSync(instance_path)) return [{"name": "Unable to locate Instances", "value": "error"}];
+        if (!fs.existsSync(instance_path)) return [{ "name": "Unable to locate Instances", "value": "error" }];
         return fs.readdirSync(instance_path)
             .filter(f => {
                 const fullPath = path.join(instance_path, f);
@@ -1322,6 +1501,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
 });
 
+function getWorld(levelDatPath) {
+    const buffer = fs.readFileSync(levelDatPath);
+    const decompressed = zlib.gunzipSync(buffer); // Decompress the GZip data
+
+    const data = nbt.parseUncompressed(decompressed); // Synchronous parsing
+    const levelData = data.value.Data.value;
+
+    const parentFolder = path.basename(path.dirname(levelDatPath));
+    const grandparentFolder = path.dirname(path.dirname(levelDatPath));
+
+    return ({
+        name: levelData.LevelName.value,
+        id: parentFolder,
+        seed: levelData.RandomSeed?.value ?? null,
+        last_played: Number(levelData.LastPlayed.value),
+        icon: fs.existsSync(path.resolve(grandparentFolder, parentFolder, "icon.png"))
+            ? path.resolve(grandparentFolder, `${parentFolder}/icon.png`)
+            : null,
+        mode: (() => {
+            const modeId = levelData.GameType?.value ?? 0;
+            switch (modeId) {
+                case 0: return "survival";
+                case 1: return "creative";
+                case 2: return "adventure";
+                case 3: return "spectator";
+                default: return "unknown";
+            }
+        })(),
+        hardcore: !!levelData.hardcore?.value,
+        commands: !!levelData.allowCommands?.value,
+        flat: levelData?.WorldGenSettings?.value?.dimensions?.value["minecraft:overworld"]?.value?.generator?.value?.type?.value == "minecraft:flat",
+        difficulty: (() => {
+            const diffId = levelData.Difficulty?.value ?? 2;
+            switch (diffId) {
+                case 0: return "peaceful";
+                case 1: return "easy";
+                case 2: return "normal";
+                case 3: return "hard";
+                default: return "unknown";
+            }
+        })()
+    })
+}
+
 function getWorlds(patha) {
     fs.mkdirSync(patha, { recursive: true });
     let worldDirs = fs.opendirSync(patha);
@@ -1333,43 +1556,8 @@ function getWorlds(patha) {
         const levelDatPath = path.resolve(patha, dir.name, 'level.dat');
 
         try {
-            const buffer = fs.readFileSync(levelDatPath);
-            const decompressed = zlib.gunzipSync(buffer); // Decompress the GZip data
 
-            const data = nbt.parseUncompressed(decompressed); // Synchronous parsing
-            const levelData = data.value.Data.value;
-
-            worlds.push({
-                name: levelData.LevelName.value,
-                id: dir.name,
-                last_played: Number(levelData.LastPlayed.value),
-                icon: fs.existsSync(path.resolve(patha, dir.name, "icon.png"))
-                    ? path.resolve(patha, `${dir.name}/icon.png`)
-                    : null,
-                mode: (() => {
-                    const modeId = levelData.GameType?.value ?? 0;
-                    switch (modeId) {
-                        case 0: return "survival";
-                        case 1: return "creative";
-                        case 2: return "adventure";
-                        case 3: return "spectator";
-                        default: return "unknown";
-                    }
-                })(),
-                hardcore: !!levelData.hardcore?.value,
-                commands: !!levelData.allowCommands?.value,
-                flat: levelData?.WorldGenSettings?.value?.dimensions?.value["minecraft:overworld"]?.value?.generator?.value?.type?.value == "minecraft:flat",
-                difficulty: (() => {
-                    const diffId = levelData.Difficulty?.value ?? 2;
-                    switch (diffId) {
-                        case 0: return "peaceful";
-                        case 1: return "easy";
-                        case 2: return "normal";
-                        case 3: return "hard";
-                        default: return "unknown";
-                    }
-                })()
-            });
+            worlds.push(getWorld(levelDatPath));
         } catch (e) {
             console.error(`Failed to parse level.dat for world ${dir.name}:`, e);
         }

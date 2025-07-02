@@ -256,6 +256,11 @@ button {
     }
 }
 
+@position-try --top {
+    bottom: calc(anchor(top) + var(--menu-padding));
+    top: unset;
+}
+
 .more-menu {
     inset: unset;
     background-color: var(--color-1);
@@ -265,6 +270,7 @@ button {
     overflow-y: hidden;
     position: absolute;
     top: calc(anchor(bottom) + var(--menu-padding));
+    position-try-fallbacks: --top;
     right: anchor(right);
     border-radius: 10px;
     height: max-content;
@@ -642,6 +648,7 @@ h1 {
     background-color: var(--color-1);
     border-radius: 8px 8px 8px 8px;
     transition: border-radius .25s;
+    overflow: hidden;
 }
 
 .search-dropdown:has(:popover-open) {
@@ -660,11 +667,21 @@ h1 {
 
 .dropdown-info {
     margin-right: 8px;
+    flex-shrink: 1;
+    flex-grow: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .dropdown-title {
     color: var(--subtle-text-color);
     font-size: .8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .dropdown-selected {
@@ -672,6 +689,12 @@ h1 {
     font-weight: bold;
     font-size: 1rem;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: block;
+    min-width: 0;
+    flex-shrink: 1;
 }
 
 .dropdown-chevron {
@@ -882,6 +905,7 @@ h1 {
     animation-name: spin;
     animation-iteration-count: infinite;
     animation-duration: 1s;
+    display: block;
 }
 
 @keyframes spin {
@@ -1741,6 +1765,10 @@ dialog[open]::backdrop {
 
 .dialog-button.confirm:hover {
     background-color: color-mix(in srgb, 85% var(--accent-color), var(--text-color));
+}
+
+.dialog-button.confirm .spinner {
+    border-width: 2px;
 }
 
 .dialog-text-input {
@@ -2854,7 +2882,7 @@ dialog[open]::backdrop {
     grid-template-columns: auto 1fr;
 }
 
-.multiple-select { 
+.multiple-select {
     border-radius: 8px;
     background-color: var(--color-1);
     grid-template-columns: subgrid;
@@ -2869,9 +2897,9 @@ dialog[open]::backdrop {
     grid-column: span 2;
     padding: 10px;
     gap: 10px;
-    align-items:center;
+    align-items: center;
     height: 50px;
-    padding-top: 0;
+    padding-top: 2px;
 }
 
 .multiple-select-top .search-bar {
@@ -2888,7 +2916,7 @@ dialog[open]::backdrop {
     grid-column: span 2;
     padding: 10px;
     gap: 10px;
-    align-items:center;
+    align-items: center;
 }
 
 .multiple-select-item:last-child {
@@ -2910,4 +2938,26 @@ dialog[open]::backdrop {
     cursor: pointer;
     margin: 0;
     accent-color: var(--accent-color);
+}
+
+.home-entry {
+    background-color: var(--color-1t);
+    border-radius: 10px;
+    display: flex;
+    padding: 8px;
+    cursor: pointer;
+    gap: 8px;
+    align-items: center;
+    transition: background-color .25s, scale .1s;
+}
+
+.home-element {
+    display: flex;
+    padding: 10px;
+    gap: 10px;
+}
+
+.home-column {
+    display: grid;
+    gap: 10px;
 }

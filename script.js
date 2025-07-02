@@ -301,6 +301,10 @@ class Instance {
         this.attempted_options_txt_version = content.attempted_options_txt_version;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
+    get pinned() {
+        let inst = db.prepare("SELECT * FROM pins WHERE instance_id = ? AND type = ?").get(this.instance_id, "instance");
+        return Boolean(inst);
+    }
     setJavaVersion(java_version) {
         db.prepare("UPDATE instances SET java_version = ? WHERE id = ?").run(java_version, this.id);
         this.java_version = java_version;
@@ -356,7 +360,7 @@ class Instance {
         this.vanilla_version = vanilla_version;
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.electronAPI.setOptionsTXT(this.instance_id, default_options.getOptionsTXT());
+        let v = window.electronAPI.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false);
         this.setAttemptedOptionsTxtVersion(v);
     }
     setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
@@ -458,7 +462,7 @@ class Data {
     addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
         db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(data.getDefault("default_width")), Number(data.getDefault("default_height")), Number(data.getDefault("default_ram")));
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT());
+        let v = window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true);
         let instance = new Instance(instance_id);
         instance.setAttemptedOptionsTxtVersion(v);
         return instance;
@@ -1081,7 +1085,9 @@ class MoreMenu {
         for (let i = 0; i < buttons.buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("context-menu-button");
-            buttonElement.innerHTML = buttons.buttons[i].icon + sanitize(buttons.buttons[i].title);
+            let icon = typeof buttons.buttons[i].icon === "function" ? buttons.buttons[i].icon() : buttons.buttons[i].icon;
+            let title = typeof buttons.buttons[i].title === "function" ? buttons.buttons[i].title() : buttons.buttons[i].title;
+            buttonElement.innerHTML = icon + sanitize(title);
             if (buttons.buttons[i].danger) {
                 buttonElement.classList.add("danger");
             }
@@ -1120,7 +1126,9 @@ class ContextMenu {
         for (let i = 0; i < buttons.buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("context-menu-button");
-            buttonElement.innerHTML = buttons.buttons[i].icon + sanitize(buttons.buttons[i].title);
+            let icon = typeof buttons.buttons[i].icon === "function" ? buttons.buttons[i].icon() : buttons.buttons[i].icon;
+            let title = typeof buttons.buttons[i].title === "function" ? buttons.buttons[i].title() : buttons.buttons[i].title;
+            buttonElement.innerHTML = icon + sanitize(title);
             if (buttons.buttons[i].danger) {
                 buttonElement.classList.add("danger");
             }
@@ -2157,7 +2165,8 @@ function showMyAccountContent(e) {
                                 "type": "text",
                                 "id": "name",
                                 "name": "Name",
-                                "default": e.name
+                                "default": e.name,
+                                "maxlength": 50
                             },
                             {
                                 "type": "dropdown",
@@ -2684,7 +2693,8 @@ function showInstanceContent(e) {
                 "type": "text",
                 "name": translate("app.instances.name"),
                 "id": "name",
-                "tab": "custom"
+                "tab": "custom",
+                "maxlength": 50
             },
             {
                 "type": "multi-select",
@@ -2718,7 +2728,8 @@ function showInstanceContent(e) {
                 "type": "text",
                 "id": "name_f",
                 "tab": "file",
-                "name": "Name"
+                "name": "Name",
+                "maxlength": 50
             },
             {
                 "type": "text",
@@ -2802,7 +2813,7 @@ function showInstanceContent(e) {
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
             if (info.selected_tab == "custom") {
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[#<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                 let loader_version = "";
                 if (info.loader == "fabric") {
                     loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
@@ -2820,7 +2831,7 @@ function showInstanceContent(e) {
                 instance.setJavaVersion(r.java_version);
                 instance.setMcInstalled(true);
             } else if (info.selected_tab == "file") {
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name_f.toLowerCase());
+                let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
                 let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
@@ -2970,7 +2981,9 @@ function showInstanceContent(e) {
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": translate("app.button.instances.duplicate"),
-                "func": (e) => { }
+                "func": (e) => {
+                    duplicateInstance(instances[i]);
+                }
             },
             {
                 "icon": '<i class="fa-solid fa-folder"></i>',
@@ -2992,11 +3005,28 @@ function showInstanceContent(e) {
                 }
             },
             {
+                "icon": () => instances[i].pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": () => instances[i].pinned ? "Unpin Instance" : "Pin Instance",
+                "func": (e) => {
+                    instances[i].pinned ? unpinInstance(instances[i]) : pinInstance(instances[i]);
+                    e.setTitle(instances[i].pinned ? "Unpin Instance" : "Pin Instance");
+                    e.setIcon(instances[i].pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                }
+            },
+            {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.button.instances.delete"),
                 "func": (e) => {
                     let dialog = new Dialog();
-                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the instance '" + instances[i].name + "'?", [ // TODO
+                    dialog.showDialog("Are you sure?", "form", [{
+                        "content": "Are you sure that you want to delete the instance '" + instances[i].name + "'?",
+                        "type": "notice"
+                    }, {
+                        "type": "toggle",
+                        "name": "Delete Instance Files",
+                        "default": false,
+                        "id": "delete"
+                    }], [
                         {
                             "type": "cancel",
                             "content": "Cancel"
@@ -3005,9 +3035,16 @@ function showInstanceContent(e) {
                             "type": "confirm",
                             "content": "Confirm Deletion"
                         }
-                    ], [], () => {
+                    ], [], async (v) => {
                         instances[i].delete();
                         instanceContent.displayContent();
+                        if (v[0].value) {
+                            try {
+                                await window.electronAPI.deleteInstanceFiles(instances[i].instance_id);
+                            } catch (e) {
+                                displayError("Unable to delete instance files.");
+                            }
+                        }
                     });
                 },
                 "danger": true
@@ -3153,7 +3190,9 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         {
             "icon": '<i class="fa-solid fa-copy"></i>',
             "title": translate("app.button.instances.duplicate"),
-            "func": (e) => { }
+            "func": (e) => {
+                duplicateInstance(instanceInfo);
+            }
         },
         {
             "icon": '<i class="fa-solid fa-folder"></i>',
@@ -3175,11 +3214,28 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             }
         },
         {
+            "icon": () => instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+            "title": () => instanceInfo.pinned ? "Unpin Instance" : "Pin Instance",
+            "func": (e) => {
+                instanceInfo.pinned ? unpinInstance(instanceInfo) : pinInstance(instanceInfo);
+                e.setTitle(instanceInfo.pinned ? "Unpin Instance" : "Pin Instance");
+                e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+            }
+        },
+        {
             "icon": '<i class="fa-solid fa-trash-can"></i>',
             "title": translate("app.button.instances.delete"),
             "func": (e) => {
                 let dialog = new Dialog();
-                dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the instance '" + instanceInfo.name + "'?", [ // TODO
+                dialog.showDialog("Are you sure?", "form", [{
+                    "content": "Are you sure that you want to delete the instance '" + instanceInfo.name + "'?",
+                    "type": "notice"
+                }, {
+                    "type": "toggle",
+                    "name": "Delete Instance Files",
+                    "default": false,
+                    "id": "delete"
+                }], [
                     {
                         "type": "cancel",
                         "content": "Cancel"
@@ -3188,9 +3244,16 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
                         "type": "confirm",
                         "content": "Confirm Deletion"
                     }
-                ], [], () => {
+                ], [], async (v) => {
                     instanceInfo.delete();
                     instanceContent.displayContent();
+                    if (v[0].value) {
+                        try {
+                            await window.electronAPI.deleteInstanceFiles(instanceInfo.instance_id);
+                        } catch (e) {
+                            displayError("Unable to delete instance files.");
+                        }
+                    }
                 });
             },
             "danger": true
@@ -3251,7 +3314,8 @@ function showInstanceSettings(instanceInfo) {
             "name": "Name",
             "id": "name",
             "default": instanceInfo.name,
-            "tab": "general"
+            "tab": "general",
+            "maxlength": 50
         },
         {
             "type": "text",
@@ -3745,7 +3809,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             for (let i = 0; i < info.world.length; i++) {
                 let world = info.world[i];
                 try {
-                    window.electronAPI.transferWorld(world,instanceInfo.instance_id,info.remove);
+                    window.electronAPI.transferWorld(world, instanceInfo.instance_id, info.remove);
                 } catch (e) {
                     displayError("Error occured while transferring world: " + e.message);
                 }
@@ -3845,6 +3909,23 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             }
                         },
                         {
+                            "title": "Open Seed Map",
+                            "icon": '<i class="fa-solid fa-map"></i>',
+                            "func": () => {
+                                
+                            }
+                        },
+                        {
+                            "title": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? "Unpin World" : "Pin World",
+                            "icon": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                            "func": (e) => {
+                                let world_pinned = isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer");
+                                world_pinned ? unpinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id) : pinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id)
+                                e.setTitle(!world_pinned ? "Unpin World" : "Pin World");
+                                e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                            }
+                        },
+                        {
                             "title": translate("app.worlds.share"),
                             "icon": '<i class="fa-solid fa-share"></i>',
                             "func": () => { }
@@ -3918,6 +3999,16 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
+                        {
+                            "title": () => isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? "Unpin World" : "Pin World",
+                            "icon": () => isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                            "func": (e) => {
+                                let world_pinned = isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer");
+                                world_pinned ? unpinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id) : pinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id)
+                                e.setTitle(!world_pinned ? "Unpin World" : "Pin World");
+                                e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                            }
+                        },
                         {
                             "title": translate("app.worlds.share"),
                             "icon": '<i class="fa-solid fa-share"></i>',
@@ -5372,11 +5463,21 @@ class MultipleSelect {
     get value() {
         let vals = [];
         this.items.forEach(e => {
-            if (e.checkbox.checked && isNotDisplayNone(e.checkbox)) {
+            if (e.checkbox.checked) {
                 vals.push(e.val);
             }
         });
         return vals;
+    }
+    setSelected(selected) {
+        this.items.forEach(e => {
+            if (selected.includes(e.val)) {
+                e.checkbox.checked = true;
+            } else {
+                e.checkbox.checked = false;
+            }
+            this.figureOutMainCheckedState();
+        });
     }
     setOptions(options) {
         console.log(options);
@@ -5510,6 +5611,7 @@ class Dialog {
                 if (info[i].type == "notice") {
                     let textElement = document.createElement("div");
                     textElement.innerHTML = (info[i].content);
+                    if (info[i].width) textElement.style.width = info[i].width + "px";
                     contents[tab].appendChild(textElement);
                 } else if (info[i].type == "text") {
                     let id = createId();
@@ -5537,7 +5639,8 @@ class Dialog {
                     if (info[i].onchange) textInput.onchange = () => {
                         info[i].onchange(textInput.value);
                     }
-                    if (info[i].default) textInput.value = info[i].default;
+                    if (info[i].maxlength) textInput.maxLength = info[i].maxlength;
+                    if (info[i].default) textInput.value = info[i].maxlength ? info[i].default.substring(0, info[i].maxlength) : info[i].default;
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     contents[tab].appendChild(wrapper);
@@ -5690,6 +5793,7 @@ class Dialog {
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);
                     let multiSelect = new MultipleSelect(element, info[i].options);
+                    if (info[i].default) multiSelect.setSelected(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "dropdown") {
                     let wrapper = document.createElement("div");
@@ -5866,10 +5970,10 @@ class Dialog {
                 }
             } else if (buttons[i].type == "confirm") {
                 buttonElement.classList.add("confirm");
-                buttonElement.onclick = () => {
+                buttonElement.onclick = async () => {
                     let info = this.values.map(e => ({ "id": e.id, "value": e.element.value }));
                     info.push({ "id": "selected_tab", "value": selectedTab });
-                    onsubmit(info);
+                    onsubmit(info, buttonElement);
                     this.element.close();
                     setTimeout(() => {
                         this.element.remove();
@@ -6272,7 +6376,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         "type": "text",
                         "name": "Name", //TODO
                         "id": "name",
-                        "default": i.title
+                        "default": i.title,
+                        "maxlength": 50
                     },
                     {
                         "type": "dropdown",
@@ -6292,7 +6397,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 ], [], async (e) => {
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
-                    let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[#<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+                    let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                     let res = await fetch(`https://api.modrinth.com/v2/project/${i.project_id}/version`);
                     let version_json = await res.json();
                     let version = {};
@@ -6437,7 +6542,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         "type": "text",
                         "name": "Name", //TODO
                         "id": "name",
-                        "default": e.name
+                        "default": e.name,
+                        "maxlength": 50
                     }
                 ], [
                     { "content": "Cancel", "type": "cancel" },
@@ -6445,7 +6551,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 ], [], async (ed) => {
                     let info = {};
                     ed.forEach(ed => { info[ed.id] = ed.value });
-                    let instance_id = window.electronAPI.getInstanceFolderName(info.name.replace(/[#<>:"/\\|?*\x00-\x1F]/g, "_").toLowerCase());
+                    let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                     let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
                     let res = await fetch(`https://www.curseforge.com/api/v1/mods/${e.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true${project_type == "mod" ? "&gameFlavorId=" + game_flavor : ""}`);
                     let version_json = await res.json();
@@ -6989,3 +7095,142 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
 }
 
 document.getElementsByClassName("toasts")[0].showPopover();
+
+function duplicateInstance(instanceInfo) {
+    instanceInfo = instanceInfo.refresh();
+    let dialog = new Dialog();
+    if (!instanceInfo.mc_installed || instanceInfo.installing) {
+        dialog.showDialog(`Duplicate '${instanceInfo.name}'`, "notice", "Please wait for the instance to finish installing before attempting to duplicate.", [
+            {
+                "type": "cancel",
+                "content": "Close"
+            }
+        ], [], () => { });
+        return;
+    }
+    dialog.showDialog(`Duplicate '${instanceInfo.name}'`, "form", [
+        {
+            "type": "image-upload",
+            "default": instanceInfo.image,
+            "id": "icon",
+            "name": "Icon"
+        },
+        {
+            "type": "text",
+            "default": instanceInfo.name + " (Copy)",
+            "id": "name",
+            "name": "Name",
+            "maxlength": 50
+        },
+        {
+            "type": "notice",
+            "content": "This will copy all of the files from this instance to the new instance."
+        }
+    ], [
+        {
+            "type": "cancel",
+            "content": "Cancel"
+        },
+        {
+            "type": "confirm",
+            "content": "Duplicate Instance"
+        }
+    ], [], async (v) => {
+        log.setData([
+            {
+                "title": "Duplicating Instance",
+                "progress": 0,
+                "desc": "Beginning Duplication"
+            }
+        ]);
+        let info = {};
+        v.forEach(e => info[e.id] = e.value);
+        let new_instance_id = window.electronAPI.getInstanceFolderName(info.name);
+        try {
+            let success = await window.electronAPI.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
+            let oldContent = instanceInfo.getContent();
+            if (!success) throw new Error();
+            let newInstance = data.addInstance(
+                info.name,
+                new Date(),
+                new Date(),
+                "",
+                instanceInfo.loader,
+                instanceInfo.vanilla_version,
+                instanceInfo.loader_version,
+                instanceInfo.locked,
+                instanceInfo.downloaded,
+                instanceInfo.group,
+                info.icon,
+                new_instance_id,
+                0,
+                instanceInfo.install_source,
+                instanceInfo.install_id,
+                false,
+                true
+            );
+            for (let c of oldContent) {
+                newInstance.addContent(
+                    c.name,
+                    c.author,
+                    c.image,
+                    c.file_name,
+                    c.source,
+                    c.type,
+                    c.version,
+                    c.source_info,
+                    c.disabled
+                );
+            }
+            showSpecificInstanceContent(newInstance);
+        } catch (e) {
+            displayError("Unable to duplicate instance.");
+            throw e;
+        }
+    })
+}
+
+function getRecentlyPlayedWorlds() {
+    return window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
+}
+
+function getRecentlyPlayedInstances() {
+    let instances = db.prepare("SELECT * FROM instances").all();
+    instances.sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
+    return instances.slice(0, 5).map(e => new Instance(e.instance_id));
+}
+
+function getPinnedInstances() {
+    let instances = db.prepare("SELECT * FROM pins WHERE type = ?").all("instance");
+    return instances.map(e => new Instance(e.instance_id));
+}
+function getPinnedWorlds() {
+    return window.electronAPI.getPinnedWorlds();
+}
+function pinInstance(instanceInfo) {
+    console.log("Pinning " + instanceInfo.name);
+    db.prepare("INSERT INTO pins (type, instance_id) VALUES (?, ?)").run("instance", instanceInfo.instance_id);
+    displaySuccess("Instance pinned");
+}
+function unpinInstance(instanceInfo) {
+    console.log("Unpinning " + instanceInfo.name);
+    db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ?").run("instance", instanceInfo.instance_id);
+    displaySuccess("Instance unpinned");
+}
+function pinSingleplayerWorld(world_id, instance_id) {
+    db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, world_id, "singleplayer");
+}
+function unpinSingleplayerWorld(world_id, instance_id) {
+    db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, world_id, "singleplayer");
+}
+function pinMultiplayerWorld(ip, instance_id) {
+    db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, ip, "multiplayer");
+}
+function unpinMultiplayerWorld(ip, instance_id) {
+    db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, ip, "multiplayer");
+}
+function isWorldPinned(world_id, instance_id, world_type) {
+    let world = db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type);
+    return Boolean(world);
+}
+
