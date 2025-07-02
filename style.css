@@ -155,7 +155,6 @@ button {
     color: var(--subtle-text-color);
 }
 
-
 .player-chevron {
     font-size: .8rem;
     color: var(--subtle-text-color);
@@ -621,7 +620,6 @@ h1 {
     outline: 0;
 }
 
-
 .search-clear {
     color: var(--subtle-text-color);
     cursor: pointer;
@@ -673,8 +671,8 @@ h1 {
     color: var(--text-color);
     font-weight: bold;
     font-size: 1rem;
+    white-space: nowrap;
 }
-
 
 .dropdown-chevron {
     transition: rotate .25s;
@@ -2055,6 +2053,10 @@ dialog[open]::backdrop {
     box-shadow: 0px 0px 10px black;
 }
 
+.success:hover {
+    opacity: .4;
+}
+
 .success.shown {
     display: block;
     transform: translateX(0);
@@ -2067,6 +2069,8 @@ dialog[open]::backdrop {
 .toasts {
     display: flex;
     flex-direction: column;
+    inset: unset;
+    border: 0;
     position: fixed;
     bottom: 0;
     right: 0;
@@ -2074,7 +2078,9 @@ dialog[open]::backdrop {
     gap: 10px;
     width: max-content;
     overflow: hidden;
-
+    z-index: 10000;
+    background: transparent;
+    pointer-events: none;
 }
 
 .vt-button-wrapper {
@@ -2844,7 +2850,7 @@ dialog[open]::backdrop {
 .multiple-select-wrapper {
     display: grid;
     max-height: 300px;
-    overflow-y: auto;
+    overflow-y: scroll;
     grid-template-columns: auto 1fr;
 }
 
@@ -2853,6 +2859,7 @@ dialog[open]::backdrop {
     background-color: var(--color-1);
     grid-template-columns: subgrid;
     grid-column: span 2;
+    margin-right: 10px;
     display: grid;
 }
 
@@ -2863,6 +2870,16 @@ dialog[open]::backdrop {
     padding: 10px;
     gap: 10px;
     align-items:center;
+    height: 50px;
+    padding-top: 0;
+}
+
+.multiple-select-top .search-bar {
+    grid-column: span 1;
+}
+
+.multiple-select-top .search-icon {
+    font-size: 1rem;
 }
 
 .multiple-select-item {
@@ -2872,6 +2889,10 @@ dialog[open]::backdrop {
     padding: 10px;
     gap: 10px;
     align-items:center;
+}
+
+.multiple-select-item:last-child {
+    border-radius: 0px 0px 8px 8px;
 }
 
 .multiple-select-title {
@@ -2884,8 +2905,8 @@ dialog[open]::backdrop {
 }
 
 .multiple-select-checkbox {
-    height: 15px;
-    width: 15px;
+    height: 20px;
+    width: 20px;
     cursor: pointer;
     margin: 0;
     accent-color: var(--accent-color);

@@ -356,11 +356,11 @@ class Instance {
         this.vanilla_version = vanilla_version;
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.electronAPI.setOptionsTXT(this.id, default_options.getOptionsTXT());
+        let v = window.electronAPI.setOptionsTXT(this.instance_id, default_options.getOptionsTXT());
         this.setAttemptedOptionsTxtVersion(v);
     }
     setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
-        db.prepare("UPDATE instance SET attempted_options_txt_version = ? WHERE id = ?").run(attempted_options_txt_version, this.id);
+        db.prepare("UPDATE instances SET attempted_options_txt_version = ? WHERE id = ?").run(attempted_options_txt_version, this.id);
         this.attempted_options_txt_version = attempted_options_txt_version;
     }
     setLoaderVersion(loader_version) {
@@ -1988,6 +1988,10 @@ settingsButtonEle.onclick = () => {
         {
             "name": translate("app.settings.tab.defaults"),
             "value": "defaults"
+        },
+        {
+            "name": "Default Options",
+            "value": "options"
         },
         {
             "name": translate("app.settings.tab.java"),
@@ -3619,7 +3623,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>Import Worlds'
     importWorlds.onclick = () => {
         let getInstances = () => {
-            return data.getInstances().map(e => ({"name":e.name,"value":e.instance_id}));
+            return data.getInstances().map(e => ({ "name": e.name, "value": e.instance_id }));
         }
         let dialog = new Dialog();
         dialog.showDialog("Select Worlds to Import", "form", [
@@ -3663,14 +3667,69 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 ]
             },
             {
+                "type": "text",
+                "id": "folder_path",
+                "name": "Instance Folder Path",
+                "default": window.electronAPI.getInstanceFolderPath(),
+                "input_source": "launcher",
+                "source": window.electronAPI.getLauncherInstancePath,
+                "buttons": [
+                    {
+                        "name": "Browse Folders",
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 1);
+                            if (newValue) i.value = newValue;
+                            if (i.onchange) i.onchange();
+                        }
+                    }
+                ]
+            },
+            {
                 "type": "dropdown",
                 "name": "Instance",
-                "input_source": "launcher",
+                "input_source": "folder_path",
                 "id": "instance",
-                "source": getInstances,
-                "options": []
+                "source": window.electronAPI.getLauncherInstances,
+                "options": [],
+                "onchange": (a, b, c) => {
+                    let launcher = "";
+                    let filePath = "";
+                    for (let i = 0; i < b.length; i++) {
+                        if (b[i].id == "launcher") {
+                            launcher = b[i].element.value;
+                            if (launcher == "vanilla") {
+                                c.style.display = "none";
+                            } else {
+                                c.style.display = "grid";
+                            }
+                        }
+                        if (b[i].id == "folder_path") {
+                            filePath = b[i].element.value;
+                        }
+                        if (b[i].id == "world") {
+                            if (launcher == "vanilla") {
+                                b[i].element.setOptions(window.electronAPI.getWorldsFromOtherLauncher(filePath).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                            } else {
+                                b[i].element.setOptions(window.electronAPI.getWorldsFromOtherLauncher(a).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "checkboxes",
+                "name": "Worlds",
+                "options": getInstanceWorlds(instanceInfo).map(e => ({ "name": e.name, "value": e.id })),
+                "id": "world"
+            },
+            {
+                "type": "toggle",
+                "name": "Remove Previous World Files",
+                "id": "remove",
+                "default": false
             }
-        ],[
+        ], [
             {
                 "type": "cancel",
                 "content": "Cancel"
@@ -3679,9 +3738,20 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 "type": "confirm",
                 "content": "Import"
             }
-        ],[],(v) => {
+        ], [], (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
+            console.log(info);
+            for (let i = 0; i < info.world.length; i++) {
+                let world = info.world[i];
+                try {
+                    window.electronAPI.transferWorld(world,instanceInfo.instance_id,info.remove);
+                } catch (e) {
+                    displayError("Error occured while transferring world: " + e.message);
+                }
+            }
+            displaySuccess("World transfers completed!");
+            setInstanceTabContentWorlds(instanceInfo, element);
         })
     }
     let addContent = document.createElement("button");
@@ -3738,7 +3808,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 "image": worlds[i].icon ?? "default.png",
                 "onremove": (ele) => {
                     let dialog = new Dialog();
-                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + parseMinecraftFormatting(worlds[i].name) + "'?", [ // TODO
                         {
                             "type": "cancel",
                             "content": "Cancel"
@@ -3751,9 +3821,9 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                         let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                         if (success) {
                             ele.remove();
-                            displaySuccess("Deleted " + worlds[i].name);
+                            displaySuccess("Deleted " + parseMinecraftFormatting(worlds[i].name));
                         } else {
-                            displayError("Unable to delete " + worlds[i].name);
+                            displayError("Unable to delete " + parseMinecraftFormatting(worlds[i].name));
                         }
                     });
                 },
@@ -3764,7 +3834,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playSingleplayerWorld(instanceInfo, worlds[i].id);
-                                showSpecificInstanceContent(instanceInfo, 'worlds');
+                                showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
                             }
                         } : null,
                         {
@@ -3786,7 +3856,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "func_id": "delete",
                             "func": (ele) => {
                                 let dialog = new Dialog();
-                                dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + worlds[i].name + "'?", [ // TODO
+                                dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + parseMinecraftFormatting(worlds[i].name) + "'?", [ // TODO
                                     {
                                         "type": "cancel",
                                         "content": "Cancel"
@@ -3799,9 +3869,9 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                     let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                                     if (success) {
                                         ele.remove();
-                                        displaySuccess("Deleted " + worlds[i].name);
+                                        displaySuccess("Deleted " + parseMinecraftFormatting(worlds[i].name));
                                     } else {
-                                        displayError("Unable to delete " + worlds[i].name);
+                                        displayError("Unable to delete " + parseMinecraftFormatting(worlds[i].name));
                                     }
                                 });
                             }
@@ -4835,7 +4905,7 @@ let hideToast = (e) => {
 function displayError(error) {
     let element = document.createElement("div");
     element.classList.add("error");
-    element.innerHTML = sanitize(error.toString());
+    element.innerHTML = (error.toString());
     let toasts = document.getElementsByClassName("toasts")[0];
     toasts.appendChild(element);
     element.classList.add("shown");
@@ -4865,6 +4935,8 @@ async function playInstance(instInfo, quickPlay = null) {
     try {
         pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path);
         if (!pid) return;
+        console.log(pid.minecraft.pid);
+        console.log(window.electronAPI.checkForProcess(pid.minecraft.pid));
         instInfo.setPid(pid.minecraft.pid);
         instInfo.setCurrentLogFile(pid.minecraft.log);
         let default_player = data.getDefaultProfile();
@@ -5157,6 +5229,8 @@ async function getVersions(loader, mcVersion) {
         let v = await window.electronAPI.getQuiltLoaderVersions(mcVersion);
         version_cache["quilt-" + mcVersion] = v;
         return v;
+    } else {
+        throw new Error("Unknown Loader");
     }
 }
 
@@ -5264,11 +5338,25 @@ class MultipleSelect {
         let topCheckbox = document.createElement("input");
         topCheckbox.className = "multiple-select-checkbox";
         topCheckbox.type = "checkbox";
+        topCheckbox.onchange = (e) => {
+            if (topCheckbox.checked) {
+                this.checkCheckboxes();
+            } else {
+                this.uncheckCheckboxes();
+            }
+        }
         this.checkBox = topCheckbox;
         let topSearch = document.createElement("div");
-        let searchBar = new SearchBar(topSearch,()=>{
-
-        },()=>{});
+        let searchBar = new SearchBar(topSearch, (v) => {
+            this.items.forEach(e => {
+                if (e.value.toLowerCase().includes(v.toLowerCase().trim())) {
+                    e.element.style.display = "grid";
+                } else {
+                    e.element.style.display = "none";
+                }
+            });
+            this.figureOutMainCheckedState();
+        }, () => { });
         topElement.appendChild(topCheckbox);
         topElement.appendChild(topSearch);
         element.appendChild(topElement);
@@ -5277,15 +5365,36 @@ class MultipleSelect {
         itemList.className = "multiple-select";
         element.appendChild(itemList);
 
+        this.itemList = itemList;
+
+        this.setOptions(options);
+    }
+    get value() {
+        let vals = [];
+        this.items.forEach(e => {
+            if (e.checkbox.checked && isNotDisplayNone(e.checkbox)) {
+                vals.push(e.val);
+            }
+        });
+        return vals;
+    }
+    setOptions(options) {
+        console.log(options);
+        this.itemList.innerHTML = "";
         this.checkBoxes = [];
+        this.items = [];
 
         options.forEach(e => {
             let itemElement = document.createElement("div");
             itemElement.className = "multiple-select-item";
-            itemList.appendChild(itemElement);
+            this.itemList.appendChild(itemElement);
             let itemCheckbox = document.createElement("input");
             itemCheckbox.className = "multiple-select-checkbox";
             itemCheckbox.type = "checkbox";
+            itemCheckbox.onchange = () => {
+                this.figureOutMainCheckedState();
+            }
+            this.items.push({ "element": itemElement, "value": e.name, "checkbox": itemCheckbox, "val": e.value });
             itemElement.appendChild(itemCheckbox);
             let itemTitle = document.createElement("div");
             itemTitle.innerHTML = e.name;
@@ -5316,6 +5425,16 @@ class MultipleSelect {
             this.checkBox.indeterminate = false;
         }
     }
+    checkCheckboxes() {
+        this.checkBoxes.forEach((e) => {
+            if (isNotDisplayNone(e)) e.checked = true;
+        });
+    }
+    uncheckCheckboxes() {
+        this.checkBoxes.forEach((e) => {
+            if (isNotDisplayNone(e)) e.checked = false;
+        });
+    }
 }
 
 class Dialog {
@@ -5333,7 +5452,7 @@ class Dialog {
         dialogTop.className = "dialog-top";
         let dialogTitle = document.createElement("div");
         dialogTitle.className = "dialog-title";
-        dialogTitle.innerHTML = sanitize(title);
+        dialogTitle.innerHTML = (title);
         let dialogX = document.createElement("button");
         dialogX.className = "dialog-x";
         dialogX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
@@ -5384,7 +5503,7 @@ class Dialog {
         }
         if (selectedTab) contents[selectedTab].style.display = "grid";
         if (type == "notice") {
-            realDialogContent.innerHTML = sanitize(info);
+            realDialogContent.innerHTML = "<span>" + (info) + "</span>";
         } else if (type == "form") {
             for (let i = 0; i < info.length; i++) {
                 let tab = info[i].tab ?? "default";
@@ -5409,6 +5528,12 @@ class Dialog {
                     textInput.className = "dialog-text-input";
                     textInput.setAttribute("placeholder", info[i].name);
                     textInput.id = id;
+                    textInput.addOnChange = (onchange) => {
+                        textInput.onchange = () => {
+                            console.log(textInput.value, "CHANGED!!!!!");
+                            onchange(textInput.value);
+                        }
+                    }
                     if (info[i].onchange) textInput.onchange = () => {
                         info[i].onchange(textInput.value);
                     }
@@ -5435,6 +5560,34 @@ class Dialog {
                             buttonWrapper.appendChild(buttonEle);
                         }
                         wrapper.appendChild(buttonWrapper);
+                    }
+                    if (info[i].source) {
+                        for (let j = 0; j < this.values.length; j++) {
+                            if (this.values[j].id != info[i].input_source) continue;
+                            // Use a token to ensure only the latest async result is displayed
+                            let updateToken = 0;
+                            this.values[j].element.addOnChange(async () => {
+                                const currentToken = ++updateToken;
+                                let value = this.values[j].element.value;
+                                if (info[i].hide?.includes(value)) {
+                                    wrapper.style.display = "none";
+                                } else {
+                                    wrapper.style.display = "grid";
+                                }
+                                try {
+                                    let list = await info[i].source(value);
+                                    // Only update if this is the latest request
+                                    if (currentToken !== updateToken) return;
+                                    textInput.value = list;
+                                    if (textInput.onchange) textInput.onchange();
+                                } catch (err) {
+                                    if (currentToken !== updateToken) return;
+                                    displayError("Failed to load info: " + (err && err.message ? err.message : err));
+                                    if (textInput.onchange) textInput.onchange();
+                                    textInput.value = "";
+                                }
+                            });
+                        }
                     }
                     this.values.push({ "id": info[i].id, "element": textInput });
                 } else if (info[i].type == "number") {
@@ -5469,14 +5622,14 @@ class Dialog {
                     let label = document.createElement("label");
                     label.innerHTML = sanitize(info[i].name);
                     label.className = "dialog-label";
-                    let toggleEle = document.createElement("bottom");
+                    let toggleEle = document.createElement("button");
                     let toggle = new Toggle(toggleEle, () => { }, info[i].default ?? false);
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper-horizontal";
                     contents[tab].appendChild(wrapper);
                     wrapper.appendChild(toggleEle);
                     wrapper.appendChild(label);
-                    this.values.push({ "id": info[i].id, "element": toggleEle });
+                    this.values.push({ "id": info[i].id, "element": toggle });
                 } else if (info[i].type == "slider") {
                     let id = createId();
                     let label = document.createElement("label");
@@ -5527,7 +5680,17 @@ class Dialog {
                     if (info[i].default) multiSelect.selectOption(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "checkboxes") {
-
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    let label = document.createElement("div");
+                    label.innerHTML = sanitize(info[i].name);
+                    label.className = "dialog-label";
+                    wrapper.appendChild(label);
+                    let element = document.createElement("div");
+                    wrapper.appendChild(element);
+                    contents[tab].appendChild(wrapper);
+                    let multiSelect = new MultipleSelect(element, info[i].options);
+                    this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "dropdown") {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
@@ -5551,38 +5714,63 @@ class Dialog {
                         multiSelect = new SearchDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value, () => { });
                     }
                     if (info[i].onchange) multiSelect.addOnChange(() => {
-                        info[i].onchange(multiSelect.value);
+                        info[i].onchange(multiSelect.value, this.values, wrapper);
                     });
                     if (info[i].source) {
                         for (let j = 0; j < this.values.length; j++) {
                             if (this.values[j].id != info[i].input_source) continue;
-                            this.values[j].element.addOnChange(async (e) => {
+                            // Use a token to ensure only the latest async result is displayed
+                            let updateToken = 0;
+                            this.values[j].element.addOnChange(async () => {
+                                const currentToken = ++updateToken;
                                 let oldValue = multiSelect.value;
                                 let value = this.values[j].element.value;
                                 label.innerHTML = "Loading...";
                                 multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
-                                let list = await info[i].source(value);
-                                if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
-                                    multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
-                                } else {
-                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                try {
+                                    let list = await info[i].source(value);
+                                    // Only update if this is the latest request
+                                    if (currentToken !== updateToken) return;
+                                    if (label.innerHTML != "Loading...") return;
+                                    if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
+                                        multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
+                                    } else {
+                                        multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                    }
+                                    if (multiSelect.onchange) multiSelect.onchange();
+                                    label.innerHTML = sanitize(info[i].name);
+                                } catch (err) {
+                                    if (currentToken !== updateToken) return;
+                                    displayError("Failed to load list: " + (err && err.message ? err.message : err));
+                                    if (multiSelect.onchange) multiSelect.onchange();
+                                    label.innerHTML = sanitize("Unable to Load " + info[i].name);
+                                    multiSelect.setOptions([{ "name": "Unable to Load", "value": "loading" }], "loading");
                                 }
-                                if (multiSelect.onchange) multiSelect.onchange();
-                                label.innerHTML = sanitize(info[i].name);
                             });
                             let setInitialValues = async () => {
+                                const currentToken = ++updateToken;
                                 let oldValue = multiSelect.value;
                                 let value = this.values[j].element.value;
                                 label.innerHTML = "Loading...";
                                 multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
-                                let list = await info[i].source(value);
-                                if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
-                                    multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
-                                } else {
-                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                try {
+                                    let list = await info[i].source(value);
+                                    if (currentToken !== updateToken) return;
+                                    if (label.innerHTML != "Loading...") return;
+                                    if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
+                                        multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
+                                    } else {
+                                        multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                    }
+                                    if (multiSelect.onchange) multiSelect.onchange();
+                                    label.innerHTML = sanitize(info[i].name);
+                                } catch (err) {
+                                    if (currentToken !== updateToken) return;
+                                    displayError("Failed to load list: " + (err && err.message ? err.message : err));
+                                    if (multiSelect.onchange) multiSelect.onchange();
+                                    label.innerHTML = sanitize("Unable to Load " + info[i].name);
+                                    multiSelect.setOptions([{ "name": "Unable to Load", "value": "loading" }], "loading");
                                 }
-                                if (multiSelect.onchange) multiSelect.onchange();
-                                label.innerHTML = sanitize(info[i].name);
                             }
                             setInitialValues();
                         }
@@ -5605,18 +5793,32 @@ class Dialog {
                             loaderElement = this.values[j].element;
                         }
                         if (this.values[j].id == info[i].game_version_source) {
+                            // Use a token to ensure only the latest async result is displayed
+                            let updateToken = 0;
                             this.values[j].element.addOnChange(async () => {
+                                const currentToken = ++updateToken;
                                 wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
                                 if (loaderElement.value == "vanilla") return;
                                 let oldValue = multiSelect.value;
                                 let value = this.values[j].element.value;
                                 label.innerHTML = "Loading...";
                                 multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
-                                let list = await getVersions(loaderElement.value, value);
-                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                label.innerHTML = loaders[loaderElement.value] + " Version";
+                                try {
+                                    let list = await getVersions(loaderElement.value, value);
+                                    // Only update if this is the latest request
+                                    if (currentToken !== updateToken) return;
+                                    if (label.innerHTML != "Loading...") return;
+                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                    label.innerHTML = loaders[loaderElement.value] + " Version";
+                                } catch (err) {
+                                    if (currentToken !== updateToken) return;
+                                    displayError("Failed to load list: " + (err && err.message ? err.message : err));
+                                    label.innerHTML = sanitize("Unable to Load " + info[i].name);
+                                    multiSelect.setOptions([{ "name": "Unable to Load", "value": "loading" }], "loading");
+                                }
                             });
                             let setInitialValues = async () => {
+                                const currentToken = ++updateToken;
                                 wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
                                 if (loaderElement.value == "vanilla") return;
                                 let oldValue = multiSelect.value;
@@ -5624,9 +5826,18 @@ class Dialog {
                                 if (value == "loading") return;
                                 label.innerHTML = "Loading...";
                                 multiSelect.setOptions([{ "name": "Loading...", "value": "loading" }], "loading");
-                                let list = await getVersions(loaderElement.value, value);
-                                multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                label.innerHTML = loaders[loaderElement.value] + " Version";
+                                try {
+                                    let list = await getVersions(loaderElement.value, value);
+                                    if (currentToken !== updateToken) return;
+                                    if (label.innerHTML != "Loading...") return;
+                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
+                                    label.innerHTML = loaders[loaderElement.value] + " Version";
+                                } catch (err) {
+                                    if (currentToken !== updateToken) return;
+                                    displayError("Failed to load list: " + (err && err.message ? err.message : err));
+                                    label.innerHTML = sanitize("Unable to Load " + info[i].name);
+                                    multiSelect.setOptions([{ "name": "Unable to Load", "value": "loading" }], "loading");
+                                }
                             }
                             setInitialValues();
                         }
@@ -5668,6 +5879,9 @@ class Dialog {
             dialogButtons.appendChild(buttonElement);
         }
         element.appendChild(dialogButtons);
+        // make the toasts show on top of the dialog
+        document.getElementsByClassName("toasts")[0].hidePopover();
+        document.getElementsByClassName("toasts")[0].showPopover();
     }
 }
 
@@ -6773,3 +6987,5 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
         profile.setName(skin_and_cape_data.name);
     }
 }
+
+document.getElementsByClassName("toasts")[0].showPopover();

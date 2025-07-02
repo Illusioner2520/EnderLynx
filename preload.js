@@ -185,62 +185,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (!pid) return;
         process.kill(pid);
     },
-    getSinglePlayerWorlds: (instance_id) => {
-        let patha = `./minecraft/instances/${instance_id}/saves`;
-        fs.mkdirSync(patha, { recursive: true });
-        let worldDirs = fs.opendirSync(patha);
-        let worlds = [];
-
-        let dir;
-        while ((dir = worldDirs.readSync()) !== null) {
-            if (!dir.isDirectory()) continue;
-            const levelDatPath = path.resolve(patha, dir.name, 'level.dat');
-
-            try {
-                const buffer = fs.readFileSync(levelDatPath);
-                const decompressed = zlib.gunzipSync(buffer); // Decompress the GZip data
-
-                const data = nbt.parseUncompressed(decompressed); // Synchronous parsing
-                const levelData = data.value.Data.value;
-
-                worlds.push({
-                    name: levelData.LevelName.value,
-                    id: dir.name,
-                    last_played: Number(levelData.LastPlayed.value),
-                    icon: fs.existsSync(path.resolve(patha, dir.name, "icon.png"))
-                        ? `minecraft/instances/${instance_id}/saves/${dir.name}/icon.png`
-                        : null,
-                    mode: (() => {
-                        const modeId = levelData.GameType?.value ?? 0;
-                        switch (modeId) {
-                            case 0: return "survival";
-                            case 1: return "creative";
-                            case 2: return "adventure";
-                            case 3: return "spectator";
-                            default: return "unknown";
-                        }
-                    })(),
-                    hardcore: !!levelData.hardcore?.value,
-                    commands: !!levelData.allowCommands?.value,
-                    flat: levelData?.WorldGenSettings?.value?.dimensions?.value["minecraft:overworld"]?.value?.generator?.value?.type?.value == "minecraft:flat",
-                    difficulty: (() => {
-                        const diffId = levelData.Difficulty?.value ?? 2;
-                        switch (diffId) {
-                            case 0: return "peaceful";
-                            case 1: return "easy";
-                            case 2: return "normal";
-                            case 3: return "hard";
-                            default: return "unknown";
-                        }
-                    })()
-                });
-            } catch (e) {
-                console.error(`Failed to parse level.dat for world ${dir.name}:`, e);
-            }
-        }
-        worldDirs.closeSync();
-        return worlds;
-    },
+    getWorlds,
+    getSinglePlayerWorlds,
     getMultiplayerWorlds: async (instance_id) => {
         let patha = `./minecraft/instances/${instance_id}`;
         fs.mkdirSync(patha, { recursive: true });
@@ -290,7 +236,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
 
         exec(command, (error) => {
-            if (error) {
+            if (error && error.code !== 1) {
                 console.error(`Error opening folder: ${error}`);
             }
         });
@@ -1115,16 +1061,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 });
                 res.on('end', () => {
                     if (res.statusCode < 200 || res.statusCode >= 300) {
-                        reject(new Error("Unable to set skin"));
+                        let errorMsg = `Unable to set skin (status ${res.statusCode})`;
+                        try {
+                            const errorJson = JSON.parse(data);
+                            if (errorJson && errorJson.error) {
+                                errorMsg += `: ${errorJson.error}`;
+                            }
+                        } catch (e) {
+                            // ignore JSON parse error, just use default message
+                        }
+                        reject(new Error(errorMsg));
                     } else {
-                        resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": JSON.parse(data) });
+                        try {
+                            resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": JSON.parse(data) });
+                        } catch (e) {
+                            reject(new Error("Unable to parse skin info response"));
+                        }
                     }
                 });
             });
 
             req.on('error', (e) => {
                 console.error('Native HTTP Request Error:', e);
-                reject(new Error("Unable to set skin"));
+                reject(new Error("Unable to set skin: " + e.message));
             });
 
             form.pipe(req);
@@ -1212,6 +1171,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return result.filePaths[0];
     },
+    getInstanceFolderPath: () => {
+        return path.resolve(__dirname, "minecraft/instances");
+    },
     triggerFileBrowse: async (file_path) => {
         let startDir = file_path;
         if (fs.existsSync(file_path)) {
@@ -1254,44 +1216,93 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return javaPaths;
     },
-    getLauncherInstances: async (launcher) => {
-        if (launcher == "modrinth") {
-            const modrinthAppPath = process.platform === "win32"
-                ? path.join(process.env.APPDATA, "com.modrinth.theseus", "profiles")
-                : process.platform === "darwin"
-                    ? path.join(process.env.HOME, "Library", "Application Support", "com.modrinth.theseus", "profiles")
-                    : path.join(process.env.HOME, ".local", "share", "com.modrinth.theseus", "profiles");
+    getWorldsFromOtherLauncher: (instance_path) => {
+        let the_path = path.resolve(instance_path, "saves");
+        console.log(the_path)
+        if (!fs.existsSync(the_path)) return [];
+        return getWorlds(the_path).map(e => ({"name":e.name, "value": path.resolve(the_path, e.id)}));
+    },
+    transferWorld: (old_world_path, instance_id, delete_previous_files) => {
+        const savesPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
+        fs.mkdirSync(savesPath, { recursive: true });
 
-            console.log(modrinthAppPath);
+        const worldName = path.basename(old_world_path);
+        let targetName = worldName;
+        let counter = 1;
+        while (fs.existsSync(path.join(savesPath, targetName))) {
+            targetName = `${worldName}_${counter}`;
+            counter++;
+        }
+        const destPath = path.join(savesPath, targetName);
 
-            if (!fs.existsSync(modrinthAppPath)) return [];
+        fs.cpSync(old_world_path, destPath, { recursive: true });
 
-            console.log(modrinthAppPath);
+        console.log(delete_previous_files);
 
-            const instanceDirs = fs.readdirSync(modrinthAppPath).filter(dir => {
-                const fullPath = path.join(modrinthAppPath, dir);
+        if (delete_previous_files) {
+            console.log("Deleting " + old_world_path);
+            fs.rmSync(old_world_path, { recursive: true, force: true });
+        }
+
+        return { new_world_path: destPath };
+    },
+    getLauncherInstances: async (instance_path) => {
+        console.log(instance_path);
+        if (!fs.existsSync(instance_path)) return [{"name": "Unable to locate Instances", "value": "error"}];
+        return fs.readdirSync(instance_path)
+            .filter(f => {
+                const fullPath = path.join(instance_path, f);
                 return fs.statSync(fullPath).isDirectory();
-            });
-
-            const instances = [];
-            for (const dir of instanceDirs) {
-                console.log(dir);
-                try {
-                    const configPath = path.join(modrinthAppPath, dir, "profile.json");
-                    if (!fs.existsSync(configPath)) continue;
-                    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-                    instances.push({
-                        id: dir,
-                        name: config.name || dir,
-                        path: path.join(modrinthAppPath, dir),
-                        icon: config.icon ? path.join(modrinthAppPath, dir, config.icon) : null,
-                        config
-                    });
-                } catch (e) {
-                    // skip broken instance
-                }
+            })
+            .map(f => ({
+                name: f,
+                value: path.resolve(instance_path, f)
+            }));
+    },
+    getLauncherInstancePath: (launcher) => {
+        switch (launcher.toLowerCase()) {
+            case "modrinth": {
+                // Default Modrinth AppData path
+                const p = path.join(os.homedir(), "AppData", "Roaming", "ModrinthApp", "profiles");
+                return fs.existsSync(p) ? p : "";
             }
-            return instances;
+            case "curseforge": {
+                // Default CurseForge Minecraft instance path
+                const p = path.join(os.homedir(), "curseforge", "minecraft", "Instances");
+                return fs.existsSync(p) ? p : "";
+            }
+            case "vanilla": {
+                // return "";
+                // Default vanilla Minecraft saves path
+                const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft");
+                return fs.existsSync(p) ? p : "";
+            }
+            case "multimc": {
+                // MultiMC instances folder
+                const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft", "instances");
+                return fs.existsSync(p) ? p : "";
+            }
+            case "prism": {
+                // Prism Launcher instances folder
+                const p = path.join(os.homedir(), "AppData", "Roaming", "PrismLauncher", "instances");
+                return fs.existsSync(p) ? p : "";
+            }
+            case "atlauncher": {
+                // ATLauncher instances folder
+                const p = path.join(os.homedir(), "AppData", "Roaming", "ATLauncher", "instances");
+                return fs.existsSync(p) ? p : "";
+            }
+            case "gdlauncher": {
+                // GDLauncher instances folder
+                const p = path.join(os.homedir(), "AppData", "Roaming", "GDLauncher", "instances");
+                return fs.existsSync(p) ? p : "";
+            }
+            case "current": {
+                const p = path.join(__dirname, "minecraft/instances");
+                return fs.existsSync(p) ? p : "";
+            }
+            default:
+                return "";
         }
     },
     getInstanceOptions: (instance_id) => {
@@ -1310,6 +1321,67 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return options;
     }
 });
+
+function getWorlds(patha) {
+    fs.mkdirSync(patha, { recursive: true });
+    let worldDirs = fs.opendirSync(patha);
+    let worlds = [];
+
+    let dir;
+    while ((dir = worldDirs.readSync()) !== null) {
+        if (!dir.isDirectory()) continue;
+        const levelDatPath = path.resolve(patha, dir.name, 'level.dat');
+
+        try {
+            const buffer = fs.readFileSync(levelDatPath);
+            const decompressed = zlib.gunzipSync(buffer); // Decompress the GZip data
+
+            const data = nbt.parseUncompressed(decompressed); // Synchronous parsing
+            const levelData = data.value.Data.value;
+
+            worlds.push({
+                name: levelData.LevelName.value,
+                id: dir.name,
+                last_played: Number(levelData.LastPlayed.value),
+                icon: fs.existsSync(path.resolve(patha, dir.name, "icon.png"))
+                    ? path.resolve(patha, `${dir.name}/icon.png`)
+                    : null,
+                mode: (() => {
+                    const modeId = levelData.GameType?.value ?? 0;
+                    switch (modeId) {
+                        case 0: return "survival";
+                        case 1: return "creative";
+                        case 2: return "adventure";
+                        case 3: return "spectator";
+                        default: return "unknown";
+                    }
+                })(),
+                hardcore: !!levelData.hardcore?.value,
+                commands: !!levelData.allowCommands?.value,
+                flat: levelData?.WorldGenSettings?.value?.dimensions?.value["minecraft:overworld"]?.value?.generator?.value?.type?.value == "minecraft:flat",
+                difficulty: (() => {
+                    const diffId = levelData.Difficulty?.value ?? 2;
+                    switch (diffId) {
+                        case 0: return "peaceful";
+                        case 1: return "easy";
+                        case 2: return "normal";
+                        case 3: return "hard";
+                        default: return "unknown";
+                    }
+                })()
+            });
+        } catch (e) {
+            console.error(`Failed to parse level.dat for world ${dir.name}:`, e);
+        }
+    }
+    worldDirs.closeSync();
+    return worlds;
+}
+
+function getSinglePlayerWorlds(instance_id) {
+    let patha = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
+    return getWorlds(patha);
+}
 
 // async function processFolder(instance_id, folder_path, title) {
 //     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
