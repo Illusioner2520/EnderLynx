@@ -500,7 +500,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark" };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -885,17 +885,18 @@ class PageContent {
         this.func = func;
         this.title = title;
     }
-    displayContent() {
+    async displayContent() {
         if (this.title == "discover") {
             showAddContent();
             return;
         }
         content.innerHTML = "";
-        content.appendChild(this.func());
+        content.appendChild(await this.func());
         if (this.title == "instances") {
             groupInstances(data.getDefault("default_group"));
         }
         currentTab = this.title;
+        clearMoreMenus();
     }
 }
 
@@ -1098,6 +1099,15 @@ class MoreMenu {
             this.element.appendChild(buttonElement);
         }
     }
+}
+
+function clearMoreMenus() {
+    [...document.getElementsByClassName("more-menu")].forEach(e => {
+        let id = e.id;
+        if (!document.querySelector(`[popovertarget="${id}"]`)) {
+            e.remove();
+        }
+    });
 }
 
 class ContextMenu {
@@ -1939,6 +1949,25 @@ settingsButtonEle.onclick = () => {
         },
         {
             "type": "dropdown",
+            "name": "Sidebar Mode",
+            "tab": "appearance",
+            "id": "default_sidebar",
+            "options": [
+                { "name": "Spacious Mode", "value": "spacious" },
+                { "name": "Compact Mode", "value": "compact" }
+            ],
+            "default": data.getDefault("default_sidebar"),
+            "onchange": (v) => {
+                data.setDefault("default_sidebar", v);
+                if (v == "compact") {
+                    document.body.classList.add("compact");
+                } else {
+                    document.body.classList.remove("compact");
+                }
+            }
+        },
+        {
+            "type": "dropdown",
             "name": "Default Page",
             "desc": "The page that the launcher opens on",
             "tab": "appearance",
@@ -2043,14 +2072,145 @@ async function toggleMicrosoftSignIn() {
     }
 }
 
-function showHomeContent(e) {
+async function showHomeContent(e) {
     let ele = document.createElement("div");
-    ele.innerHTML = translate("app.page.home");
+    ele.className = "home-element";
+    let column1 = document.createElement("div");
+    column1.className = "home-column";
+    let column2 = document.createElement("div");
+    column2.className = "home-column";
+    ele.appendChild(column1);
+    ele.appendChild(column2);
+    let pinnedWorlds = await getPinnedWorlds();
+    let pinnedInstances = getPinnedInstances();
+    let lastPlayedWorlds = getRecentlyPlayedWorlds();
+    let lastPlayedInstances = getRecentlyPlayedInstances();
+    let pinnedWorldTitle = document.createElement("h2");
+    pinnedWorldTitle.innerHTML = "Pinned Worlds";
+    let pinnedInstanceTitle = document.createElement("h2");
+    pinnedInstanceTitle.innerHTML = "Pinned Instances";
+    let lastPlayedWorldTitle = document.createElement("h2");
+    lastPlayedWorldTitle.innerHTML = "Last Played Worlds";
+    let lastPlayedInstanceTitle = document.createElement("h2");
+    lastPlayedInstanceTitle.innerHTML = "Last Played Instances";
+    let pinnedWorldGrid = document.createElement("div");
+    pinnedWorldGrid.className = "home-list-section";
+    let lastPlayedWorldGrid = document.createElement("div");
+    lastPlayedWorldGrid.className = "home-list-section";
+    pinnedWorlds.forEach(e => {
+        let item = document.createElement("div");
+        item.className = "home-entry";
+        let icon = document.createElement("img");
+        icon.className = "instance-image";
+        icon.src = e.icon;
+        item.appendChild(icon);
+        let itemInfo = document.createElement("div");
+        itemInfo.className = "instance-info";
+        let itemTitle = document.createElement("div");
+        itemTitle.className = "instance-name";
+        itemTitle.innerHTML = e.name;
+        let itemDesc = document.createElement("div");
+        itemDesc.className = "instance-desc";
+        itemDesc.innerHTML = translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (e.commands ? " - " + translate("app.worlds.description.commands") : "") + (e.flat ? " - " + translate("app.worlds.description.flat") : "");
+        itemInfo.appendChild(itemTitle);
+        itemInfo.appendChild(itemDesc);
+        item.appendChild(itemInfo);
+        let playButton = document.createElement("button");
+        playButton.className = "home-play-button";
+        playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
+        let instanceInfo = new Instance(e.instance_id);
+        playButton.onclick = () => {
+            playSingleplayerWorld(instanceInfo, e.id);
+            showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
+        }
+        let morebutton = document.createElement("button");
+        morebutton.className = "home-list-more";
+        morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        new MoreMenu(morebutton, new ContextMenuButtons([
+            minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
+                "title": translate("app.worlds.play"),
+                "icon": '<i class="fa-solid fa-play"></i>',
+                "func": async () => {
+                    playSingleplayerWorld(instanceInfo, e.id);
+                    showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
+                }
+            } : null,
+            {
+                "title": translate("app.worlds.open"),
+                "icon": '<i class="fa-solid fa-folder"></i>',
+                "func": () => {
+                    window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`)
+                }
+            },
+            {
+                "title": "Open Seed Map",
+                "icon": '<i class="fa-solid fa-map"></i>',
+                "func": () => {
+
+                }
+            },
+            {
+                "title": () => isWorldPinned(e.id, instanceInfo.instance_id, "singleplayer") ? "Unpin World" : "Pin World",
+                "icon": () => isWorldPinned(e.id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "func": (i) => {
+                    let world_pinned = isWorldPinned(e.id, instanceInfo.instance_id, "singleplayer");
+                    world_pinned ? unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : pinSingleplayerWorld(e.id, instanceInfo.instance_id)
+                    i.setTitle(!world_pinned ? "Unpin World" : "Pin World");
+                    i.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    homeContent.displayContent();
+                }
+            },
+            {
+                "title": translate("app.worlds.share"),
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "func": () => { }
+            },
+            {
+                "title": translate("app.worlds.delete"),
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "danger": true,
+                "func_id": "delete",
+                "func": () => {
+                    let dialog = new Dialog();
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + parseMinecraftFormatting(worlds[i].name) + "'?", [ // TODO
+                        {
+                            "type": "cancel",
+                            "content": "Cancel"
+                        },
+                        {
+                            "type": "confirm",
+                            "content": "Confirm Deletion"
+                        }
+                    ], [], async () => {
+                        let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                        if (success) {
+                            displaySuccess("Deleted " + parseMinecraftFormatting(e.name));
+                        } else {
+                            displayError("Unable to delete " + parseMinecraftFormatting(e.name));
+                        }
+                        homeContent.displayContent();
+                    });
+                }
+            }
+        ]));
+        item.appendChild(playButton);
+        item.appendChild(morebutton);
+        pinnedWorldGrid.appendChild(item);
+    });
+    column1.appendChild(pinnedWorldTitle);
+    column1.appendChild(pinnedWorldGrid);
+    column1.appendChild(lastPlayedWorldTitle);
+    column2.appendChild(pinnedInstanceTitle);
+    column2.appendChild(lastPlayedInstanceTitle);
     return ele;
 }
 
 if (data.getDefault("default_mode") == "light") {
     document.body.classList.add("light");
+}
+
+if (data.getDefault("default_sidebar") == "compact") {
+    document.body.classList.add("compact");
 }
 
 let skinViewer;
@@ -2437,6 +2597,7 @@ function showMyAccountContent(e) {
                 "id": "model",
                 "name": "Model",
                 "options": [
+                    { "name": "Auto-Detect", "value": "auto" },
                     { "name": "Classic Arms (4px)", "value": "wide" },
                     { "name": "Slim Arms (3px)", "value": "slim" }
                 ]
@@ -2461,7 +2622,29 @@ function showMyAccountContent(e) {
                 displayError("Invalid skin. Make sure the height is exactly 64 pixels (or 32)");
                 return;
             }
-            data.addSkin("", info.name ? info.name : "<unnamed>", info.model, "", await window.electronAPI.importSkin(info.skin));
+            let model = info.model;
+            if (info.model == "auto") {
+                const tempImg = new Image();
+                tempImg.onload = async () => {
+                    const tempCanvas = document.createElement("canvas");
+                    tempCanvas.width = dims.width;
+                    tempCanvas.height = dims.height;
+                    const ctx = tempCanvas.getContext("2d");
+                    ctx.drawImage(tempImg, 0, 0);
+                    const pixel = ctx.getImageData(54, 24, 1, 1).data;
+                    // pixel is [r, g, b, a]
+                    if (pixel[3] === 0) {
+                        model = "slim";
+                    } else {
+                        model = "wide";
+                    }
+                    data.addSkin("", info.name ? info.name : "<unnamed>", model, "", await window.electronAPI.importSkin(info.skin));
+                    showContent();
+                };
+                tempImg.src = info.skin;
+                return;
+            }
+            data.addSkin("", info.name ? info.name : "<unnamed>", model, "", await window.electronAPI.importSkin(info.skin));
             showContent();
         });
     }
@@ -3675,6 +3858,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
         })
     }
     element.appendChild(contentListWrap);
+    clearMoreMenus();
 }
 function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
@@ -3912,7 +4096,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": "Open Seed Map",
                             "icon": '<i class="fa-solid fa-map"></i>',
                             "func": () => {
-                                
+
                             }
                         },
                         {
@@ -4068,8 +4252,10 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
         }
     }, dropdownInfo);
     element.appendChild(contentListWrap);
+    clearMoreMenus();
 }
 function setInstanceTabContentLogs(instanceInfo, element) {
+    let deleteButton = document.createElement("button");
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let contentSearch = document.createElement("div");
@@ -4172,8 +4358,10 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         } catch (e) { }
 
         if (e == "live_log") {
+            deleteButton.style.display = "none";
             setUpLiveLog();
         } else {
+            deleteButton.style.display = "flex";
             let logInfo = window.electronAPI.getLog(e);
             logInfo = logInfo.split("\n");
             logs = [];
@@ -4206,6 +4394,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     logTop.className = "logs-top";
     logWrapper.appendChild(logTop);
     logWrapper.appendChild(logDisplay);
+    deleteButton.style.display = "none";
     setUpLiveLog();
     render();
     // let wordWrapToggle = document.createElement("button");
@@ -4220,7 +4409,6 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     // wordWrapLabel.innerHTML = "Word Wrap";
     let copyButton = document.createElement("button");
     let shareButton = document.createElement("button");
-    let deleteButton = document.createElement("button");
     copyButton.className = "logs-copy";
     shareButton.className = "logs-share";
     deleteButton.className = "logs-delete";
@@ -4234,6 +4422,21 @@ function setInstanceTabContentLogs(instanceInfo, element) {
             displaySuccess(searchBarFilter ? "Logs copied to clipbard! (Only those that match the current search)" : "Logs copied to clipboard!");
         }).catch(() => {
             displayError("Failed to copy logs to clipboard.");
+        });
+    }
+    deleteButton.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete these logs?", [
+            {
+                "type": "cancel",
+                "content": "Cancel"
+            },
+            {
+                "type": "confirm",
+                "content": "Delete Logs"
+            }
+        ], [], () => {
+
         });
     }
     // logTop.appendChild(wordWrapToggle);
@@ -5159,26 +5362,43 @@ function parseMinecraftFormatting(text) {
     let result = '';
     let currentClasses = [];
     let i = 0;
+    let buffer = '';
+    let lastClasses = [];
+
+    function flushBuffer() {
+        if (buffer.length > 0) {
+            if (lastClasses.length > 0) {
+                result += `<span class="${lastClasses.join(' ')}">${buffer}</span>`;
+            } else {
+                result += buffer;
+            }
+            buffer = '';
+        }
+    }
 
     while (i < text.length) {
         if (text[i] === '§' && i + 1 < text.length) {
+            flushBuffer();
             const code = text[i + 1].toLowerCase();
             i += 2;
 
             if (colorCodes[code]) {
-                currentClasses = [colorCodes[code]];
+                lastClasses = [colorCodes[code]];
             } else if (formatCodes[code]) {
-                currentClasses.push(formatCodes[code]);
+                // Avoid duplicate format codes
+                if (!lastClasses.includes(formatCodes[code])) {
+                    lastClasses = lastClasses.concat(formatCodes[code]);
+                }
             } else if (code === 'r') {
-                currentClasses = [];
+                lastClasses = [];
             }
             continue;
         }
 
-        const span = `<span class="${currentClasses.join(' ')}">${text[i]}</span>`;
-        result += span;
+        buffer += text[i];
         i++;
     }
+    flushBuffer();
 
     return result;
 }
@@ -6076,6 +6296,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     } else {
         contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id);
     }
+    clearMoreMenus();
 }
 
 class ContentSearchEntry {
@@ -7204,8 +7425,8 @@ function getPinnedInstances() {
     let instances = db.prepare("SELECT * FROM pins WHERE type = ?").all("instance");
     return instances.map(e => new Instance(e.instance_id));
 }
-function getPinnedWorlds() {
-    return window.electronAPI.getPinnedWorlds();
+async function getPinnedWorlds() {
+    return await window.electronAPI.getPinnedWorlds();
 }
 function pinInstance(instanceInfo) {
     console.log("Pinning " + instanceInfo.name);
@@ -7233,4 +7454,3 @@ function isWorldPinned(world_id, instance_id, world_type) {
     let world = db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type);
     return Boolean(world);
 }
-

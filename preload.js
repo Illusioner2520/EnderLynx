@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");
         let allWorlds = [];
         for (const world of worlds) {
+            if (!world.world_id) continue;
             if (world.world_type == "singleplayer") {
                 const worldPath = path.resolve(__dirname, "minecraft/instances", world.instance_id || "", "saves", world.world_id, "level.dat");
                 if (fs.existsSync(worldPath)) {

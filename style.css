@@ -4,6 +4,10 @@
     box-sizing: border-box;
 }
 
+:root:has(body:not(.light)) {
+    color-scheme: dark;
+}
+
 body {
     --background-color: #0a0a0a;
     --text-color: white;
@@ -75,6 +79,10 @@ button {
     border-width: 1px;
     z-index: 4;
     backdrop-filter: blur(15px);
+}
+
+body.compact .sidebar {
+    width: 76px;
 }
 
 .player-switch {
@@ -400,9 +408,10 @@ button {
 }
 
 *:focus-visible,
-.search-bar:has(.search-input:focus-visible) {
+.search-bar:has(.search-input:focus-visible),
+.search-dropdown:has(.dropdown-button:focus-visible) {
     outline-style: solid;
-    outline-color: var(--accent-color);
+    outline-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     outline-width: 3.5px;
     z-index: 100000;
 }
@@ -425,12 +434,21 @@ button {
     font-weight: bold;
 }
 
+body.compact .menu-title, body.compact #playerSwitch .player-info, body.compact #playerSwitch .player-chevron {
+    display: none;
+}
+
 .content {
     position: absolute;
     top: 0;
     left: 301px;
     width: calc(100% - 301px);
     height: 100%;
+}
+
+body.compact .content {
+    left: 77px;
+    width: calc(100% - 77px);
 }
 
 .instance-content {
@@ -626,6 +644,10 @@ h1 {
     outline: 0;
 }
 
+.dropdown-button:focus-visible {
+    outline: 0;
+}
+
 .search-clear {
     color: var(--subtle-text-color);
     cursor: pointer;
@@ -749,11 +771,12 @@ h1 {
     height: 0px;
     padding-block: 0px;
     interpolate-size: allow-keywords;
-    transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
+    transition: height .2s, overlay .2s allow-discrete, display .2s allow-discrete;
     border-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
+    /* max-height: 200px; */
 }
 
 .dropdown-list:popover-open {
@@ -782,7 +805,7 @@ h1 {
     height: 0px;
     padding-block: 0px;
     interpolate-size: allow-keywords;
-    transition: height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
+    transition: height .2s, overlay .2s allow-discrete, display .2s allow-discrete;
     border-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
@@ -1459,6 +1482,14 @@ i {
     flex-shrink: 0;
 }
 
+body.compact .live-indicator {
+    margin-inline: 22px;
+}
+
+body.compact .live-name, body.compact .live-log, body.compact .live-stop {
+    display: none;
+}
+
 .live.minecraft-live .live-indicator {
     background-color: var(--go-color);
 }
@@ -1609,7 +1640,12 @@ i {
     display: grid;
     max-height: 600px;
     position: relative;
+    color: white;
     overflow-x: scroll;
+}
+
+.logs-display:not(:has(.log-entry + .log-entry)) {
+    overflow-x: auto;
 }
 
 .logs-visible {
@@ -1867,6 +1903,7 @@ dialog[open]::backdrop {
 
 .log-entry {
     height: 15px;
+    padding-right: 10px;
 }
 
 .discover-list {
@@ -2458,7 +2495,6 @@ dialog[open]::backdrop {
     grid-row: 1;
     max-height: 100%;
     padding-bottom: 10px;
-    overflow: hidden;
 }
 
 .my-account-option-box {
@@ -2952,12 +2988,93 @@ dialog[open]::backdrop {
 }
 
 .home-element {
-    display: flex;
+    display: grid;
     padding: 10px;
     gap: 10px;
+    grid-template-columns: 1fr 1fr;
 }
 
 .home-column {
     display: grid;
     gap: 10px;
+    grid-template-rows: subgrid;
+    grid-row: span 4;
+}
+
+.home-element h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.home-list-section {
+    display: grid;
+    gap: 10px;
+}
+
+.home-play-button {
+    border-radius: 8px;
+    background-color: var(--go-color);
+    padding: 8px;
+    font-size: 1.1rem;
+    color: black;
+    display: flex;
+    gap: 8px;
+    font-weight: bold;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    margin-left: auto;
+}
+
+.home-play-button:active {
+    scale: .95;
+}
+
+.home-play-button:hover {
+    background-color: color-mix(in srgb, 70% var(--go-color), var(--text-color));
+}
+
+.home-stop-button {
+    border-radius: 8px;
+    background-color: var(--danger-color);
+    padding: 8px;
+    font-size: 1.1rem;
+    color: black;
+    display: flex;
+    gap: 8px;
+    font-weight: bold;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    margin-left: auto;
+}
+
+.home-stop-button:active {
+    scale: .95;
+}
+
+.home-stop-button:hover {
+    background-color: color-mix(in srgb, 70% var(--danger-color), var(--text-color));
+}
+
+.home-list-more {
+    font-size: .8rem;
+    color: var(--text-color);
+    background-color: var(--color-1t);
+    height: 32px;
+    aspect-ratio: 1;
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color .25s, scale .1s;
+}
+
+.home-list-more:active {
+    scale: .95;
+}
+
+.home-list-more:hover {
+    background-color: var(--accent-color);
 }
