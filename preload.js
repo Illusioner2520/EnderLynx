@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, clipboard, nativeImage, dialog } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, nativeImage, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
@@ -17,6 +17,7 @@ const FormData = require('form-data');
 const sharp = require("sharp");
 const crypto = require('crypto');
 const os = require('os');
+const MarkdownIt = require('markdown-it');
 
 const db = new Database('app.db');
 
@@ -41,7 +42,53 @@ class LoginError extends Error {
     }
 }
 
+function openInBrowser(url) {
+    shell.openExternal(url);
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
+    parseModrinthMarkdown: (md) => {
+        const mkd = new MarkdownIt('default', {
+            html: true,
+            linkify: true,
+            breaks: false
+        });
+
+        const defaultRender = mkd.renderer.rules.link_open || function (tokens, idx, options, env, self) {
+            return self.renderToken(tokens, idx, options);
+        };
+
+        mkd.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+            const token = tokens[idx];
+
+            const hrefIndex = token.attrIndex('href');
+            if (hrefIndex !== -1) {
+                const href = token.attrs[hrefIndex][1];
+
+                token.attrs.splice(hrefIndex, 1);
+
+                token.attrPush(['data-href', href]);
+                token.attrPush(['class', 'external-link']);
+                token.attrPush([
+                    'tabindex',
+                    "0"
+                ])
+            }
+
+            return defaultRender(tokens, idx, options, env, self);
+        };
+
+        return mkd.render(md);
+    },
+    openInBrowser,
+    getRandomModpacks: (callback) => {
+        let indexes = ["relevance", "updated", "follows", "newest", "updated"];
+        let index = indexes[Math.floor(Math.random() * indexes.length)];
+        let offset = Math.floor(Math.random() * 10000);
+        fetch(`https://api.modrinth.com/v2/search?facets=[["project_type:modpack"]]&index=${index}&offset=${offset}&limit=10`).then(response => {
+            response.json().then(data => callback(data));
+        });
+    },
     getPinnedWorlds: async () => {
         let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");
         let allWorlds = [];

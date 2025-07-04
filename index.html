@@ -7,7 +7,7 @@
     <link href="style.css" rel="stylesheet" type="text/css">
     <link href="fontawesome/css/all.min.css" rel="stylesheet" type="text/css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: *; connect-src *;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: *; connect-src *; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;">
 </head>
 <body>
     <div class="sidebar">
@@ -23,6 +23,7 @@
     <div class="content" id="content"></div>
     <script src="node_modules/skinview3d/bundles/skinview3d.bundle.js"></script>
     <dialog class="screenshot-preview" id="screenshotPreview"></dialog>
+    <dialog class="content-info" id="contentInfo"></dialog>
     <div class="toasts" popover="manual"></div>
     <script src="script.js"></script>
 </body>

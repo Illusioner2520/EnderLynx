@@ -2083,23 +2083,34 @@ async function showHomeContent(e) {
     ele.appendChild(column2);
     let pinnedWorlds = await getPinnedWorlds();
     let pinnedInstances = getPinnedInstances();
+    pinnedInstances.forEach(e => e.actuallyPinned = true);
     let lastPlayedWorlds = getRecentlyPlayedWorlds();
     let lastPlayedInstances = getRecentlyPlayedInstances();
+    pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     let pinnedWorldTitle = document.createElement("h2");
-    pinnedWorldTitle.innerHTML = "Pinned Worlds";
+    pinnedWorldTitle.innerHTML = '<i class="fa-solid fa-thumbtack" style="color: var(--subtle-text-color)"></i>' + " Pinned Worlds";
     let pinnedInstanceTitle = document.createElement("h2");
-    pinnedInstanceTitle.innerHTML = "Pinned Instances";
+    pinnedInstanceTitle.innerHTML = '<i class="fa-solid fa-thumbtack" style="color: var(--subtle-text-color)"></i>' + " Pinned Instances";
     let lastPlayedWorldTitle = document.createElement("h2");
-    lastPlayedWorldTitle.innerHTML = "Last Played Worlds";
+    lastPlayedWorldTitle.innerHTML = '<i class="fa-solid fa-clock-rotate-left" style="color: var(--subtle-text-color)"></i> ' + "Last Played Worlds";
     let lastPlayedInstanceTitle = document.createElement("h2");
-    lastPlayedInstanceTitle.innerHTML = "Last Played Instances";
+    lastPlayedInstanceTitle.innerHTML = '<i class="fa-solid fa-clock-rotate-left" style="color: var(--subtle-text-color)"></i> ' + "Last Played Instances";
     let pinnedWorldGrid = document.createElement("div");
     pinnedWorldGrid.className = "home-list-section";
     let lastPlayedWorldGrid = document.createElement("div");
     lastPlayedWorldGrid.className = "home-list-section";
-    pinnedWorlds.forEach(e => {
+    let pinnedInstanceGrid = document.createElement("div");
+    pinnedInstanceGrid.className = "home-list-section";
+    let lastPlayedInstanceGrid = document.createElement("div");
+    lastPlayedInstanceGrid.className = "home-list-section";
+    pinnedWorlds.concat(lastPlayedWorlds).forEach(e => {
+        // TEMPORARY: ALLOW MULTIPLAYER WORLDS TO BE RECENTLY PLAYED LATER!!!
+        if (!e.pinned) e.type = "singleplayer";
+
         let item = document.createElement("div");
         item.className = "home-entry";
+        item.style.cursor = "auto";
         let icon = document.createElement("img");
         icon.className = "instance-image";
         icon.src = e.icon;
@@ -2111,7 +2122,7 @@ async function showHomeContent(e) {
         itemTitle.innerHTML = e.name;
         let itemDesc = document.createElement("div");
         itemDesc.className = "instance-desc";
-        itemDesc.innerHTML = translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (e.commands ? " - " + translate("app.worlds.description.commands") : "") + (e.flat ? " - " + translate("app.worlds.description.flat") : "");
+        itemDesc.innerHTML = e.type == "singleplayer" ? (translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (e.commands ? " - " + translate("app.worlds.description.commands") : "") + (e.flat ? " - " + translate("app.worlds.description.flat") : "")) : e.ip;
         itemInfo.appendChild(itemTitle);
         itemInfo.appendChild(itemDesc);
         item.appendChild(itemInfo);
@@ -2119,42 +2130,46 @@ async function showHomeContent(e) {
         playButton.className = "home-play-button";
         playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
         let instanceInfo = new Instance(e.instance_id);
-        playButton.onclick = () => {
-            playSingleplayerWorld(instanceInfo, e.id);
-            showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
+        playButton.onclick = async () => {
+            playButton.className = "home-loading-button";
+            playButton.innerHTML = '<i class="spinner"></i>Loading'
+            e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
+            showSpecificInstanceContent(instanceInfo.refresh());
         }
         let morebutton = document.createElement("button");
         morebutton.className = "home-list-more";
         morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-        new MoreMenu(morebutton, new ContextMenuButtons([
+        let buttons = new ContextMenuButtons([
             minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
                 "title": translate("app.worlds.play"),
                 "icon": '<i class="fa-solid fa-play"></i>',
                 "func": async () => {
-                    playSingleplayerWorld(instanceInfo, e.id);
-                    showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
+                    playButton.className = "home-loading-button";
+                    playButton.innerHTML = '<i class="spinner"></i>Loading'
+                    e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
+                    showSpecificInstanceContent(instanceInfo.refresh());
                 }
             } : null,
-            {
+            e.type == "singleplayer" ? {
                 "title": translate("app.worlds.open"),
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "func": () => {
                     window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`)
                 }
-            },
-            {
+            } : null,
+            e.type == "singleplayer" ? {
                 "title": "Open Seed Map",
                 "icon": '<i class="fa-solid fa-map"></i>',
                 "func": () => {
 
                 }
-            },
+            } : null,
             {
-                "title": () => isWorldPinned(e.id, instanceInfo.instance_id, "singleplayer") ? "Unpin World" : "Pin World",
-                "icon": () => isWorldPinned(e.id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? "Unpin World" : "Pin World",
+                "icon": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
                 "func": (i) => {
-                    let world_pinned = isWorldPinned(e.id, instanceInfo.instance_id, "singleplayer");
-                    world_pinned ? unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : pinSingleplayerWorld(e.id, instanceInfo.instance_id)
+                    let world_pinned = isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type);
+                    world_pinned ? (e.type == "singleplayer" ? unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : unpinMultiplayerWorld(e.ip, instanceInfo.instance_id)) : (e.type == "singleplayer" ? pinSingleplayerWorld(e.id, instanceInfo.instance_id) : pinMultiplayerWorld(e.ip, instanceInfo.instance_id))
                     i.setTitle(!world_pinned ? "Unpin World" : "Pin World");
                     i.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                     homeContent.displayContent();
@@ -2172,7 +2187,7 @@ async function showHomeContent(e) {
                 "func_id": "delete",
                 "func": () => {
                     let dialog = new Dialog();
-                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + parseMinecraftFormatting(worlds[i].name) + "'?", [ // TODO
+                    dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete the world '" + parseMinecraftFormatting(e.name) + "'?", [ // TODO
                         {
                             "type": "cancel",
                             "content": "Cancel"
@@ -2192,16 +2207,245 @@ async function showHomeContent(e) {
                     });
                 }
             }
-        ]));
+        ].filter(e => e))
+        new MoreMenu(morebutton, buttons);
+        item.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
         item.appendChild(playButton);
         item.appendChild(morebutton);
-        pinnedWorldGrid.appendChild(item);
+        e.pinned ? pinnedWorldGrid.appendChild(item) : lastPlayedWorldGrid.appendChild(item);
     });
-    column1.appendChild(pinnedWorldTitle);
-    column1.appendChild(pinnedWorldGrid);
+    pinnedInstances.concat(lastPlayedInstances).forEach(e => {
+        let item = document.createElement("div");
+        item.className = "home-entry";
+        item.onclick = (event) => {
+            if (event.target.matches("button")) return;
+            if (event.target.matches("i")) return;
+            showSpecificInstanceContent(e.refresh());
+        }
+        item.setAttribute("tabindex", "0");
+        item.onkeydown = (event) => {
+            if (event.target.matches("button")) return;
+            if (event.target.matches("i")) return;
+            if (event.key == "Enter" || event.key == " ") {
+                showSpecificInstanceContent(e.refresh());
+            }
+        }
+        let icon = document.createElement("img");
+        icon.className = "instance-image";
+        icon.src = e.image ? e.image : "default.png";
+        item.appendChild(icon);
+        let itemInfo = document.createElement("div");
+        itemInfo.className = "instance-info";
+        let itemTitle = document.createElement("div");
+        itemTitle.className = "instance-name";
+        itemTitle.innerHTML = e.name;
+        let itemDesc = document.createElement("div");
+        itemDesc.className = "instance-desc";
+        itemDesc.innerHTML = loaders[e.loader] + " " + e.vanilla_version;
+        itemInfo.appendChild(itemTitle);
+        itemInfo.appendChild(itemDesc);
+        item.appendChild(itemInfo);
+        let instanceInfo = new Instance(e.instance_id);
+        let running = checkForProcess(instanceInfo.pid);
+        if (!running) instanceInfo.setPid(null);
+        if (running) {
+            window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+                if (currentTab != "home") return;
+                homeContent.displayContent();
+                live.findLive();
+            });
+        }
+        let playButton = document.createElement("button");
+        playButton.className = running ? "home-stop-button" : "home-play-button";
+        playButton.innerHTML = running ? '<i class="fa-solid fa-circle-stop"></i>Stop' : '<i class="fa-solid fa-play"></i>Play';
+        playButton.onclick = running ? () => {
+            stopInstance(instanceInfo);
+            homeContent.displayContent();
+        } : async () => {
+            playButton.className = "home-loading-button";
+            playButton.innerHTML = '<i class="spinner"></i>Loading'
+            await playInstance(instanceInfo);
+            showSpecificInstanceContent(instanceInfo.refresh());
+        }
+        let morebutton = document.createElement("button");
+        morebutton.className = "home-list-more";
+        morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        let buttons = new ContextMenuButtons([
+            {
+                "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
+                "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
+                "func": running ? async (e) => {
+                    await stopInstance(instanceInfo);
+                    homeContent.displayContent();
+                } : async (e) => {
+                    playButton.className = "home-loading-button";
+                    playButton.innerHTML = '<i class="spinner"></i>Loading'
+                    await playInstance(instanceInfo);
+                    showSpecificInstanceContent(instanceInfo.refresh());
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-plus"></i>',
+                "title": translate("app.button.content.add"),
+                "func": (e) => {
+                    showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-eye"></i>',
+                "title": translate("app.button.instances.view"),
+                "func": (e) => {
+                    showSpecificInstanceContent(instanceInfo.refresh());
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "title": translate("app.button.instances.duplicate"),
+                "func": (e) => {
+                    duplicateInstance(instanceInfo);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-folder"></i>',
+                "title": translate("app.button.instances.open_folder"),
+                "func": (e) => {
+                    window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}`);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "title": translate("app.button.instances.share"),
+                "func": (e) => { }
+            },
+            {
+                "icon": '<i class="fa-solid fa-gear"></i>',
+                "title": translate("app.button.instances.open_settings"),
+                "func": (e) => {
+                    showInstanceSettings(new Instance(instanceInfo.instance_id));
+                }
+            },
+            {
+                "icon": () => instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": () => instanceInfo.pinned ? "Unpin Instance" : "Pin Instance",
+                "func": (e) => {
+                    instanceInfo.pinned ? unpinInstance(instanceInfo) : pinInstance(instanceInfo);
+                    e.setTitle(instanceInfo.pinned ? "Unpin Instance" : "Pin Instance");
+                    e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    homeContent.displayContent();
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "title": translate("app.button.instances.delete"),
+                "func": (e) => {
+                    let dialog = new Dialog();
+                    dialog.showDialog("Are you sure?", "form", [{
+                        "content": "Are you sure that you want to delete the instance '" + instanceInfo.name + "'?",
+                        "type": "notice"
+                    }, {
+                        "type": "toggle",
+                        "name": "Delete Instance Files",
+                        "default": false,
+                        "id": "delete"
+                    }], [
+                        {
+                            "type": "cancel",
+                            "content": "Cancel"
+                        },
+                        {
+                            "type": "confirm",
+                            "content": "Confirm Deletion"
+                        }
+                    ], [], async (v) => {
+                        instanceInfo.delete();
+                        homeContent.displayContent();
+                        if (v[0].value) {
+                            try {
+                                await window.electronAPI.deleteInstanceFiles(instanceInfo.instance_id);
+                            } catch (e) {
+                                displayError("Unable to delete instance files.");
+                            }
+                        }
+                    });
+                },
+                "danger": true
+            }
+        ].filter(e => e))
+        new MoreMenu(morebutton, buttons);
+        item.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
+        item.appendChild(playButton);
+        item.appendChild(morebutton);
+        e.actuallyPinned ? pinnedInstanceGrid.appendChild(item) : lastPlayedInstanceGrid.appendChild(item);
+    });
+    let noPinnedWorlds = document.createElement("div");
+    noPinnedWorlds.className = "home-entry-empty";
+    noPinnedWorlds.innerHTML = "You have no pinned worlds. Add some to appear here."
+    let noPinnedInstances = document.createElement("div");
+    noPinnedInstances.className = "home-entry-empty";
+    noPinnedInstances.innerHTML = "You have no pinned instances. Add some to appear here."
+    if (pinnedWorlds.length || pinnedInstances.length) {
+        column1.appendChild(pinnedWorldTitle);
+        column1.appendChild(pinnedWorlds.length ? pinnedWorldGrid : noPinnedWorlds);
+        column2.appendChild(pinnedInstanceTitle);
+        column2.appendChild(pinnedInstances.length ? pinnedInstanceGrid : noPinnedInstances);
+    } else {
+        column1.style.gridRow = "span 2";
+        column2.style.gridRow = "span 2";
+    }
     column1.appendChild(lastPlayedWorldTitle);
-    column2.appendChild(pinnedInstanceTitle);
+    column1.appendChild(lastPlayedWorldGrid);
     column2.appendChild(lastPlayedInstanceTitle);
+    column2.appendChild(lastPlayedInstanceGrid);
+
+    let discoverModsWrapper = document.createElement("div");
+    discoverModsWrapper.className = "home-discover-wrapper";
+    discoverModsWrapper.style.display = "none";
+    let discoverModsTitle = document.createElement("button");
+    discoverModsTitle.innerHTML = 'Discover Modpacks <i class="fa-solid fa-angles-right"></i>'
+    discoverModsTitle.className = "home-discover-title";
+    discoverModsTitle.onclick = () => {
+        showAddContent();
+    }
+    discoverModsWrapper.appendChild(discoverModsTitle);
+    let discoverModsContainer = document.createElement("div");
+    discoverModsContainer.className = "home-discover-container";
+    discoverModsWrapper.appendChild(discoverModsContainer);
+    window.electronAPI.getRandomModpacks((e) => {
+        discoverModsWrapper.style.display = "grid";
+        console.log(e);
+        e.hits.forEach(e => {
+            let item = document.createElement("button");
+            item.className = "home-discover";
+            item.onclick = () => {
+                displayContentInfo("modrinth",e.project_id);
+            }
+            let img = document.createElement("img");
+            img.className = "home-discover-image";
+            img.src = e.icon_url ? e.icon_url : "default.png";
+            item.appendChild(img);
+            let itemInfo = document.createElement("div");
+            itemInfo.className = "home-discover-info";
+            let itemTitle = document.createElement("div");
+            itemTitle.innerHTML = e.title;
+            itemTitle.className = "home-discover-item-title";
+            let itemAuthor = document.createElement("div");
+            itemAuthor.innerHTML = 'by ' + e.author;
+            itemAuthor.className = "home-discover-author";
+            itemInfo.appendChild(itemTitle);
+            itemInfo.appendChild(itemAuthor);
+            item.appendChild(itemInfo);
+            let itemDownloadCount = document.createElement("div");
+            itemDownloadCount.className = "home-discover-downloads";
+            itemDownloadCount.innerHTML = formatNumber(e.downloads) + " downloads";
+            item.appendChild(itemDownloadCount);
+            discoverModsContainer.appendChild(item);
+        })
+    }, () => { });
+    ele.appendChild(discoverModsWrapper);
     return ele;
 }
 
@@ -3071,6 +3315,7 @@ function showInstanceContent(e) {
         if (!running) instances[i].setPid(null);
         if (running) {
             window.electronAPI.watchProcessForExit(instances[i].pid, () => {
+                if (currentTab != "instances") return;
                 instanceContent.displayContent();
                 live.findLive();
             });
@@ -3241,6 +3486,10 @@ function showInstanceContent(e) {
     return ele;
 }
 function showSpecificInstanceContent(instanceInfo, default_tab) {
+    for (let i = 0; i < navButtons.length; i++) {
+        navButtons[i].removeSelected();
+    }
+    instanceButton.setSelected();
     let running = checkForProcess(instanceInfo.pid);
     if (!running) instanceInfo.setPid(null);
     content.innerHTML = "";
@@ -6210,6 +6459,10 @@ class Dialog {
 }
 
 function showAddContent(instance_id, vanilla_version, loader, default_tab) {
+    for (let i = 0; i < navButtons.length; i++) {
+        navButtons[i].removeSelected();
+    }
+    worldButton.setSelected();
     added_vt_dp_packs = [];
     added_vt_rp_packs = [];
     content.innerHTML = "";
@@ -6300,9 +6553,12 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader) {
         let element = document.createElement("div");
         element.className = "discover-item";
+        element.onclick = () => {
+            displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
+        }
         this.element = element;
         if (id) element.id = id;
         let image = document.createElement("img");
@@ -6356,17 +6612,24 @@ class ContentSearchEntry {
 }
 
 function formatNumber(num) {
-    num = num.toString();
-    let output = "";
-    let counter = 0;
-    for (let i = num.length - 1; i >= 0; i--) {
-        if (counter % 3 == 0 && counter != 0) {
-            output = "," + output;
-        }
-        output = num[i] + output;
-        counter++;
-    }
-    return output;
+    // num = num.toString();
+    // let output = "";
+    // let counter = 0;
+    // for (let i = num.length - 1; i >= 0; i--) {
+    //     if (counter % 3 == 0 && counter != 0) {
+    //         output = "," + output;
+    //     }
+    //     output = num[i] + output;
+    //     counter++;
+    // }
+    if (num < 1000) return num.toString();
+    if (num < 100000) return Math.round(num / 100) / 10 + "k";
+    if (num < 1000000) return Math.round(num / 1000) + "k";
+    if (num < 100000000) return Math.round(num / 100000) / 10 + "M";
+    if (num < 1000000000) return Math.round(num / 1000000) + "M";
+    if (num < 100000000000) return Math.round(num / 100000000) / 10 + "B";
+    if (num < 1000000000000) return Math.round(num / 1000000000) + "B";
+    return "Some Number";
 }
 
 function contentTabSelect(tab, ele, loader, version, instance_id) {
@@ -6425,7 +6688,6 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
     searchAndFilter.appendChild(searchElement);
     ele.appendChild(searchAndFilter);
     ele.appendChild(discoverList);
-
 }
 
 let added_vt_rp_packs = [];
@@ -7453,4 +7715,211 @@ function unpinMultiplayerWorld(ip, instance_id) {
 function isWorldPinned(world_id, instance_id, world_type) {
     let world = db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type);
     return Boolean(world);
+}
+
+async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader) {
+    if (content_source == "modrinth") {
+        let content_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}`);
+        let content = await content_pre_json.json();
+        contentInfo.innerHTML = "";
+        let contentWrapper = document.createElement("div");
+        contentWrapper.className = "content-wrapper";
+        contentInfo.appendChild(contentWrapper);
+        let topBar = document.createElement("div");
+        topBar.classList.add("content-top");
+        let instImg = document.createElement("img");
+        instImg.classList.add("content-top-image");
+        instImg.src = content.icon_url ? content.icon_url : "default.png";
+        topBar.appendChild(instImg);
+        let instTopInfo = document.createElement("div");
+        instTopInfo.classList.add("content-top-info");
+        let instTopTitle = document.createElement("h1");
+        instTopTitle.innerHTML = sanitize(content.title);
+        instTopTitle.classList.add("content-top-title");
+        instTopInfo.appendChild(instTopTitle);
+        let instTopSubInfo = document.createElement("div");
+        instTopSubInfo.classList.add("content-top-sub-info");
+        let instTopVersions = document.createElement("div");
+        instTopVersions.classList.add("content-top-sub-info-specific");
+        let type = "Mod";
+        if (content.project_type == "modpack") type = "Modpack";
+        if (content.project_type == "resourcepack") type = "Resource Pack";
+        if (content.project_type == "shader") type = "Shader";
+        if (content.project_type == "datapack") type = "Data Pack";
+        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
+        let instTopPlaytime = document.createElement("div");
+        instTopPlaytime.classList.add("content-top-sub-info-specific");
+        instTopPlaytime.innerHTML = `<i class="fa-solid fa-download"></i>${formatNumber(content.downloads) + " downloads"}`;
+        let instTopLastPlayed = document.createElement("div");
+        instTopLastPlayed.classList.add("content-top-sub-info-specific");
+        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.updated))}`;
+        instTopSubInfo.appendChild(instTopVersions);
+        instTopSubInfo.appendChild(instTopPlaytime);
+        instTopSubInfo.appendChild(instTopLastPlayed);
+        instTopInfo.appendChild(instTopSubInfo);
+        topBar.appendChild(instTopInfo);
+        let installButton = document.createElement("button");
+        installButton.className = "content-top-install-button";
+        installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
+        installButton.onclick = () => {
+
+        }
+        let threeDots = document.createElement("button");
+        threeDots.classList.add("content-top-more");
+        threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        let links = [];
+        if (content.source_url) {
+            links.push({
+                "icon": '<i class="fa-solid fa-code"></i>',
+                "title": "View Source",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.source_url);
+                }
+            })
+        }
+        if (content.wiki_url) {
+            links.push({
+                "icon": '<i class="fa-solid fa-book-atlas"></i>',
+                "title": "View Wiki",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.wiki_url);
+                }
+            })
+        }
+        if (content.issues_url) {
+            links.push({
+                "icon": '<i class="fa-solid fa-bug"></i>',
+                "title": "View Issues",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.issues_url);
+                }
+            })
+        }
+        if (content.discord_url) {
+            links.push({
+                "icon": '<i class="fa-brands fa-discord"></i>',
+                "title": "View Discord",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.discord_url);
+                }
+            })
+        }
+        if (content.donation_urls) {
+            content.donation_urls.forEach(e => {
+                links.push({
+                    "icon": '<i class="fa-solid fa-hand-holding-dollar"></i>',
+                    "title": e.platform == "Other" ? "Donate" : "Donate on " + e.platform,
+                    "func": () => {
+                        window.electronAPI.openInBrowser(e.url);
+                    }
+                })
+            });
+        }
+        let buttons = new ContextMenuButtons([
+            {
+                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                "title": "Open in Browser",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(`https://modrinth.com/project/${content.id}`);
+                }
+            }
+        ].concat(links));
+        let moreMenu = new MoreMenu(threeDots, buttons);
+        topBar.appendChild(installButton);
+        topBar.appendChild(threeDots);
+        topBar.appendChild(moreMenu.element);
+        contentWrapper.appendChild(topBar);
+
+        let tabsElement = document.createElement("div");
+        contentWrapper.appendChild(tabsElement);
+        let tabContent = document.createElement("div");
+        tabContent.className = "tab-info";
+        tabContent.style.padding = "10px";
+        tabContent.style.paddingTop = "0";
+        contentWrapper.appendChild(tabContent);
+        contentInfo.showModal();
+        let tabs = new TabContent(tabsElement, [
+            {
+                "name": "Description",
+                "value": "description",
+                "func": () => {
+                    tabContent.innerHTML = "";
+                    let element = document.createElement("div");
+                    element.className = "markdown-body";
+                    element.style.maxWidth = "700px";
+                    element.style.marginInline = "auto";
+                    tabContent.appendChild(element);
+                    element.innerHTML = parseModrinthMarkdown(content.body);
+                    afterMarkdownParse(instance_id, vanilla_version, loader);
+                }
+            },
+            content.project_type == "modpack" ? {
+                "name": "Mods",
+                "value": "mods",
+                "func": () => { }
+            } : null,
+            {
+                "name": "Files",
+                "value": "files",
+                "func": () => { }
+            },
+            {
+                "name": "Gallery",
+                "value": "gallery",
+                "func": () => { }
+            }
+        ].filter(e => e))
+        tabs.selectOption("description");
+    }
+}
+
+function parseModrinthMarkdown(md) {
+    return window.electronAPI.parseModrinthMarkdown(md);
+}
+
+function afterMarkdownParse(instance_id, vanilla_version, loader) {
+    document.querySelectorAll('.markdown-body a').forEach((el) => {
+        let url = el.getAttribute('data-href');
+        if (!url) {
+            url = el.getAttribute('href');
+            el.removeAttribute('href');
+            el.setAttribute("tabindex", "0");
+        }
+        if (url) {
+            try {
+                const url_obj = new URL(url);
+                console.log(url_obj.hostname);
+                if (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com") {
+                    let split = url.split("/");
+                    if (["mod", "datapack", "resourcepack", "shader", "modpack"].includes(split[split.length - 2])) {
+                        el.setAttribute('title', url);
+                        el.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            displayContentInfo("modrinth", split[split.length - 1], instance_id, vanilla_version, loader);
+                        });
+                        el.addEventListener('keydown', (e) => {
+                            if (e.key == "Enter" || e.key == " ") {
+                                e.preventDefault();
+                                displayContentInfo("modrinth", split[split.length - 1], instance_id, vanilla_version, loader);
+                            }
+                        });
+                        return;
+                    }
+                }
+                el.setAttribute('title', url);
+            } catch (e) {
+                el.setAttribute("tabindex", "-1");
+            }
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.electronAPI.openInBrowser(url);
+            });
+            el.addEventListener('keydown', (e) => {
+                if (e.key == "Enter" || e.key == " ") {
+                    e.preventDefault();
+                    window.electronAPI.openInBrowser(url);
+                }
+            })
+        }
+    });
 }
