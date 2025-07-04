@@ -2421,7 +2421,7 @@ async function showHomeContent(e) {
             let item = document.createElement("button");
             item.className = "home-discover";
             item.onclick = () => {
-                displayContentInfo("modrinth",e.project_id);
+                displayContentInfo("modrinth", e.project_id);
             }
             let img = document.createElement("img");
             img.className = "home-discover-image";
@@ -7717,14 +7717,71 @@ function isWorldPinned(world_id, instance_id, world_type) {
     return Boolean(world);
 }
 
-async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader) {
+let contentInfoHistory = [];
+let contentInfoIndex = 0;
+
+async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false) {
+    if (!disableAddToHistory) {
+        if (contentInfo.open) {
+            contentInfoHistory = contentInfoHistory.slice(0, contentInfoIndex + 1);
+            contentInfoHistory.push({ "content_source": content_source, "content_id": content_id });
+            contentInfoIndex++;
+        } else {
+            contentInfoHistory = [{ "content_source": content_source, "content_id": content_id }];
+            contentInfoIndex = 0;
+        }
+    }
     if (content_source == "modrinth") {
-        let content_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}`);
-        let content = await content_pre_json.json();
         contentInfo.innerHTML = "";
+        contentInfo.showModal();
         let contentWrapper = document.createElement("div");
         contentWrapper.className = "content-wrapper";
+        let contentNav = document.createElement("div");
+        contentNav.className = "content-nav";
+        contentWrapper.appendChild(contentNav);
+        let buttonBack = document.createElement("button");
+        buttonBack.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+        buttonBack.className = "content-nav-button";
+        if (contentInfoIndex <= 0) {
+            buttonBack.classList.add("disabled");
+        } else {
+            buttonBack.onclick = () => {
+                contentInfoIndex--;
+                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+            }
+        }
+        contentNav.appendChild(buttonBack);
+        let buttonForward = document.createElement("button");
+        buttonForward.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
+        buttonForward.className = "content-nav-button";
+        if (contentInfoIndex >= contentInfoHistory.length - 1) {
+            buttonForward.classList.add("disabled");
+        } else {
+            buttonForward.onclick = () => {
+                contentInfoIndex++;
+                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+            }
+        }
+        contentNav.appendChild(buttonForward);
+        let contentX = document.createElement("button");
+        contentX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        contentX.className = "content-x";
+        contentX.onclick = () => {
+            contentInfo.close();
+        }
+        contentNav.appendChild(contentX);
         contentInfo.appendChild(contentWrapper);
+        let loading = document.createElement("div");
+        loading.className = "loading-container";
+        loading.style.height = "100%";
+        loading.style.borderRadius = "2px";
+        let spinner = document.createElement("div");
+        spinner.className = "loading-container-spinner";
+        loading.appendChild(spinner);
+        contentWrapper.appendChild(loading);
+        let content_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}`);
+        let content = await content_pre_json.json();
+        loading.remove();
         let topBar = document.createElement("div");
         topBar.classList.add("content-top");
         let instImg = document.createElement("img");
@@ -7835,7 +7892,6 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         let tabContent = document.createElement("div");
         tabContent.className = "tab-info";
         tabContent.style.padding = "10px";
-        tabContent.style.paddingTop = "0";
         contentWrapper.appendChild(tabContent);
         contentInfo.showModal();
         let tabs = new TabContent(tabsElement, [

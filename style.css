@@ -3271,13 +3271,14 @@ dialog[open]::backdrop {
     border-width: 1px;
     border-style: solid;
     box-shadow: 0px 0px 10px black;
+    width: 100%;
+    height: 100%;
 }
 
 .content-wrapper {
     display: grid;
     gap: 10px;
-    width: calc(100svw - 100px);
-    min-height: calc(100svh - 100px);
+    width: 100%;
     padding: 10px;
     align-content: start;
 }
@@ -3290,6 +3291,63 @@ dialog[open]::backdrop {
     border-width: 2px;
     border-color: var(--color-2t);
     padding-bottom: 10px;
+}
+
+.content-nav {
+    display: flex;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom-style: solid;
+    border-width: 2px;
+    border-color: var(--color-2t);
+}
+
+.content-x {
+    height: 40px;
+    width: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    border-radius: 5px;
+    transition: background-color .25s, scale .1s;
+    margin-left: auto;
+}
+
+.content-x:hover {
+    background-color: var(--color-1t);
+}
+
+.content-x:active {
+    scale: .95;
+}
+
+.content-nav-button {
+    height: 40px;
+    width: 40px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    border-radius: 5px;
+    transition: background-color .25s, scale .1s;
+}
+
+.content-nav-button.disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.content-nav-button:hover {
+    background-color: var(--color-1t);
+}
+
+.content-nav-button:active {
+    scale: .95;
 }
 
 .content-top-image {
@@ -3390,214 +3448,218 @@ dialog[open]::backdrop {
 }
 
 .markdown-body {
-  h1:first-child {
-    margin-block-start: 0;
-    padding-block-start: 0;
-  }
-
-  blockquote,
-  details,
-  dl,
-  ol,
-  p,
-  code,
-  pre,
-  table,
-  ul {
-    margin-top: 0;
-    margin-bottom: 16px;
-  }
-
-  li,
-  p {
-    padding: 0;
-    line-height: 1.5;
-  }
-
-  h1 {
-    display: block;
-  }
-
-  h1,
-  h2,
-  h3 {
-    color: var(--text-color);
-  }
-
-  h1,
-  h2 {
-    padding: 10px 0 5px;
-    border-bottom: 1px solid var(--color-1);
-  }
-
-  h1 {
-    margin-block: .67em;
-  }
-
-  h2 {
-    margin-top: 0;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  li,
-  p {
-    word-wrap: break-word;
-    overflow-wrap: anywhere;
-  }
-
-  blockquote {
-    padding: 0 1em;
-    color: var(--color-base);
-    border-left: 0.25em solid var(--color-1);
-    margin-inline: 0;
-  }
-
-  a {
-    cursor: pointer;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
-    font-weight: bold;
-    text-decoration: none;
-
-    &:focus-visible,
-    &:hover {
-      filter: brightness(1.2);
-      text-decoration: none;
+    h1:first-child {
+        margin-block-start: 0;
+        padding-block-start: 0;
     }
 
-    &:active {
-      filter: brightness(1.1);
-      text-decoration: none;
+    blockquote,
+    details,
+    dl,
+    ol,
+    p,
+    code,
+    pre,
+    table,
+    ul {
+        margin-top: 0;
+        margin-bottom: 16px;
     }
-  }
 
-  a:active > img {
-    scale: 0.98;
-  }
+    li,
+    p {
+        padding: 0;
+        line-height: 1.5;
+    }
 
-  img {
-    max-width: 100%;
-    height: auto;
-    display: inline-block;
-  }
+    h1 {
+        display: block;
+    }
 
-  html:not(.dark-mode, .oled-mode) & img[src$='#gh-dark-mode-only'] {
-    display: none;
-  }
+    h1,
+    h2,
+    h3 {
+        color: var(--text-color);
+    }
 
-  html:is(.dark-mode, .oled-mode) & img[src$='#gh-light-mode-only'] {
-    display: none;
-  }
+    h1,
+    h2 {
+        padding: 10px 0 5px;
+        border-bottom: 1px solid var(--color-1);
+    }
 
-  pre {
-    margin-top: 1rem;
-    padding: 14px;
-    border-radius: 10px;
-    background-color: var(--color-1);
-    overflow-x: auto;
+    h1 {
+        margin-block: .67em;
+    }
+
+    h2 {
+        margin-top: 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    li,
+    p {
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    blockquote {
+        padding: 0 1em;
+        color: var(--color-base);
+        border-left: 0.25em solid var(--color-1);
+        margin-inline: 0;
+    }
+
+    a {
+        cursor: pointer;
+        color: color-mix(in srgb, var(--accent-color), var(--text-color));
+        font-weight: bold;
+        text-decoration: none;
+
+        &:focus-visible,
+        &:hover {
+            filter: brightness(1.2);
+            text-decoration: none;
+        }
+
+        &:active {
+            filter: brightness(1.1);
+            text-decoration: none;
+        }
+    }
+
+    a:active>img {
+        scale: 0.98;
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+        display: inline-block;
+    }
+
+    html:not(.dark-mode, .oled-mode) & img[src$='#gh-dark-mode-only'] {
+        display: none;
+    }
+
+    html:is(.dark-mode, .oled-mode) & img[src$='#gh-light-mode-only'] {
+        display: none;
+    }
+
+    pre {
+        margin-top: 1rem;
+        padding: 14px;
+        border-radius: 10px;
+        background-color: var(--color-1);
+        overflow-x: auto;
+
+        code {
+            font-size: 100%;
+            padding: 0;
+            border-radius: 0;
+        }
+    }
 
     code {
-      font-size: 100%;
-      padding: 0;
-      border-radius: 0;
-    }
-  }
-
-  code {
-    padding: 0.2em 0.4em;
-    font-size: 100%;
-    border-radius: 10px;
-    background-color: var(--color-1);
-    color: var(--text-color);
-  }
-
-  hr {
-    margin: 20px 0;
-    color: var(--color-1);
-  }
-
-  table {
-    display: block;
-    width: max-content;
-    max-width: 100%;
-    overflow: auto;
-    border-collapse: separate;
-    border-spacing: 0;
-    line-height: 1.5;
-    border: 0.1rem solid var(--color-1);
-    border-radius: 2px;
-
-    th {
-      font-weight: 600;
+        padding: 0.2em 0.4em;
+        font-size: 100%;
+        border-radius: 10px;
+        background-color: var(--color-1);
+        color: var(--text-color);
     }
 
-    td,
-    th {
-      padding: 0.4rem 0.85rem;
+    hr {
+        margin: 20px 0;
+        color: var(--color-1);
     }
 
-    tr:nth-child(2n) {
-      background-color: var(--accent-color);
+    table {
+        display: block;
+        width: max-content;
+        max-width: 100%;
+        overflow: auto;
+        border-collapse: separate;
+        border-spacing: 0;
+        line-height: 1.5;
+        border: 0.1rem solid var(--color-1);
+        border-radius: 2px;
+
+        th {
+            font-weight: 600;
+        }
+
+        td,
+        th {
+            padding: 0.4rem 0.85rem;
+        }
+
+        tr:nth-child(2n) {
+            background-color: var(--color-2);
+        }
+
+        td:not(:last-of-type),
+        th:not(:last-of-type) {
+            border-right: 0.1rem solid var(--color-1);
+        }
+
+        tr:not(:last-of-type) td,
+        th {
+            border-bottom: 0.1rem solid var(--color-1);
+        }
     }
 
-    td:not(:last-of-type),
-    th:not(:last-of-type) {
-      border-right: 0.1rem solid var(--color-1);
+    details {
+        border: 0.15rem solid var(--color-1);
+        border-radius: 10px;
+        padding: 0.5rem 0.5rem 0;
+
+        summary {
+            font-weight: bold;
+            margin: -0.5rem -0.5rem 0;
+            padding: 0.5rem 0.8rem;
+            cursor: pointer;
+            background-color: var(--color-1);
+
+            &:hover {
+                filter: brightness(0.85);
+            }
+        }
+
+        &[open] {
+            padding: 0.5rem;
+
+            summary {
+                margin-bottom: 0.5rem;
+            }
+
+            > :last-child:not(summary) {
+                margin-bottom: 0 !important;
+            }
+        }
     }
 
-    tr:not(:last-of-type) td,
-    th {
-      border-bottom: 0.1rem solid var(--color-1);
-    }
-  }
-
-  details {
-    border: 0.15rem solid var(--color-1);
-    border-radius: 10px;
-    padding: 0.5rem 0.5rem 0;
-
-    summary {
-      font-weight: bold;
-      margin: -0.5rem -0.5rem 0;
-      padding: 0.5rem 0.8rem;
-      cursor: pointer;
-      background-color: var(--color-1);
-      border-radius: var(--radius-xs);
-
-      &:hover {
-        filter: brightness(0.85);
-      }
-    }
-
-    &[open] {
-      padding: 0.5rem;
-
-      > :last-child:not(summary) {
+    > :last-child {
         margin-bottom: 0 !important;
-      }
     }
-  }
 
-  > :last-child {
-    margin-bottom: 0 !important;
-  }
-
-  iframe,
-  video {
-    aspect-ratio: 16 / 9;
-    width: 850px;
-    max-width: 100%;
-    height: auto;
-  }
-
-  @media screen and (max-width: 1280px) {
     iframe,
     video {
-      width: 100%;
+        aspect-ratio: 16 / 9;
+        width: 850px;
+        max-width: 100%;
+        height: auto;
     }
-  }
+
+    @media screen and (max-width: 1280px) {
+
+        iframe,
+        video {
+            width: 100%;
+        }
+    }
 }
