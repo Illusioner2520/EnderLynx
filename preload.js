@@ -82,7 +82,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     openInBrowser,
     getRandomModpacks: (callback, errcallback) => {
-        let indexes = ["relevance", "updated", "follows", "newest", "updated"];
+        let indexes = ["relevance", "downloads", "follows", "newest", "updated"];
         let index = indexes[Math.floor(Math.random() * indexes.length)];
         let offset = Math.floor(Math.random() * 10000);
         try {
@@ -1147,9 +1147,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
             });
         return files;
     },
-    copyImageToClipboard: (file_path) => {
+    copyImageToClipboard: async (file_path) => {
         try {
-            const image = nativeImage.createFromPath(file_path);
+            let image;
+            if (/^https?:\/\//.test(file_path)) {
+                // file_path is a URL, download it first
+                const response = await axios.get(file_path, { responseType: "arraybuffer" });
+                image = nativeImage.createFromBuffer(Buffer.from(response.data));
+            } else {
+                image = nativeImage.createFromPath(file_path);
+            }
             clipboard.writeImage(image);
             return true;
         } catch (err) {

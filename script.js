@@ -5294,8 +5294,8 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": "Copy Screenshot",
-                "func": () => {
-                    let success = window.electronAPI.copyImageToClipboard(e.file_path);
+                "func": async () => {
+                    let success = await window.electronAPI.copyImageToClipboard(e.file_path);
                     if (success) {
                         displaySuccess("Screenshot copied to clipboard!");
                     } else {
@@ -5330,33 +5330,58 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
     });
 }
 
-function displayScreenshot(name, file, instanceInfo, element, list, currentIndex) {
+function displayScreenshot(name, file, instanceInfo, element, list, currentIndex, word = "Screenshot") {
     let index = currentIndex;
     let buttonLeft = document.createElement("button");
     buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
     buttonLeft.className = "screenshot-arrow";
     let changeDisplay = (name, file) => {
+        screenshotDisplayW.innerHTML = '';
+        let spinner = document.createElement("div");
+        spinner.className = "loading-container-spinner";
+        let error = document.createElement("div");
+        error.className = "loading-container-error";
+        error.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        error.style.display = "none";
+        screenshotDisplayW.appendChild(spinner);
+        screenshotDisplayW.appendChild(error);
         screenshotAction2.onclick = () => {
             window.electronAPI.openFolder(file);
         };
-        screenshotAction3.onclick = () => {
-            let success = window.electronAPI.copyImageToClipboard(file);
+        screenshotAction3.onclick = async () => {
+            let success = await window.electronAPI.copyImageToClipboard(file);
             if (success) {
-                displaySuccess("Screenshot copied to clipboard!");
+                displaySuccess(word + " copied to clipboard!");
             } else {
                 displayError("Failed to copy to clipboard");
             }
         };
-        screenshotAction5.onclick = () => {
-            let success = window.electronAPI.deleteScreenshot(file);
-            if (success) {
-                screenshotPreview.close();
-                displaySuccess("Screenshot deleted!");
-            } else {
-                displayError("Failed to delete screenshot");
-            }
-            setInstanceTabContentScreenshots(instanceInfo, element);
+        if (instanceInfo) {
+            screenshotAction5.onclick = () => {
+                let success = window.electronAPI.deleteScreenshot(file);
+                if (success) {
+                    screenshotPreview.close();
+                    displaySuccess(word + " deleted!");
+                } else {
+                    displayError("Failed to delete " + word);
+                }
+                setInstanceTabContentScreenshots(instanceInfo, element);
+            };
+        }
+        let screenshotDisplay = document.createElement("img");
+        screenshotDisplay.className = "screenshot-display";
+        screenshotDisplay.style.display = "none";
+        screenshotDisplay.onload = () => {
+            spinner.style.display = "none";
+            screenshotDisplay.style.display = "";
         };
+        screenshotDisplay.onerror = () => {
+            spinner.style.display = "none";
+            screenshotDisplay.style.display = "none";
+            error.style.display = "";
+            screenshotTitle.innerHTML = "Failed to load image";
+        };
+        screenshotDisplayW.appendChild(screenshotDisplay);
         screenshotTitle.innerHTML = sanitize(name);
         screenshotDisplay.src = file;
         screenshotDisplay.alt = sanitize(name);
@@ -5383,8 +5408,8 @@ function displayScreenshot(name, file, instanceInfo, element, list, currentIndex
             shiftLeft();
         }
     }
-    let screenshotDisplay = document.createElement("img");
-    screenshotDisplay.className = "screenshot-display";
+    let screenshotDisplayW = document.createElement("div");
+    screenshotDisplayW.className = "screenshot-display-wrapper";
     let screenshotInfo = document.createElement("div");
     screenshotInfo.className = "screenshot-info";
     let screenshotX = document.createElement("button");
@@ -5409,33 +5434,41 @@ function displayScreenshot(name, file, instanceInfo, element, list, currentIndex
     screenshotAction1.onclick = () => {
         window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`);
     };
-    screenshotActions.appendChild(screenshotAction1);
+    if (instanceInfo) {
+        screenshotActions.appendChild(screenshotAction1);
+    }
     let screenshotAction2 = document.createElement("button");
     screenshotAction2.className = "screenshot-action";
     screenshotAction2.innerHTML = '<i class="fa-solid fa-image"></i>Open Photo';
-    screenshotActions.appendChild(screenshotAction2);
+    if (instanceInfo) {
+        screenshotActions.appendChild(screenshotAction2);
+    }
     let screenshotAction3 = document.createElement("button");
     screenshotAction3.className = "screenshot-action";
-    screenshotAction3.innerHTML = '<i class="fa-solid fa-copy"></i>Copy Screenshot';
+    screenshotAction3.innerHTML = '<i class="fa-solid fa-copy"></i>Copy ' + word;
     screenshotActions.appendChild(screenshotAction3);
     let screenshotAction4 = document.createElement("button");
     screenshotAction4.className = "screenshot-action";
-    screenshotAction4.innerHTML = '<i class="fa-solid fa-share"></i>Share Screenshot';
+    screenshotAction4.innerHTML = '<i class="fa-solid fa-share"></i>Share ' + word;
     screenshotAction4.onclick = () => {
 
     };
     screenshotActions.appendChild(screenshotAction4);
     let screenshotAction5 = document.createElement("button");
     screenshotAction5.className = "screenshot-action";
-    screenshotAction5.innerHTML = '<i class="fa-solid fa-trash-can"></i>Delete Screenshot';
-    screenshotActions.appendChild(screenshotAction5);
+    screenshotAction5.innerHTML = '<i class="fa-solid fa-trash-can"></i>Delete ' + word;
+    if (instanceInfo) {
+        screenshotActions.appendChild(screenshotAction5);
+    }
     screenshotWrapper.appendChild(buttonLeft);
-    screenshotWrapper.appendChild(screenshotDisplay);
+    screenshotWrapper.appendChild(screenshotDisplayW);
     screenshotWrapper.appendChild(buttonRight);
     screenshotWrapper.appendChild(screenshotInfo);
     screenshotPreview.appendChild(screenshotWrapper);
     changeDisplay(name, file);
     screenshotPreview.showModal();
+    document.getElementsByClassName("toasts")[0].hidePopover();
+    document.getElementsByClassName("toasts")[0].showPopover();
 }
 
 let hideToast = (e) => {
@@ -6937,7 +6970,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
                     displaySuccess(`${i.title} installed to instance ${(new Instance(info.instance)).name}`);
                 });
-            }, e.categories.map(e => formatCategory(e)), e);
+            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader);
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -7894,6 +7927,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         tabContent.style.padding = "10px";
         contentWrapper.appendChild(tabContent);
         contentInfo.showModal();
+        tabsElement.style.marginInline = "auto";
         let tabs = new TabContent(tabsElement, [
             {
                 "name": "Description",
@@ -7919,14 +7953,54 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 "value": "files",
                 "func": () => { }
             },
-            {
+            content.gallery.length ? {
                 "name": "Gallery",
                 "value": "gallery",
-                "func": () => { }
-            }
+                "func": () => {
+                    tabContent.innerHTML = "";
+                    let gallery = document.createElement("div");
+                    gallery.className = "gallery";
+                    content.gallery.forEach(e => {
+                        let screenshotElement = document.createElement("button");
+                        screenshotElement.className = "gallery-screenshot";
+                        screenshotElement.setAttribute("data-title", e.title ?? "Untitled");
+                        screenshotElement.style.backgroundImage = `url("${e.url}")`;
+                        let screenshotInformation = content.gallery.map(e => ({ "name": e.title ?? "Untitled", "file": e.raw_url }));
+                        screenshotElement.onclick = () => {
+                            displayScreenshot(e.title ?? "Untitled", e.raw_url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), "Gallery Image");
+                        }
+                        let buttons = new ContextMenuButtons([
+                            {
+                                "icon": '<i class="fa-solid fa-copy"></i>',
+                                "title": "Copy Gallery Image",
+                                "func": async () => {
+                                    let success = await window.electronAPI.copyImageToClipboard(e.url);
+                                    if (success) {
+                                        displaySuccess("Gallery Image copied to clipboard!");
+                                    } else {
+                                        displayError("Failed to copy to clipboard");
+                                    }
+                                }
+                            },
+                            {
+                                "icon": '<i class="fa-solid fa-share"></i>',
+                                "title": "Share Gallery Image",
+                                "func": (e) => { }
+                            }
+                        ]);
+                        screenshotElement.oncontextmenu = (e) => {
+                            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+                        }
+                        gallery.appendChild(screenshotElement);
+                    });
+                    tabContent.appendChild(gallery);
+                }
+            } : null
         ].filter(e => e))
         tabs.selectOption("description");
     }
+    document.getElementsByClassName("toasts")[0].hidePopover();
+    document.getElementsByClassName("toasts")[0].showPopover();
 }
 
 function parseModrinthMarkdown(md) {
@@ -7946,20 +8020,24 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
                 const url_obj = new URL(url);
                 console.log(url_obj.hostname);
                 if (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com") {
-                    let split = url.split("/");
-                    if (["mod", "datapack", "resourcepack", "shader", "modpack"].includes(split[split.length - 2])) {
-                        el.setAttribute('title', url);
-                        el.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            displayContentInfo("modrinth", split[split.length - 1], instance_id, vanilla_version, loader);
-                        });
-                        el.addEventListener('keydown', (e) => {
-                            if (e.key == "Enter" || e.key == " ") {
+                    let pathParts = url_obj.pathname.split('/').filter(Boolean);
+                    if (pathParts.length >= 2) {
+                        let pageType = pathParts[0];
+                        let pageId = pathParts[1];
+                        if (["mod", "datapack", "resourcepack", "shader", "modpack"].includes(pageType)) {
+                            el.setAttribute('title', url);
+                            el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("modrinth", split[split.length - 1], instance_id, vanilla_version, loader);
-                            }
-                        });
-                        return;
+                                displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader);
+                            });
+                            el.addEventListener('keydown', (e) => {
+                                if (e.key == "Enter" || e.key == " ") {
+                                    e.preventDefault();
+                                    displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader);
+                                }
+                            });
+                            return;
+                        }
                     }
                 }
                 el.setAttribute('title', url);
