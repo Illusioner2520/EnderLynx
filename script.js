@@ -5274,7 +5274,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
         screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
         let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
         screenshotElement.onclick = () => {
-            displayScreenshot(formatDateAndTime(e.file_name), e.file_path, instanceInfo, element, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
+            displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, instanceInfo, element, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
         }
         let buttons = new ContextMenuButtons([
             {
@@ -5330,12 +5330,12 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
     });
 }
 
-function displayScreenshot(name, file, instanceInfo, element, list, currentIndex, word = "Screenshot") {
+function displayScreenshot(name, desc, file, instanceInfo, element, list, currentIndex, word = "Screenshot") {
     let index = currentIndex;
     let buttonLeft = document.createElement("button");
     buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
     buttonLeft.className = "screenshot-arrow";
-    let changeDisplay = (name, file) => {
+    let changeDisplay = (name, file, desc) => {
         screenshotDisplayW.innerHTML = '';
         let spinner = document.createElement("div");
         spinner.className = "loading-container-spinner";
@@ -5383,18 +5383,19 @@ function displayScreenshot(name, file, instanceInfo, element, list, currentIndex
         };
         screenshotDisplayW.appendChild(screenshotDisplay);
         screenshotTitle.innerHTML = sanitize(name);
+        screenshotDesc.innerHTML = sanitize(desc);
         screenshotDisplay.src = file;
         screenshotDisplay.alt = sanitize(name);
     }
     let shiftLeft = () => {
         index--;
         if (index < 0) index = list.length - 1;
-        changeDisplay(list[index].name, list[index].file);
+        changeDisplay(list[index].name, list[index].file, list[index].desc);
     }
     let shiftRight = () => {
         index++;
         if (index > list.length - 1) index = 0;
-        changeDisplay(list[index].name, list[index].file);
+        changeDisplay(list[index].name, list[index].file, list[index].desc);
     }
     buttonLeft.onclick = shiftLeft;
     let buttonRight = document.createElement("button");
@@ -5422,6 +5423,9 @@ function displayScreenshot(name, file, instanceInfo, element, list, currentIndex
     let screenshotTitle = document.createElement("div");
     screenshotTitle.className = "screenshot-title";
     screenshotInfo.appendChild(screenshotTitle);
+    let screenshotDesc = document.createElement("div");
+    screenshotDesc.className = "screenshot-desc";
+    screenshotInfo.appendChild(screenshotDesc);
     let screenshotActions = document.createElement("div");
     screenshotActions.className = "screenshot-actions";
     screenshotInfo.appendChild(screenshotActions);
@@ -5465,7 +5469,7 @@ function displayScreenshot(name, file, instanceInfo, element, list, currentIndex
     screenshotWrapper.appendChild(buttonRight);
     screenshotWrapper.appendChild(screenshotInfo);
     screenshotPreview.appendChild(screenshotWrapper);
-    changeDisplay(name, file);
+    changeDisplay(name, file, desc);
     screenshotPreview.showModal();
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
@@ -6637,7 +6641,8 @@ class ContentSearchEntry {
         let installButton = document.createElement("button");
         installButton.className = "discover-item-install";
         installButton.innerHTML = installContent;
-        installButton.onclick = () => {
+        installButton.onclick = (evnt) => {
+            evnt.stopPropagation();
             installFunction(infoData, installButton);
         }
         actions.appendChild(installButton);
@@ -7851,8 +7856,107 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         let installButton = document.createElement("button");
         installButton.className = "content-top-install-button";
         installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
-        installButton.onclick = () => {
-
+        let button = installButton;
+        let project_type = content.project_type;
+        installButton.onclick = project_type == "modpack" ? () => {
+            let options = [];
+            content.loaders.forEach((e) => {
+                if (loaders[e]) {
+                    options.push({ "name": loaders[e], "value": e })
+                }
+            })
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.button.instances.create"), "form", [
+                {
+                    "type": "image-upload",
+                    "id": "icon",
+                    "name": "Icon", //TODO: replace with translate
+                    "default": content.icon_url
+                },
+                {
+                    "type": "text",
+                    "name": "Name", //TODO
+                    "id": "name",
+                    "default": content.title,
+                    "maxlength": 50
+                },
+                {
+                    "type": "dropdown",
+                    "name": "Game Version", //TODO
+                    "id": "game_version",
+                    "options": content.game_versions.map(e => ({ "name": e, "value": e })).reverse()
+                },
+                {
+                    "type": "dropdown",
+                    "name": "Mod Loader", //TODO
+                    "id": "loader",
+                    "options": options
+                }
+            ], [
+                { "content": "Cancel", "type": "cancel" },
+                { "content": "Submit", "type": "confirm" }
+            ], [], async (e) => {
+                contentInfo.close();
+                let info = {};
+                e.forEach(e => { info[e.id] = e.value });
+                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                let res = await fetch(`https://api.modrinth.com/v2/project/${content.id}/version`);
+                let version_json = await res.json();
+                let version = {};
+                for (let j = 0; j < version_json.length; j++) {
+                    if (version_json[j].game_versions.includes(info.game_version) && version_json[j].loaders.includes(info.loader)) {
+                        version = version_json[j];
+                        break;
+                    }
+                }
+                if (!version.files) {
+                    displayError(`Error: Could not find version of '${content.title}' that is version ${info.game_version} and uses loader ${loaders[info.loader]}`);
+                    return;
+                }
+                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                showSpecificInstanceContent(instance);
+                await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
+                let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
+                if (!mr_pack_info.loader_version) {
+                    displayError(mr_pack_info);
+                    return;
+                }
+                instance.setLoaderVersion(mr_pack_info.loader_version);
+                mr_pack_info.content.forEach(e => {
+                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                });
+                instance.setInstalling(false);
+                let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
+            })
+        } : instance_id ? async () => {
+            button.innerHTML = '<i class="spinner"></i>Installing...';
+            button.classList.add("disabled");
+            button.onclick = () => { };
+            await installContent("modrinth", content.id, instance_id, project_type, content.title, content.author, content.icon_url);
+            button.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+        } : (i) => {
+            let dialog = new Dialog();
+            let instances = data.getInstances();
+            dialog.showDialog(`Select Instance to install ${content.title}`, "form", [
+                {
+                    "type": "dropdown",
+                    "name": "Instance",
+                    "id": "instance",
+                    "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).map(e => ({ "name": content.game_versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.map(e => ({ "name": content.game_versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").map(e => ({ "name": content.game_versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id })) : instances.map(e => ({ "name": content.game_versions.includes(e.vanilla_version) ? e.name : `${e.name} (Incompatible)`, "value": e.instance_id }))
+                }
+            ], [
+                { "content": "Cancel", "type": "cancel" },
+                { "content": "Submit", "type": "confirm" }
+            ], null, async (e) => {
+                contentInfo.close();
+                let info = {};
+                e.forEach(e => { info[e.id] = e.value });
+                await installContent("modrinth", content.id, info.instance, project_type, content.title, content.author, content.icon_url);
+                displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
+            });
         }
         let threeDots = document.createElement("button");
         threeDots.classList.add("content-top-more");
@@ -7965,9 +8069,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         screenshotElement.className = "gallery-screenshot";
                         screenshotElement.setAttribute("data-title", e.title ?? "Untitled");
                         screenshotElement.style.backgroundImage = `url("${e.url}")`;
-                        let screenshotInformation = content.gallery.map(e => ({ "name": e.title ?? "Untitled", "file": e.raw_url }));
+                        let screenshotInformation = content.gallery.map(e => ({ "name": e.title ?? "Untitled", "file": e.raw_url, "desc": e.description }));
                         screenshotElement.onclick = () => {
-                            displayScreenshot(e.title ?? "Untitled", e.raw_url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), "Gallery Image");
+                            displayScreenshot(e.title ?? "Untitled", e.description, e.raw_url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), "Gallery Image");
                         }
                         let buttons = new ContextMenuButtons([
                             {
