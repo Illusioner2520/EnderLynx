@@ -1147,6 +1147,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             });
         return files;
     },
+    copyToClipboard: async (text) => {
+        clipboard.writeText(text);
+        return true;
+    },
     copyImageToClipboard: async (file_path) => {
         try {
             let image;

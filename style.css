@@ -37,7 +37,7 @@ body.light {
     --success-color: rgb(180, 255, 180);
     --error-color: rgb(255, 180, 180);
     --dialog-background: #fff9;
-    --dialog-backdrop: #00000088;
+    --dialog-backdrop: #ffffff88;
     --color-1: color-mix(in srgb, 7.8% var(--text-color), var(--background-color));
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
     --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
@@ -276,7 +276,7 @@ body.compact .sidebar {
     border: 0;
     padding: 0px;
     overflow-y: hidden;
-    position: absolute;
+    position: fixed;
     top: calc(anchor(bottom) + var(--menu-padding));
     position-try-fallbacks: --top;
     right: anchor(right);
@@ -3692,4 +3692,202 @@ dialog[open]::backdrop {
             width: 100%;
         }
     }
+}
+
+.authors-wrapper {
+    width: 100%;
+    display: grid;
+}
+
+.authors {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 8px;
+    font-size: 1.2rem;
+}
+
+.author {
+    padding: 8px;
+    display: flex;
+    gap: 8px;
+    background-color: var(--color-1);
+    border-radius: 16px;
+    align-items:center;
+    border-width: 1px;
+    border-color: var(--color-2);
+    border-style: solid;
+}
+
+.author-image {
+    height: 50px;
+    width: 50px;
+    border-width: 1px;
+    border-radius: 50%;
+    border-style: solid;
+    border-color: var(--color-2);
+    background-color: var(--color-1);
+    object-fit: contain;
+}
+
+.author-info {
+    overflow: hidden;
+}
+
+.author-name {
+    font-size: 1rem;
+    color: var(--text-color);
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.author-role {
+    font-size: .8rem;
+    color: var(--subtle-text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.version-files-wrapper {
+    background-color: var(--color-1);
+    border-radius: 10px;
+    display: grid;
+    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto;
+}
+
+.version-file {
+    display: grid;
+    grid-template-columns: subgrid;
+    gap: 10px;
+    padding: 10px;
+    border-top-style: solid;
+    border-width: 1px;
+    border-color: var(--color-1t);
+    grid-column: span 7;
+    align-content:center;
+}
+
+.version-file-top {
+    display: grid;
+    grid-template-columns: subgrid;
+    gap: 10px;
+    padding: 10px;
+    grid-column: span 7;
+    align-content:center;
+}
+
+.version-file-channel {
+    height: 40px;
+    width: 40px;
+    color: var(--channel-color);
+    display: flex;
+    justify-content:center;
+    align-items:center;
+    font-weight: bold;
+    align-self: center;
+    border-radius: 50%;
+    background-color: color-mix(in srgb, 15% var(--channel-color), transparent);
+}
+
+.version-file-info {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.version-file-title {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.version-file-desc {
+    font-size: .8rem;
+    color: var(--subtle-text-color);
+}
+
+.version-file-chip {
+    font-size: .9rem;
+    background-color: var(--color-1t);
+    padding: 4px;
+    border-radius: 100px;
+    color: var(--subtle-text-color);
+    padding-inline: 8px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.version-file-chip-wrapper {
+    display: flex;
+    gap: 4px;
+    max-width: 100%;
+    overflow: hidden;
+    flex-wrap: wrap;
+    align-items:center;
+}
+
+.version-file-install {
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-width: 2px;
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    align-self: center;
+    margin-left: auto;
+}
+
+.version-file-install:active {
+    scale: .95;
+}
+
+.version-file-install:hover {
+    background-color: var(--color-1t);
+}
+
+.version-file-install.disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+.version-file-install.disabled:active {
+    scale: 1;
+}
+
+.version-file-install.disabled:hover {
+    background-color: transparent;
+}
+
+.version-file-text {
+    display: flex;
+    align-items:center;
+}
+
+.version-file-column-name {
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.version-file-filters {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 200px 200px 200px;
+    margin-bottom: 10px;
 }
