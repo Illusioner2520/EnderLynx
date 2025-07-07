@@ -3496,6 +3496,11 @@ dialog[open]::backdrop {
         margin-bottom: 16px;
     }
 
+    ul,
+    ol {
+        padding-left: 20px;
+    }
+
     li,
     p {
         padding: 0;
@@ -3712,7 +3717,7 @@ dialog[open]::backdrop {
     gap: 8px;
     background-color: var(--color-1);
     border-radius: 16px;
-    align-items:center;
+    align-items: center;
     border-width: 1px;
     border-color: var(--color-2);
     border-style: solid;
@@ -3756,7 +3761,7 @@ dialog[open]::backdrop {
     background-color: var(--color-1);
     border-radius: 10px;
     display: grid;
-    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto;
+    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto auto;
 }
 
 .version-file {
@@ -3767,8 +3772,8 @@ dialog[open]::backdrop {
     border-top-style: solid;
     border-width: 1px;
     border-color: var(--color-1t);
-    grid-column: span 7;
-    align-content:center;
+    grid-column: span 8;
+    align-content: center;
 }
 
 .version-file-top {
@@ -3776,8 +3781,8 @@ dialog[open]::backdrop {
     grid-template-columns: subgrid;
     gap: 10px;
     padding: 10px;
-    grid-column: span 7;
-    align-content:center;
+    grid-column: span 8;
+    align-content: center;
 }
 
 .version-file-channel {
@@ -3785,8 +3790,8 @@ dialog[open]::backdrop {
     width: 40px;
     color: var(--channel-color);
     display: flex;
-    justify-content:center;
-    align-items:center;
+    justify-content: center;
+    align-items: center;
     font-weight: bold;
     align-self: center;
     border-radius: 50%;
@@ -3829,7 +3834,35 @@ dialog[open]::backdrop {
     max-width: 100%;
     overflow: hidden;
     flex-wrap: wrap;
-    align-items:center;
+    align-items: center;
+}
+
+.version-file-changelog {
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+    border-style: solid;
+    border-color: var(--text-color);
+    border-width: 2px;
+    color: var(--text-color);
+    align-self: center;
+    margin-left: auto;
+}
+
+.version-file-changelog:active {
+    scale: .95;
+}
+
+.version-file-changelog:hover {
+    background-color: var(--color-1t);
 }
 
 .version-file-install {
@@ -3875,7 +3908,7 @@ dialog[open]::backdrop {
 
 .version-file-text {
     display: flex;
-    align-items:center;
+    align-items: center;
 }
 
 .version-file-column-name {

@@ -6609,6 +6609,13 @@ class ContentSearchEntry {
         element.onclick = () => {
             displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
         }
+        element.setAttribute("tabindex", "0");
+        element.setAttribute("role", "button");
+        element.onkeydown = (e) => {
+            if (e.key == "Enter" || e.key == " ") {
+                displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
+            }
+        }
         this.element = element;
         if (id) element.id = id;
         let image = document.createElement("img");
@@ -6747,7 +6754,7 @@ let selected_vt_version = "1.21";
 let pages = 0;
 
 class Pagination {
-    constructor(currentPage, totalPages, change_page_function, d1opt, d1def, d1func, d2opt, d2def, d2func) {
+    constructor(currentPage, totalPages, change_page_function, d1opt, d1def, d1func, d2opt, d2def, d2func, d3opt, d3def, d3func, d4opt, d4def, d4func) {
         let element = document.createElement("div");
         element.className = "page-container";
         this.element = element;
@@ -6781,12 +6788,27 @@ class Pagination {
             dropdownEle.style.width = "150px";
             let dropdown = new SearchDropdown("Sort by", d1opt, dropdownEle, d1def, d1func);
             element.appendChild(dropdownEle);
+            if (!d2opt && !d3opt && !d4opt) dropdownEle.style.marginRight = "auto";
         }
         if (d2opt) {
             let dropdownEle = document.createElement("div");
-            dropdownEle.style.marginRight = "auto";
             dropdownEle.style.width = "75px";
             let dropdown = new SearchDropdown("View", d2opt, dropdownEle, d2def, d2func);
+            element.appendChild(dropdownEle);
+            if (!d3opt && !d4opt) dropdownEle.style.marginRight = "auto";
+        }
+        if (d3opt) {
+            let dropdownEle = document.createElement("div");
+            dropdownEle.style.width = "180px";
+            let dropdown = new DialogDropdown("Game Version", d3opt, dropdownEle, d3def, d3func);
+            element.appendChild(dropdownEle);
+            if (!d4opt) dropdownEle.style.marginRight = "auto";
+        }
+        if (d4opt) {
+            let dropdownEle = document.createElement("div");
+            dropdownEle.style.marginRight = "auto";
+            dropdownEle.style.width = "150px";
+            let dropdown = new SearchDropdown("Loader", d4opt, dropdownEle, d4def, d4func);
             element.appendChild(dropdownEle);
         }
         element.appendChild(leftArrow);
@@ -6879,6 +6901,31 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }
         ], pageSize.toString(), (v) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
+        }, [{ "name": "All", "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
+            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy);
+        }, ["resourcepack", "shader", "world", "datapack"].includes(project_type) ? null : [
+            {
+                "name": "All",
+                "value": "all"
+            },
+            {
+                "name": "Fabric",
+                "value": "fabric"
+            },
+            {
+                "name": "Forge",
+                "value": "forge"
+            },
+            {
+                "name": "NeoForge",
+                "value": "neoforge"
+            },
+            {
+                "name": "Quilt",
+                "value": "quilt"
+            }
+        ], loader ? loader : "all", (v) => {
+            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy);
         });
         let paginationBottom = new Pagination(page, pages, (new_page) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
@@ -7051,6 +7098,31 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }
         ], pageSize.toString(), (v) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
+        }, [{ "name": "All", "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
+            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy);
+        }, ["resourcepack", "shader", "world", "datapack"].includes(project_type) ? null : [
+            {
+                "name": "All",
+                "value": "all"
+            },
+            {
+                "name": "Fabric",
+                "value": "fabric"
+            },
+            {
+                "name": "Forge",
+                "value": "forge"
+            },
+            {
+                "name": "NeoForge",
+                "value": "neoforge"
+            },
+            {
+                "name": "Quilt",
+                "value": "quilt"
+            }
+        ], loader ? loader : "all", (v) => {
+            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy);
         });
         let paginationBottom = new Pagination(page, pages, (new_page) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
@@ -8156,7 +8228,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     wrapper.className = "version-files-wrapper";
                     let topBar = document.createElement("div");
                     topBar.className = "version-file-top";
-                    let names = ["", "Name", "Versions", "Loaders", "Date Published", "Download Count", ""];
+                    let names = ["", "Name", "Versions", "Loaders", "Date Published", "Download Count", "", ""];
                     names.forEach(e => {
                         let element = document.createElement("div");
                         element.className = "version-file-column-name";
@@ -8168,7 +8240,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
 
                     let notfound = new NoResultsFound();
                     wrapper.appendChild(notfound.element);
-                    notfound.element.style.gridColumn = "span 7";
+                    notfound.element.style.gridColumn = "span 8";
                     notfound.element.style.display = "none";
                     notfound.element.style.backgroundColor = "var(--color-1)"
 
@@ -8356,6 +8428,21 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         }
                         versionEle.appendChild(installButton);
 
+                        // Changelog Button
+                        let changeLogButton = document.createElement("button");
+                        changeLogButton.className = "version-file-changelog";
+                        changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>Changelog';
+                        changeLogButton.onclick = () => {
+                            let dialog = new Dialog();
+                            dialog.showDialog(e.version_number + " Changelog", "notice", `<div class='markdown-body'>${parseModrinthMarkdown(e.changelog)}</div>`, [
+                                {
+                                    "type": "confirm",
+                                    "content": "Done"
+                                }
+                            ], [], () => { })
+                        }
+                        versionEle.appendChild(changeLogButton);
+
                         wrapper.appendChild(versionEle);
 
                         versionInfo.push({ "element": versionEle, "loaders": e.loaders, "game_versions": e.game_versions, "channel": e.version_type })
@@ -8447,7 +8534,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 "icon": '<i class="fa-solid fa-copy"></i>',
                                 "title": "Copy Gallery Image",
                                 "func": async () => {
-                                    let success = await window.electronAPI.copyImageToClipboard(e.url);
+                                    let success = await window.electronAPI.copyImageToClipboard(e.raw_url);
                                     if (success) {
                                         displaySuccess("Gallery Image copied to clipboard!");
                                     } else {
