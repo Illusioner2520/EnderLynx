@@ -124,6 +124,9 @@ class Skin {
         this.last_used = new Date(skin.last_used);
         this.skin_id = skin.skin_id;
         this.active_uuid = skin.active_uuid;
+        this.skin_url = skin.skin_url;
+        this.default_skin = Boolean(skin.default_skin);
+        this.texture_key = skin.texture_key;
     }
 
     setModel(model) {
@@ -453,6 +456,179 @@ class Instance {
     }
 }
 
+let defaultSkins = [{
+    "name": "Steve",
+    "model": "wide",
+    "texture_key": "31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb"
+}, {
+    "name": "Alex",
+    "model": "slim",
+    "texture_key": "46acd06e8483b176e8ea39fc12fe105eb3a2a4970f5100057e9d84d4b60bdfa7"
+}, {
+    "name": "Ari",
+    "model": "wide",
+    "texture_key": "4c05ab9e07b3505dc3ec11370c3bdce5570ad2fb2b562e9b9dd9cf271f81aa44"
+}, {
+    "name": "Efe",
+    "model": "slim",
+    "texture_key": "fece7017b1bb13926d1158864b283b8b930271f80a90482f174cca6a17e88236"
+}, {
+    "name": "Kai",
+    "model": "wide",
+    "texture_key": "e5cdc3243b2153ab28a159861be643a4fc1e3c17d291cdd3e57a7f370ad676f3"
+}, {
+    "name": "Makena",
+    "model": "slim",
+    "texture_key": "7cb3ba52ddd5cc82c0b050c3f920f87da36add80165846f479079663805433db"
+}, {
+    "name": "Noor",
+    "model": "slim",
+    "texture_key": "6c160fbd16adbc4bff2409e70180d911002aebcfa811eb6ec3d1040761aea6dd"
+}, {
+    "name": "Sunny",
+    "model": "wide",
+    "texture_key": "a3bd16079f764cd541e072e888fe43885e711f98658323db0f9a6045da91ee7a"
+}, {
+    "name": "Zuri",
+    "model": "wide",
+    "texture_key": "f5dddb41dcafef616e959c2817808e0be741c89ffbfed39134a13e75b811863d"
+},
+{
+    "name": "Steve Cake",
+    "model": "wide",
+    "texture_key": "b182ad5783a343be3e202ac35902270a8d31042fdfd48b849fc99a55a1b60a91"
+},
+{
+    "name": "Alex Globe",
+    "model": "wide",
+    "texture_key": "6c25523e7dabfcaf0dbe32d90fd0c001d5d57ac66206a0595defe9be5947ff08"
+},
+{
+    "name": "Sheep Cosplayer",
+    "model": "wide",
+    "texture_key": "7cbe449d9d37c111a07a902e322d3869d98790c48f1fa16a24bcbe2d8d73808b"
+},
+{
+    "name": "Cardboard Cosplayer",
+    "model": "wide",
+    "texture_key": "6acf91326bd116ce889e461ddb57e92ace07a8367dbd2d191075078fccc3c727"
+},
+{
+    "name": "Alex Party",
+    "model": "slim",
+    "texture_key": "66206c8f51d13d2d31c54696a58a3e8bcd1e5e7db9888d331d0753129324e4f1"
+},
+{
+    "name": "Steve Party",
+    "model": "wide",
+    "texture_key": "c05e396bbf744082122f77b7277af390d11d2d4e93dd2f8c67942ca9626db24d"
+},
+{
+    "name": "Creeper Piñata Cosplay",
+    "model": "wide",
+    "texture_key": "b7393199a84eb9e932efa8dda6829423875eb65af76cb82912ade62f93996b9c"
+},
+{
+    "name": "Creeper Cosplay",
+    "model": "wide",
+    "texture_key": "b9f7facdca2bf4772fa168e1c3cf7b020124eb1fc82118307d426da1b88c32c5"
+},
+{
+    "name": "Buff Butcher",
+    "model": "wide",
+    "texture_key": "5e4e09eccbce11e701c51bb64b102d688a6ac4018c725dd2b780210aee101b31"
+},
+{
+    "name": "Buff Butcher Alternate",
+    "model": "wide",
+    "texture_key": "d66ed86ce96a1b63c30f1baac762f638717930866474ac4fce697cdbd0bd6fbb"
+},
+{
+    "name": "Barn Builder",
+    "model": "wide",
+    "texture_key": "2007b66a99ae905c81f339e2a0a4bf4b99e9454a485d5164e3e1051c3036ad70"
+},
+{
+    "name": "Homestead Healer",
+    "model": "wide",
+    "texture_key": "b9e9d1b51b4be289b9525d4decd798cb7912e920bac8846a2df70e9ff4f0b1d8"
+},
+{
+    "name": "Bee-friender",
+    "model": "wide",
+    "texture_key": "59f2872323bf515aa8d84c00931fbf8170b2cec5138961527c09ffcd06ca4ab2"
+},
+{
+    "name": "Bee-friender Alternate",
+    "model": "wide",
+    "texture_key": "7cd85127cbc710a1c9a53c6bb3474f59995c222b9d8c57b293993cc2d8a225aa"
+},
+{
+    "name": "Ranch Ranger",
+    "model": "wide",
+    "texture_key": "25dc6421d47cad8e2bdf93f56fae9ab06fcfe218c8645c1775ae2e4563c065ad"
+},
+{
+    "name": "Pig Whisperer",
+    "model": "wide",
+    "texture_key": "83e283ab33558baa2cd0184d2e85f090c795a797bdbcb2cc47230c27f23fe9b1"
+},
+{
+    "name": "Pig Whisperer Alternate",
+    "model": "wide",
+    "texture_key": "e1fc44f1d69fd2864df7b80618a38af4170d4800f2df4fbde81c17b74b2a818b"
+},
+{
+    "name": "Snowfeather",
+    "model": "wide",
+    "texture_key": "721c05483a435d4362047ccb62e075ef5f001aa63a7e0e2afe03e60759bab91d"
+},
+{
+    "name": "Stray",
+    "model": "wide",
+    "texture_key": "b914cf5106aaa82409fdd9213fbdb1479b4d65aecc5d5e22b1f25e5744c4c4f7"
+},
+{
+    "name": "Strider",
+    "model": "wide",
+    "texture_key": "5eb077c54ecfc7e760c36add887b68859d7a3160d331580ff859f7353d959151"
+},
+{
+    "name": "Villager 1",
+    "model": "wide",
+    "texture_key": "b271a744ef479018927575952621b110b9c11f62730a95729af7e8591cf8dbf6"
+},
+{
+    "name": "Villager 2",
+    "model": "wide",
+    "texture_key": "748923629fed7c6ec9462016b4480fa3cff8c16e82ee6fe26d4b707f4de10060"
+},
+{
+    "name": "Wither Skeleton",
+    "model": "wide",
+    "texture_key": "3d996abc69ea70a20442855e429bf44b45111f9818d0f8c46272e12d12bec218"
+},
+{
+    "name": "Pale Lumberjack",
+    "model": "wide",
+    "texture_key": "6f8fc677cdcd4c6eed67d90c08d23162abc3a3a85357c7636fdf80d874aa857f"
+},
+{
+    "name": "Creaking",
+    "model": "wide",
+    "texture_key": "9a0af2b1fd9659480d43132db95cd7d459d1a66480fe42150e132d03b9731573"
+},
+{
+    "name": "Ghast Riding Swimmer",
+    "model": "wide",
+    "texture_key": "e12d98dab548e92cad7ac80f92d8fefbb9ca7a1af94aa4f428daf6ef723aa8e0"
+},
+{
+    "name": "Happy Ghast Pilot",
+    "model": "wide",
+    "texture_key": "8409954698b6c7741460fdd85d6ec6a5e0a9ad04ade7e2c72c913f02936a607d"
+}]
+
 class Data {
     getInstances() {
         let instances = db.prepare("SELECT * FROM instances").all();
@@ -520,13 +696,35 @@ class Data {
         return skins.map(e => new Skin(e.id));
     }
 
-    addSkin(file_name, name, model, active_uuid, skin_id) {
+    getSkinsNoDefaults() {
+        let skins = db.prepare("SELECT * FROM skins WHERE NOT default_skin = ?").all(Number(true));
+        return skins.map(e => new Skin(e.id));
+    }
+
+    async getDefaultSkins() {
+        let skins = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(Number(true));
+        if (skins.length != defaultSkins.length) {
+            let texture_keys = skins.map(e => e.texture_key);
+            for (let i = 0; i < defaultSkins.length; i++) {
+                let e = defaultSkins[i];
+                if (!texture_keys.includes(e.texture_key)) {
+                    let info = await window.electronAPI.downloadSkin("https://textures.minecraft.net/texture/" + e.texture_key);
+                    db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, Number(true), "", e.texture_key);
+                }
+            }
+            let skins2 = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(Number(true));
+            return skins2.map(e => new Skin(e.id));
+        }
+        return skins.map(e => new Skin(e.id));
+    }
+
+    addSkin(file_name, name, model, active_uuid, skin_id, skin_url) {
         let skins = this.getSkins();
         let previousSkinIds = skins.map(e => e.skin_id);
         if (previousSkinIds.includes(skin_id)) {
             return new Skin(skins[previousSkinIds.indexOf(skin_id)].id);
         }
-        let result = db.prepare("INSERT INTO skins (file_name, name, model, active_uuid, skin_id) VALUES (?,?,?,?,?)").run(file_name, name, model, `;${active_uuid};`, skin_id);
+        let result = db.prepare("INSERT INTO skins (file_name, name, model, active_uuid, skin_id, skin_url, default_skin) VALUES (?,?,?,?,?,?,?)").run(file_name, name, model, `;${active_uuid};`, skin_id, skin_url, Number(false));
         return new Skin(result.lastInsertRowid);
     }
 }
@@ -844,7 +1042,7 @@ function getPlayerHead(profile, callback) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
         return;
     }
-    skinToHead(`./minecraft/skins/${skin.skin_id}.png`, callback);
+    skinToHead(skin.skin_url, callback);
 }
 
 class NavigationButton {
@@ -1977,7 +2175,7 @@ settingsButtonEle.onclick = () => {
                 { "name": "Home", "value": "home" },
                 { "name": "Instances", "value": "instances" },
                 { "name": "Discover", "value": "discover" },
-                { "name": "My Account", "value": "my_account" }
+                { "name": "Wardrobe", "value": "my_account" }
             ],
             "default": data.getDefault("default_page")
         },
@@ -2128,6 +2326,7 @@ async function showHomeContent(e) {
         itemInfo.appendChild(itemDesc);
         item.appendChild(itemInfo);
         let playButton = document.createElement("button");
+        playButton.setAttribute("title", "Play World");
         playButton.className = "home-play-button";
         playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
         let instanceInfo = new Instance(e.instance_id);
@@ -2259,6 +2458,7 @@ async function showHomeContent(e) {
             });
         }
         let playButton = document.createElement("button");
+        playButton.setAttribute("title", running ? "Stop Instance" : "Play Instance");
         playButton.className = running ? "home-stop-button" : "home-play-button";
         playButton.innerHTML = running ? '<i class="fa-solid fa-circle-stop"></i>Stop' : '<i class="fa-solid fa-play"></i>Play';
         playButton.onclick = running ? () => {
@@ -2525,14 +2725,14 @@ function showMyAccountContent(e) {
     let showContent = () => {
         let default_profile = data.getDefaultProfile();
         let activeSkin = default_profile.getActiveSkin();
-        skinViewer.loadSkin(activeSkin ? `minecraft/skins/${activeSkin.skin_id}.png` : null, {
+        skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
             model: default_profile.getActiveSkin()?.model == "slim" ? "slim" : "default",
         });
         let activeCape = default_profile.getActiveCape();
         skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
         skinList.innerHTML = '';
         capeList.innerHTML = '';
-        let skins = data.getSkins();
+        let skins = data.getSkinsNoDefaults();
         skins.forEach((e) => {
             let skinEle = document.createElement("div");
             let equipSkin = async () => {
@@ -2542,10 +2742,10 @@ function showMyAccountContent(e) {
                 let success = await applySkin(default_profile, e);
                 if (success) {
                     let oldEle = document.querySelector(".my-account-option.skin.selected");
-                    oldEle.classList.remove("selected");
+                    if (oldEle) oldEle.classList.remove("selected");
                     currentEle.classList.add("selected");
                     e.setActive(default_profile.uuid);
-                    skinViewer.loadSkin(`minecraft/skins/${e.skin_id}.png`, {
+                    skinViewer.loadSkin(e.skin_url, {
                         model: e.model == "wide" ? "default" : "slim"
                     });
                     viewerInfo.innerHTML = 'Current Skin';
@@ -2618,7 +2818,7 @@ function showMyAccountContent(e) {
             let moreMenu = new MoreMenu(skinMore, buttons, true, 2);
             skinEle.appendChild(skinMore);
             let skinImg = document.createElement("img");
-            renderSkinToDataUrl(`minecraft/skins/${e.skin_id}.png`, (v) => {
+            renderSkinToDataUrl(e.skin_url, (v) => {
                 skinImg.src = v;
             }, e.model);
             skinImg.classList.add("option-image");
@@ -2632,27 +2832,27 @@ function showMyAccountContent(e) {
             skinName.innerHTML = sanitize(e.name);
             skinList.appendChild(skinEle);
             skinEle.onmouseenter = () => {
-                skinViewer.loadSkin(`minecraft/skins/${e.skin_id}.png`, {
+                skinViewer.loadSkin(e.skin_url, {
                     model: e.model == "wide" ? "default" : "slim",
                 });
                 viewerInfo.innerHTML = 'Skin Preview';
             }
             skinEle.onfocus = () => {
-                skinViewer.loadSkin(`minecraft/skins/${e.skin_id}.png`, {
+                skinViewer.loadSkin(e.skin_url, {
                     model: e.model == "wide" ? "default" : "slim",
                 });
                 viewerInfo.innerHTML = 'Skin Preview';
             }
             skinEle.onmouseleave = () => {
-                skinViewer.loadSkin(activeSkin ? `minecraft/skins/${activeSkin.skin_id}.png` : null, {
-                    model: default_profile.getActiveSkin()?.model == "slim" ? "slim" : "default",
+                skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+                    model: activeSkin?.model == "slim" ? "slim" : "default",
                 });
                 viewerInfo.innerHTML = 'Current Skin';
             }
             skinEle.onblur = (e) => {
                 if (e.relatedTarget?.matches(".my-account-option.skin")) return;
-                skinViewer.loadSkin(activeSkin ? `minecraft/skins/${activeSkin.skin_id}.png` : null, {
-                    model: default_profile.getActiveSkin()?.model == "slim" ? "slim" : "default",
+                skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+                    model: activeSkin?.model == "slim" ? "slim" : "default",
                 });
                 viewerInfo.innerHTML = 'Current Skin';
             }
@@ -2672,6 +2872,97 @@ function showMyAccountContent(e) {
                 }
             }
         });
+        let showDefaultSkinButton = document.createElement("button");
+        showDefaultSkinButton.className = "my-account-option";
+        let skinImg = document.createElement("div");
+        skinImg.classList.add("option-image");
+        skinImg.innerHTML = '<i class="fa-solid fa-plus"></i>';
+        let skinName = document.createElement("div");
+        skinName.innerHTML = "Show Default Skins";
+        let dfLoader = document.createElement("div");
+        dfLoader.className = "loading-container-spinner";
+        dfLoader.style.display = "none";
+        showDefaultSkinButton.appendChild(skinImg);
+        showDefaultSkinButton.appendChild(dfLoader);
+        showDefaultSkinButton.appendChild(skinName);
+        showDefaultSkinButton.onclick = async () => {
+            skinImg.style.display = "none";
+            dfLoader.style.display = "";
+            let defaultSkins = await data.getDefaultSkins();
+            showDefaultSkinButton.style.display = "none";
+            defaultSkins.forEach(e => {
+                let skinEle = document.createElement("button");
+                let equipSkin = async () => {
+                    loader.style.display = "block";
+                    skinImg.style.display = "none";
+                    let currentEle = skinEle;
+                    let success = await applySkinFromURL(default_profile, e);
+                    if (success) {
+                        let oldEle = document.querySelector(".my-account-option.skin.selected");
+                        if (oldEle) oldEle.classList.remove("selected");
+                        currentEle.classList.add("selected");
+                        e.setActive(default_profile.uuid);
+                        skinViewer.loadSkin(e.url, {
+                            model: e.model == "wide" ? "default" : "slim"
+                        });
+                        viewerInfo.innerHTML = 'Current Skin';
+                        activeSkin = e;
+                    }
+                    loader.style.display = "none";
+                    skinImg.style.display = "block";
+                }
+                skinEle.className = "my-account-option";
+                skinEle.classList.add("skin");
+                let skinImg = document.createElement("img");
+                renderSkinToDataUrl(e.skin_url, (v) => {
+                    skinImg.src = v;
+                }, e.model);
+                skinImg.classList.add("option-image");
+                let loader = document.createElement("div");
+                loader.className = "loading-container-spinner";
+                loader.style.display = "none";
+                let skinName = document.createElement("div");
+                skinEle.appendChild(skinImg);
+                skinEle.appendChild(loader);
+                skinEle.appendChild(skinName);
+                skinName.innerHTML = sanitize(e.name);
+                skinList.appendChild(skinEle);
+                skinEle.onmouseenter = () => {
+                    skinViewer.loadSkin(e.skin_url, {
+                        model: e.model == "wide" ? "default" : "slim",
+                    });
+                    viewerInfo.innerHTML = 'Skin Preview';
+                }
+                skinEle.onfocus = () => {
+                    skinViewer.loadSkin(e.skin_url, {
+                        model: e.model == "wide" ? "default" : "slim",
+                    });
+                    viewerInfo.innerHTML = 'Skin Preview';
+                }
+                skinEle.onmouseleave = () => {
+                    skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+                        model: activeSkin?.model == "slim" ? "slim" : "default",
+                    });
+                    viewerInfo.innerHTML = 'Current Skin';
+                }
+                skinEle.onblur = (e) => {
+                    if (e.relatedTarget?.matches(".my-account-option.skin")) return;
+                    skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+                        model: activeSkin?.model == "slim" ? "slim" : "default",
+                    });
+                    viewerInfo.innerHTML = 'Current Skin';
+                }
+                if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
+                    skinEle.classList.add("selected");
+                }
+                skinEle.onclick = (e) => {
+                    if (e.target.matches(".skin-more")) return;
+                    if (e.target.matches("i")) return;
+                    equipSkin();
+                }
+            });
+        }
+        skinList.appendChild(showDefaultSkinButton);
         let capes = default_profile.getCapes();
         capes.forEach((e) => {
             let capeEle = document.createElement("button");
@@ -2883,13 +3174,13 @@ function showMyAccountContent(e) {
                     } else {
                         model = "wide";
                     }
-                    data.addSkin("", info.name ? info.name : "<unnamed>", model, "", await window.electronAPI.importSkin(info.skin));
+                    data.addSkin("", info.name ? info.name : "<unnamed>", model, "", await window.electronAPI.importSkin(info.skin), info.skin);
                     showContent();
                 };
                 tempImg.src = info.skin;
                 return;
             }
-            data.addSkin("", info.name ? info.name : "<unnamed>", model, "", await window.electronAPI.importSkin(info.skin));
+            data.addSkin("", info.name ? info.name : "<unnamed>", model, "", await window.electronAPI.importSkin(info.skin), info.skin);
             showContent();
         });
     }
@@ -2988,7 +3279,7 @@ function renderSkinToDataUrl(skinPath, callback, model) {
         drawPart(20, 36, 8, 12, 4, 8); // torso
         drawPart(4, 36, 4, 12, 4, 20); // right leg
         drawPart(4, 52, 4, 12, 8, 20); // left leg
-        drawPart(44, 36, model == "wide" ? 4 : 3, 12, model == "wide" ? 0 : 1, 8, 8); // right arm
+        drawPart(44, 36, model == "wide" ? 4 : 3, 12, model == "wide" ? 0 : 1, 8); // right arm
         drawPart(52, 52, model == "wide" ? 4 : 3, 12, 12, 8); // left arm
 
         callback(canvas.toDataURL())
@@ -3933,6 +4224,78 @@ function showInstanceSettings(instanceInfo) {
 function setInstanceTabContentContent(instanceInfo, element) {
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
+    let importContent = document.createElement("button");
+    importContent.classList.add("add-content-button");
+    importContent.innerHTML = '<i class="fa-solid fa-plus"></i>Import Content';
+    importContent.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog("Select Worlds to Import", "form", [
+            {
+                "type": "text",
+                "id": "file_path",
+                "name": "File Path",
+                "buttons": [
+                    {
+                        "name": "Browse Files",
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.electronAPI.triggerFileImportBrowseWithOptions(v, 0, ["zip", "jar", "disabled"], "Content Files");
+                            if (newValue) i.value = newValue;
+                            if (i.onchange) i.onchange();
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "dropdown",
+                "name": "Content Type",
+                "options": [
+                    {
+                        "name": "Auto Detect",
+                        "value": "auto"
+                    },
+                    {
+                        "name": "Mod",
+                        "value": "mod"
+                    },
+                    {
+                        "name": "Resource Pack",
+                        "value": "resource_pack"
+                    },
+                    {
+                        "name": "Shader",
+                        "value": "shader"
+                    }
+                ],
+                "id": "content_type",
+                "default": "auto"
+            }
+        ], [
+            {
+                "type": "cancel",
+                "content": "Cancel"
+            },
+            {
+                "type": "confirm",
+                "content": "Import"
+            }
+        ], [], async (v) => {
+            let info = {};
+            v.forEach(e => info[e.id] = e.value);
+            // console.log(info);
+            // for (let i = 0; i < info.world.length; i++) {
+            //     let world = info.world[i];
+            //     try {
+            //         window.electronAPI.transferWorld(world, instanceInfo.instance_id, info.remove);
+            //     } catch (e) {
+            //         displayError("Error occured while transferring world: " + e.message);
+            //     }
+            // }
+            await window.electronAPI.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
+            displaySuccess("Content import completed!");
+            setInstanceTabContentContent(instanceInfo, element);
+        })
+    }
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
@@ -3964,6 +4327,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
+    searchAndFilter.appendChild(importContent);
     searchAndFilter.appendChild(addContent);
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
@@ -4132,9 +4496,6 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     importWorlds.classList.add("add-content-button");
     importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>Import Worlds'
     importWorlds.onclick = () => {
-        let getInstances = () => {
-            return data.getInstances().map(e => ({ "name": e.name, "value": e.instance_id }));
-        }
         let dialog = new Dialog();
         dialog.showDialog("Select Worlds to Import", "form", [
             {
@@ -6123,7 +6484,11 @@ class Dialog {
         }
         if (selectedTab) contents[selectedTab].style.display = "grid";
         if (type == "notice") {
-            realDialogContent.innerHTML = "<span>" + (info) + "</span>";
+            if (info instanceof Element) {
+                realDialogContent.appendChild(info);
+            } else {
+                realDialogContent.innerHTML = "<span>" + (info) + "</span>";
+            }
         } else if (type == "form") {
             for (let i = 0; i < info.length; i++) {
                 let tab = info[i].tab ?? "default";
@@ -6603,7 +6968,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled) {
         let element = document.createElement("div");
         element.className = "discover-item";
         element.onclick = () => {
@@ -6664,6 +7029,11 @@ class ContentSearchEntry {
         installButton.onclick = (evnt) => {
             evnt.stopPropagation();
             installFunction(infoData, installButton);
+        }
+        if (alreadyInstalled) {
+            installButton.onclick = () => { };
+            installButton.classList.add("disabled");
+            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed'
         }
         actions.appendChild(installButton);
     }
@@ -6839,6 +7209,9 @@ class Pagination {
 }
 
 async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version, page = 1, pageSize = 20, sortBy = "relevance") {
+    let instance_content = [];
+    if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+    let content_ids = instance_content.map(e => e.source_info);
     element.innerHTML = "";
     let loading = new LoadingContainer();
     element.appendChild(loading.element);
@@ -7036,7 +7409,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
                     displaySuccess(`${i.title} installed to instance ${(new Instance(info.instance)).name}`);
                 });
-            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader);
+            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id));
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -7668,6 +8041,28 @@ async function applySkin(profile, skin) {
     }
 }
 
+async function applySkinFromURL(profile, skin) {
+    try {
+        let res = await window.electronAPI.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
+        profile.setAccessToken(res.player_info.access_token);
+        profile.setClientId(res.player_info.client_id);
+        profile.setExpires(res.player_info.expires);
+        profile.setName(res.player_info.name);
+        profile.setRefreshToken(res.player_info.refresh_token);
+        profile.setUuid(res.player_info.uuid);
+        profile.setXuid(res.player_info.xuid);
+        profile.setIsDemo(res.player_info.is_demo);
+        await updateSkinsAndCapes(res.skin_info);
+        console.log(res.skin_info.skins[0]);
+        accountSwitcher.reloadHeads();
+        displaySuccess("Successfully changed skin.");
+        return true;
+    } catch (e) {
+        displayError(e.message);
+        return false;
+    }
+}
+
 async function updateSkinsAndCapes(skin_and_cape_data) {
     if (!skin_and_cape_data.capes) return;
     if (!skin_and_cape_data.skins) return;
@@ -7687,7 +8082,7 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     try {
         for (const e of skin_and_cape_data.skins) {
             let hash = await window.electronAPI.downloadSkin(e.url);
-            let skin = data.addSkin("./minecraft/skins/" + hash + ".png", "<unnamed>", e.variant == "CLASSIC" ? "wide" : "slim", "", hash);
+            let skin = data.addSkin("", "<unnamed>", e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl);
             if (e.state == "ACTIVE") skin.setActive(skin_and_cape_data.uuid);
             else skin.removeActive(skin_and_cape_data.uuid);
         }
@@ -7853,6 +8248,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             contentInfoIndex = 0;
         }
     }
+    let instance_content = [];
+    if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+    let content_ids = instance_content.map(e => e.source_info);
     if (content_source == "modrinth") {
         contentInfo.innerHTML = "";
         contentInfo.showModal();
@@ -7942,6 +8340,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         let instTopLastPlayed = document.createElement("div");
         instTopLastPlayed.classList.add("content-top-sub-info-specific");
         instTopLastPlayed.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.updated))}`;
+        instTopLastPlayed.setAttribute("title", "Last Updated");
         instTopSubInfo.appendChild(instTopVersions);
         instTopSubInfo.appendChild(instTopPlaytime);
         instTopSubInfo.appendChild(instTopLastPlayed);
@@ -8052,6 +8451,13 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
             });
         }
+        let installedVersion = "";
+        if (content_ids.includes(content.id)) {
+            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+            installButton.classList.add("disabled");
+            installButton.onclick = () => { };
+            installedVersion = instance_content[content_ids.indexOf(content.id)].version;
+        }
         let threeDots = document.createElement("button");
         threeDots.classList.add("content-top-more");
         threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -8142,13 +8548,6 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     afterMarkdownParse(instance_id, vanilla_version, loader);
                 }
             },
-            content.project_type == "modpack" ? {
-                "name": "Mods",
-                "value": "mods",
-                "func": () => {
-                    tabContent.innerHTML = "";
-                }
-            } : null,
             {
                 "name": "Files",
                 "value": "files",
@@ -8273,7 +8672,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         }
                     }
 
-                    versions.forEach(e => {
+                    let installedVersionIndex = versions.findIndex(v => v.version_number === installedVersion);
+
+                    versions.forEach((e, i) => {
                         let versionEle = document.createElement("div");
                         versionEle.className = "version-file";
 
@@ -8340,6 +8741,14 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         // Install Button
                         let installButton = document.createElement("button");
                         installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
+                        installButton.setAttribute("title", "Install Specific Version");
+                        if (installedVersion && installedVersionIndex > i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Update';
+                            installButton.setAttribute("title", "Update to this Version");
+                        } else if (installedVersion && installedVersionIndex < i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Downgrade';
+                            installButton.setAttribute("title", "Downgrade to this Version");
+                        }
                         installButton.className = "version-file-install"
                         installButton.onclick = project_type == "modpack" ? () => {
                             let options = [];
@@ -8426,12 +8835,21 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
                             });
                         }
+
+                        if (installedVersion == e.version_number) {
+                            installButton.classList.add("disabled");
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+                            installButton.onclick = () => { }
+                            installButton.setAttribute("title", "Version already installed");
+                        }
+
                         versionEle.appendChild(installButton);
 
                         // Changelog Button
                         let changeLogButton = document.createElement("button");
                         changeLogButton.className = "version-file-changelog";
                         changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>Changelog';
+                        changeLogButton.setAttribute("title", "View Changelog");
                         changeLogButton.onclick = () => {
                             let dialog = new Dialog();
                             dialog.showDialog(e.version_number + " Changelog", "notice", `<div class='markdown-body'>${parseModrinthMarkdown(e.changelog)}</div>`, [
@@ -8439,9 +8857,10 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                     "type": "confirm",
                                     "content": "Done"
                                 }
-                            ], [], () => { })
+                            ], [], () => { });
+                            afterMarkdownParse();
                         }
-                        versionEle.appendChild(changeLogButton);
+                        if (e.changelog) versionEle.appendChild(changeLogButton);
 
                         wrapper.appendChild(versionEle);
 
@@ -8558,6 +8977,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             } : null
         ].filter(e => e))
         tabs.selectOption("description");
+    } else if (content_source == "curseforge") {
+        // ahh
     }
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
@@ -8617,3 +9038,63 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
         }
     });
 }
+
+document.addEventListener("mouseover", function (e) {
+    let tooltip = document.getElementById("tooltip");
+    if (!tooltip) return;
+    let target = e.target;
+    // Traverse up to find element with title
+    while (target && target !== document.body) {
+        if (target.hasAttribute && target.hasAttribute("title")) {
+            let title = target.getAttribute("title");
+            if (title) {
+                tooltip.textContent = title;
+                tooltip.showPopover();
+                // Position tooltip near mouse
+                // Position tooltip at the top center of the element
+                const rect = target.getBoundingClientRect();
+                let x = rect.left + (rect.width / 2);
+                let y = rect.top - 8;
+                tooltip.style.setProperty("--left", x + "px");
+                tooltip.style.setProperty("--top", y + "px");
+            }
+            return;
+        }
+        target = target.parentElement;
+    }
+    tooltip.hidePopover();
+});
+
+document.addEventListener("mouseout", function (e) {
+    let tooltip = document.getElementById("tooltip");
+    if (!tooltip) return;
+    tooltip.hidePopover();
+});
+
+document.addEventListener("mouseover", function (e) {
+    let target = e.target;
+    while (target && target !== document.body) {
+        if (target.hasAttribute && target.hasAttribute("title")) {
+            target.setAttribute("data-tooltip-title", target.getAttribute("title"));
+            target.removeAttribute("title");
+        }
+        target = target.parentElement;
+    }
+});
+
+document.addEventListener("mouseout", function (e) {
+    let target = e.target;
+    while (target && target !== document.body) {
+        if (target.hasAttribute && target.hasAttribute("data-tooltip-title")) {
+            target.setAttribute("title", target.getAttribute("data-tooltip-title"));
+            target.removeAttribute("data-tooltip-title");
+        }
+        target = target.parentElement;
+    }
+});
+
+document.addEventListener("scroll", function (e) {
+    let tooltip = document.getElementById("tooltip");
+    if (!tooltip) return;
+    tooltip.hidePopover();
+}, true);

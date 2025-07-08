@@ -2652,6 +2652,7 @@ dialog[open]::backdrop {
 
 .skin-button-container {
     display: flex;
+    gap: 10px;
 }
 
 .skin-button {
@@ -2676,8 +2677,8 @@ dialog[open]::backdrop {
     background-color: var(--color-2t);
 }
 
-.skin-button:last-child {
-    margin-left: auto;
+.skin-button:first-child {
+    margin-right: auto;
 }
 
 .spinning {
@@ -3448,12 +3449,17 @@ dialog[open]::backdrop {
     margin-left: auto;
 }
 
-.content-top-install-button:active {
+.content-top-install-button:not(.disabled):active {
     scale: .95;
 }
 
-.content-top-install-button:hover {
+.content-top-install-button:not(.disabled):hover {
     background-color: var(--color-1t);
+}
+
+.content-top-install-button.disabled {
+    opacity: .5;
+    cursor: not-allowed;
 }
 
 .content-top-more {
@@ -3834,7 +3840,7 @@ dialog[open]::backdrop {
     max-width: 100%;
     overflow: hidden;
     flex-wrap: wrap;
-    align-items: center;
+    align-content: center;
 }
 
 .version-file-changelog {
@@ -3923,4 +3929,52 @@ dialog[open]::backdrop {
     gap: 10px;
     grid-template-columns: 200px 200px 200px;
     margin-bottom: 10px;
+}
+
+dialog * {
+    overscroll-behavior: contain;
+}
+
+#tooltip {
+    position: fixed;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-weight: bold;
+    padding: 4px;
+    padding-inline: 8px;
+    border-radius: 10px;
+    translate: -50% -100%;
+    box-shadow: 0 0 0px 1px var(--text-color), 0 0 10px black;
+    pointer-events: none;
+    width: max-content;
+    transition: .2s opacity .2s, .2s display allow-discrete .2s, .2s overlay allow-discrete .2s, .1s left, .1s top;
+    opacity: 0;
+    overflow: visible;
+    border: none;
+    font-size: .8rem;
+    inset: unset;
+    left: var(--left);
+    top: var(--top);
+    max-width: calc(min(calc(2 * (100% - var(--left))), calc(2 * var(--left))) - 20px);
+}
+
+#tooltip:popover-open {
+    opacity: 1;
+
+    @starting-style {
+        opacity: 0;
+    }
+}
+
+#tooltip::after {
+    content: "";
+    left: 50%;
+    top: 100%;
+    translate: -50%;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 8px 6px;
+    border-color: var(--text-color) transparent transparent transparent;
+    position: absolute;
 }

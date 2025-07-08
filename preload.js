@@ -25,7 +25,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name T
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name TEXT, last_used TEXT, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name TEXT, last_used TEXT, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
@@ -1213,7 +1213,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         fs.writeFileSync(`./minecraft/skins/${hash}.png`, imageBuffer);
 
-        return hash;
+        const base64 = imageBuffer.toString('base64');
+        const dataUrl = `data:image/png;base64,${base64}`;
+
+        return { hash, dataUrl };
     },
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
@@ -1260,6 +1263,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
             }
             return { "status": res.status, "player_info": player_info, "skin_info": res.data };
         }
+    },
+    setSkinFromURL: async (player_info, skin_url, variant) => {
+        let date = new Date();
+        date.setHours(date.getHours() - 1);
+        if (new Date(player_info.expires) < date) {
+            try {
+                player_info = await getNewAccessToken(player_info.refresh_token);
+            } catch (err) {
+                throw new Error("Unable to update access token.");
+            }
+        }
+        
+        console.log(skin_url);
+        console.log(variant);
+
+        const res = await axios.post(
+            'https://api.minecraftservices.com/minecraft/profile/skins',
+            { variant: variant, url: skin_url },
+            {
+                headers: {
+                    Authorization: `Bearer ${player_info.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (res.status < 200 || res.status >= 300) {
+            throw new Error("Unable to set cape");
+        }
+        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
     },
     setSkin: async (player_info, skin_id, variant) => {
         let date = new Date();
@@ -1403,10 +1436,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
             }
         }
         const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: "Select File or Folder to import",
+            title: type ? "Select Folder to import" : "Select File to import",
             defaultPath: startDir,
             properties: [type ? 'openDirectory' : 'openFile'],
             filters: [{ name: 'Pack Files', extensions: ['mrpack', 'zip'] }]
+        });
+        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
+            return null;
+        }
+        return result.filePaths[0];
+    },
+    triggerFileImportBrowseWithOptions: async (file_path, type, extensions, extName) => {
+        let startDir = file_path;
+        if (fs.existsSync(file_path)) {
+            const stat = fs.statSync(file_path);
+            if (stat.isFile()) {
+                startDir = path.dirname(file_path);
+            }
+        }
+        const result = await ipcRenderer.invoke('show-open-dialog', {
+            title: type ? "Select Folder to import" : "Select File to import",
+            defaultPath: startDir,
+            properties: [type ? 'openDirectory' : 'openFile'],
+            filters: [{ name: extName, extensions: extensions }]
         });
         if (result.canceled || !result.filePaths || !result.filePaths[0]) {
             return null;
@@ -1561,7 +1613,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             options.push({ key, value });
         }
         return options;
-    }
+    },
+    importContent
 });
 
 function getWorld(levelDatPath) {
@@ -1795,6 +1848,92 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
         "vanilla_version": manifest_json.minecraft.version
     })
+}
+async function importContent(file_path, content_type, instance_id) {
+    // Determine destination folder and file type
+    let destFolder = "";
+    let fileType = content_type;
+
+    // If content_type is "auto", try to detect type by inspecting the file
+    if (content_type === "auto") {
+        if (file_path.endsWith(".jar")) {
+            try {
+                const tempZip = new AdmZip(file_path);
+                if (tempZip.getEntry("fabric.mod.json")) {
+                    destFolder = "mods";
+                    fileType = "mod";
+                } else if (tempZip.getEntry("META-INF/mods.toml")) {
+                    destFolder = "mods";
+                    fileType = "mod";
+                } else if (tempZip.getEntry("quilt.mod.json")) {
+                    destFolder = "mods";
+                    fileType = "mod";
+                } else {
+                    destFolder = "mods";
+                    fileType = "mod";
+                }
+            } catch (e) {
+                destFolder = "mods";
+                fileType = "mod";
+            }
+        } else if (file_path.endsWith(".zip")) {
+            try {
+                const tempZip = new AdmZip(file_path);
+                if (tempZip.getEntry("pack.mcmeta")) {
+                    destFolder = "resourcepacks";
+                    fileType = "resource_pack";
+                } else if (tempZip.getEntry("shaders/")) {
+                    destFolder = "shaderpacks";
+                    fileType = "shader";
+                } else {
+                    destFolder = "resourcepacks";
+                    fileType = "resource_pack";
+                }
+            } catch (e) {
+                destFolder = "resourcepacks";
+                fileType = "resource_pack";
+            }
+        } else {
+            // fallback
+            destFolder = "mods";
+            fileType = "mod";
+        }
+    } else {
+        // Map content_type to folder
+        if (content_type === "mod") destFolder = "mods";
+        else if (content_type === "resource_pack") destFolder = "resourcepacks";
+        else if (content_type === "shader") destFolder = "shaderpacks";
+        else destFolder = "mods";
+    }
+
+    // Ensure destination folder exists
+    const destPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/${destFolder}`);
+    fs.mkdirSync(destPath, { recursive: true });
+
+    // Copy file
+    let fileName = path.basename(file_path);
+    let finalPath = path.join(destPath, fileName);
+    // If the file already exists, change the name to something unique
+    let uniqueFinalPath = finalPath;
+    let uniqueFileName = fileName;
+    let count = 1;
+    while (fs.existsSync(uniqueFinalPath)) {
+        const ext = path.extname(fileName);
+        const base = path.basename(fileName, ext);
+        uniqueFileName = `${base} (${count})${ext}`;
+        uniqueFinalPath = path.join(destPath, uniqueFileName);
+        count++;
+    }
+    fs.copyFileSync(file_path, uniqueFinalPath);
+    // Update fileName and finalPath to the unique ones for return value
+    fileName = uniqueFileName;
+    finalPath = uniqueFinalPath;
+
+    return {
+        file_name: fileName,
+        type: fileType,
+        dest: finalPath
+    };
 }
 async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");

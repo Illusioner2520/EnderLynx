@@ -5,9 +5,9 @@ let win;
 
 const createWindow = () => {
     win = new BrowserWindow({
-        width: 1000,
+        width: 1250,
         height: 600,
-        minWidth: 1000,
+        minWidth: 1250,
         minHeight: 600,
         webPreferences: {
             nodeIntegration: false,
