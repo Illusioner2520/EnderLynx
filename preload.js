@@ -17,11 +17,13 @@ const FormData = require('form-data');
 const sharp = require("sharp");
 const crypto = require('crypto');
 const os = require('os');
+const treeKill = require('tree-kill');
 const MarkdownIt = require('markdown-it');
+const { version } = require('./package.json');
 
 const db = new Database('app.db');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -46,7 +48,20 @@ function openInBrowser(url) {
     shell.openExternal(url);
 }
 
+console.log(process);
+
 contextBridge.exposeInMainWorld('electronAPI', {
+    version,
+    osplatform: () => os.platform(),
+    osrelease: () => os.release(),
+    osarch: () => os.arch(),
+    osversion: () => os.version?.() || `${os.type()} ${os.release()}`,
+    electronversion: process.versions.electron,
+    nodeversion: process.versions.node,
+    chromeversion: process.versions.chrome,
+    v8version: process.versions.v8,
+    cpuUsage: process.getCPUUsage,
+    memUsage: process.getProcessMemoryInfo,
     parseModrinthMarkdown: (md) => {
         const mkd = new MarkdownIt('default', {
             html: true,
@@ -384,9 +399,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
             throw err;
         }
     },
+    clearActivity: () => ipcRenderer.send('remove-discord-activity'),
+    setActivity: (activity) => {
+        let rpc_enabled = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("discord_rpc");
+        let enabled = rpc_enabled.value == "true";
+        if (!enabled) return;
+        ipcRenderer.send('set-discord-activity', activity)
+    },
     killProcess: async (pid) => {
+        console.log(pid);
         if (!pid) return;
-        process.kill(pid);
+        pid = Number(pid);
+        return new Promise((resolve, reject) => {
+            let timedOut = false;
+
+            treeKill(pid, 'SIGINT', (err) => {
+                if (err && !timedOut) {
+                    return reject(err);
+                }
+                resolve();
+            });
+
+            setTimeout(() => {
+                timedOut = true;
+
+                treeKill(pid, 'SIGKILL', (err) => {
+                    if (err) return reject(err);
+                    resolve();
+                });
+            }, 5000);
+        });
     },
     getWorlds,
     getSinglePlayerWorlds,
@@ -1196,28 +1238,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    downloadSkin: async (url) => {
-        if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-
-        const response = await axios.get(url, { responseType: "arraybuffer" });
-        const imageBuffer = Buffer.from(response.data);
-
-        const { data, info } = await sharp(imageBuffer)
-            .ensureAlpha()
-            .raw()
-            .toBuffer({ resolveWithObject: true });
-
-        const hash = crypto.createHash('sha256')
-            .update(data)
-            .digest('hex');
-
-        fs.writeFileSync(`./minecraft/skins/${hash}.png`, imageBuffer);
-
-        const base64 = imageBuffer.toString('base64');
-        const dataUrl = `data:image/png;base64,${base64}`;
-
-        return { hash, dataUrl };
-    },
+    getSkinFromUsername,
+    downloadSkin,
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
         await urlToFile(url, `./minecraft/capes/${id}.png`);
@@ -1274,7 +1296,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 throw new Error("Unable to update access token.");
             }
         }
-        
+
         console.log(skin_url);
         console.log(variant);
 
@@ -1627,10 +1649,12 @@ function getWorld(levelDatPath) {
     const parentFolder = path.basename(path.dirname(levelDatPath));
     const grandparentFolder = path.dirname(path.dirname(levelDatPath));
 
+    console.log(levelData);
+
     return ({
         name: levelData.LevelName.value,
         id: parentFolder,
-        seed: levelData.RandomSeed?.value ?? null,
+        seed: levelData.WorldGenSettings?.value?.seed?.value ? BigInt(levelData.WorldGenSettings?.value?.seed?.value) : null,
         last_played: Number(levelData.LastPlayed.value),
         icon: fs.existsSync(path.resolve(grandparentFolder, parentFolder, "icon.png"))
             ? path.resolve(grandparentFolder, `${parentFolder}/icon.png`)
@@ -2136,4 +2160,56 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         "loader": loader.replace("-loader", ""),
         "vanilla_version": modrinth_index_json.dependencies["minecraft"]
     })
+}
+
+async function getSkinFromUsername(username) {
+    try {
+        // Step 1: Get UUID from username
+        const profileRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
+        if (!profileRes.ok) throw new Error(`Username "${username}" not found`);
+        const profile = await profileRes.json();
+        const uuid = profile.id;
+
+        // Step 2: Get skin data from session server
+        const sessionRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`);
+        if (!sessionRes.ok) throw new Error(`Failed to fetch profile for UUID ${uuid}`);
+        const sessionData = await sessionRes.json();
+
+        // Step 3: Decode base64 texture data
+        const textureProp = sessionData.properties.find(p => p.name === 'textures');
+        const textureJson = JSON.parse(Buffer.from(textureProp.value, 'base64').toString('utf8'));
+
+        const skinUrl = textureJson.textures?.SKIN?.url;
+        if (!skinUrl) throw new Error("No skin URL found");
+
+        let hash = await downloadSkin(skinUrl);
+
+        return { "hash": hash.hash, "url": hash.dataUrl };
+    } catch (err) {
+        console.error("Error:", err.message);
+        return null;
+    }
+}
+
+async function downloadSkin(url) {
+    if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
+
+    const response = await axios.get(url, { responseType: "arraybuffer" });
+    const imageBuffer = Buffer.from(response.data);
+
+    const { data, info } = await sharp(imageBuffer)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+    const hash = crypto.createHash('sha256')
+        .update(data)
+        .digest('hex');
+
+    fs.writeFileSync(`./minecraft/skins/${hash}.png`, imageBuffer);
+
+    const base64 = imageBuffer.toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    return { hash, dataUrl };
 }

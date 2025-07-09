@@ -9,7 +9,7 @@ const { spawn, exec, execFile } = require('child_process');
 const fsPromises = require('fs').promises;
 const { ipcRenderer } = require('electron');
 
-let launchername = "EnderGate";
+let launchername = "EnderLynx";
 let launcherversion = "0.0.1";
 
 class Minecraft {

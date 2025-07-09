@@ -1261,6 +1261,7 @@ i {
     border-radius: 1000px;
     --left: 4px;
     transition: background-color .25s, scale .1s;
+    flex-shrink: 0;
 }
 
 .toggle:active {
@@ -1751,7 +1752,7 @@ dialog[open]::backdrop {
     border-style: solid;
     min-width: 400px;
     box-shadow: 0px 0px 10px black;
-    max-width: 600px;
+    max-width: 700px;
 }
 
 .dialog-content {
@@ -3977,4 +3978,78 @@ dialog * {
     border-width: 8px 6px;
     border-color: var(--text-color) transparent transparent transparent;
     position: absolute;
+}
+
+.details {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    border-width: 1px;
+    border-radius: 8px;
+    border-style: solid;
+    border-color: var(--color-1);
+    overflow: hidden;
+}
+
+.details-top {
+    padding: 8px;
+    background-color: var(--color-1);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background-color .25s;
+    display: flex;
+    font-size: 1rem;
+}
+
+.details-top:hover {
+    background-color: var(--color-2);
+}
+
+.details-top-text {
+    font-weight: bold;
+}
+
+.details-top-chevron {
+    margin-left: auto;
+    transition: rotate .25s;
+}
+
+.details.open .details-top-chevron {
+    rotate: 180deg;
+}
+
+.details-content {
+    transition: height .25s, padding-block .25s, display .25s allow-discrete;
+    interpolate-size: allow-keywords;
+    height: 0px;
+    padding: 8px;
+    padding-block: 0px;
+    display: none;
+}
+
+.details.open .details-content {
+    height: max-content;
+    padding-block: 8px;
+    display: block;
+
+    @starting-style {
+        height: 0px;
+        padding-block: 0px;
+    }
+}
+
+.skin-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    white-space: normal;
+}
+
+.label-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }

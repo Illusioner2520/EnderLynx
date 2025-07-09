@@ -302,11 +302,51 @@ class Instance {
         this.java_version = content.java_version;
         this.java_path = content.java_path;
         this.attempted_options_txt_version = content.attempted_options_txt_version;
+        this.java_args = content.java_args;
+        this.env_vars = content.env_vars;
+        this.pre_launch_hook = content.pre_launch_hook;
+        this.wrapper = content.wrapper;
+        this.post_exit_hook = content.post_exit_hook;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
     get pinned() {
         let inst = db.prepare("SELECT * FROM pins WHERE instance_id = ? AND type = ?").get(this.instance_id, "instance");
         return Boolean(inst);
+    }
+    setJavaArgs(java_args) {
+        db.prepare("UPDATE instances SET java_args = ? WHERE id = ?").run(java_args, this.id);
+        this.java_args = java_args;
+        if (instance_watches[this.instance_id].onchangejava_args) {
+            instance_watches[this.instance_id].onchangejava_args(java_args);
+        }
+    }
+    setEnvVars(env_vars) {
+        db.prepare("UPDATE instances SET env_vars = ? WHERE id = ?").run(env_vars, this.id);
+        this.env_vars = env_vars;
+        if (instance_watches[this.instance_id].onchangeenv_vars) {
+            instance_watches[this.instance_id].onchangeenv_vars(env_vars);
+        }
+    }
+    setPreLaunchHook(pre_launch_hook) {
+        db.prepare("UPDATE instances SET pre_launch_hook = ? WHERE id = ?").run(pre_launch_hook, this.id);
+        this.pre_launch_hook = pre_launch_hook;
+        if (instance_watches[this.instance_id].onchangepre_launch_hook) {
+            instance_watches[this.instance_id].onchangepre_launch_hook(pre_launch_hook);
+        }
+    }
+    setWrapper(wrapper) {
+        db.prepare("UPDATE instances SET wrapper = ? WHERE id = ?").run(wrapper, this.id);
+        this.wrapper = wrapper;
+        if (instance_watches[this.instance_id].onchangewrapper) {
+            instance_watches[this.instance_id].onchangewrapper(wrapper);
+        }
+    }
+    setPostExitHook(post_exit_hook) {
+        db.prepare("UPDATE instances SET post_exit_hook = ? WHERE id = ?").run(post_exit_hook, this.id);
+        this.post_exit_hook = post_exit_hook;
+        if (instance_watches[this.instance_id].onchangepost_exit_hook) {
+            instance_watches[this.instance_id].onchangepost_exit_hook(post_exit_hook);
+        }
     }
     setJavaVersion(java_version) {
         db.prepare("UPDATE instances SET java_version = ? WHERE id = ?").run(java_version, this.id);
@@ -641,6 +681,11 @@ class Data {
         let v = window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true);
         let instance = new Instance(instance_id);
         instance.setAttemptedOptionsTxtVersion(v);
+        instance.setJavaArgs(data.getDefault("default_java_args"));
+        instance.setEnvVars(data.getDefault("default_env_vars"));
+        instance.setPreLaunchHook(data.getDefault("default_pre_launch_hook"));
+        instance.setWrapper(data.getDefault("default_wrapper"));
+        instance.setPostExitHook(data.getDefault("default_post_exit_hook"));
         return instance;
     }
 
@@ -676,7 +721,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious" };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "discord_rpc": "true", "default_java_args": "", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -1084,8 +1129,19 @@ class PageContent {
         this.title = title;
     }
     async displayContent() {
+        if (!rpcLocked) {
+            window.electronAPI.setActivity({
+                "details": this.title == "home" ? "Viewing Home" : this.title == "instances" ? "Viewing My Instances" : this.title == "discover" ? "Discovering Custom Content" : this.title == "my_account" ? "Viewing My Wardrobe" : "Unknown",
+                "state": "Not Playing Minecraft",
+                startTimestamp: new Date(),
+                largeImageKey: 'icon',
+                largeImageText: 'EnderLynx Logo',
+                instance: false
+            });
+        }
         if (this.title == "discover") {
             showAddContent();
+            currentTab = "discover";
             return;
         }
         content.innerHTML = "";
@@ -1097,6 +1153,8 @@ class PageContent {
         clearMoreMenus();
     }
 }
+
+let rpcLocked = false;
 
 class LiveMinecraft {
     constructor(element) {
@@ -1112,9 +1170,11 @@ class LiveMinecraft {
         this.nameElement = innerName;
         let stopButton = document.createElement("div");
         stopButton.className = "live-stop";
+        stopButton.setAttribute("title", "Stop Instance");
         stopButton.innerHTML = '<i class="fa-regular fa-circle-stop"></i>';
         let logButton = document.createElement("div");
         logButton.className = "live-log";
+        logButton.setAttribute("title", "View Instance Logs");
         logButton.innerHTML = '<i class="fa-solid fa-terminal"></i>';
         this.stopButton = stopButton;
         this.logButton = logButton;
@@ -1160,6 +1220,15 @@ class LiveMinecraft {
         this.element.oncontextmenu = (e) => {
             contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
+        window.electronAPI.setActivity({
+            "details": "Playing " + instanceInfo.name,
+            "state": loaders[instanceInfo.loader] + " " + instanceInfo.vanilla_version,
+            startTimestamp: new Date(),
+            largeImageKey: 'icon',
+            largeImageText: 'EnderLynx Logo',
+            instance: false
+        });
+        rpcLocked = true;
     }
     removeLive() {
         this.nameElement.innerHTML = sanitize(translate("app.instances.no_running"));
@@ -1167,6 +1236,15 @@ class LiveMinecraft {
         this.element.oncontextmenu = () => { };
         this.stopButton.onclick = () => { };
         this.logButton.onclick = () => { };
+        window.electronAPI.setActivity({
+            "details": currentTab == "home" ? "Viewing Home" : currentTab == "instances" ? "Viewing My Instances" : currentTab == "discover" ? "Discovering Custom Content" : currentTab == "my_account" ? "Viewing My Wardrobe" : "Unknown",
+            "state": "Not Playing Minecraft",
+            startTimestamp: new Date(),
+            largeImageKey: 'icon',
+            largeImageText: 'EnderLynx Logo',
+            instance: false
+        });
+        rpcLocked = false;
     }
     async findLive() {
         for (const instances of data.getInstances()) {
@@ -2126,6 +2204,59 @@ settingsButtonEle.onclick = () => {
             ]
         });
     });
+    let app_info = document.createElement("div");
+    app_info.style.display = "flex";
+    app_info.style.flexDirection = "column";
+    app_info.style.gap = "4px";
+    let info_to_show = [{
+        "name": "EnderLynx Version",
+        "value": window.electronAPI.version
+    }, {
+        "name": "Electron Version",
+        "value": window.electronAPI.electronversion
+    }, {
+        "name": "OS Platform",
+        "value": window.electronAPI.osplatform()
+    }, {
+        "name": "OS Arch",
+        "value": window.electronAPI.osarch()
+    }, {
+        "name": "OS Release",
+        "value": window.electronAPI.osrelease()
+    }, {
+        "name": "OS Version",
+        "value": window.electronAPI.osversion()
+    }, {
+        "name": "Node Version",
+        "value": window.electronAPI.nodeversion
+    }, {
+        "name": "Chromium Version",
+        "value": window.electronAPI.chromeversion
+    }, {
+        "name": "V8 Version",
+        "value": window.electronAPI.v8version
+    }, {
+        "name": "RAM Usage",
+        "value": async () => { return ((await window.electronAPI.memUsage()).private / 1024).toFixed(2) + " MB" },
+        "update": 1000
+    }]
+    info_to_show.forEach(async (e) => {
+        let element = document.createElement("span");
+        if (e.update) {
+            element.innerHTML = e.name + ": " + await e.value();
+        } else {
+            element.innerHTML = e.name + ": " + e.value;
+        }
+        element.style.color = "var(--subtle-text-color)";
+        if (e.update) {
+            setInterval(async () => {
+                if (element) {
+                    element.innerHTML = e.name + ": " + await e.value();
+                }
+            }, e.update);
+        }
+        app_info.appendChild(element);
+    });
     dialog.showDialog("Settings", "form", [
         {
             "type": "dropdown",
@@ -2180,6 +2311,14 @@ settingsButtonEle.onclick = () => {
             "default": data.getDefault("default_page")
         },
         {
+            "type": "toggle",
+            "name": "Discord Rich Presence",
+            "tab": "appearance",
+            "id": "discord_rpc",
+            "desc": "Manages whether your Discord can show 'EnderLynx' as your status. Note: This does not affect Rich Presence added by launched modpacks or instances.",
+            "default": data.getDefault("discord_rpc") == "true"
+        },
+        {
             "type": "number",
             "name": "Default Width",
             "desc": "The width of the game when launched",
@@ -2206,6 +2345,46 @@ settingsButtonEle.onclick = () => {
             "max": window.electronAPI.getTotalRAM(),
             "increment": 64,
             "unit": "MB"
+        },
+        {
+            "type": "text",
+            "name": "Default Custom Java Arguments",
+            "tab": "defaults",
+            "id": "default_java_args",
+            "default": data.getDefault("default_java_args")
+        },
+        {
+            "type": "text",
+            "name": "Default Environment Variables",
+            "tab": "defaults",
+            "id": "default_env_vars",
+            "default": data.getDefault("default_env_vars")
+        },
+        {
+            "type": "text",
+            "name": "Default Pre-Launch Hook",
+            "tab": "defaults",
+            "id": "default_pre_launch_hook",
+            "default": data.getDefault("default_pre_launch_hook")
+        },
+        {
+            "type": "text",
+            "name": "Defaunt Wrapper",
+            "tab": "defaults",
+            "id": "default_wrapper",
+            "default": data.getDefault("default_wrapper")
+        },
+        {
+            "type": "text",
+            "name": "Default Post-Exit Hook",
+            "tab": "defaults",
+            "id": "default_post_exit_hook",
+            "default": data.getDefault("default_post_exit_hook")
+        },
+        {
+            "type": "notice",
+            "content": app_info,
+            "tab": "app_info"
         }
     ].concat(java_installations), [
         {
@@ -2244,6 +2423,22 @@ settingsButtonEle.onclick = () => {
         data.setDefault("default_height", info.default_height);
         data.setDefault("default_ram", info.default_ram);
         data.setDefault("default_page", info.default_page);
+        data.setDefault("discord_rpc", (info.discord_rpc).toString());
+        if (info.discord_rpc) {
+            live.findLive();
+            if (!rpcLocked) {
+                window.electronAPI.setActivity({
+                    "details": currentTab == "home" ? "Viewing Home" : currentTab == "instances" ? "Viewing My Instances" : currentTab == "discover" ? "Discovering Custom Content" : currentTab == "my_account" ? "Viewing My Wardrobe" : "Unknown",
+                    "state": "Not Playing Minecraft",
+                    startTimestamp: new Date(),
+                    largeImageKey: 'icon',
+                    largeImageText: 'EnderLynx Logo',
+                    instance: false
+                });
+            }
+        } else {
+            window.electronAPI.clearActivity();
+        }
         v.forEach(e => {
             if (e.id.includes("java_")) {
                 let version = e.id.replace("java_", "");
@@ -2357,13 +2552,14 @@ async function showHomeContent(e) {
                     window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`)
                 }
             } : null,
-            e.type == "singleplayer" ? {
+            e.type == "singleplayer" ? (e.seed ? {
                 "title": "Open Seed Map",
                 "icon": '<i class="fa-solid fa-map"></i>',
                 "func": () => {
-
+                    displaySuccess("Make sure to select the correct version.");
+                    window.electronAPI.openInBrowser("https://www.chunkbase.com/apps/seed-map#seed=" + e.seed);
                 }
-            } : null,
+            } : null) : null,
             {
                 "title": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? "Unpin World" : "Pin World",
                 "icon": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
@@ -2726,12 +2922,13 @@ function showMyAccountContent(e) {
         let default_profile = data.getDefaultProfile();
         let activeSkin = default_profile.getActiveSkin();
         skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-            model: default_profile.getActiveSkin()?.model == "slim" ? "slim" : "default",
+            model: activeSkin?.model == "slim" ? "slim" : "default",
         });
         let activeCape = default_profile.getActiveCape();
         skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
         skinList.innerHTML = '';
         capeList.innerHTML = '';
+        if (document.getElementsByClassName("details")[0]) document.getElementsByClassName("details")[0].remove();
         let skins = data.getSkinsNoDefaults();
         skins.forEach((e) => {
             let skinEle = document.createElement("div");
@@ -2830,6 +3027,7 @@ function showMyAccountContent(e) {
             skinEle.appendChild(loader);
             skinEle.appendChild(skinName);
             skinName.innerHTML = sanitize(e.name);
+            skinName.className = "skin-name";
             skinList.appendChild(skinEle);
             skinEle.onmouseenter = () => {
                 skinViewer.loadSkin(e.skin_url, {
@@ -2872,97 +3070,120 @@ function showMyAccountContent(e) {
                 }
             }
         });
-        let showDefaultSkinButton = document.createElement("button");
-        showDefaultSkinButton.className = "my-account-option";
-        let skinImg = document.createElement("div");
-        skinImg.classList.add("option-image");
-        skinImg.innerHTML = '<i class="fa-solid fa-plus"></i>';
-        let skinName = document.createElement("div");
-        skinName.innerHTML = "Show Default Skins";
-        let dfLoader = document.createElement("div");
-        dfLoader.className = "loading-container-spinner";
-        dfLoader.style.display = "none";
-        showDefaultSkinButton.appendChild(skinImg);
-        showDefaultSkinButton.appendChild(dfLoader);
-        showDefaultSkinButton.appendChild(skinName);
-        showDefaultSkinButton.onclick = async () => {
-            skinImg.style.display = "none";
-            dfLoader.style.display = "";
-            let defaultSkins = await data.getDefaultSkins();
-            showDefaultSkinButton.style.display = "none";
-            defaultSkins.forEach(e => {
-                let skinEle = document.createElement("button");
-                let equipSkin = async () => {
-                    loader.style.display = "block";
-                    skinImg.style.display = "none";
-                    let currentEle = skinEle;
-                    let success = await applySkinFromURL(default_profile, e);
-                    if (success) {
-                        let oldEle = document.querySelector(".my-account-option.skin.selected");
-                        if (oldEle) oldEle.classList.remove("selected");
-                        currentEle.classList.add("selected");
-                        e.setActive(default_profile.uuid);
-                        skinViewer.loadSkin(e.url, {
-                            model: e.model == "wide" ? "default" : "slim"
+        let defaultSkinList = document.createElement("div");
+        defaultSkinList.className = "my-account-option-list";
+        let detailsWrapper = document.createElement("div");
+        detailsWrapper.className = "details";
+        skinOptions.appendChild(detailsWrapper);
+        let detailstop = document.createElement("button");
+        detailstop.className = "details-top";
+        let detailTitle = document.createElement("span");
+        detailTitle.className = "details-top-text";
+        detailTitle.innerHTML = "Default Skins & Official Skin Packs";
+        let detailChevron = document.createElement("span");
+        detailChevron.className = "details-top-chevron";
+        detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+        detailstop.appendChild(detailTitle);
+        detailstop.appendChild(detailChevron);
+        let detailContent = document.createElement("div");
+        detailContent.className = "details-content";
+        detailsWrapper.appendChild(detailstop);
+        detailsWrapper.appendChild(detailContent);
+        detailContent.appendChild(defaultSkinList);
+
+        let showDefSkins = async () => {
+            let eles = document.querySelectorAll(".my-account-option.default-skin");
+            if (eles.length == 0) {
+                let defaultSkins = await data.getDefaultSkins();
+                defaultSkins.forEach(e => {
+                    let skinEle = document.createElement("button");
+                    skinEle.className = "my-account-option";
+                    skinEle.classList.add("default-skin");
+                    let equipSkin = async () => {
+                        loader.style.display = "block";
+                        skinImg.style.display = "none";
+                        let currentEle = skinEle;
+                        let success = await applySkinFromURL(default_profile, e);
+                        if (success) {
+                            let oldEle = document.querySelector(".my-account-option.skin.selected");
+                            if (oldEle) oldEle.classList.remove("selected");
+                            currentEle.classList.add("selected");
+                            e.setActive(default_profile.uuid);
+                            skinViewer.loadSkin(e.url, {
+                                model: e.model == "wide" ? "default" : "slim"
+                            });
+                            viewerInfo.innerHTML = 'Current Skin';
+                            activeSkin = e;
+                        }
+                        loader.style.display = "none";
+                        skinImg.style.display = "block";
+                    }
+                    skinEle.classList.add("skin");
+                    let skinImg = document.createElement("img");
+                    renderSkinToDataUrl(e.skin_url, (v) => {
+                        skinImg.src = v;
+                    }, e.model);
+                    skinImg.classList.add("option-image");
+                    let loader = document.createElement("div");
+                    loader.className = "loading-container-spinner";
+                    loader.style.display = "none";
+                    let skinName = document.createElement("div");
+                    skinEle.appendChild(skinImg);
+                    skinEle.appendChild(loader);
+                    skinEle.appendChild(skinName);
+                    skinName.innerHTML = sanitize(e.name);
+                    skinName.className = "skin-name";
+                    defaultSkinList.appendChild(skinEle);
+                    skinEle.onmouseenter = () => {
+                        skinViewer.loadSkin(e.skin_url, {
+                            model: e.model == "wide" ? "default" : "slim",
+                        });
+                        viewerInfo.innerHTML = 'Skin Preview';
+                    }
+                    skinEle.onfocus = () => {
+                        skinViewer.loadSkin(e.skin_url, {
+                            model: e.model == "wide" ? "default" : "slim",
+                        });
+                        viewerInfo.innerHTML = 'Skin Preview';
+                    }
+                    skinEle.onmouseleave = () => {
+                        skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+                            model: activeSkin?.model == "slim" ? "slim" : "default",
                         });
                         viewerInfo.innerHTML = 'Current Skin';
-                        activeSkin = e;
                     }
-                    loader.style.display = "none";
-                    skinImg.style.display = "block";
-                }
-                skinEle.className = "my-account-option";
-                skinEle.classList.add("skin");
-                let skinImg = document.createElement("img");
-                renderSkinToDataUrl(e.skin_url, (v) => {
-                    skinImg.src = v;
-                }, e.model);
-                skinImg.classList.add("option-image");
-                let loader = document.createElement("div");
-                loader.className = "loading-container-spinner";
-                loader.style.display = "none";
-                let skinName = document.createElement("div");
-                skinEle.appendChild(skinImg);
-                skinEle.appendChild(loader);
-                skinEle.appendChild(skinName);
-                skinName.innerHTML = sanitize(e.name);
-                skinList.appendChild(skinEle);
-                skinEle.onmouseenter = () => {
-                    skinViewer.loadSkin(e.skin_url, {
-                        model: e.model == "wide" ? "default" : "slim",
-                    });
-                    viewerInfo.innerHTML = 'Skin Preview';
-                }
-                skinEle.onfocus = () => {
-                    skinViewer.loadSkin(e.skin_url, {
-                        model: e.model == "wide" ? "default" : "slim",
-                    });
-                    viewerInfo.innerHTML = 'Skin Preview';
-                }
-                skinEle.onmouseleave = () => {
-                    skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-                        model: activeSkin?.model == "slim" ? "slim" : "default",
-                    });
-                    viewerInfo.innerHTML = 'Current Skin';
-                }
-                skinEle.onblur = (e) => {
-                    if (e.relatedTarget?.matches(".my-account-option.skin")) return;
-                    skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-                        model: activeSkin?.model == "slim" ? "slim" : "default",
-                    });
-                    viewerInfo.innerHTML = 'Current Skin';
-                }
-                if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
-                    skinEle.classList.add("selected");
-                }
-                skinEle.onclick = (e) => {
-                    if (e.target.matches(".skin-more")) return;
-                    if (e.target.matches("i")) return;
-                    equipSkin();
-                }
-            });
+                    skinEle.onblur = (e) => {
+                        if (e.relatedTarget?.matches(".my-account-option.skin")) return;
+                        skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+                            model: activeSkin?.model == "slim" ? "slim" : "default",
+                        });
+                        viewerInfo.innerHTML = 'Current Skin';
+                    }
+                    if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
+                        skinEle.classList.add("selected");
+                    }
+                    skinEle.onclick = (e) => {
+                        if (e.target.matches(".skin-more")) return;
+                        if (e.target.matches("i")) return;
+                        equipSkin();
+                    }
+                });
+            }
+            detailsWrapper.classList.add("open");
+
         }
-        skinList.appendChild(showDefaultSkinButton);
+        let hideDefSkins = () => {
+            detailsWrapper.classList.remove("open");
+        }
+        let isShow = true;
+        detailstop.onclick = async () => {
+            if (isShow) {
+                await showDefSkins();
+            } else {
+                hideDefSkins();
+            }
+            isShow = !isShow;
+        }
         let capes = default_profile.getCapes();
         capes.forEach((e) => {
             let capeEle = document.createElement("button");
@@ -3112,6 +3333,33 @@ function showMyAccountContent(e) {
         }
     }
     skinButtonContainer.appendChild(refreshButton);
+    let usernameImport = document.createElement("button");
+    usernameImport.className = "skin-button";
+    usernameImport.innerHTML = '<i class="fa-solid fa-user"></i>Import from Username';
+    usernameImport.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog("Enter Usename", "form", [
+            {
+                "type": "text",
+                "id": "username",
+                "name": "Username"
+            }
+        ], [
+            {
+                "type": "cancel",
+                "content": "Cancel"
+            },
+            {
+                "type": "confirm",
+                "content": "Import"
+            }
+        ], [], async (v) => {
+            let info = {};
+            v.forEach(e => info[e.id] = e.value);
+            await getSkinFromUsername(info.username);
+            showContent();
+        })
+    }
     let importButton = document.createElement("button");
     importButton.innerHTML = '<i class="fa-solid fa-file-import"></i>Import Skin';
     importButton.className = "skin-button";
@@ -3184,6 +3432,7 @@ function showMyAccountContent(e) {
             showContent();
         });
     }
+    skinButtonContainer.appendChild(usernameImport);
     skinButtonContainer.appendChild(importButton);
     optionsContainer.appendChild(skinButtonContainer);
     optionsContainer.appendChild(skinOptions);
@@ -3262,25 +3511,43 @@ function renderSkinToDataUrl(skinPath, callback, model) {
         canvas.height = 32;
         const ctx = canvas.getContext('2d');
 
-        function drawPart(sx, sy, sw, sh, dx, dy, dw = sw, dh = sh) {
-            ctx.drawImage(skin, sx, sy, sw, sh, dx, dy, dw, dh);
+        function drawPart(sx, sy, sw, sh, dx, dy, dw = sw, dh = sh, mirror = false) {
+            ctx.save();
+            if (mirror) {
+                ctx.translate(dx + dw, dy);
+                ctx.scale(-1, 1);
+                ctx.drawImage(skin, sx, sy, sw, sh, 0, 0, dw, dh);
+            } else {
+                ctx.drawImage(skin, sx, sy, sw, sh, dx, dy, dw, dh);
+            }
+            ctx.restore();
         }
 
         // first layer
         drawPart(8, 8, 8, 8, 4, 0); // head
         drawPart(20, 20, 8, 12, 4, 8); // torso
         drawPart(4, 20, 4, 12, 4, 20); // right leg
-        drawPart(20, 52, 4, 12, 8, 20); // left leg
+        if (skin.height == 64) {
+            drawPart(20, 52, 4, 12, 8, 20); // left leg
+        } else {
+            drawPart(4, 20, 4, 12, 8, 20, 4, 12, true);
+        }
         drawPart(44, 20, model == "wide" ? 4 : 3, 12, model == "wide" ? 0 : 1, 8); // right arm
-        drawPart(36, 52, model == "wide" ? 4 : 3, 12, 12, 8); // left arm
+        if (skin.height == 64) {
+            drawPart(36, 52, model == "wide" ? 4 : 3, 12, 12, 8); // left arm
+        } else {
+            drawPart(44, 20, model == "wide" ? 4 : 3, 12, 12, 8, model == "wide" ? 4 : 3, 12, true); // left arm
+        }
 
         // second layer
-        drawPart(40, 8, 8, 8, 4, 0); // head
-        drawPart(20, 36, 8, 12, 4, 8); // torso
-        drawPart(4, 36, 4, 12, 4, 20); // right leg
-        drawPart(4, 52, 4, 12, 8, 20); // left leg
-        drawPart(44, 36, model == "wide" ? 4 : 3, 12, model == "wide" ? 0 : 1, 8); // right arm
-        drawPart(52, 52, model == "wide" ? 4 : 3, 12, 12, 8); // left arm
+        if (skin.height == 64) {
+            drawPart(40, 8, 8, 8, 4, 0); // head
+            drawPart(20, 36, 8, 12, 4, 8); // torso
+            drawPart(4, 36, 4, 12, 4, 20); // right leg
+            drawPart(4, 52, 4, 12, 8, 20); // left leg
+            drawPart(44, 36, model == "wide" ? 4 : 3, 12, model == "wide" ? 0 : 1, 8); // right arm
+            drawPart(52, 52, model == "wide" ? 4 : 3, 12, 12, 8); // left arm
+        }
 
         callback(canvas.toDataURL())
     }
@@ -4198,6 +4465,41 @@ function showInstanceSettings(instanceInfo) {
                     }
                 }
             ]
+        },
+        {
+            "type": "text",
+            "id": "java_args",
+            "name": "Custom Java Arguments",
+            "default": instanceInfo.java_args,
+            "tab": "java"
+        },
+        {
+            "type": "text",
+            "id": "env_vars",
+            "name": "Custom Environment Variables",
+            "default": instanceInfo.env_vars,
+            "tab": "java"
+        },
+        {
+            "type": "text",
+            "id": "pre_launch_hook",
+            "name": "Pre-Launch Hook",
+            "default": instanceInfo.pre_launch_hook,
+            "tab": "launch_hooks"
+        },
+        {
+            "type": "text",
+            "id": "wrapper",
+            "name": "Wrapper",
+            "default": instanceInfo.wrapper,
+            "tab": "launch_hooks"
+        },
+        {
+            "type": "text",
+            "id": "post_exit_hook",
+            "name": "Post-Exit Hook",
+            "default": instanceInfo.post_exit_hook,
+            "tab": "launch_hooks"
         }
     ], [
         { "type": "cancel", "content": "Cancel" },
@@ -4218,6 +4520,11 @@ function showInstanceSettings(instanceInfo) {
         instanceInfo.setWindowHeight(info.height);
         instanceInfo.setAllocatedRam(info.allocated_ram);
         instanceInfo.setJavaPath(info.java_path);
+        instanceInfo.setJavaArgs(info.java_args);
+        instanceInfo.setEnvVars(info.env_vars);
+        instanceInfo.setPreLaunchHook(info.pre_launch_hook);
+        instanceInfo.setWrapper(info.wrapper);
+        instanceInfo.setPostExitHook(info.post_exit_hook);
     });
 }
 
@@ -4504,7 +4811,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 "name": "Launcher",
                 "options": [
                     {
-                        "name": "EnderGate",
+                        "name": "EnderLynx",
                         "value": "current"
                     },
                     {
@@ -4715,13 +5022,14 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`)
                             }
                         },
-                        {
+                        worlds[i].seed ? {
                             "title": "Open Seed Map",
                             "icon": '<i class="fa-solid fa-map"></i>',
                             "func": () => {
-
+                                displaySuccess("Make sure to select the correct version.");
+                                window.electronAPI.openInBrowser("https://www.chunkbase.com/apps/seed-map#seed=" + worlds[i].seed);
                             }
-                        },
+                        } : null,
                         {
                             "title": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? "Unpin World" : "Pin World",
                             "icon": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
@@ -6494,7 +6802,11 @@ class Dialog {
                 let tab = info[i].tab ?? "default";
                 if (info[i].type == "notice") {
                     let textElement = document.createElement("div");
-                    textElement.innerHTML = (info[i].content);
+                    if (info[i].content instanceof Element) {
+                        textElement.appendChild(info[i].content);
+                    } else {
+                        textElement.innerHTML = (info[i].content);
+                    }
                     if (info[i].width) textElement.style.width = info[i].width + "px";
                     contents[tab].appendChild(textElement);
                 } else if (info[i].type == "text") {
@@ -6606,16 +6918,23 @@ class Dialog {
                     wrapper.appendChild(textInput);
                     this.values.push({ "id": info[i].id, "element": textInput });
                 } else if (info[i].type == "toggle") {
+                    let labelWrapper = document.createElement("div");
+                    labelWrapper.className = "label-wrapper";
                     let label = document.createElement("label");
                     label.innerHTML = sanitize(info[i].name);
                     label.className = "dialog-label";
+                    let labelDesc = document.createElement("label");
+                    labelDesc.innerHTML = sanitize(info[i].desc);
+                    labelDesc.className = "dialog-label-desc";
                     let toggleEle = document.createElement("button");
                     let toggle = new Toggle(toggleEle, () => { }, info[i].default ?? false);
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper-horizontal";
                     contents[tab].appendChild(wrapper);
                     wrapper.appendChild(toggleEle);
-                    wrapper.appendChild(label);
+                    wrapper.appendChild(labelWrapper);
+                    labelWrapper.appendChild(label);
+                    if (info[i].desc) labelWrapper.appendChild(labelDesc);
                     this.values.push({ "id": info[i].id, "element": toggle });
                 } else if (info[i].type == "slider") {
                     let id = createId();
@@ -9098,3 +9417,36 @@ document.addEventListener("scroll", function (e) {
     if (!tooltip) return;
     tooltip.hidePopover();
 }, true);
+
+async function getSkinFromUsername(username) {
+    let info;
+    try {
+        info = await window.electronAPI.getSkinFromUsername(username);
+        if (!info) throw new Error();
+        console.log(info);
+    } catch (e) {
+        displayError("Unable to get skin from username.");
+        return;
+    }
+    return new Promise(async (resolve, reject) => {
+        const tempImg = new Image();
+        let dims = await getImageDimensionsFromDataURL(info.url);
+        tempImg.onload = async () => {
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = dims.width;
+            tempCanvas.height = dims.height;
+            const ctx = tempCanvas.getContext("2d");
+            ctx.drawImage(tempImg, 0, 0);
+            const pixel = ctx.getImageData(54, 24, 1, 1).data;
+            // pixel is [r, g, b, a]
+            if (pixel[3] === 0) {
+                model = "slim";
+            } else {
+                model = "wide";
+            }
+            let skin = data.addSkin("", username + "'s Skin", model, "", info.hash, info.url);
+            resolve(skin);
+        };
+        tempImg.src = info.url;
+    })
+}
