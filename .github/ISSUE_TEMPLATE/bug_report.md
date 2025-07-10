@@ -1,6 +1,6 @@
 name: 🐛 Bug Report
 description: Report a bug or unexpected behavior
-labels: ["Bug 🐛"]
+labels: [Bug 🐛]
 body:
   - type: checkboxes
     attributes:
