@@ -24,6 +24,7 @@
     "prismarine-nbt": "^2.7.0",
     "sharp": "^0.34.2",
     "skinview3d": "^3.4.1",
+    "string-argv": "^0.3.2",
     "three": "^0.177.0",
     "toml": "^3.0.0",
     "tree-kill": "^1.2.2",

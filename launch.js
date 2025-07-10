@@ -43,6 +43,33 @@ class Minecraft {
         this.modded_args_game = data.arguments.game;
         this.modded_args_jvm = data.arguments.jvm;
     }
+    async installQuilt(mcversion, quiltversion) {
+        ipcRenderer.send('progress-update', "Downloading Quilt", 0, "Download quilt info...");
+        const quilt_json = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcversion}/${quiltversion}/profile/json`);
+        const data = await quilt_json.json();
+        fs.mkdirSync(`./minecraft/meta/quilt/${mcversion}/${quiltversion}`, { recursive: true });
+        fs.writeFileSync(`./minecraft/meta/quilt/${mcversion}/${quiltversion}/quilt-${mcversion}-${quiltversion}.json`, JSON.stringify(data));
+        ipcRenderer.send('progress-update', "Downloading Quilt", 20, "Downloading quilt libraries...");
+        for (let i = 0; i < data.libraries.length; i++) {
+            ipcRenderer.send('progress-update', "Downloading Quilt", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
+            let fileName = data.libraries[i].name.split(":");
+            fileName.splice(0, 1);
+            fileName = fileName.join("-") + ".jar";
+            let patha = data.libraries[i].name.split(":");
+            patha[0] = patha[0].replaceAll(".", "/");
+            patha = patha.join("/") + "/" + fileName;
+            if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+                await urlToFile(data.libraries[i].url + `${patha}`, `./minecraft/meta/libraries/${patha}`);
+            }
+            this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+            let libName = data.libraries[i].name.split(":");
+            libName.splice(libName.length - 1, 1);
+            this.libNames.push(libName.join(":"));
+        }
+        this.main_class = data.mainClass;
+        if (data?.arguments?.jvm) this.modded_args_game = data.arguments.game;
+        if (data?.arguments?.jvm) this.modded_args_jvm = data.arguments.jvm;
+    }
     async installForge(mcversion, forgeversion) {
         ipcRenderer.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...");
         const forgeInstallerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
@@ -190,6 +217,10 @@ class Minecraft {
             });
             this.main_class = version_json.mainClass;
             this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${mcversion}-forge-${forgeversion}/${mcversion}-forge-${forgeversion}.jar`);
+            if (forge_version_info.minecraftArguments) {
+                this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                this.legacy_modded_arguments = forge_version_info.minecraftArguments;
+            }
         }
 
 
@@ -276,7 +307,9 @@ class Minecraft {
 
         ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
     }
-    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath) {
+    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) {
+        if (!javaArgs || !javaArgs.length) javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml")];
+        console.log(javaArgs);
         let newJava = new Java();
         this.libs = "";
         this.libNames = [];
@@ -306,6 +339,28 @@ class Minecraft {
                     patha = patha.join("/") + "/" + fileName;
                     this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
                     let libName = fabric_json.libraries[i].name.split(":");
+                    libName.splice(libName.length - 1, 1);
+                    this.libNames.push(libName.join(":"));
+                }
+            }
+        } else if (loader == "quilt") {
+            if (!fs.existsSync(`./minecraft/meta/quilt/${version}/${loaderVersion}/quilt-${version}-${loaderVersion}.json`)) {
+                await this.installQuilt(version, loaderVersion);
+            } else {
+                let quilt_json = fs.readFileSync(`./minecraft/meta/quilt/${version}/${loaderVersion}/quilt-${version}-${loaderVersion}.json`);
+                quilt_json = JSON.parse(quilt_json);
+                this.main_class = quilt_json.mainClass;
+                if (quilt_json.arguments?.game) this.modded_args_game = quilt_json.arguments.game;
+                if (quilt_json.arguments?.jvm) this.modded_args_jvm = quilt_json.arguments.jvm;
+                for (let i = 0; i < quilt_json.libraries.length; i++) {
+                    let fileName = quilt_json.libraries[i].name.split(":");
+                    fileName.splice(0, 1);
+                    fileName = fileName.join("-") + ".jar";
+                    let patha = quilt_json.libraries[i].name.split(":");
+                    patha[0] = patha[0].replaceAll(".", "/");
+                    patha = patha.join("/") + "/" + fileName;
+                    this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
+                    let libName = quilt_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
                 }
@@ -397,6 +452,10 @@ class Minecraft {
                         e = e.replaceAll("${version_name}", `${version}-forge-${loaderVersion}`);
                         return e;
                     }) : [];
+                    if (forge_version_info.minecraftArguments) {
+                        this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                        this.legacy_modded_arguments = forge_version_info.minecraftArguments;
+                    }
                 }
             }
         } else if (loader == "neoforge") {
@@ -498,7 +557,7 @@ class Minecraft {
             let extraArgs = [];
             let quickPlayHandled = false;
             // ~1.13+
-            this.args.game = this.args.game.concat(this.modded_args_game);
+            if (this.modded_args_game) this.args.game = this.args.game.concat(this.modded_args_game);
             this.args.game = this.args.game.map((e) => {
                 if (e?.value) {
                     if (isDemo && e.rules[0].features.is_demo_user) {
@@ -589,8 +648,8 @@ class Minecraft {
                     e = e.replace("${launcher_version}", launcherversion);
                     if (e.includes("${classpath}")) {
                         let theargs = [this.libs + this.jarfile];
-                        theargs = theargs.concat(this.modded_args_jvm);
-                        theargs = theargs.concat(["-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"), this.main_class]);
+                        if (this.modded_args_jvm) theargs = theargs.concat(this.modded_args_jvm);
+                        theargs = theargs.concat(javaArgs).concat([this.main_class]);
                         args = args.concat(theargs);
                     } else {
                         args.push(e);
@@ -618,8 +677,7 @@ class Minecraft {
             args.push("-Dminecraft.client.jar=" + this.jarfile);
             args.push("-cp");
             args.push(this.libs + this.jarfile);
-            args = args.concat(("-Xmx" + allocatedRam + "M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M").split(" "));
-            args.push("-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml"));
+            args = args.concat(javaArgs);
             args.push(this.main_class);
             this.args = this.args.map((e) => {
                 e = e.replace("${auth_player_name}", player_info.name);
@@ -649,11 +707,16 @@ class Minecraft {
         console.log("Launching game.");
         console.log(this.libNames);
         console.log("Executing: " + this.java_installation + " " + args.join(" "));
+        console.log(args);
         let LOG_PATH = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/logs/${fileFormatDate(new Date())}.log`);
         fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
         let fd = fs.openSync(LOG_PATH, 'w');
         fs.closeSync(fd);
         const child = spawn(this.java_installation, args, {
+            env: {
+                ...process.env,
+                ...envVars
+            },
             cwd: `./minecraft/instances/${this.instance_id}`,
             detached: true,
             stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')]
@@ -661,9 +724,9 @@ class Minecraft {
 
         child.once('error', (err) => {
             if (err.code === 'ENOENT') {
-                ipcRenderer.send('display-error',"Unable to launch Minecraft");
+                ipcRenderer.send('display-error', "Unable to launch Minecraft");
             } else {
-                ipcRenderer.send('display-error',"Unable to launch Minecraft (" + err + ")");
+                ipcRenderer.send('display-error', "Unable to launch Minecraft (" + err + ")");
             }
         });
         child.unref();
@@ -938,7 +1001,7 @@ class Java {
         }
         return this.versions["java-" + version];
     }
-    async setJavaInstallation(version,file_path) {
+    async setJavaInstallation(version, file_path) {
         if (this.versions["java-" + version] == file_path) return;
         this.versions["java-" + version] = file_path;
         fs.writeFileSync("./java/versions.json", JSON.stringify(this.versions), 'utf-8');
@@ -1117,7 +1180,7 @@ class Quilt {
     async getVersions(mcVersion) {
         const res = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcVersion}`);
         const data = await res.json();
-        return data.map(e => e.version);
+        return data.map(e => e.loader.version);
     }
 }
 

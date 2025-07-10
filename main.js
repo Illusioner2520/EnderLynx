@@ -6,9 +6,9 @@ let win;
 
 const createWindow = () => {
     win = new BrowserWindow({
-        width: 1250,
+        width: 1000,
         height: 600,
-        minWidth: 1250,
+        minWidth: 1000,
         minHeight: 600,
         webPreferences: {
             nodeIntegration: false,
@@ -38,6 +38,10 @@ ipcMain.on('display-error', (event, message) => {
 ipcMain.handle('show-open-dialog', async (event, options) => {
     const result = await dialog.showOpenDialog(win, options);
     return result;
+});
+
+ipcMain.handle('get-app-metrics', (event) => {
+    return app.getAppMetrics();
 });
 
 const clientId = '1392227892594999368';

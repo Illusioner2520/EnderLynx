@@ -721,7 +721,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "discord_rpc": "true", "default_java_args": "", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "" };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "discord_rpc": "true", "default_java_args": "", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -1847,7 +1847,9 @@ class ContentList {
             "func": () => {}
         }
     } */
-    constructor(element, content, searchBar, features, filter) {
+    constructor(element, content, searchBar, features, filter, notFoundMessage = "No Results Found") {
+        let notFoundElement = new NoResultsFound(notFoundMessage).element;
+        notFoundElement.style.background = "transparent";
         this.checkBoxes = [];
         element.classList.add("content-list-wrapper");
         let contentListTop = document.createElement("div");
@@ -1891,15 +1893,18 @@ class ContentList {
         }
 
         let applyFilters = (search, dropdown) => {
+            let numShown = 0;
             for (let i = 0; i < this.items.length; i++) {
                 if (this.items[i].name.toLowerCase().includes(search.toLowerCase().trim()) && (this.items[i].type == dropdown || dropdown == "all")) {
                     this.items[i].element.style.display = "flex";
                     this.items[i].element.classList.remove("hidden");
+                    numShown++;
                 } else {
                     this.items[i].element.style.display = "none";
                     this.items[i].element.classList.add("hidden");
                 }
             }
+            notFoundElement.style.display = numShown ? "none" : "";
             this.figureOutMainCheckedState();
         }
 
@@ -1913,6 +1918,12 @@ class ContentList {
 
         let contentMainElement = document.createElement("div");
         contentMainElement.className = "content-list";
+
+        contentMainElement.appendChild(notFoundElement);
+        notFoundElement.style.display = "none";
+        if (!content.length) {
+            notFoundElement.style.display = "";
+        }
 
         this.items = [];
         for (let i = 0; i < content.length; i++) {
@@ -2319,6 +2330,19 @@ settingsButtonEle.onclick = () => {
             "default": data.getDefault("discord_rpc") == "true"
         },
         {
+            "type": "toggle",
+            "name": "Potato PC Mode",
+            "tab": "appearance",
+            "id": "potato_mode",
+            "desc": "Toggle this on to disable graphically intensive effects in the launcher.",
+            "default": data.getDefault("potato_mode") == "true"
+        },
+        {
+            "type": "notice",
+            "content": "Note: These defaults will only apply to new instances you create and will not be retroactively applied. For previously created instances, you can edit these settings in that instance's settings.",
+            "tab": "defaults"
+        },
+        {
             "type": "number",
             "name": "Default Width",
             "desc": "The width of the game when launched",
@@ -2355,7 +2379,7 @@ settingsButtonEle.onclick = () => {
         },
         {
             "type": "text",
-            "name": "Default Environment Variables",
+            "name": "Default Custom Environment Variables",
             "tab": "defaults",
             "id": "default_env_vars",
             "default": data.getDefault("default_env_vars")
@@ -2424,6 +2448,12 @@ settingsButtonEle.onclick = () => {
         data.setDefault("default_ram", info.default_ram);
         data.setDefault("default_page", info.default_page);
         data.setDefault("discord_rpc", (info.discord_rpc).toString());
+        data.setDefault("potato_mode", (info.potato_mode).toString());
+        if (info.potato_mode) {
+            document.body.classList.add("potato");
+        } else {
+            document.body.classList.remove("potato");
+        }
         if (info.discord_rpc) {
             live.findLive();
             if (!rpcLocked) {
@@ -2852,6 +2882,10 @@ if (data.getDefault("default_mode") == "light") {
 
 if (data.getDefault("default_sidebar") == "compact") {
     document.body.classList.add("compact");
+}
+
+if (data.getDefault("potato_mode") == "true") {
+    document.body.classList.add("potato");
 }
 
 let skinViewer;
@@ -3830,7 +3864,7 @@ function showInstanceContent(e) {
                     return;
                 }
                 let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
-                let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
+                let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", true, true, "", info.icon_f, instance_id, 0, "", "", true, false);
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
                 console.log(packInfo);
@@ -4106,9 +4140,14 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
     })
     let instTopPlaytime = document.createElement("div");
     instTopPlaytime.classList.add("instance-top-sub-info-specific");
+    instTopPlaytime.setAttribute("title", "Play Time");
     instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(instanceInfo.playtime))}`;
+    instanceInfo.watchForChange("playtime",(v) => {
+        instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(v))}`
+    });
     let instTopLastPlayed = document.createElement("div");
     instTopLastPlayed.classList.add("instance-top-sub-info-specific");
+    instTopLastPlayed.setAttribute("title", "Last Played");
     instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatDate(instanceInfo.last_played))}`;
     instanceInfo.watchForChange("last_played", (v) => {
         instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatDate(v))}`;
@@ -4328,7 +4367,7 @@ function showInstanceSettings(instanceInfo) {
             "tab": "general",
             "desc": "Library Groups help to organize your instance list. Any instances in the same group will be displayed together when they are grouped by custom groups."
         },
-        {
+        instanceInfo.locked ? null : {
             "type": "multi-select",
             "name": "Loader",
             "options": [
@@ -4342,7 +4381,7 @@ function showInstanceSettings(instanceInfo) {
             "default": instanceInfo.loader,
             "tab": "installation"
         },
-        {
+        instanceInfo.locked ? null : {
             "type": "dropdown",
             "name": "Game Version",
             "options": [],
@@ -4352,7 +4391,7 @@ function showInstanceSettings(instanceInfo) {
             "input_source": "loader",
             "source": (new VersionList).getVersions
         },
-        {
+        instanceInfo.locked ? null : {
             "type": "loader-version-dropdown",
             "name": "",
             "options": [],
@@ -4469,6 +4508,7 @@ function showInstanceSettings(instanceInfo) {
         {
             "type": "text",
             "id": "java_args",
+            "desc": "Specifying these will override the specified allocated RAM above.",
             "name": "Custom Java Arguments",
             "default": instanceInfo.java_args,
             "tab": "java"
@@ -4501,16 +4541,16 @@ function showInstanceSettings(instanceInfo) {
             "default": instanceInfo.post_exit_hook,
             "tab": "launch_hooks"
         }
-    ], [
+    ].filter(e => e), [
         { "type": "cancel", "content": "Cancel" },
         { "type": "confirm", "content": "Save" }
     ], [
         { "name": "General", "value": "general" },
-        { "name": "Installation", "value": "installation" },
+        instanceInfo.locked ? null : { "name": "Installation", "value": "installation" },
         { "name": "Window", "value": "window" },
         { "name": "Java", "value": "java" },
         { "name": "Launch Hooks", "value": "launch_hooks" }
-    ], (e) => {
+    ].filter(e => e), (e) => {
         let info = {};
         e.forEach(e => { info[e.id] = e.value });
         instanceInfo.setName(info.name);
@@ -4529,6 +4569,24 @@ function showInstanceSettings(instanceInfo) {
 }
 
 function setInstanceTabContentContent(instanceInfo, element) {
+    element.innerHTML = "";
+    instanceInfo = instanceInfo.refresh();
+    let instanceLockedBanner = document.createElement("div");
+    instanceLockedBanner.className = "instance-locked-banner";
+    let instanceLockedText = document.createElement("span");
+    instanceLockedText.innerHTML = "Instance is locked. Unlock to edit it's content.";
+    let instanceLockedButton = document.createElement("button");
+    instanceLockedButton.className = "instance-locked-button";
+    instanceLockedButton.innerHTML = '<i class="fa-solid fa-unlock"></i>Unlock';
+    instanceLockedButton.onclick = () => {
+        instanceInfo.setLocked(false);
+        showSpecificInstanceContent(instanceInfo);
+    }
+    instanceLockedBanner.appendChild(instanceLockedText);
+    instanceLockedBanner.appendChild(instanceLockedButton);
+    if (instanceInfo.locked) {
+        element.appendChild(instanceLockedBanner);
+    }
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let importContent = document.createElement("button");
@@ -4603,11 +4661,23 @@ function setInstanceTabContentContent(instanceInfo, element) {
             setInstanceTabContentContent(instanceInfo, element);
         })
     }
+    if (instanceInfo.locked) {
+        importContent.onclick = () => { };
+        importContent.style.opacity = ".5";
+        importContent.style.cursor = "not-allowed";
+        importContent.setAttribute("title", "Instance is Locked")
+    }
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
     addContent.onclick = () => {
         showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+    }
+    if (instanceInfo.locked) {
+        addContent.onclick = () => { };
+        addContent.style.opacity = ".5";
+        addContent.style.cursor = "not-allowed";
+        addContent.setAttribute("title", "Instance is Locked")
     }
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
@@ -4636,7 +4706,6 @@ function setInstanceTabContentContent(instanceInfo, element) {
     searchAndFilter.appendChild(typeDropdown);
     searchAndFilter.appendChild(importContent);
     searchAndFilter.appendChild(addContent);
-    element.innerHTML = "";
     element.appendChild(searchAndFilter);
     let contentListWrap = document.createElement("div");
     let showContent = () => {
@@ -4707,17 +4776,17 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                 window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`)
                             }
                         },
-                        {
+                        instanceInfo.locked ? null : {
                             "title": translate("app.content.update"),
                             "icon": '<i class="fa-solid fa-download"></i>',
                             "func_id": "update"
                         },
-                        {
+                        instanceInfo.locked ? null : {
                             "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
                             "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
                             "func_id": "toggle"
                         },
-                        {
+                        instanceInfo.locked ? null : {
                             "title": translate("app.content.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
@@ -4752,14 +4821,14 @@ function setInstanceTabContentContent(instanceInfo, element) {
         }
         let contentList = new ContentList(contentListWrap, content, searchBar, {
             "checkbox": {
-                "enabled": true,
+                "enabled": instanceInfo.locked ? false: true,
                 "actionsList": null
             },
             "disable": {
-                "enabled": true
+                "enabled": instanceInfo.locked ? false: true
             },
             "remove": {
-                "enabled": true
+                "enabled": instanceInfo.locked ? false: true
             },
             "more": {
                 "enabled": true
@@ -4774,12 +4843,12 @@ function setInstanceTabContentContent(instanceInfo, element) {
                 }
             },
             "update_all": {
-                "enabled": true,
+                "enabled": instanceInfo.locked ? false: true,
                 "func": () => { }
             }
-        }, dropdownInfo);
+        }, dropdownInfo, "No Content Found");
     }
-    if (!instanceInfo.installing) {
+    if (!instanceInfo.refresh().installing) {
         showContent();
     } else {
         let currently_installing = new CurrentlyInstalling();
@@ -5181,7 +5250,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
         "update_all": {
             "enabled": false
         }
-    }, dropdownInfo);
+    }, dropdownInfo, "No Worlds Found");
     element.appendChild(contentListWrap);
     clearMoreMenus();
 }
@@ -5247,7 +5316,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                     lineElement.classList.add("log-info");
                 } else if (e.includes("WARN")) {
                     lineElement.classList.add("log-warn");
-                } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                     lineElement.classList.add("log-error");
                 }
                 logs.push({ "element": lineElement, "content": e });
@@ -5282,6 +5351,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
             });
         }
     }
+    let currentLog = "";
     logDisplay.onscroll = render;
     let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": "Live Log", "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", (e) => {
         try {
@@ -5293,6 +5363,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
             setUpLiveLog();
         } else {
             deleteButton.style.display = "flex";
+            currentLog = e;
             let logInfo = window.electronAPI.getLog(e);
             logInfo = logInfo.split("\n");
             logs = [];
@@ -5328,24 +5399,17 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     deleteButton.style.display = "none";
     setUpLiveLog();
     render();
-    // let wordWrapToggle = document.createElement("button");
-    // let actualToggle = new Toggle(wordWrapToggle, (e) => {
-    //     if (e) {
-    //         logDisplay.classList.add("word-wrap");
-    //     } else {
-    //         logDisplay.classList.remove("word-wrap");
-    //     }
-    // }, true);
-    // let wordWrapLabel = document.createElement("div");
-    // wordWrapLabel.innerHTML = "Word Wrap";
     let copyButton = document.createElement("button");
     let shareButton = document.createElement("button");
+    let deleteAllButton = document.createElement("button");
     copyButton.className = "logs-copy";
     shareButton.className = "logs-share";
     deleteButton.className = "logs-delete";
+    deleteAllButton.className = "logs-delete";
     copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>Copy';
     shareButton.innerHTML = '<i class="fa-solid fa-share"></i>Share';
     deleteButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>Delete';
+    deleteAllButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>Delete All Logs';
     copyButton.onclick = () => {
         let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
         let copyLogs = showLogs.map(e => e.content).join("\n");
@@ -5366,17 +5430,42 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                 "type": "confirm",
                 "content": "Delete Logs"
             }
-        ], [], () => {
-
+        ], [], async () => {
+            let success = await window.electronAPI.deleteLogs(currentLog);
+            if (success) {
+                displaySuccess("Logs deleted.");
+                setInstanceTabContentLogs(instanceInfo, element);
+            } else {
+                displayError("Unable to delete logs");
+            }
         });
     }
-    // logTop.appendChild(wordWrapToggle);
-    // logTop.appendChild(wordWrapLabel);
+    deleteAllButton.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog("Are you sure?", "notice", "Are you sure that you want to delete all logs for this instance?", [
+            {
+                "type": "cancel",
+                "content": "Cancel"
+            },
+            {
+                "type": "confirm",
+                "content": "Delete All Logs"
+            }
+        ], [], async () => {
+            let success = await window.electronAPI.deleteAllLogs(instanceInfo.instance_id, instanceInfo.refresh().current_log_file);
+            if (success) {
+                displaySuccess("Logs deleted.");
+                setInstanceTabContentLogs(instanceInfo, element);
+            } else {
+                displayError("Unable to delete logs");
+            }
+        });
+    }
     logTop.appendChild(copyButton);
     logTop.appendChild(shareButton);
     logTop.appendChild(deleteButton);
+    logTop.appendChild(deleteAllButton);
     logDisplay.className = "logs-display";
-    // logDisplay.classList.add("word-wrap");
 }
 function setInstanceTabContentOptions(instanceInfo, element) {
     let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
@@ -5931,8 +6020,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
 
         item.appendChild(setDefaultButton);
 
-        if (e.key == "version" && Number(e.value) != instanceInfo.attempted_options_txt_version) {
-            defaultOptions.setDefault(e.key, e.value);
+        if (e.key == "version") {
             setDefaultButton.remove();
             inputElement.style.gridColumn = "span 2";
             inputElement.style.opacity = ".5";
@@ -5940,8 +6028,18 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             inputElement.disabled = true;
         }
 
+        if (e.key == "version" && Number(e.value) != instanceInfo.attempted_options_txt_version) {
+            defaultOptions.setDefault(e.key, e.value);
+        }
+
         optionList.appendChild(item);
     };
+    if (!values.length) {
+        let nofound = new NoResultsFound("No Options Found");
+        nofound.element.style.background = "transparent";
+        nofound.element.style.gridColumn = "span 3";
+        optionList.appendChild(nofound.element);
+    }
 }
 function setInstanceTabContentScreenshots(instanceInfo, element) {
     element.innerHTML = "";
@@ -6010,6 +6108,11 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
         }
         galleryElement.appendChild(screenshotElement);
     });
+    if (!screenshots.length) {
+        let nofound = new NoResultsFound("No Screenshots Found");
+        nofound.element.style.gridColumn = "1 / -1";
+        galleryElement.appendChild(nofound.element);
+    }
 }
 
 function displayScreenshot(name, desc, file, instanceInfo, element, list, currentIndex, word = "Screenshot") {
@@ -6195,7 +6298,7 @@ async function playInstance(instInfo, quickPlay = null) {
     instInfo.setLastPlayed(new Date());
     let pid;
     try {
-        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path);
+        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.wrapper, instInfo.post_exit_hook);
         if (!pid) return;
         console.log(pid.minecraft.pid);
         console.log(window.electronAPI.checkForProcess(pid.minecraft.pid));
@@ -7262,13 +7365,13 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
         //         contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id);
         //     }
         // },
-        {
-            "name": "Data Packs",
-            "value": "datapack",
-            "func": () => {
-                contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id);
-            }
-        }
+        // {
+        //     "name": "Data Packs",
+        //     "value": "datapack",
+        //     "func": () => {
+        //         contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id);
+        //     }
+        // }
     ].filter(e => e));
     let tabInfo = document.createElement("div");
     tabInfo.className = "tab-info";
@@ -7684,7 +7787,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         displayError(`Error: Could not find version of '${i.title}' that is version ${info.game_version} and uses loader ${loaders[info.loader]}`);
                         return;
                     }
-                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, true, "", info.icon, instance_id, 0, "modrinth", i.project_id, true, false);
+                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", i.project_id, true, false);
                     showSpecificInstanceContent(instance);
                     await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, i.title);
                     let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, i.title);
@@ -7827,7 +7930,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
         element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.data.length; i++) {
             let e = apiresult.data[i];
-            let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
+            let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>Install', project_type == "modpack" ? (i) => {
                 let options = [];
                 let dialog = new Dialog();
                 dialog.showDialog(translate("app.button.instances.create"), "form", [
@@ -7855,7 +7958,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     let res = await fetch(`https://www.curseforge.com/api/v1/mods/${e.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true${project_type == "mod" ? "&gameFlavorId=" + game_flavor : ""}`);
                     let version_json = await res.json();
                     let version = version_json.data[0];
-                    let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", false, true, "", info.icon, instance_id, 0, "curseforge", e.id, true, false);
+                    let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", e.id, true, false);
                     showSpecificInstanceContent(instance);
                     await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), e.name);
                     let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, e.id, e.name);
@@ -7900,7 +8003,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     await installContent("curseforge", i.id, info.instance, project_type, i.name, i.author.username, i.thumbnailUrl);
                     displaySuccess(`${i.name} installed to instance ${(new Instance(info.instance)).name}`);
                 });
-            }, e.categories.map(e => e.name), e);
+            }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"));
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -8262,7 +8365,7 @@ class LoadingContainer {
 }
 
 class NoResultsFound {
-    constructor() {
+    constructor(message = "No Results Found") {
         let element = document.createElement("div");
         element.className = "loading-container";
         let question = document.createElement("div");
@@ -8272,7 +8375,7 @@ class NoResultsFound {
         text.className = "loading-container-text";
         element.appendChild(question);
         element.appendChild(text);
-        text.innerHTML = "No Results Found"; //TODO
+        text.innerHTML = message; //TODO
         this.element = element;
     }
 }
@@ -8524,7 +8627,7 @@ function getPinnedInstances() {
     return instances.map(e => new Instance(e.instance_id));
 }
 async function getPinnedWorlds() {
-    return await window.electronAPI.getPinnedWorlds();
+    return (await window.electronAPI.getPinnedWorlds());
 }
 function pinInstance(instanceInfo) {
     console.log("Pinning " + instanceInfo.name);
@@ -8725,7 +8828,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     displayError(`Error: Could not find version of '${content.title}' that is version ${info.game_version} and uses loader ${loaders[info.loader]}`);
                     return;
                 }
-                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
                 showSpecificInstanceContent(instance);
                 await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
                 let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
@@ -8771,11 +8874,11 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             });
         }
         let installedVersion = "";
-        if (content_ids.includes(content.id)) {
+        if (content_ids.includes(content.id.toString())) {
             installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
             installButton.classList.add("disabled");
             installButton.onclick = () => { };
-            installedVersion = instance_content[content_ids.indexOf(content.id)].version;
+            installedVersion = instance_content[content_ids.indexOf(content.id.toString())].version;
         }
         let threeDots = document.createElement("button");
         threeDots.classList.add("content-top-more");
@@ -9107,7 +9210,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 v.forEach(e => { info[e.id] = e.value });
                                 let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                                 let version = e;
-                                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
                                 showSpecificInstanceContent(instance);
                                 await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
                                 let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
@@ -9297,7 +9400,732 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         ].filter(e => e))
         tabs.selectOption("description");
     } else if (content_source == "curseforge") {
-        // ahh
+        contentInfo.innerHTML = "";
+        contentInfo.showModal();
+        let dialogContextMenu = new ContextMenu();
+        contentInfo.appendChild(dialogContextMenu.element);
+        let contentWrapper = document.createElement("div");
+        contentWrapper.className = "content-wrapper";
+        let contentNav = document.createElement("div");
+        contentNav.className = "content-nav";
+        contentWrapper.appendChild(contentNav);
+        let buttonBack = document.createElement("button");
+        buttonBack.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+        buttonBack.className = "content-nav-button";
+        if (contentInfoIndex <= 0) {
+            buttonBack.classList.add("disabled");
+        } else {
+            buttonBack.onclick = () => {
+                contentInfoIndex--;
+                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+            }
+        }
+        contentNav.appendChild(buttonBack);
+        let buttonForward = document.createElement("button");
+        buttonForward.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
+        buttonForward.className = "content-nav-button";
+        if (contentInfoIndex >= contentInfoHistory.length - 1) {
+            buttonForward.classList.add("disabled");
+        } else {
+            buttonForward.onclick = () => {
+                contentInfoIndex++;
+                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+            }
+        }
+        contentNav.appendChild(buttonForward);
+        let contentX = document.createElement("button");
+        contentX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        contentX.className = "content-x";
+        contentX.onclick = () => {
+            contentInfo.close();
+        }
+        contentNav.appendChild(contentX);
+        contentInfo.appendChild(contentWrapper);
+        let loading = new LoadingContainer();
+        loading.className = "loading-container";
+        loading.element.style.height = "100%";
+        contentWrapper.appendChild(loading.element);
+        let content, description, versions;
+        try {
+            let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}`);
+            content = await content_pre_json.json();
+            let description_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}/description`);
+            description = await description_pre_json.json();
+            let versions_pre_json = await fetch(`https://www.curseforge.com/api/v1/mods/${content_id}/files?pageIndex=0&pageSize=50&sort=dateCreated&sortDescending=true&removeAlphas=false`);
+            versions = await versions_pre_json.json();
+        } catch (e) {
+            loading.errorOut(e, () => {
+                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, true);
+            });
+            return;
+        }
+        loading.element.remove();
+        let topBar = document.createElement("div");
+        topBar.classList.add("content-top");
+        let instImg = document.createElement("img");
+        instImg.classList.add("content-top-image");
+        instImg.src = content.data.logo.url ? content.data.logo.url : "default.png";
+        topBar.appendChild(instImg);
+        let instTopInfo = document.createElement("div");
+        instTopInfo.classList.add("content-top-info");
+        let instTopTitle = document.createElement("h1");
+        instTopTitle.innerHTML = sanitize(content.data.name);
+        instTopTitle.classList.add("content-top-title");
+        instTopInfo.appendChild(instTopTitle);
+        let instTopSubInfo = document.createElement("div");
+        instTopSubInfo.classList.add("content-top-sub-info");
+        let instTopVersions = document.createElement("div");
+        instTopVersions.classList.add("content-top-sub-info-specific");
+        let type = "Mod";
+        let project_type = "mod";
+        if (content.data.classId == 6) {
+            type = "Mod";
+            project_type = "mod";
+        }
+        if (content.data.classId == 4471) {
+            type = "Modpack";
+            project_type = "modpack"
+        }
+        if (content.data.classId == 12) {
+            type = "Resource Pack";
+            project_type = "resourcepack";
+        }
+        if (content.data.classId == 6552) {
+            type = "Shader";
+            project_type = "shader"
+        }
+        if (content.data.classId == 17) {
+            type = "World";
+            project_type = "world";
+        }
+        if (content.data.classId == 6945) {
+            type = "Data Pack";
+            project_type = "datapack"
+        }
+        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
+        let instTopPlaytime = document.createElement("div");
+        instTopPlaytime.classList.add("content-top-sub-info-specific");
+        instTopPlaytime.innerHTML = `<i class="fa-solid fa-download"></i>${formatNumber(content.data.downloadCount) + " downloads"}`;
+        let instTopLastPlayed = document.createElement("div");
+        instTopLastPlayed.classList.add("content-top-sub-info-specific");
+        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.data.dateModified))}`;
+        instTopLastPlayed.setAttribute("title", "Last Updated");
+        instTopSubInfo.appendChild(instTopVersions);
+        instTopSubInfo.appendChild(instTopPlaytime);
+        instTopSubInfo.appendChild(instTopLastPlayed);
+        instTopInfo.appendChild(instTopSubInfo);
+        topBar.appendChild(instTopInfo);
+        let installButton = document.createElement("button");
+        installButton.className = "content-top-install-button";
+        installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
+        let button = installButton;
+        installButton.onclick = project_type == "modpack" ? (i) => {
+            let options = [];
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.button.instances.create"), "form", [
+                {
+                    "type": "image-upload",
+                    "id": "icon",
+                    "name": "Icon",
+                    "default": content.data.logo.thumbnailUrl
+                },
+                {
+                    "type": "text",
+                    "name": "Name",
+                    "id": "name",
+                    "default": content.data.name,
+                    "maxlength": 50
+                }
+            ], [
+                { "content": "Cancel", "type": "cancel" },
+                { "content": "Submit", "type": "confirm" }
+            ], [], async (ed) => {
+                contentInfo.close();
+                let info = {};
+                ed.forEach(ed => { info[ed.id] = ed.value });
+                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
+                let res = await fetch(`https://www.curseforge.com/api/v1/mods/${content.data.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true${project_type == "mod" ? "&gameFlavorId=" + game_flavor : ""}`);
+                let version_json = await res.json();
+                let version = version_json.data[0];
+                let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", content.data.id, true, false);
+                showSpecificInstanceContent(instance);
+                await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), content.data.name);
+                let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, content.data.id, content.data.name);
+                if (!mr_pack_info.loader_version) {
+                    displayError(mr_pack_info);
+                    return;
+                }
+                instance.setLoader(mr_pack_info.loader);
+                instance.setVanillaVersion(mr_pack_info.vanilla_version);
+                instance.setLoaderVersion(mr_pack_info.loader_version);
+                mr_pack_info.content.forEach(e => {
+                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                });
+                instance.setInstalling(false);
+                let r = await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
+            })
+        } : instance_id ? async () => {
+            installButton.innerHTML = '<i class="spinner"></i>Installing...';
+            installButton.classList.add("disabled");
+            installButton.onclick = () => { };
+            await installContent("curseforge", content.data.id, instance_id, project_type, content.data.name, content.data.authors[0].name, content.data.logo.thumbnailUrl);
+            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+        } : (i) => {
+            let dialog = new Dialog();
+            let instances = data.getInstances();
+            dialog.showDialog(`Select Instance to install ${content.data.name}`, "form", [
+                {
+                    "type": "dropdown",
+                    "name": "Instance",
+                    "id": "instance",
+                    "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
+                }
+            ], [
+                { "content": "Cancel", "type": "cancel" },
+                { "content": "Submit", "type": "confirm" }
+            ], null, async (e) => {
+                contentInfo.close();
+                let info = {};
+                e.forEach(e => { info[e.id] = e.value });
+                await installContent("curseforge", content.data.id, info.instance, project_type, content.data.name, content.data.authors[0].name, content.data.logo.thumbnailUrl);
+                displaySuccess(`${content.data.name} installed to instance ${(new Instance(info.instance)).name}`);
+            });
+        }
+        let installedVersion = "";
+        if (content_ids.includes(content.data.id + ".0")) {
+            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+            installButton.classList.add("disabled");
+            installButton.onclick = () => { };
+            installedVersion = instance_content[content_ids.indexOf(content.data.id + ".0")].version;
+        }
+        let threeDots = document.createElement("button");
+        threeDots.classList.add("content-top-more");
+        threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        let links = [];
+        if (content.data.links.sourceUrl) {
+            links.push({
+                "icon": '<i class="fa-solid fa-code"></i>',
+                "title": "View Source",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.data.links.sourceUrl);
+                }
+            })
+        }
+        if (content.data.links.wikiUrl) {
+            links.push({
+                "icon": '<i class="fa-solid fa-book-atlas"></i>',
+                "title": "View Wiki",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.data.links.wikiUrl);
+                }
+            })
+        }
+        if (content.data.links.issuesUrl) {
+            links.push({
+                "icon": '<i class="fa-solid fa-bug"></i>',
+                "title": "View Issues",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.data.links.issuesUrl);
+                }
+            })
+        }
+        // if (content.links.sourceUrl) {
+        //     links.push({
+        //         "icon": '<i class="fa-brands fa-discord"></i>',
+        //         "title": "View Discord",
+        //         "func": (e) => {
+        //             window.electronAPI.openInBrowser(content.discord_url);
+        //         }
+        //     })
+        // }
+        // if (content.donation_urls) {
+        //     content.donation_urls.forEach(e => {
+        //         links.push({
+        //             "icon": '<i class="fa-solid fa-hand-holding-dollar"></i>',
+        //             "title": e.platform == "Other" ? "Donate" : "Donate on " + e.platform,
+        //             "func": () => {
+        //                 window.electronAPI.openInBrowser(e.url);
+        //             }
+        //         })
+        //     });
+        // }
+        let buttons = new ContextMenuButtons([
+            {
+                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                "title": "Open in Browser",
+                "func": (e) => {
+                    window.electronAPI.openInBrowser(content.data.links.sourceUrl);
+                }
+            }
+        ].concat(links));
+        let moreMenu = new MoreMenu(threeDots, buttons);
+        topBar.appendChild(installButton);
+        topBar.appendChild(threeDots);
+        topBar.appendChild(moreMenu.element);
+        contentWrapper.appendChild(topBar);
+
+        let tabsElement = document.createElement("div");
+        contentWrapper.appendChild(tabsElement);
+        let tabContent = document.createElement("div");
+        tabContent.className = "tab-info";
+        tabContent.style.padding = "10px";
+        contentWrapper.appendChild(tabContent);
+        contentInfo.showModal();
+        tabsElement.style.marginInline = "auto";
+        let tabs = new TabContent(tabsElement, [
+            {
+                "name": "Description",
+                "value": "description",
+                "func": () => {
+                    tabContent.style.paddingTop = "10px";
+                    tabContent.innerHTML = "";
+                    let element = document.createElement("div");
+                    element.className = "markdown-body";
+                    element.style.maxWidth = "700px";
+                    element.style.marginInline = "auto";
+                    tabContent.appendChild(element);
+                    element.innerHTML = description.data;
+                    afterMarkdownParse(instance_id, vanilla_version, loader);
+                }
+            },
+            {
+                "name": "Files",
+                "value": "files",
+                "func": () => {
+                    if (versions.data) versions = versions.data;
+                    tabContent.innerHTML = "";
+                    let topFilters = document.createElement("div");
+                    topFilters.className = "version-file-filters";
+                    let mcVersionFilter = document.createElement("div");
+                    let allGameVersions = Array.from(
+                        new Set(
+                            versions.flatMap(v => v.gameVersions)
+                        )
+                    );
+                    if (Array.isArray(minecraftVersions) && minecraftVersions.length > 0) {
+                        allGameVersions.sort((a, b) => {
+                            const ia = minecraftVersions.indexOf(a);
+                            const ib = minecraftVersions.indexOf(b);
+                            if (ia === -1 && ib === -1) return 0;
+                            if (ia === -1) return 1;
+                            if (ib === -1) return -1;
+                            return ia - ib;
+                        });
+                        allGameVersions.reverse();
+                    }
+
+                    allGameVersions = allGameVersions.filter(e => minecraftVersions.includes(e));
+
+                    let versionDropdown = new DialogDropdown(
+                        "Game Version",
+                        [{ "name": "All", "value": "all" }].concat(
+                            allGameVersions.map(e => ({ "name": e, "value": e }))
+                        ),
+                        mcVersionFilter,
+                        vanilla_version ? vanilla_version : "all",
+                        (v) => {
+                            filterVersions(v, loaderDropdown.value, channelDropdown.value);
+                        }
+                    );
+                    let mcLoaderFilter = document.createElement("div");
+                    let allLoaders = Array.from(
+                        new Set(
+                            versions.flatMap(v => v.gameVersions)
+                        )
+                    );
+                    allLoaders = allLoaders.filter(e => loaders[e.toLowerCase()]);
+                    allLoaders = allLoaders.map(e => e.toLowerCase());
+                    let loaderDropdown = new SearchDropdown("Loader",
+                        [{
+                            "name": "All",
+                            "value": "all"
+                        }].concat(allLoaders.map(e => ({ "name": loaders[e] ? loaders[e] : e, "value": e }))),
+                        mcLoaderFilter, loader ? loader : "all", (v) => {
+                            filterVersions(versionDropdown.value, v, channelDropdown.value);
+                        })
+                    let channelFilter = document.createElement("div");
+                    let channelDropdown = new SearchDropdown("Channel", [
+                        {
+                            "name": "All",
+                            "value": "all"
+                        },
+                        {
+                            "name": "Release",
+                            "value": "release"
+                        },
+                        {
+                            "name": "Beta",
+                            "value": "beta"
+                        },
+                        {
+                            "name": "Alpha",
+                            "value": "alpha"
+                        }
+                    ], channelFilter, "all", (v) => {
+                        filterVersions(versionDropdown.value, loaderDropdown.value, v);
+                    })
+                    topFilters.appendChild(mcVersionFilter);
+                    if (["modpack", "mod"].includes(project_type)) topFilters.appendChild(mcLoaderFilter);
+                    topFilters.appendChild(channelFilter);
+                    tabContent.appendChild(topFilters);
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "version-files-wrapper";
+                    let topBar = document.createElement("div");
+                    topBar.className = "version-file-top";
+                    let names = ["", "Name", "Versions", "Loaders", "Date Published", "Download Count", "", ""];
+                    names.forEach(e => {
+                        let element = document.createElement("div");
+                        element.className = "version-file-column-name";
+                        element.innerHTML = e;
+                        topBar.appendChild(element);
+                    });
+
+                    wrapper.appendChild(topBar);
+
+                    let notfound = new NoResultsFound();
+                    wrapper.appendChild(notfound.element);
+                    notfound.element.style.gridColumn = "span 8";
+                    notfound.element.style.display = "none";
+                    notfound.element.style.backgroundColor = "var(--color-1)"
+
+                    let versionInfo = [];
+
+                    let filterVersions = (version, loader_, channel) => {
+                        // let count = 0;
+                        // versionInfo.forEach(e => {
+                        //     if (!e.game_versions.includes(version) && version && version != "all") {
+                        //         e.element.style.display = "none";
+                        //         return;
+                        //     }
+                        //     if (loader_ && !e.loaders.includes(loader_) && (content.project_type == "mod" || content.project_type == "modpack") && loader_ != "all") {
+                        //         e.element.style.display = "none";
+                        //         return;
+                        //     }
+                        //     if (channel && e.channel != channel && channel != "all") {
+                        //         e.element.style.display = "none";
+                        //         return;
+                        //     }
+                        //     count++;
+                        //     e.element.style.display = "grid";
+                        // });
+                        // if (count == 0) {
+                        //     notfound.element.style.display = "";
+                        //     topBar.style.display = "none";
+                        // } else {
+                        //     notfound.element.style.display = "none";
+                        //     topBar.style.display = "grid";
+                        // }
+                    }
+
+                    let installedVersionIndex = versions.findIndex(v => v.version_number === installedVersion);
+
+                    versions.forEach((e, i) => {
+                        let versionEle = document.createElement("div");
+                        versionEle.className = "version-file";
+
+                        // Channel
+                        let channelEle = document.createElement("div");
+                        channelEle.className = "version-file-channel";
+                        channelEle.innerHTML = ["", "R", "B", "A"][e.releaseType];
+                        if (e.releaseType == 1) {
+                            channelEle.style.setProperty("--channel-color", "var(--go-color)");
+                        } else if (e.releaseType == 2) {
+                            channelEle.style.setProperty("--channel-color", "yellow");
+                        } else if (e.releaseType == 3) {
+                            channelEle.style.setProperty("--channel-color", "var(--danger-color)");
+                        }
+                        versionEle.appendChild(channelEle);
+
+                        // Name
+                        let nameInfo = document.createElement("div");
+                        nameInfo.className = "version-file-info";
+                        let nameName = document.createElement("div");
+                        nameName.className = "version-file-title";
+                        let nameDesc = document.createElement("div");
+                        nameDesc.className = "version-file-desc";
+                        nameName.innerHTML = e.id;
+                        nameDesc.innerHTML = e.displayName;
+                        nameInfo.appendChild(nameName);
+                        nameInfo.appendChild(nameDesc);
+                        versionEle.appendChild(nameInfo);
+
+                        //Game Version
+                        let tagWrapper = document.createElement("div");
+                        tagWrapper.className = "version-file-chip-wrapper";
+                        e.gameVersions.forEach(i => {
+                            let tag = document.createElement("div");
+                            tag.className = "version-file-chip";
+                            tag.innerHTML = i;
+                            tagWrapper.appendChild(tag);
+                        });
+                        versionEle.appendChild(tagWrapper);
+
+                        //Loaders
+                        let tagWrapper2 = document.createElement("div");
+                        tagWrapper2.className = "version-file-chip-wrapper";
+                        e.gameVersions.forEach(i => {
+                            let tag = document.createElement("div");
+                            tag.className = "version-file-chip";
+                            tag.innerHTML = loaders[i] ? loaders[i] : i;
+                            tagWrapper2.appendChild(tag);
+                        });
+                        versionEle.appendChild(tagWrapper2);
+
+                        //Published
+                        let published = document.createElement("div");
+                        published.className = "version-file-text";
+                        published.innerHTML = formatDate(e.dateCreated);
+                        versionEle.appendChild(published);
+
+                        //Downloads
+                        let downloads = document.createElement("div");
+                        downloads.className = "version-file-text";
+                        downloads.innerHTML = formatNumber(e.totalDownloads);
+                        versionEle.appendChild(downloads);
+
+                        // Install Button
+                        let installButton = document.createElement("button");
+                        installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
+                        installButton.setAttribute("title", "Install Specific Version");
+                        if (installedVersion && installedVersionIndex > i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Update';
+                            installButton.setAttribute("title", "Update to this Version");
+                        } else if (installedVersion && installedVersionIndex < i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Downgrade';
+                            installButton.setAttribute("title", "Downgrade to this Version");
+                        }
+                        installButton.className = "version-file-install"
+                        // installButton.onclick = project_type == "modpack" ? () => {
+                        //     let options = [];
+                        //     let dialog = new Dialog();
+                        //     dialog.showDialog(translate("app.button.instances.create"), "form", [
+                        //         {
+                        //             "type": "image-upload",
+                        //             "id": "icon",
+                        //             "name": "Icon", //TODO: replace with translate
+                        //             "default": content.icon_url
+                        //         },
+                        //         {
+                        //             "type": "text",
+                        //             "name": "Name", //TODO
+                        //             "id": "name",
+                        //             "default": content.title,
+                        //             "maxlength": 50
+                        //         },
+                        //         {
+                        //             "type": "dropdown",
+                        //             "name": "Game Version",
+                        //             "id": "game_version",
+                        //             "options": e.game_versions.map(e => ({ "name": e, "value": e })).reverse()
+                        //         },
+                        //         {
+                        //             "type": "dropdown",
+                        //             "name": "Mod Loader",
+                        //             "id": "loader",
+                        //             "options": e.loaders.map(e => ({ "name": loaders[e], "value": e }))
+                        //         }
+                        //     ], [
+                        //         { "content": "Cancel", "type": "cancel" },
+                        //         { "content": "Submit", "type": "confirm" }
+                        //     ], [], async (v) => {
+                        //         contentInfo.close();
+                        //         let info = {};
+                        //         v.forEach(e => { info[e.id] = e.value });
+                        //         let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                        //         let version = e;
+                        //         let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                        //         showSpecificInstanceContent(instance);
+                        //         await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
+                        //         let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
+                        //         if (!mr_pack_info.loader_version) {
+                        //             displayError(mr_pack_info);
+                        //             return;
+                        //         }
+                        //         instance.setLoaderVersion(mr_pack_info.loader_version);
+                        //         mr_pack_info.content.forEach(e => {
+                        //             instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                        //         });
+                        //         instance.setInstalling(false);
+                        //         let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                        //         instance.setJavaPath(r.java_installation);
+                        //         instance.setJavaVersion(r.java_version);
+                        //         instance.setMcInstalled(true);
+                        //     })
+                        // } : instance_id ? async () => {
+                        //     installButton.innerHTML = '<i class="spinner"></i>Installing...';
+                        //     installButton.classList.add("disabled");
+                        //     installButton.onclick = () => { };
+                        //     await installSpecificVersion(e, "modrinth", new Instance(instance_id), project_type, content.title, content.author, content.icon_url, content_id)
+                        //     // await installContent("modrinth", content.id, instance_id, project_type, content.title, content.author, content.icon_url);
+                        //     installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+                        // } : (i) => {
+                        //     let dialog = new Dialog();
+                        //     let instances = data.getInstances();
+                        //     dialog.showDialog(`Select Instance to install ${content.title}`, "form", [
+                        //         {
+                        //             "type": "dropdown",
+                        //             "name": "Instance",
+                        //             "id": "instance",
+                        //             "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
+                        //         }
+                        //     ], [
+                        //         { "content": "Cancel", "type": "cancel" },
+                        //         { "content": "Submit", "type": "confirm" }
+                        //     ], null, async (v) => {
+                        //         contentInfo.close();
+                        //         let info = {};
+                        //         v.forEach(e => { info[e.id] = e.value });
+                        //         await installSpecificVersion(e, "modrinth", new Instance(info.instance), project_type, content.title, content.author, content.icon_url, content_id)
+                        //         // await installContent("modrinth", content.id, info.instance, project_type, content.title, content.author, content.icon_url);
+                        //         displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
+                        //     });
+                        // }
+
+                        if (Number(installedVersion) == Number(e.id)) {
+                            installButton.classList.add("disabled");
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+                            installButton.onclick = () => { }
+                            installButton.setAttribute("title", "Version already installed");
+                        }
+
+                        versionEle.appendChild(installButton);
+
+                        // // Changelog Button
+                        // let changeLogButton = document.createElement("button");
+                        // changeLogButton.className = "version-file-changelog";
+                        // changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>Changelog';
+                        // changeLogButton.setAttribute("title", "View Changelog");
+                        // changeLogButton.onclick = () => {
+                        //     let dialog = new Dialog();
+                        //     dialog.showDialog(e.id + " Changelog", "notice", `<div class='markdown-body'>${parseModrinthMarkdown(e.changelog)}</div>`, [
+                        //         {
+                        //             "type": "confirm",
+                        //             "content": "Done"
+                        //         }
+                        //     ], [], () => { });
+                        //     afterMarkdownParse();
+                        // }
+                        // if (e.changelog) versionEle.appendChild(changeLogButton);
+
+                        wrapper.appendChild(versionEle);
+
+                        versionInfo.push({ "element": versionEle, "loaders": e.gameVersions, "game_versions": e.gameVersions, "channel": ["", "release", "beta", "alpha"][e.releaseType] })
+                    });
+
+                    filterVersions(vanilla_version, loader, "all");
+
+                    tabContent.appendChild(wrapper);
+                }
+            },
+            content.data.authors.length ? {
+                "name": content.data.authors.length == 1 ? "Author" : "Authors",
+                "value": "authors",
+                "func": () => {
+                    tabContent.style.paddingTop = "0";
+                    tabContent.innerHTML = "";
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "authors-wrapper";
+                    let authors = document.createElement("div");
+                    authors.className = "authors";
+                    content.data.authors.forEach(e => {
+                        let author = document.createElement("div");
+                        author.className = "author";
+                        // if (e.user.bio) author.setAttribute("title", e.user.bio);
+                        let authorImg = document.createElement("img");
+                        authorImg.className = "author-image";
+                        authorImg.src = e.avatarUrl ? e.avatarUrl : "default.png";
+                        let authorInfo = document.createElement("div");
+                        authorInfo.className = "author-info";
+                        let authorTitle = document.createElement("div");
+                        authorTitle.className = "author-title";
+                        authorTitle.innerHTML = e.name;
+                        // let authorRole = document.createElement("div");
+                        // authorRole.className = "author-role";
+                        // authorRole.innerHTML = e.role;
+                        authorInfo.appendChild(authorTitle);
+                        // authorInfo.appendChild(authorRole);
+                        author.appendChild(authorImg);
+                        author.appendChild(authorInfo);
+                        let buttons = new ContextMenuButtons([
+                            {
+                                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                                "title": "Open in Browser",
+                                "func": () => {
+                                    window.electronAPI.openInBrowser(e.url);
+                                }
+                            },
+                            {
+                                "icon": '<i class="fa-solid fa-copy"></i>',
+                                "title": "Copy User ID",
+                                "func": async () => {
+                                    let success = await window.electronAPI.copyToClipboard(e.id.toString());
+                                    if (success) {
+                                        displaySuccess("User ID copied to clipboard!");
+                                    } else {
+                                        displayError("Failed to copy to clipboard");
+                                    }
+                                }
+                            }
+                        ]);
+                        author.oncontextmenu = (e) => {
+                            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+                        }
+                        authors.appendChild(author);
+                    });
+                    wrapper.appendChild(authors);
+                    tabContent.appendChild(wrapper);
+                }
+            } : null,
+            content.data.screenshots.length ? {
+                "name": "Gallery",
+                "value": "gallery",
+                "func": () => {
+                    tabContent.style.paddingTop = "0";
+                    tabContent.innerHTML = "";
+                    let gallery = document.createElement("div");
+                    gallery.className = "gallery";
+                    content.data.screenshots.forEach(e => {
+                        let screenshotElement = document.createElement("button");
+                        screenshotElement.className = "gallery-screenshot";
+                        screenshotElement.setAttribute("data-title", e.title ?? "Untitled");
+                        screenshotElement.style.backgroundImage = `url("${e.thumbnailUrl}")`;
+                        let screenshotInformation = content.data.screenshots.map(e => ({ "name": e.title ?? "Untitled", "file": e.url, "desc": e.description }));
+                        screenshotElement.onclick = () => {
+                            displayScreenshot(e.title ?? "Untitled", e.description, e.url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.url), "Gallery Image");
+                        }
+                        let buttons = new ContextMenuButtons([
+                            {
+                                "icon": '<i class="fa-solid fa-copy"></i>',
+                                "title": "Copy Gallery Image",
+                                "func": async () => {
+                                    let success = await window.electronAPI.copyImageToClipboard(e.url);
+                                    if (success) {
+                                        displaySuccess("Gallery Image copied to clipboard!");
+                                    } else {
+                                        displayError("Failed to copy to clipboard");
+                                    }
+                                }
+                            },
+                            {
+                                "icon": '<i class="fa-solid fa-share"></i>',
+                                "title": "Share Gallery Image",
+                                "func": (e) => { }
+                            }
+                        ]);
+                        screenshotElement.oncontextmenu = (e) => {
+                            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+                        }
+                        gallery.appendChild(screenshotElement);
+                    });
+                    tabContent.appendChild(gallery);
+                }
+            } : null
+        ].filter(e => e))
+        tabs.selectOption("description");
     }
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
@@ -9316,8 +10144,16 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
             el.setAttribute("tabindex", "0");
         }
         if (url) {
+            if (url[0] == "/") {
+                url = "https://www.curseforge.com" + url;
+            }
             try {
-                const url_obj = new URL(url);
+                let url_obj = new URL(url);
+                if (url_obj.searchParams.get("remoteUrl")) {
+                    url = decodeURIComponent(url_obj.searchParams.get("remoteUrl"));
+                    url_obj = new URL(url);
+                }
+
                 console.log(url_obj.hostname);
                 if (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com") {
                     let pathParts = url_obj.pathname.split('/').filter(Boolean);

@@ -27,6 +27,10 @@ body {
     color-scheme: dark;
 }
 
+body.potato {
+    --dialog-background: #000e;
+}
+
 body.light {
     --background-color: white;
     --text-color: black;
@@ -44,6 +48,10 @@ body.light {
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
     --sidebar: color-mix(in srgb, 15.6% var(--accent-color), transparent);
     color-scheme: light;
+}
+
+body.light.potato {
+    --dialog-background: #fffe;
 }
 
 body {
@@ -3802,7 +3810,7 @@ dialog[open]::backdrop {
     font-weight: bold;
     align-self: center;
     border-radius: 50%;
-    background-color: color-mix(in srgb, 15% var(--channel-color), transparent);
+    background-color: color-mix(in srgb, 35% var(--channel-color), black);
 }
 
 .version-file-info {
@@ -3932,7 +3940,7 @@ dialog[open]::backdrop {
     margin-bottom: 10px;
 }
 
-dialog * {
+dialog *, dialog {
     overscroll-behavior: contain;
 }
 
@@ -4052,4 +4060,61 @@ dialog * {
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.instance-locked-banner {
+    padding: 8px;
+    width: 100%;
+    background-color: var(--accent-color);
+    font-weight: bold;
+    display: flex;
+    gap: 8px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    align-items:center;
+}
+
+.instance-locked-button {
+    border-radius: 2px;
+    padding: 8px;
+    background-color: transparent;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    border-style: solid;
+    margin-left: auto;
+    border-color: var(--text-color);
+    border-width: 1px;
+}
+
+.instance-locked-button:active {
+    scale: .95;
+}
+
+.instance-locked-button:hover {
+    background-color: var(--color-1t);
+}
+
+body.potato *, body.potato *::backdrop, body.potato *::before, body.potato *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    box-shadow: none !important;
+    transition-delay: 0s !important;
+    transition: none !important;
+    animation-delay: 0s !important;
+    backdrop-filter: none !important;
+    animation: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    will-change: auto !important;
+    transform: none !important;
+    perspective: none !important;
+    contain: initial !important;
+    mix-blend-mode: normal !important;
+    isolation: auto !important;
+    image-rendering: pixelated !important;
 }

@@ -20,6 +20,7 @@ const os = require('os');
 const treeKill = require('tree-kill');
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
+const stringArgv = require('string-argv').default;
 
 const db = new Database('app.db');
 
@@ -62,6 +63,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     v8version: process.versions.v8,
     cpuUsage: process.getCPUUsage,
     memUsage: process.getProcessMemoryInfo,
+    getAppMetrics: async () => {
+        let appMetrics = await ipcRenderer.invoke('get-app-metrics');
+        return appMetrics;
+    },
     parseModrinthMarkdown: (md) => {
         const mkd = new MarkdownIt('default', {
             html: true,
@@ -344,7 +349,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return `Error reading file: ${err.message}`;
         }
     },
-    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath) => {
+    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) => {
         if (!player_info) throw new LoginError("Please sign in to your Microsoft account to play Minecraft.");
 
         let date = new Date();
@@ -363,7 +368,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     "accessToken": player_info.access_token,
                     "xuid": player_info.xuid,
                     "clientId": player_info.client_id
-                }, customResolution, quickPlay, false, allocatedRam, javaPath), "player_info": player_info
+                }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), parseEnvString(envVars), preLaunch, wrapper, postExit), "player_info": player_info
             };
         } catch (err) {
             throw new Error("Unable to launch Minecraft");
@@ -522,6 +527,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getLog: (log_path) => {
         return fs.readFileSync(log_path, { encoding: 'utf8', flag: 'r' });
     },
+    deleteLogs: (log_path) => {
+        try {
+            fs.unlinkSync(log_path);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    },
+    deleteAllLogs: (instance_id, current_log_file) => {
+        let folderPath = `./minecraft/instances/${instance_id}/logs`;
+        if (!fs.existsSync(folderPath)) {
+            console.error('Folder does not exist:', folderPath);
+            return;
+        }
+
+        const files = fs.readdirSync(folderPath);
+
+        for (const file of files) {
+            const filePath = path.join(folderPath, file);
+            if (fs.lstatSync(filePath).isFile() && path.resolve(filePath) !== path.resolve(current_log_file)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+
+        return true;
+    },
     getInstanceContent: (loader, instance_id, old_content) => {
         let old_files = old_content.map((e) => e.file_name);
         let patha = `./minecraft/instances/${instance_id}/mods`;
@@ -545,6 +576,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 const zip = fs.readFileSync(filePath);
 
                 const admZip = new AdmZip(zip);
+                const entry2 = admZip.getEntry('quilt.mod.json');
+                if (entry2) {
+                    modJson = JSON.parse(entry2.getData().toString('utf-8'));
+                    modJson.name = modJson.quilt_loader.metadata.name;
+                    modJson.authors = []
+                    modJson.authors[0] = Object.keys(modJson.quilt_loader.metadata.contributors)[0];
+                    if (modJson.quilt_loader.metadata.icon) {
+                        let iconPath = Array.isArray(modJson.quilt_loader.metadata.icon) ? modJson.quilt_loader.metadata.icon[0] : modJson.quilt_loader.metadata.icon;
+                        const iconEntry = admZip.getEntry(iconPath);
+                        if (iconEntry) {
+                            const iconBuffer = iconEntry.getData();
+                            let mime = 'image/png';
+                            if (iconPath.endsWith('.jpg') || iconPath.endsWith('.jpeg')) mime = 'image/jpeg';
+                            else if (iconPath.endsWith('.gif')) mime = 'image/gif';
+                            modJson.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
+                        }
+                    }
+                }
                 const entry = admZip.getEntry('fabric.mod.json');
                 if (entry) {
                     modJson = JSON.parse(entry.getData().toString('utf-8'));
@@ -932,6 +981,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             await mc.installForge(vanilla_version, loader_version);
         } else if (loader == "neoforge") {
             await mc.installNeoForge(vanilla_version, loader_version);
+        } else if (loader == "quilt") {
+            await mc.installQuilt(vanilla_version, loader_version);
         }
         return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
     },
@@ -1146,6 +1197,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             file_name: filename
         };
     },
+    parseJavaArgs,
     downloadModrinthPack: async (instance_id, url, title) => {
         ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
         await urlToFile(url, `./minecraft/instances/${instance_id}/pack.mrpack`);
@@ -2212,4 +2264,27 @@ async function downloadSkin(url) {
     const dataUrl = `data:image/png;base64,${base64}`;
 
     return { hash, dataUrl };
+}
+
+function parseEnvString(input) {
+    const env = {};
+
+    if (!input) return env;
+
+    // Supports both space-separated or newline-separated input
+    const lines = input.split(/\s+|\n/);
+
+    for (const line of lines) {
+        if (!line || !line.includes('=')) continue;
+        const [key, ...rest] = line.split('=');
+        const value = rest.join('='); // Rejoin in case value had '='
+        env[key.trim()] = value.trim();
+    }
+
+    return env;
+}
+
+function parseJavaArgs(input) {
+    if (!input) return [];
+    return stringArgv(input);
 }
