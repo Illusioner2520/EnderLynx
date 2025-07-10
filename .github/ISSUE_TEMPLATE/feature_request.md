@@ -1,12 +1,16 @@
 name: ✨ Feature Request
 description: Request a feature be added
-title: ""
 labels: ["Enchancement ✨"]
 body:
-  - type: textarea
-    id: description
+  - type: checkboxes
     attributes:
-      label: Describe the feature
-      placeholder: What do you want to change?
+      label: Please confirm the following.
+      options:
+        - label: I checked the [existing issues](https://github.com/Illusioner2520/EnderLynx/issues?q=is%3Aissue) for duplicate feature requests
+          required: true
+  - type: textarea
+    attributes:
+      label: Describe the feature request
+      description: A clear and concise description of what you want changed.
     validations:
       required: true

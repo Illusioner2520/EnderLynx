@@ -2270,7 +2270,7 @@ settingsButtonEle.onclick = () => {
     let bugButton = document.createElement("button");
     bugButton.innerHTML = '<i class="fa-solid fa-bug"></i> Report a Bug';
     bugButton.onclick = () => {
-        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?labels=Bug%20🐛");
+        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=bug_report.md");
     }
     bugButton.className = "bug-button";
     app_info.appendChild(bugButton);
@@ -2278,7 +2278,7 @@ settingsButtonEle.onclick = () => {
     featureButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Request a Feature';
     featureButton.className = "bug-button";
     featureButton.onclick = () => {
-        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?labels=Enhancement%20✨");
+        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=feature_request.md");
     }
     app_info.appendChild(featureButton);
     dialog.showDialog("Settings", "form", [

@@ -1,44 +1,36 @@
 name: 🐛 Bug Report
 description: Report a bug or unexpected behavior
-title: ""
 labels: ["Bug 🐛"]
 body:
-  - type: markdown
+  - type: checkboxes
     attributes:
-      value: |
-        Thanks for reporting a bug! Please fill out the details below.
+      label: Please confirm the following.
+      options:
+        - label: I checked the [existing issues](https://github.com/Illusioner2520/EnderLynx/issues?q=is%3Aissue) for duplicate problems
+          required: true
+        - label: I have ensured the EnderLynx app is up to date
+          required: true
   - type: input
     id: version
     attributes:
-      label: App Version
-      placeholder: e.g. 1.2.3
+      label: What version of EnderLynx are you using?
+      description: Find this in ⚙️ Settings (bottom left) -> App Info -> EnderLynx Version
     validations:
       required: true
   - type: textarea
-    id: description
     attributes:
       label: Describe the bug
-      placeholder: What happened? What did you expect to happen?
+      description: A clear and concise description of what the bug is. Include screenshots if applicable.
     validations:
       required: true
   - type: textarea
-    id: steps
     attributes:
-      label: Steps to Reproduce
+      label: Steps to reproduce
+      description: Steps to reproduce the behavior.
       placeholder: |
-        1. Open the app
-        2. Click on 'X'
-        3. Observe crash
+        1. Go to '...'
+        2. Click on '...'
+        3. Scroll down to '...'
+        4. See error
     validations:
       required: false
-  - type: dropdown
-    id: os
-    attributes:
-      label: Operating System
-      options:
-        - Windows
-        - macOS
-        - Linux
-        - Other
-    validations:
-      required: true
