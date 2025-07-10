@@ -218,11 +218,10 @@ class Minecraft {
             this.main_class = version_json.mainClass;
             this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${mcversion}-forge-${forgeversion}/${mcversion}-forge-${forgeversion}.jar`);
             if (forge_version_info.minecraftArguments) {
-                this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                this.modded_jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${mcversion}/${mcversion}.jar`);
                 this.legacy_modded_arguments = forge_version_info.minecraftArguments;
             }
         }
-
 
         ipcRenderer.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
     }

@@ -4118,3 +4118,25 @@ body.potato *, body.potato *::backdrop, body.potato *::before, body.potato *::af
     isolation: auto !important;
     image-rendering: pixelated !important;
 }
+
+.bug-button {
+    border-radius: 10px;
+    padding: 8px;
+    background-color: var(--color-1t);
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.bug-button:active {
+    scale: .95;
+}
+
+.bug-button:hover {
+    background-color: var(--color-2t);
+}

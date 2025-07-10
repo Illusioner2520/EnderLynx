@@ -20,6 +20,7 @@ const os = require('os');
 const treeKill = require('tree-kill');
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
+const { error } = require('console');
 const stringArgv = require('string-argv').default;
 
 const db = new Database('app.db');
@@ -390,20 +391,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let fabric = new Fabric();
         return await fabric.getVersions(v);
     },
-    checkForProcess: (pid) => {
-        if (!pid) return false;
-        try {
-            process.kill(pid, 0);
-            return true;
-        } catch (err) {
-            if (err.code === 'ESRCH') {
-                return false;
-            } else if (err.code === 'EPERM') {
-                return true;
-            }
-            throw err;
-        }
-    },
+    checkForProcess,
     clearActivity: () => ipcRenderer.send('remove-discord-activity'),
     setActivity: (activity) => {
         let rpc_enabled = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("discord_rpc");
@@ -412,27 +400,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.send('set-discord-activity', activity)
     },
     killProcess: async (pid) => {
-        console.log(pid);
-        if (!pid) return;
+        if (!pid) return false;
         pid = Number(pid);
-        return new Promise((resolve, reject) => {
-            let timedOut = false;
 
-            treeKill(pid, 'SIGINT', (err) => {
-                if (err && !timedOut) {
-                    return reject(err);
+        return new Promise((resolve) => {
+            exec(`taskkill /PID ${pid} /T`, (error) => {
+                if (error) {
+                    console.log(`Graceful taskkill failed: ${error.message}`);
                 }
-                resolve();
+
+                let elapsed = 0;
+                const interval = setInterval(() => {
+                    if (!checkForProcess(pid)) {
+                        clearInterval(interval);
+                        return resolve(true);
+                    }
+
+                    elapsed += 500;
+                    if (elapsed >= 5000) {
+                        clearInterval(interval);
+                        exec(`taskkill /PID ${pid} /T /F`, (forceError) => {
+                            if (forceError) {
+                                console.log(`Force kill failed: ${forceError.message}`);
+                            }
+                            const stillAlive = checkForProcess(pid);
+                            resolve(!stillAlive);
+                        });
+                    }
+                }, 500);
             });
-
-            setTimeout(() => {
-                timedOut = true;
-
-                treeKill(pid, 'SIGKILL', (err) => {
-                    if (err) return reject(err);
-                    resolve();
-                });
-            }, 5000);
         });
     },
     getWorlds,
@@ -1688,7 +1684,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return options;
     },
-    importContent
+    importContent,
+    getAllCurseforgeFiles: async (project_id) => {
+        let first_pre_json = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=50&sort=dateCreated&sortDescending=true&removeAlphas=false`);
+        let first = await first_pre_json.json();
+        let data = first.data;
+        for (let i = 0; i < Math.ceil(first.pagination.totalCount / first.pagination.pageSize) - 1; i++) {
+            let new_data = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=${i + 1}&pageSize=50&sort=dateCreated&sortDescending=true&removeAlphas=false`);
+            let new_data_json = await new_data.json();
+            data = data.concat(new_data_json.data);
+        }
+        return data;
+    },
+    getCurseforgePage: async (project_id, page, game_flavor) => {
+        let new_data = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=${page - 1}&pageSize=50&sort=dateCreated&sortDescending=true&removeAlphas=false${game_flavor >= 1 ? "&gameFlavorId=" + game_flavor : ""}`);
+        let new_data_json = await new_data.json();
+        return new_data_json;
+    },
+    getCurseforgeChangelog: async (project_id, file_id, callback, errorCallback) => {
+        try {
+            let data = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}/changelog`);
+            let data_json = await data.json();
+            callback(data_json.data ? data_json.data : "No Changelog Specified");
+        } catch (e) {
+            errorCallback(e);
+        }
+    }
 });
 
 function getWorld(levelDatPath) {
@@ -2287,4 +2308,19 @@ function parseEnvString(input) {
 function parseJavaArgs(input) {
     if (!input) return [];
     return stringArgv(input);
+}
+
+function checkForProcess(pid) {
+    if (!pid) return false;
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (err) {
+        if (err.code === 'ESRCH') {
+            return false;
+        } else if (err.code === 'EPERM') {
+            return true;
+        }
+        throw err;
+    }
 }
