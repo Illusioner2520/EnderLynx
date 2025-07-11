@@ -17,11 +17,13 @@ const FormData = require('form-data');
 const sharp = require("sharp");
 const crypto = require('crypto');
 const os = require('os');
-const treeKill = require('tree-kill');
+const ws = require("windows-shortcuts");
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
 const { error } = require('console');
 const stringArgv = require('string-argv').default;
+const { Jimp } = require('jimp');
+const pngToIco = require('png-to-ico');
 
 const db = new Database('app.db');
 
@@ -908,6 +910,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             callback(message);
         });
     },
+    onLaunchInstance: async (callback) => {
+        let v = await ipcRenderer.invoke('get-instance-to-launch');
+        if (v) callback(v);
+    },
     getVanillaVersions: async () => {
         let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
         let json = await res.json();
@@ -1709,8 +1715,98 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } catch (e) {
             errorCallback(e);
         }
+    },
+    createDesktopShortcut: async (instance_id, instance_name, iconSource) => {
+        const desktopPath = await ipcRenderer.invoke('get-desktop');
+        let safeName = instance_name.replace(/[<>:"/\\|?*]/g, '_');
+        const shortcutPath = path.join(desktopPath, `${safeName} - Minecraft.lnk`);
+
+        console.log("Launcher path:", process.execPath);
+
+        let target, workingDir, args;
+
+        let isDev = await ipcRenderer.invoke('is-dev');
+
+        if (isDev) {
+            target = path.join(__dirname, 'node_modules', 'electron', 'dist', 'electron.exe');
+            workingDir = path.resolve(__dirname);
+            args = `"${workingDir}" "--instance=${instance_id}"`;
+        } else {
+            target = process.execPath;
+            workingDir = path.dirname(process.execPath);
+            args = `"--instance=${instance_id}"`;
+        }
+
+        if (!iconSource) iconSource = "icon.ico";
+
+        let iconPath = path.resolve(__dirname, "temp_icons", instance_id + '.ico');
+
+        convertToIco(iconSource, iconPath);
+
+        return new Promise((resolve) => {
+            ws.create(shortcutPath, {
+                target,
+                args,
+                workingDir,
+                runStyle: 1,
+                desc: `Launch Minecraft instance "${instance_name}"`,
+                icon: iconPath
+            }, (err) => {
+                console.log(err);
+                if (err) {
+                    resolve(false);
+                    return false;
+                } else {
+                    resolve(true);
+                    return true;
+                }
+            });
+        });
     }
 });
+
+async function convertToIco(input, outputPath) {
+    let imageBuffer;
+
+    if (input.startsWith('data:image/')) {
+        const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
+        imageBuffer = Buffer.from(base64Data, 'base64');
+    } else if (input.startsWith('http://') || input.startsWith('https://')) {
+        const response = await axios.get(input, { responseType: 'arraybuffer' });
+        imageBuffer = Buffer.from(response.data);
+    } else if (fs.existsSync(input)) {
+        imageBuffer = fs.readFileSync(input);
+    } else {
+        throw new Error('Invalid input: must be a data URL, image URL, or file path');
+    }
+
+    const isWebP = imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
+        imageBuffer.toString('ascii', 8, 12) === 'WEBP';
+
+    if (isWebP) {
+        const { data, info } = await sharp(imageBuffer)
+            .ensureAlpha()
+            .png()
+            .toBuffer({ resolveWithObject: true });
+
+        console.log(info);
+
+        console.log(`Sharp decoded WebP details: Width=${info.width}, Height=${info.height}, Channels=${info.channels}, Format=${info.format}`);
+
+        if (info.channels !== 4) {
+            console.warn(`Sharp did not output 4 channels (RGBA), but ${info.channels}. This might be an issue.`);
+        }
+
+        imageBuffer = data;
+    }
+
+    const image = await Jimp.read(imageBuffer);
+    const resized = await image.resize({ w: 256, h: 256 }).getBuffer("image/png");
+
+    const icoBuffer = await pngToIco(resized);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+    fs.writeFileSync(outputPath, icoBuffer);
+}
 
 function getWorld(levelDatPath) {
     const buffer = fs.readFileSync(levelDatPath);

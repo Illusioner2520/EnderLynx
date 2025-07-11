@@ -13,21 +13,24 @@
     "electron-rebuild": "^3.2.9"
   },
   "dependencies": {
+    "@jimp/wasm-webp": "^1.6.0",
     "adm-zip": "^0.5.16",
     "axios": "^1.10.0",
     "better-sqlite3": "^12.0.0",
     "discord-rpc": "^4.0.1",
     "form-data": "^4.0.3",
+    "jimp": "^1.6.0",
     "lzma-native": "^8.0.6",
     "markdown-it": "^14.1.0",
     "msmc": "^5.0.5",
+    "png-to-ico": "^2.1.8",
     "prismarine-nbt": "^2.7.0",
     "sharp": "^0.34.2",
     "skinview3d": "^3.4.1",
     "string-argv": "^0.3.2",
     "three": "^0.177.0",
     "toml": "^3.0.0",
-    "tree-kill": "^1.2.2",
+    "windows-shortcuts": "^0.1.6",
     "winreg": "^1.2.5"
   }
 }

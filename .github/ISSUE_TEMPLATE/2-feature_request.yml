@@ -1,6 +1,6 @@
 name: ✨ Feature Request
 description: Request a feature be added
-labels: [Enchancement ✨]
+labels: [Enhancement ✨]
 body:
   - type: checkboxes
     attributes:

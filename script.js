@@ -1402,7 +1402,7 @@ class ContextMenu {
         if (window.innerWidth - x < 200) {
             xTranslate = "-100%";
         }
-        if (window.innerHeight - y < 300) {
+        if (window.innerHeight - y < 350) {
             yTranslate = "-100%";
         }
         this.element.style.translate = xTranslate + " " + yTranslate;
@@ -2270,7 +2270,7 @@ settingsButtonEle.onclick = () => {
     let bugButton = document.createElement("button");
     bugButton.innerHTML = '<i class="fa-solid fa-bug"></i> Report a Bug';
     bugButton.onclick = () => {
-        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=bug_report.md");
+        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=1-bug_report.yml&version=" + window.electronAPI.version);
     }
     bugButton.className = "bug-button";
     app_info.appendChild(bugButton);
@@ -2278,7 +2278,7 @@ settingsButtonEle.onclick = () => {
     featureButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Request a Feature';
     featureButton.className = "bug-button";
     featureButton.onclick = () => {
-        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=feature_request.md");
+        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=2-feature_request.yml");
     }
     app_info.appendChild(featureButton);
     dialog.showDialog("Settings", "form", [
@@ -2774,6 +2774,13 @@ async function showHomeContent(e) {
                     e.setTitle(instanceInfo.pinned ? "Unpin Instance" : "Pin Instance");
                     e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                     homeContent.displayContent();
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-desktop"></i>',
+                "title": "Add Desktop Shortcut",
+                "func": (e) => {
+                    addDesktopShortcut(instanceInfo);
                 }
             },
             {
@@ -4060,6 +4067,13 @@ function showInstanceContent(e) {
                 }
             },
             {
+                "icon": '<i class="fa-solid fa-desktop"></i>',
+                "title": "Add Desktop Shortcut",
+                "func": (e) => {
+                    addDesktopShortcut(instances[i]);
+                }
+            },
+            {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.button.instances.delete"),
                 "func": (e) => {
@@ -4297,6 +4311,13 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
                 e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
             }
         },
+            {
+                "icon": '<i class="fa-solid fa-desktop"></i>',
+                "title": "Add Desktop Shortcut",
+                "func": (e) => {
+                    addDesktopShortcut(instanceInfo);
+                }
+            },
         {
             "icon": '<i class="fa-solid fa-trash-can"></i>',
             "title": translate("app.button.instances.delete"),
@@ -6560,7 +6581,31 @@ class DownloadLog {
     constructor(element) {
         element.className = "download-log";
         this.logs = [];
-        this.element = element;
+        let downloadLogToggle = document.createElement("button");
+        downloadLogToggle.className = "download-log-toggle";
+        downloadLogToggle.innerHTML = '<i class="fa-solid fa-bars-progress"></i>';
+        downloadLogToggle.setAttribute("popovertarget", "download-log-wrapper");
+        // let close = () => {
+        //     downloadLogToggle.classList.remove("open");
+        //     downloadLogToggle.onclick = open;
+        //     logsWrapper.hidePopover();
+        //     downloadLogToggle.setAttribute("title", "Hide Downloads");
+        // }
+        // let open = () => {
+        //     downloadLogToggle.classList.add("open");
+        //     downloadLogToggle.onclick = close;
+        //     logsWrapper.showPopover();
+        //     downloadLogToggle.setAttribute("title", "Show Downloads");
+        // }
+        // downloadLogToggle.onclick = open;
+        element.appendChild(downloadLogToggle);
+        let logsWrapper = document.createElement("div");
+        logsWrapper.className = "download-log-wrapper";
+        logsWrapper.id = "download-log-wrapper";
+        logsWrapper.setAttribute("popover","");
+        element.appendChild(logsWrapper);
+        this.element = logsWrapper;
+        this.toggle = downloadLogToggle;
     }
 
     setData(info) {
@@ -6583,6 +6628,10 @@ class DownloadLog {
             }
         })
         this.logs = this.logs.filter((e) => e.getProgress != 100);
+        if (this.logs[0]) {
+            console.log(this.logs[0].getProgress);
+            this.toggle.style.setProperty("--percent-preview", this.logs[0].getProgress + "%");
+        }
     }
 }
 
@@ -6600,6 +6649,14 @@ window.electronAPI.onProgressUpdate((a, b, c) => {
 
 window.electronAPI.onErrorMessage((message) => {
     displayError(message);
+});
+
+window.electronAPI.onLaunchInstance(async (instance_id) => {
+    console.log(instance_id);
+    let instance = new Instance(instance_id);
+    showSpecificInstanceContent(instance);
+    await playInstance(instance);
+    showSpecificInstanceContent(instance.refresh());
 });
 
 class MultiSelect {
@@ -10411,4 +10468,13 @@ async function getSkinFromUsername(username) {
         };
         tempImg.src = info.url;
     })
+}
+
+async function addDesktopShortcut(instanceInfo) {
+    let success = await window.electronAPI.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.refresh().name, instanceInfo.refresh().image);
+    if (success) {
+        displaySuccess("Created Shortcut on Desktop");
+    } else {
+        displayError("Unable to create shortcut");
+    }
 }

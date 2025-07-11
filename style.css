@@ -1509,7 +1509,13 @@ body.compact .live-stop {
 
 .download-log {
     margin-top: auto;
-    display: flex;
+}
+
+.download-log-wrapper:empty {
+    opacity: 0;
+}
+
+.download-log-wrapper {
     flex-direction: column;
     background-color: var(--color-1);
     border-width: 1px;
@@ -1517,10 +1523,97 @@ body.compact .live-stop {
     border-color: var(--color-2);
     border-radius: 8px;
     padding-inline: 8px;
+    inset: unset;
+    position: static;
+    width: auto;
+    height: auto;
+    opacity: 0;
+    transform: scaleY(.8);
+    transition: opacity .2s, display .2s allow-discrete, overlay .2s allow-discrete, transform .2s;
 }
 
-.download-log:empty {
-    opacity: 0;
+.download-log-wrapper:popover-open {
+    opacity: 1;
+    transform: scaleY(1);
+
+    @starting-style {
+        opacity: 0;
+        transform: scaleY(.8);
+    }
+}
+
+body.compact .download-log-wrapper {
+    width: 280px;
+    position: fixed;
+    left: 10px;
+    box-shadow: 0 0 10px black;
+    bottom: 176px;
+}
+
+body:not(.compact) .download-log-toggle {
+    display: none;
+}
+
+body:not(.compact) .download-log-wrapper:not(:empty) {
+    display: flex;
+    opacity: 1;
+}
+
+.download-log:has(.download-log-wrapper:empty) .download-log-toggle {
+    display: none;
+}
+
+@property --percent-preview {
+    syntax: "<percentage>";
+    inherits: false;
+    initial-value: 0%;
+}
+
+.download-log-toggle {
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    background-color: var(--color-1t);
+    transition: background-color .25s, scale .1s, transform .1s, --percent-preview .1s;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    margin-inline: auto;
+    position: relative;
+    background-image: conic-gradient(var(--accent-color) var(--percent-preview), var(--color-1t) var(--percent-preview));
+}
+
+.download-log-toggle:hover {
+    background-color: var(--color-2t);
+}
+
+.download-log-toggle:active {
+    scale: .95;
+}
+
+.download-log:has(.download-log-wrapper:popover-open) .download-log-toggle {
+    transform: rotateZ(180deg);
+}
+
+.download-log-toggle::after {
+    height: 10px;
+    width: 10px;
+    border-radius: 50%;
+    content: "";
+    right: -2px;
+    top: -2px;
+    background-color: var(--accent-color);
+    position: absolute;
+}
+
+.download-log:has(.download-log-wrapper:popover-open) .download-log-toggle::after {
+    display: none;
+}
+
+.download-log-wrapper:empty {
+    opacity: 0 !important;
 }
 
 .download-item {
@@ -3940,7 +4033,8 @@ dialog[open]::backdrop {
     margin-bottom: 10px;
 }
 
-dialog *, dialog {
+dialog *,
+dialog {
     overscroll-behavior: contain;
 }
 
@@ -3962,6 +4056,7 @@ dialog *, dialog {
     border: none;
     font-size: .8rem;
     inset: unset;
+    text-align: center;
     left: var(--left);
     top: var(--top);
     max-width: calc(min(calc(2 * (100% - var(--left))), calc(2 * var(--left))) - 20px);
@@ -4071,16 +4166,16 @@ dialog *, dialog {
     gap: 8px;
     border-radius: 8px;
     margin-bottom: 10px;
-    align-items:center;
+    align-items: center;
 }
 
 .instance-locked-button {
-    border-radius: 2px;
+    border-radius: 4px;
     padding: 8px;
     background-color: transparent;
     width: max-content;
     cursor: pointer;
-    transition: background-color .25s, scale .1s;
+    transition: background-color .25s, scale .1s, color .25s;
     display: flex;
     gap: 8px;
     font-size: 1rem;
@@ -4096,10 +4191,14 @@ dialog *, dialog {
 }
 
 .instance-locked-button:hover {
-    background-color: var(--color-1t);
+    background-color: var(--text-color);
+    color: var(--accent-color);
 }
 
-body.potato *, body.potato *::backdrop, body.potato *::before, body.potato *::after {
+body.potato *,
+body.potato *::backdrop,
+body.potato *::before,
+body.potato *::after {
     transition-duration: 0s !important;
     animation-duration: 0s !important;
     box-shadow: none !important;

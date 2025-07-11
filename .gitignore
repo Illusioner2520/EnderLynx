@@ -11,3 +11,5 @@ app.db-shm
 app.db-wal
 
 .devdbrc
+
+temp_icons/
