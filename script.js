@@ -721,7 +721,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "discord_rpc": "true", "default_java_args": "", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false" };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "discord_rpc": "true", "default_java_args": "", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -1967,6 +1967,13 @@ class ContentList {
             let infoElement2Desc = document.createElement("div");
             infoElement2Desc.className = "content-list-info-desc-2";
             infoElement2Desc.innerHTML = (content[i].secondary_column.desc);
+            if (content[i]?.secondary_column?.desc_hidden) {
+                infoElement2Desc.style.width = "fit-content";
+                infoElement2Desc.classList.add("hidden-text");
+                infoElement2Desc.onclick = () => {
+                    infoElement2Desc.classList.add("shown");
+                }
+            }
             infoElement2.appendChild(infoElement2Desc);
             let toggle;
             if (features?.disable?.enabled) {
@@ -2351,6 +2358,14 @@ settingsButtonEle.onclick = () => {
             "default": data.getDefault("potato_mode") == "true"
         },
         {
+            "type": "toggle",
+            "name": "Hide IP Addresses",
+            "tab": "appearance",
+            "id": "hide_ip",
+            "desc": "Hide the IP addresses in the world list. (Click to reveal them)",
+            "default": data.getDefault("hide_ip") == "true"
+        },
+        {
             "type": "notice",
             "content": "Note: These defaults will only apply to new instances you create and will not be retroactively applied. For previously created instances, you can edit these settings in that instance's settings.",
             "tab": "defaults"
@@ -2462,10 +2477,16 @@ settingsButtonEle.onclick = () => {
         data.setDefault("default_page", info.default_page);
         data.setDefault("discord_rpc", (info.discord_rpc).toString());
         data.setDefault("potato_mode", (info.potato_mode).toString());
+        data.setDefault("hide_ip", (info.hide_ip).toString());
         if (info.potato_mode) {
             document.body.classList.add("potato");
         } else {
             document.body.classList.remove("potato");
+        }
+        if (info.hide_ip) {
+            document.body.classList.add("hide_ip");
+        } else {
+            document.body.classList.remove("hide_ip");
         }
         if (info.discord_rpc) {
             live.findLive();
@@ -2550,7 +2571,7 @@ async function showHomeContent(e) {
         item.style.cursor = "auto";
         let icon = document.createElement("img");
         icon.className = "instance-image";
-        icon.src = e.icon;
+        icon.src = e.icon ? e.icon : "default.png";
         item.appendChild(icon);
         let itemInfo = document.createElement("div");
         itemInfo.className = "instance-info";
@@ -2560,14 +2581,21 @@ async function showHomeContent(e) {
         let itemDesc = document.createElement("div");
         itemDesc.className = "instance-desc";
         itemDesc.innerHTML = e.type == "singleplayer" ? (translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (e.commands ? " - " + translate("app.worlds.description.commands") : "") + (e.flat ? " - " + translate("app.worlds.description.flat") : "")) : e.ip;
+        if (e.type == "multiplayer") {
+            itemDesc.style.width = "fit-content";
+            itemDesc.classList.add("hidden-text");
+            itemDesc.onclick = () => {
+                itemDesc.classList.add("shown");
+            }
+        }
         itemInfo.appendChild(itemTitle);
         itemInfo.appendChild(itemDesc);
         item.appendChild(itemInfo);
+        let instanceInfo = new Instance(e.instance_id);
         let playButton = document.createElement("button");
-        playButton.setAttribute("title", "Play World");
+        playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? "Play World" : "Play Instance");
         playButton.className = "home-play-button";
         playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
-        let instanceInfo = new Instance(e.instance_id);
         playButton.onclick = async () => {
             playButton.className = "home-loading-button";
             playButton.innerHTML = '<i class="spinner"></i>Loading'
@@ -2577,8 +2605,9 @@ async function showHomeContent(e) {
         let morebutton = document.createElement("button");
         morebutton.className = "home-list-more";
         morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        console.log(minecraftVersions.indexOf(instanceInfo.vanilla_version));
         let buttons = new ContextMenuButtons([
-            minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
+            ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? {
                 "title": translate("app.worlds.play"),
                 "icon": '<i class="fa-solid fa-play"></i>',
                 "func": async () => {
@@ -2619,6 +2648,17 @@ async function showHomeContent(e) {
                 "icon": '<i class="fa-solid fa-share"></i>',
                 "func": () => { }
             },
+            (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions ? {
+                "icon": '<i class="fa-solid fa-desktop"></i>',
+                "title": "Add Desktop Shortcut",
+                "func": () => {
+                    if (e.type == "singleplayer") {
+                        addDesktopShortcutWorld(instanceInfo, e.name, "singleplayer", e.id, e.icon ?? "default.png");
+                    } else {
+                        addDesktopShortcutWorld(instanceInfo, e.name, "multiplayer", e.ip, e.icon ?? "default.png");
+                    }
+                }
+            } : null,
             {
                 "title": translate("app.worlds.delete"),
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
@@ -2906,6 +2946,10 @@ if (data.getDefault("default_sidebar") == "compact") {
 
 if (data.getDefault("potato_mode") == "true") {
     document.body.classList.add("potato");
+}
+
+if (data.getDefault("hide_ip") == "true") {
+    document.body.classList.add("hide_ip");
 }
 
 let skinViewer;
@@ -4311,13 +4355,13 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
                 e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
             }
         },
-            {
-                "icon": '<i class="fa-solid fa-desktop"></i>',
-                "title": "Add Desktop Shortcut",
-                "func": (e) => {
-                    addDesktopShortcut(instanceInfo);
-                }
-            },
+        {
+            "icon": '<i class="fa-solid fa-desktop"></i>',
+            "title": "Add Desktop Shortcut",
+            "func": (e) => {
+                addDesktopShortcut(instanceInfo);
+            }
+        },
         {
             "icon": '<i class="fa-solid fa-trash-can"></i>',
             "title": translate("app.button.instances.delete"),
@@ -5168,6 +5212,13 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-share"></i>',
                             "func": () => { }
                         },
+                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
+                            "icon": '<i class="fa-solid fa-desktop"></i>',
+                            "title": "Add Desktop Shortcut",
+                            "func": (e) => {
+                                addDesktopShortcutWorld(instanceInfo, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? "default.png");
+                            }
+                        } : null,
                         {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
@@ -5208,7 +5259,8 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 },
                 "secondary_column": {
                     "title": translate("app.worlds.description.multiplayer"),
-                    "desc": worldsMultiplayer[i].ip
+                    "desc": worldsMultiplayer[i].ip,
+                    "desc_hidden": true
                 },
                 "type": "multiplayer",
                 "image": worldsMultiplayer[i].icon ?? "default.png",
@@ -5234,7 +5286,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
-                                showSpecificInstanceContent(instanceInfo, 'worlds');
+                                showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
                             }
                         } : null,
                         {
@@ -5252,6 +5304,13 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-share"></i>',
                             "func": () => { }
                         },
+                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
+                            "icon": '<i class="fa-solid fa-desktop"></i>',
+                            "title": "Add Desktop Shortcut",
+                            "func": (e) => {
+                                addDesktopShortcutWorld(instanceInfo, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? "default.png");
+                            }
+                        } : null,
                         {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
@@ -6602,7 +6661,7 @@ class DownloadLog {
         let logsWrapper = document.createElement("div");
         logsWrapper.className = "download-log-wrapper";
         logsWrapper.id = "download-log-wrapper";
-        logsWrapper.setAttribute("popover","");
+        logsWrapper.setAttribute("popover", "");
         element.appendChild(logsWrapper);
         this.element = logsWrapper;
         this.toggle = downloadLogToggle;
@@ -6651,12 +6710,18 @@ window.electronAPI.onErrorMessage((message) => {
     displayError(message);
 });
 
-window.electronAPI.onLaunchInstance(async (instance_id) => {
-    console.log(instance_id);
-    let instance = new Instance(instance_id);
-    showSpecificInstanceContent(instance);
-    await playInstance(instance);
-    showSpecificInstanceContent(instance.refresh());
+window.electronAPI.onLaunchInstance(async (launch_info) => {
+    console.log(launch_info.instance_id);
+    let instance = new Instance(launch_info.instance_id);
+    showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+    if (launch_info.world_type == "singleplayer") {
+        await playSingleplayerWorld(instance, launch_info.world_id);
+    } else if (launch_info.world_type == "multiplayer") {
+        await playMultiplayerWorld(instance, launch_info.world_id);
+    } else {
+        await playInstance(instance);
+    }
+    showSpecificInstanceContent(instance.refresh(), launch_info.world_type ? "worlds" : "content");
 });
 
 class MultiSelect {
@@ -10472,6 +10537,15 @@ async function getSkinFromUsername(username) {
 
 async function addDesktopShortcut(instanceInfo) {
     let success = await window.electronAPI.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.refresh().name, instanceInfo.refresh().image);
+    if (success) {
+        displaySuccess("Created Shortcut on Desktop");
+    } else {
+        displayError("Unable to create shortcut");
+    }
+}
+
+async function addDesktopShortcutWorld(instanceInfo, worldName, worldType, worldId, worldImage) {
+    let success = await window.electronAPI.createDesktopShortcut(instanceInfo.instance_id, worldName, worldImage, worldType, worldId);
     if (success) {
         displaySuccess("Created Shortcut on Desktop");
     } else {

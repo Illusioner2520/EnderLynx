@@ -19,22 +19,28 @@ const createWindow = () => {
             sandbox: false,
             devTools: isDev
         },
-        icon: path.join(__dirname, 'icon.png')
+        icon: path.join(__dirname, 'icon.ico')
     });
     win.loadFile('index.html');
 }
 
 let instance_id_to_launch = "";
+let world_type_to_launch = "";
+let world_id_to_launch = "";
 
 const args = process.argv.slice(1);
 const instanceArg = args.find(arg => arg.startsWith('--instance='));
+const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
+const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
 
 if (instanceArg) {
-    const instanceId = instanceArg.split('=')[1];
-    instance_id_to_launch = instanceId;
+    if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0,1).join('=');
+    if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0,1).join('=');
+    if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0,1).join('=');
 }
 
 app.whenReady().then(() => {
+    app.setAppUserModelId('net.illusioner.enderlynx');
     createWindow();
     rpc.login({ clientId }).catch(console.error);
 });
@@ -48,7 +54,17 @@ ipcMain.on('display-error', (event, message) => {
 });
 
 ipcMain.handle('get-instance-to-launch', (_) => {
-    return instance_id_to_launch.toString();
+    let temp_ii = instance_id_to_launch;
+    let temp_wt = world_type_to_launch;
+    let temp_wi = world_id_to_launch;
+    instance_id_to_launch = "";
+    world_type_to_launch = "";
+    world_id_to_launch = "";
+    return {
+        instance_id: temp_ii.toString(),
+        world_type: temp_wt.toString(),
+        world_id: temp_wi.toString()
+    };
 });
 
 ipcMain.handle('show-open-dialog', async (event, options) => {

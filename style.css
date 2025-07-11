@@ -4239,3 +4239,29 @@ body.potato *::after {
 .bug-button:hover {
     background-color: var(--color-2t);
 }
+
+.hidden-text {
+    position: relative;
+}
+
+body.hide_ip .hidden-text::after {
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-2);
+    cursor: pointer;
+    opacity: 1;
+    display: block;
+    transition: opacity .3s, display .3s allow-discrete;
+    content: "";
+    border-radius: 2px;
+    text-align: center;
+}
+
+body.hide_ip .hidden-text.shown::after {
+    display: none;
+    opacity: 0;
+
+    @starting-style {
+        opacity: 1;
+    }
+}

@@ -22,7 +22,7 @@ const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
 const { error } = require('console');
 const stringArgv = require('string-argv').default;
-const { Jimp } = require('jimp');
+const { Jimp, ResizeStrategy } = require('jimp');
 const pngToIco = require('png-to-ico');
 
 const db = new Database('app.db');
@@ -912,7 +912,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onLaunchInstance: async (callback) => {
         let v = await ipcRenderer.invoke('get-instance-to-launch');
-        if (v) callback(v);
+        if (v?.instance_id) callback(v);
     },
     getVanillaVersions: async () => {
         let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
@@ -1716,12 +1716,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
             errorCallback(e);
         }
     },
-    createDesktopShortcut: async (instance_id, instance_name, iconSource) => {
+    createDesktopShortcut: async (instance_id, instance_name, iconSource, worldType, worldId) => {
         const desktopPath = await ipcRenderer.invoke('get-desktop');
         let safeName = instance_name.replace(/[<>:"/\\|?*]/g, '_');
-        const shortcutPath = path.join(desktopPath, `${safeName} - Minecraft.lnk`);
+        let shortcutPath = path.join(desktopPath, `${safeName} - Minecraft.lnk`);
 
-        console.log("Launcher path:", process.execPath);
+        let base_shortcut = safeName + " - Minecraft";
+        let count_shortcut = 1;
+
+        while (fs.existsSync(shortcutPath)) {
+            shortcutPath = path.join(desktopPath, `${base_shortcut} (${count_shortcut}).lnk`);
+            count_shortcut++;
+        }
 
         let target, workingDir, args;
 
@@ -1731,17 +1737,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
             target = path.join(__dirname, 'node_modules', 'electron', 'dist', 'electron.exe');
             workingDir = path.resolve(__dirname);
             args = `"${workingDir}" "--instance=${instance_id}"`;
+            if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
         } else {
             target = process.execPath;
             workingDir = path.dirname(process.execPath);
             args = `"--instance=${instance_id}"`;
+            if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
         }
 
         if (!iconSource) iconSource = "icon.ico";
 
+        let base_path_name = instance_id;
+        let current_count = 1;
+
         let iconPath = path.resolve(__dirname, "temp_icons", instance_id + '.ico');
 
-        convertToIco(iconSource, iconPath);
+        while (fs.existsSync(iconPath)) {
+            iconPath = path.resolve(__dirname, "temp_icons", base_path_name + "_" + current_count + ".ico");
+            current_count++;
+        }
+
+        console.log(iconPath);
+
+        try {
+            await convertToIco(iconSource, iconPath);
+        } catch (e) { }
+
+        if (!fs.existsSync(iconPath)) {
+            iconPath = path.resolve(__dirname, "icon.ico");
+        }
 
         return new Promise((resolve) => {
             ws.create(shortcutPath, {
@@ -1801,7 +1825,7 @@ async function convertToIco(input, outputPath) {
     }
 
     const image = await Jimp.read(imageBuffer);
-    const resized = await image.resize({ w: 256, h: 256 }).getBuffer("image/png");
+    const resized = await image.resize({ w: 256, h: 256, mode: "nearestNeighbor"}).getBuffer("image/png");
 
     const icoBuffer = await pngToIco(resized);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
