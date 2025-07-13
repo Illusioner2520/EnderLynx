@@ -24,10 +24,11 @@ const { error } = require('console');
 const stringArgv = require('string-argv').default;
 const { Jimp, ResizeStrategy } = require('jimp');
 const pngToIco = require('png-to-ico');
+const QRCode = require('qrcode');
 
 const db = new Database('app.db');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -35,6 +36,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name 
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT)').run();
 
 db.pragma('journal_mode = WAL');
 
@@ -1786,6 +1788,50 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 }
             });
         });
+    },
+    shareLogs: async (logs) => {
+        const params = new URLSearchParams();
+        params.append("content", logs);
+
+        const response = await fetch("https://api.mclo.gs/1/log", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: params.toString()
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(`Upload failed: ${data.error || 'Unknown error'}`);
+        }
+
+        return data.url;
+    },
+    generateQRCode: async (url) => {
+        return new Promise((resolve) => {
+            QRCode.toDataURL(url, {
+                errorCorrectionLevel: 'H',
+                width: 96,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, (err, dataUrl) => {
+                if (err) {
+                    resolve(false);
+                    return;
+                }
+
+                resolve(dataUrl);
+            });
+        })
     }
 });
 
@@ -1825,7 +1871,7 @@ async function convertToIco(input, outputPath) {
     }
 
     const image = await Jimp.read(imageBuffer);
-    const resized = await image.resize({ w: 256, h: 256, mode: "nearestNeighbor"}).getBuffer("image/png");
+    const resized = await image.resize({ w: 256, h: 256, mode: "nearestNeighbor" }).getBuffer("image/png");
 
     const icoBuffer = await pngToIco(resized);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })

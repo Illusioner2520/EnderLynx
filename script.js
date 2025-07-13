@@ -1,12 +1,5 @@
 let lang = null;
 document.getElementsByTagName("title")[0].innerHTML = sanitize(translate("app.name"));
-let minecraftVersions = [];
-let getMCVersions = async () => {
-    try {
-        minecraftVersions = (await window.electronAPI.getVanillaVersions()).reverse();
-    } catch (e) { }
-}
-getMCVersions();
 
 class SQL {
     constructor(sql) {
@@ -30,6 +23,40 @@ class DB {
 }
 
 const db = new DB();
+
+let minecraftVersions = [];
+let getMCVersions = () => {
+    let mc_versions = db.prepare("SELECT * FROM mc_versions_cache").all();
+    mc_versions.sort((a, b) => {
+        return (new Date(a.date_published)).getTime() - (new Date(b.date_published)).getTime();
+    });
+    return mc_versions.map(e => e.name);
+}
+minecraftVersions = getMCVersions();
+
+let fetchUpdatedMCVersions = async () => {
+    let result_pre_json = await fetch(`https://launchermeta.mojang.com/mc/game/version_manifest.json`);
+    let result = await result_pre_json.json();
+    let mc_versions = db.prepare('SELECT * FROM mc_versions_cache').all();
+    let mc_version_names = mc_versions.map(e => e.name);
+    console.log(result.versions);
+    for (let i = 0; i < result.versions.length; i++) {
+        let e = result.versions[i];
+        if (!mc_version_names.includes(e.id)) {
+            db.prepare("INSERT INTO mc_versions_cache (name, date_published) VALUES (?, ?)").run(e.id, e.releaseTime);
+        } else {
+            mc_version_names.splice(mc_version_names.indexOf(e.id), 1);
+        }
+    }
+    console.log(mc_version_names);
+    for (let i = 0; i < mc_version_names.length; i++) {
+        let id = mc_version_names[i];
+        db.prepare("DELETE FROM mc_versions_cache WHERE name = ?").run(id);
+    }
+    minecraftVersions = getMCVersions();
+}
+
+fetchUpdatedMCVersions();
 
 class DefaultOptions {
     constructor(v) {
@@ -307,11 +334,19 @@ class Instance {
         this.pre_launch_hook = content.pre_launch_hook;
         this.wrapper = content.wrapper;
         this.post_exit_hook = content.post_exit_hook;
+        this.installed_version = content.installed_version;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
     get pinned() {
         let inst = db.prepare("SELECT * FROM pins WHERE instance_id = ? AND type = ?").get(this.instance_id, "instance");
         return Boolean(inst);
+    }
+    setInstalledVersion(installed_version) {
+        db.prepare("UPDATE instances SET installed_version = ? WHERE id = ?").run(installed_version, this.id);
+        this.installed_version = installed_version;
+        if (instance_watches[this.instance_id].onchangeinstalled_version) {
+            instance_watches[this.instance_id].onchangeinstalled_version(installed_version);
+        }
     }
     setJavaArgs(java_args) {
         db.prepare("UPDATE instances SET java_args = ? WHERE id = ?").run(java_args, this.id);
@@ -3928,7 +3963,7 @@ function showInstanceContent(e) {
                     return;
                 }
                 let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
-                let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", true, true, "", info.icon_f, instance_id, 0, "", "", true, false);
+                let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
                 console.log(packInfo);
@@ -5531,6 +5566,18 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         }).catch(() => {
             displayError("Failed to copy logs to clipboard.");
         });
+    }
+    shareButton.onclick = async () => {
+        let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
+        let copyLogs = showLogs.map(e => e.content).join("\n");
+        let url = "";
+        try {
+            url = await window.electronAPI.shareLogs(copyLogs);
+        } catch (e) {
+            displayError("Unable to upload logs to mclo.gs");
+            return;
+        }
+        await openShareDialog("Instance Logs", url, "Check out my Instance Logs from the EnderLynx Launcher!");
     }
     deleteButton.onclick = () => {
         let dialog = new Dialog();
@@ -7947,6 +7994,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         return;
                     }
                     let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", i.project_id, true, false);
+                    instance.setInstalledVersion(version.id);
                     showSpecificInstanceContent(instance);
                     await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, i.title);
                     let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, i.title);
@@ -8122,6 +8170,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     let version_json = await res.json();
                     let version = version_json.data[0];
                     let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", e.id, true, false);
+                    instance.setInstalledVersion(version.id);
                     showSpecificInstanceContent(instance);
                     await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), e.name);
                     let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, e.id, e.name);
@@ -8809,6 +8858,7 @@ function duplicateInstance(instanceInfo) {
                 false,
                 true
             );
+            newInstance.setInstalledVersion(instanceInfo.installed_version);
             for (let c of oldContent) {
                 newInstance.addContent(
                     c.name,
@@ -9047,6 +9097,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     return;
                 }
                 let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                instance.setInstalledVersion(version.id);
                 showSpecificInstanceContent(instance);
                 await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
                 let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
@@ -9429,6 +9480,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                                 let version = e;
                                 let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                                instance.setInstalledVersion(version.id);
                                 showSpecificInstanceContent(instance);
                                 await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
                                 let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
@@ -9766,6 +9818,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 let version_json = await res.json();
                 let version = version_json.data[0];
                 let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", content.data.id, true, false);
+                instance.setInstalledVersion(version.id);
                 showSpecificInstanceContent(instance);
                 await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), content.data.name);
                 let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, content.data.id, content.data.name);
@@ -10140,6 +10193,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                                 let version = e;
                                 let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", content.data.id, true, false);
+                                instance.setInstalledVersion(version.id);
                                 showSpecificInstanceContent(instance);
                                 await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), content.data.name);
                                 let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, content.data.id, content.data.name);
@@ -10551,4 +10605,115 @@ async function addDesktopShortcutWorld(instanceInfo, worldName, worldType, world
     } else {
         displayError("Unable to create shortcut");
     }
+}
+
+async function openShareDialog(title, url, text) {
+    let shareWrapper = document.createElement("div");
+    shareWrapper.className = "share-wrapper";
+    let qrCodeUrl = await window.electronAPI.generateQRCode(url);
+    let qrCodeWrapper = document.createElement("button");
+    qrCodeWrapper.className = "share-qrcode-wrapper";
+    let qrCode = document.createElement("img");
+    qrCode.className = "share-qrcode";
+    qrCode.src = qrCodeUrl;
+    qrCodeWrapper.appendChild(qrCode);
+    let largeQrCode = document.createElement("img");
+    largeQrCode.className = "large-qrcode";
+    largeQrCode.src = qrCodeUrl;
+    qrCodeWrapper.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog("QR Code", "notice", largeQrCode, [
+            {
+                "type": "confirm",
+                "content": "Done"
+            }
+        ], [], () => { })
+    }
+    shareWrapper.appendChild(qrCodeWrapper);
+    let linkWrapper = document.createElement("div");
+    linkWrapper.className = "share-link";
+    let linkText = document.createElement("span");
+    linkText.innerHTML = url;
+    linkText.className = "share-link-text";
+    linkWrapper.appendChild(linkText);
+    let copyButton = document.createElement("button");
+    copyButton.setAttribute("title", "Copy Link");
+    copyButton.className = "share-link-copy";
+    copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>';
+    copyButton.onclick = async () => {
+        let success = await window.electronAPI.copyToClipboard(url);
+        if (success) {
+            displaySuccess("Copied to clipboard!");
+        } else {
+            displayError("Unable to copy to clipboard");
+        }
+        copyButton.innerHTML = '<i class="fa-solid fa-check"></i>';
+        setTimeout(() => {
+            copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>';
+        }, 2000);
+    }
+    linkWrapper.appendChild(copyButton);
+    shareWrapper.appendChild(linkWrapper);
+    let links = document.createElement("div");
+    links.className = "share-links";
+    shareWrapper.appendChild(links);
+    let linkList = [
+        {
+            "icon": '<i class="fa-solid fa-envelope"></i>',
+            "func": () => {
+                window.electronAPI.openInBrowser(`mailto:example@example.com?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + " " + url)}`)
+            },
+            "tooltip": "Send an Email"
+        },
+        {
+            "icon": '<i class="fa-solid fa-globe"></i>',
+            "func": () => {
+                window.electronAPI.openInBrowser(url);
+            },
+            "tooltip": "Open link in browser"
+        },
+        {
+            "icon": '<i class="fa-brands fa-x-twitter"></i>',
+            "func": () => {
+                window.electronAPI.openInBrowser(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title + "\n\n" + text + " " + url)}`)
+            },
+            "tooltip": "Share on X"
+        },
+        {
+            "icon": '<i class="fa-brands fa-bluesky"></i>',
+            "func": () => {
+                window.electronAPI.openInBrowser(`https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + url)}`)
+            },
+            "tooltip": "Share on Bluesky"
+        },
+        {
+            "icon": '<i class="fa-brands fa-mastodon"></i>',
+            "func": () => {
+                window.electronAPI.openInBrowser(`https://tootpick.org/#text=${encodeURIComponent(title + "\n\n" + text + " " + url)}`)
+            },
+            "tooltip": "Share on Mastadon"
+        },
+        {
+            "icon": '<i class="fa-brands fa-reddit"></i>',
+            "func": () => {
+                window.electronAPI.openInBrowser(`https://www.reddit.com/submit?title=${encodeURIComponent(title)}&message=${encodeURIComponent(text + " " + url)}`)
+            },
+            "tooltip": "Share on Reddit"
+        }
+    ]
+    linkList.forEach(e => {
+        let linkElement = document.createElement("button");
+        linkElement.className = "share-special-link";
+        linkElement.innerHTML = e.icon;
+        linkElement.setAttribute("title", e.tooltip);
+        linkElement.onclick = e.func;
+        links.appendChild(linkElement);
+    });
+    let dialog = new Dialog();
+    dialog.showDialog("Share Link", "notice", shareWrapper, [
+        {
+            "type": "confirm",
+            "content": "Close"
+        }
+    ], [], () => { });
 }

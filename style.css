@@ -4265,3 +4265,109 @@ body.hide_ip .hidden-text.shown::after {
         opacity: 1;
     }
 }
+
+.share-wrapper {
+    display: grid;
+    grid-template-columns: 98px auto;
+    grid-template-rows: 44px 44px;
+    gap: 10px;
+}
+
+.share-qrcode-wrapper {
+    grid-row: span 2;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: scale .1s;
+}
+
+.share-qrcode-wrapper:active {
+    scale: .95;
+}
+
+.share-qrcode {
+    border-radius: 8px;
+    image-rendering: pixelated;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
+    border-width: 1px;
+    border-style: solid;
+    object-fit: contain;
+    width: 100%;
+    height: 100%;
+}
+
+.large-qrcode {
+    border-radius: 8px;
+    image-rendering: pixelated;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
+    border-width: 1px;
+    border-style: solid;
+    height: 384px;
+    width: 384px;
+    margin-inline: auto;
+}
+
+.share-link {
+    color: var(--text-color);
+    padding: 8px;
+    min-width: 300px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-1);
+    font-size: 1.1rem;
+    display: flex;
+    align-items:center;
+    overflow: hidden;
+}
+
+.share-link-text {
+    font-weight: bold;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+    overflow: hidden;
+}
+
+.share-link-copy {
+    color: var(--subtle-text-color);
+    cursor: pointer;
+    padding: 8px;
+    height: 32px;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    font-size: 1rem;
+    margin-left: auto;
+}
+
+.share-link-copy:hover {
+    color: var(--text-color);
+    background-color: var(--color-1t);
+}
+
+.share-links {
+    display: flex;
+    gap: 10px;
+}
+
+.share-special-link {
+    border-radius: 8px;
+    background-color: var(--color-1);
+    display: grid;
+    place-items:center;
+    cursor: pointer;
+    width: 44px;
+    font-size: 1.2rem;
+    height: 44px;
+    transition: scale .1s;
+}
+
+.share-special-link:active {
+    scale: .9;
+}
+
+.share-special-link:hover {
+    background-color: var(--color-2);
+}

@@ -25,6 +25,7 @@
     "msmc": "^5.0.5",
     "png-to-ico": "^2.1.8",
     "prismarine-nbt": "^2.7.0",
+    "qrcode": "^1.5.4",
     "sharp": "^0.34.2",
     "skinview3d": "^3.4.1",
     "string-argv": "^0.3.2",
