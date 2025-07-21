@@ -4320,14 +4320,6 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         playButton.classList.remove("instance-top-play-button");
         playButton.classList.add("instance-top-loading-button");
         playButton.onclick = () => { };
-        instanceInfo.watchForChange("mc_installed", (v) => {
-            if (v) {
-                playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-                playButton.classList.remove("instance-top-loading-button");
-                playButton.classList.add("instance-top-play-button");
-                playButton.onclick = playButtonClick;
-            }
-        });
     } else if (!running) {
         playButton.classList.add("instance-top-play-button");
         playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
@@ -4344,6 +4336,20 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             live.findLive();
         });
     }
+    instanceInfo.watchForChange("mc_installed", (v) => {
+        if (v) {
+            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.classList.remove("instance-top-loading-button");
+            playButton.classList.add("instance-top-play-button");
+            playButton.onclick = playButtonClick;
+        } else {
+            playButton.innerHTML = '<i class="spinner"></i>' + "Installing"; //TODO
+            playButton.classList.remove("instance-top-play-button");
+            playButton.classList.remove("instance-top-stop-button");
+            playButton.classList.add("instance-top-loading-button");
+            playButton.onclick = () => { };
+        }
+    });
     let threeDots = document.createElement("button");
     threeDots.classList.add("instance-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -4683,7 +4689,7 @@ function showInstanceSettings(instanceInfo) {
         { "name": "Window", "value": "window" },
         { "name": "Java", "value": "java" },
         { "name": "Launch Hooks", "value": "launch_hooks" }
-    ].filter(e => e), (e) => {
+    ].filter(e => e), async (e) => {
         let info = {};
         e.forEach(e => { info[e.id] = e.value });
         instanceInfo.setName(info.name);
@@ -4698,6 +4704,21 @@ function showInstanceSettings(instanceInfo) {
         instanceInfo.setPreLaunchHook(info.pre_launch_hook);
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
+        console.log("Loader", info.loader);
+        console.log("Game Version", info.game_version);
+        console.log("Loader Version", info.loader_version);
+        if (instanceInfo.loader == info.loader && instanceInfo.vanilla_version == info.game_version && instanceInfo.loader_version == info.loader_version) {
+            return;
+        }
+        if ([info.game_version, info.loader_version].includes("loading")) {
+            return;
+        }
+        instanceInfo.setLoader(info.loader);
+        instanceInfo.setVanillaVersion(info.game_version);
+        instanceInfo.setLoaderVersion(info.loader_version);
+        instanceInfo.setMcInstalled(false);
+        await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
+        instanceInfo.setMcInstalled(true);
     });
 }
 
