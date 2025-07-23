@@ -399,7 +399,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearActivity: () => ipcRenderer.send('remove-discord-activity'),
     setActivity: (activity) => {
         let rpc_enabled = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("discord_rpc");
-        let enabled = rpc_enabled.value == "true";
+        let enabled = rpc_enabled?.value ? rpc_enabled.value == "true" : true;
         if (!enabled) return;
         ipcRenderer.send('set-discord-activity', activity)
     },

@@ -2909,6 +2909,12 @@ async function showHomeContent(e) {
     let noPinnedInstances = document.createElement("div");
     noPinnedInstances.className = "home-entry-empty";
     noPinnedInstances.innerHTML = "You have no pinned instances. Add some to appear here."
+    let noPlayedWorlds = document.createElement("div");
+    noPlayedWorlds.className = "home-entry-empty";
+    noPlayedWorlds.innerHTML = "You haven't played any worlds. Create some to appear here."
+    let noPlayedInstances = document.createElement("div");
+    noPlayedInstances.className = "home-entry-empty";
+    noPlayedInstances.innerHTML = "You haven't played any instances. Create some to appear here."
     if (pinnedWorlds.length || pinnedInstances.length) {
         column1.appendChild(pinnedWorldTitle);
         column1.appendChild(pinnedWorlds.length ? pinnedWorldGrid : noPinnedWorlds);
@@ -2919,9 +2925,9 @@ async function showHomeContent(e) {
         column2.style.gridRow = "span 2";
     }
     column1.appendChild(lastPlayedWorldTitle);
-    column1.appendChild(lastPlayedWorldGrid);
+    column1.appendChild(lastPlayedWorlds.length ? lastPlayedWorldGrid : noPlayedWorlds);
     column2.appendChild(lastPlayedInstanceTitle);
-    column2.appendChild(lastPlayedInstanceGrid);
+    column2.appendChild(lastPlayedInstances.length ? lastPlayedInstanceGrid : noPlayedInstances);
 
     let discoverModsWrapper = document.createElement("div");
     discoverModsWrapper.className = "home-discover-wrapper";

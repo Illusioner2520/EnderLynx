@@ -1528,18 +1528,21 @@ body.compact .live-stop {
     width: auto;
     height: auto;
     opacity: 0;
-    transform: scaleY(.8);
     transition: opacity .2s, display .2s allow-discrete, overlay .2s allow-discrete, transform .2s;
 }
 
 .download-log-wrapper:popover-open {
     opacity: 1;
-    transform: scaleY(1);
+    transform: scaleY(1) !important;
 
     @starting-style {
         opacity: 0;
-        transform: scaleY(.8);
+        transform: scaleY(.8) !important;
     }
+}
+
+body.compact .download-log-wrapper {
+    transform: scaleY(.8);
 }
 
 body.compact .download-log-wrapper {
