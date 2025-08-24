@@ -806,7 +806,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         console.log(data_vt);
         data_vt = JSON.parse(data_vt);
         if (data_vt.link) {
-            // Find a unique filename: vanilla_tweaks.zip, vanilla_tweaks_1.zip, vanilla_tweaks_2.zip, etc.
             const resourcepacksDir = `./minecraft/instances/${instance_id}/resourcepacks`;
             fs.mkdirSync(resourcepacksDir, { recursive: true });
             let baseName = "vanilla_tweaks.zip";

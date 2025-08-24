@@ -6563,6 +6563,11 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
                 displayError("Failed to copy to clipboard");
             }
         };
+        screenshotAction4.onclick = () => {
+            if (file.includes("https://") || file.includes("http://")) {
+                openShareDialog(word, file, "Check out this gallery image:")
+            }
+        }
         if (instanceInfo) {
             screenshotAction5.onclick = () => {
                 let success = window.electronAPI.deleteScreenshot(file);
@@ -6661,9 +6666,6 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
     let screenshotAction4 = document.createElement("button");
     screenshotAction4.className = "screenshot-action";
     screenshotAction4.innerHTML = '<i class="fa-solid fa-share"></i>Share ' + word;
-    screenshotAction4.onclick = () => {
-
-    };
     screenshotActions.appendChild(screenshotAction4);
     let screenshotAction5 = document.createElement("button");
     screenshotAction5.className = "screenshot-action";
@@ -9948,7 +9950,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             {
                                 "icon": '<i class="fa-solid fa-share"></i>',
                                 "title": "Share Gallery Image",
-                                "func": (e) => { }
+                                "func": () => {
+                                    openShareDialog("Gallery Image", e.raw_url, `Check out this image from the project '${content.title}':`)
+                                }
                             }
                         ]);
                         screenshotElement.oncontextmenu = (e) => {
@@ -10707,7 +10711,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             {
                                 "icon": '<i class="fa-solid fa-share"></i>',
                                 "title": "Share Gallery Image",
-                                "func": (e) => { }
+                                "func": () => {
+                                    openShareDialog("Gallery Image", e.url, `Check out this image from the project '${content.title}':`);
+                                }
                             }
                         ]);
                         screenshotElement.oncontextmenu = (e) => {
@@ -10900,6 +10906,7 @@ async function addDesktopShortcutWorld(instanceInfo, worldName, worldType, world
 }
 
 async function openShareDialog(title, url, text) {
+    console.log("Opening share dialog");
     let shareWrapper = document.createElement("div");
     shareWrapper.className = "share-wrapper";
     let qrCodeUrl = await window.electronAPI.generateQRCode(url);
@@ -10988,7 +10995,7 @@ async function openShareDialog(title, url, text) {
         {
             "icon": '<i class="fa-brands fa-reddit"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(`https://www.reddit.com/submit?title=${encodeURIComponent(title)}&message=${encodeURIComponent(text + " " + url)}`)
+                window.electronAPI.openInBrowser(`https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`)
             },
             "tooltip": "Share on Reddit"
         }
