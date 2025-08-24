@@ -806,7 +806,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
         console.log(data_vt);
         data_vt = JSON.parse(data_vt);
         if (data_vt.link) {
-            await urlToFile("https://vanillatweaks.net" + data_vt.link, `./minecraft/instances/${instance_id}/resourcepacks/vanilla_tweaks.zip`);
+            // Find a unique filename: vanilla_tweaks.zip, vanilla_tweaks_1.zip, vanilla_tweaks_2.zip, etc.
+            const resourcepacksDir = `./minecraft/instances/${instance_id}/resourcepacks`;
+            fs.mkdirSync(resourcepacksDir, { recursive: true });
+            let baseName = "vanilla_tweaks.zip";
+            let filePath = path.join(resourcepacksDir, baseName);
+            let counter = 1;
+            while (fs.existsSync(filePath)) {
+                baseName = `vanilla_tweaks_${counter}.zip`;
+                filePath = path.join(resourcepacksDir, baseName);
+                counter++;
+            }
+            await urlToFile("https://vanillatweaks.net" + data_vt.link, filePath);
+
+            return baseName;
         }
     },
     getVanillaTweaksResourcePacks: async (query = "", version = "1.21") => {
@@ -1120,6 +1133,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let url = `https://www.curseforge.com/api/v1/mods/search?gameId=432&index=${page - 1}&filterText=${query}${gv}&pageSize=${pageSize}&sortField=${sort}${gf}${ci}`;
         let res = await fetch(url);
         return await res.json();
+    },
+    deleteContent: async (instance_id, project_type, filename) => {
+        let install_path = "";
+        if (project_type == "mod") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`, filename);
+        } else if (project_type == "resource_pack") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`, filename);
+        } else if (project_type == "shader") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`, filename);
+        }
+        if (fs.existsSync(install_path)) {
+            fs.unlinkSync(install_path);
+            return true;
+        }
+        return false;
     },
     addContent: async (instance_id, project_type, project_url, filename) => {
         let install_path = "";
@@ -1890,10 +1918,18 @@ function getWorld(levelDatPath) {
 
     console.log(levelData);
 
+    let seed = null;
+    try {
+        if (levelData.WorldGenSettings?.value?.seed?.value !== undefined && levelData.WorldGenSettings?.value?.seed?.value !== null) {
+            seed = BigInt(levelData.WorldGenSettings.value.seed.value);
+        }
+    } catch (e) {
+        seed = null;
+    }
     return ({
         name: levelData.LevelName.value,
         id: parentFolder,
-        seed: levelData.WorldGenSettings?.value?.seed?.value ? BigInt(levelData.WorldGenSettings?.value?.seed?.value) : null,
+        seed: seed,
         last_played: Number(levelData.LastPlayed.value),
         icon: fs.existsSync(path.resolve(grandparentFolder, parentFolder, "icon.png"))
             ? path.resolve(grandparentFolder, `${parentFolder}/icon.png`)

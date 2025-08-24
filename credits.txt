@@ -16,3 +16,7 @@ Vanilla Tweaks: https://vanillatweaks.net/
 Artists:
 Fruit Salad
 Font Awesome: https://fontawesome.com/
+
+Java Distributions from Zulu by Azul: https://www.azul.com/
+
+CurseForge Integration done using curse.tools: https://curse.tools/

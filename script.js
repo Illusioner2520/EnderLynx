@@ -249,6 +249,13 @@ class Content {
         this.version = content.version;
         this.instance = content.instance;
         this.source_info = content.source_info;
+
+        this.id_or_instanceId = id_or_instanceId;
+        this.fileName = fileName;
+    }
+
+    refresh() {
+        return new Content(this.id_or_instanceId, this.fileName);
     }
 
     setName(name) {
@@ -1903,6 +1910,71 @@ class ContentList {
             }
             this.checkBox = checkboxElement;
             contentListTop.appendChild(checkboxElement);
+
+            this.checkBoxActions = [];
+
+            if (features.checkbox.actionsList) features.checkbox.actionsList.forEach(e => {
+                let actionElement = document.createElement("button");
+                actionElement.className = "selected-button";
+                actionElement.innerHTML = e.icon + e.title;
+                actionElement.style.display = "none";
+                if (e.danger) {
+                    actionElement.classList.add("danger");
+                }
+                actionElement.onclick = () => {
+                    if (e.func_id) {
+                        if (e.func_id == "disable") {
+                            this.checkBoxes.forEach(c => {
+                                if (c.element.checked && isNotDisplayNone(c.element) && c.toggle.toggled) {
+                                    c.toggle.toggle();
+                                }
+                            });
+                            this.uncheckCheckboxes();
+                            this.figureOutMainCheckedState();
+                        } else if (e.func_id == "enable") {
+                            this.checkBoxes.forEach(c => {
+                                if (c.element.checked && isNotDisplayNone(c.element) && !c.toggle.toggled) {
+                                    c.toggle.toggle();
+                                }
+                            });
+                            this.uncheckCheckboxes();
+                            this.figureOutMainCheckedState();
+                        }
+                        return;
+                    }
+                    if (e.show_confirmation_dialog) {
+                        let dialog = new Dialog();
+                        dialog.showDialog(e.dialog_title, "notice", e.dialog_content.replace("%s", this.checkBoxes.filter(c => c.element.checked && isNotDisplayNone(c.element)).length), [
+                            {
+                                "type": "cancel",
+                                "content": "Cancel"
+                            },
+                            {
+                                "type": "confirm",
+                                "content": e.dialog_button
+                            }
+                        ], [], () => {
+                            this.checkBoxes.forEach(c => {
+                                if (c.element.checked && isNotDisplayNone(c.element)) {
+                                    e.func(c.element.parentElement, c.content_info);
+                                }
+                            });
+                            this.uncheckCheckboxes();
+                            this.figureOutMainCheckedState();
+                        });
+                        return;
+                    }
+                    this.checkBoxes.forEach(c => {
+                        if (c.element.checked && isNotDisplayNone(c.element)) {
+                            e.func(c.element.parentElement, c.content_info);
+                        }
+                    });
+                    this.uncheckCheckboxes();
+                    this.figureOutMainCheckedState();
+                }
+                this.checkBoxActions.push(actionElement);
+                contentListTop.appendChild(actionElement);
+            });
         }
         let primaryColumnTitle = document.createElement("div");
         primaryColumnTitle.className = "content-list-title";
@@ -1923,7 +1995,10 @@ class ContentList {
             let updateAllButton = document.createElement("button");
             updateAllButton.className = "content-list-update-all";
             updateAllButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.button.content.update_all");
-            updateAllButton.onclick = features.update_all.func;
+            updateAllButton.onclick = () => {
+                features.update_all.func(updateAllButton);
+            }
+            updateAllButton.title = "Check for and Update all Content."
             contentListTop.appendChild(updateAllButton);
         }
 
@@ -1967,19 +2042,19 @@ class ContentList {
             if (content[i].class) contentEle.classList.add(content[i].class);
             if (content[i].type) contentEle.setAttribute("data-type", content[i].type);
             this.items.push({ "name": [content[i].primary_column.title, content[i].primary_column.desc, content[i].secondary_column.title, content[i].secondary_column.desc].join("!!!!!!!!!!"), "element": contentEle, "type": content[i].type });
+            let checkboxElement;
             if (features?.checkbox?.enabled) {
-                let checkboxElement = document.createElement("input");
+                checkboxElement = document.createElement("input");
                 checkboxElement.type = "checkbox";
                 checkboxElement.className = "content-list-checkbox";
                 checkboxElement.onchange = (e) => {
                     this.figureOutMainCheckedState();
                 }
-                this.checkBoxes.push(checkboxElement);
                 contentEle.appendChild(checkboxElement);
             }
             let imageElement = document.createElement("img");
             imageElement.className = "content-list-image";
-            imageElement.src = content[i].image ? content[i].image : "default.png";
+            imageElement.src = fixPathForImage(content[i].image ? content[i].image : "default.png");
             contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
             infoElement1.className = "content-list-info";
@@ -2027,6 +2102,9 @@ class ContentList {
                     }
                 }, !content[i].disabled);
                 contentEle.appendChild(toggleElement);
+            }
+            if (checkboxElement) {
+                this.checkBoxes.push({ "element": checkboxElement, "content_info": content[i].pass_to_checkbox, "toggle": toggle });
             }
             if (features?.remove?.enabled) {
                 let removeElement = document.createElement("button");
@@ -2079,11 +2157,12 @@ class ContentList {
     figureOutMainCheckedState() {
         let total = 0;
         let checked = 0;
-        for (let i = 0; i < this.checkBoxes.length; i++) {
-            if (this.checkBoxes[i].checked && isNotDisplayNone(this.checkBoxes[i])) {
+        let checkboxes = this.checkBoxes.map(e => e.element);
+        for (let i = 0; i < checkboxes.length; i++) {
+            if (checkboxes[i].checked && isNotDisplayNone(checkboxes[i])) {
                 checked++;
             }
-            if (isNotDisplayNone(this.checkBoxes[i])) {
+            if (isNotDisplayNone(checkboxes[i])) {
                 total++;
             }
         }
@@ -2097,16 +2176,23 @@ class ContentList {
             this.checkBox.checked = false;
             this.checkBox.indeterminate = false;
         }
+        if (checked == 0) {
+            this.checkBoxActions.forEach(e => e.style.display = "none");
+        } else {
+            this.checkBoxActions.forEach(e => e.style.display = "");
+        }
     }
     checkCheckboxes() {
-        this.checkBoxes.forEach((e) => {
+        this.checkBoxes.map(e => e.element).forEach((e) => {
             if (isNotDisplayNone(e)) e.checked = true;
         });
+        this.checkBoxActions.forEach(e => e.style.display = "");
     }
     uncheckCheckboxes() {
-        this.checkBoxes.forEach((e) => {
+        this.checkBoxes.map(e => e.element).forEach((e) => {
             if (isNotDisplayNone(e)) e.checked = false;
         });
+        this.checkBoxActions.forEach(e => e.style.display = "none");
     }
 }
 
@@ -2606,13 +2692,13 @@ async function showHomeContent(e) {
         item.style.cursor = "auto";
         let icon = document.createElement("img");
         icon.className = "instance-image";
-        icon.src = e.icon ? e.icon : "default.png";
+        icon.src = fixPathForImage(e.icon ? e.icon : "default.png");
         item.appendChild(icon);
         let itemInfo = document.createElement("div");
         itemInfo.className = "instance-info";
         let itemTitle = document.createElement("div");
         itemTitle.className = "instance-name";
-        itemTitle.innerHTML = e.name;
+        itemTitle.innerHTML = parseMinecraftFormatting(e.name);
         let itemDesc = document.createElement("div");
         itemDesc.className = "instance-desc";
         itemDesc.innerHTML = e.type == "singleplayer" ? (translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (e.commands ? " - " + translate("app.worlds.description.commands") : "") + (e.flat ? " - " + translate("app.worlds.description.flat") : "")) : e.ip;
@@ -2640,7 +2726,6 @@ async function showHomeContent(e) {
         let morebutton = document.createElement("button");
         morebutton.className = "home-list-more";
         morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-        console.log(minecraftVersions.indexOf(instanceInfo.vanilla_version));
         let buttons = new ContextMenuButtons([
             ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? {
                 "title": translate("app.worlds.play"),
@@ -2652,6 +2737,13 @@ async function showHomeContent(e) {
                     showSpecificInstanceContent(instanceInfo.refresh());
                 }
             } : null,
+            {
+                "title": "View Instance",
+                "icon": '<i class="fa-solid fa-eye"></i>',
+                "func": () => {
+                    showSpecificInstanceContent(instanceInfo.refresh());
+                }
+            },
             e.type == "singleplayer" ? {
                 "title": translate("app.worlds.open"),
                 "icon": '<i class="fa-solid fa-folder"></i>',
@@ -3756,11 +3848,24 @@ function groupInstances(how) {
     let groupList = document.getElementsByClassName("group-list")[0];
     while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
     let groups = Object.keys(groupMap);
-    groups.sort((a, b) => {
-        if (a === "" && b !== "") return -1;
-        if (a !== "" && b === "") return 1;
-        return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
-    });
+    if (how == "game_version") {
+        groups.sort((a, b) => {
+            const aIndex = minecraftVersions.indexOf(a);
+            const bIndex = minecraftVersions.indexOf(b);
+            if (aIndex === -1 && bIndex === -1) {
+                return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+            }
+            if (aIndex === -1) return -1;
+            if (bIndex === -1) return 1;
+            return bIndex - aIndex;
+        });
+    } else {
+        groups.sort((a, b) => {
+            if (a === "" && b !== "") return -1;
+            if (a !== "" && b === "") return 1;
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+        });
+    }
     groups.forEach(groupKey => {
         let newElement = document.createElement("div");
         newElement.classList.add("group");
@@ -4546,6 +4651,14 @@ function showInstanceSettings(instanceInfo) {
             "loader_source": "loader",
             "game_version_source": "game_version"
         },
+        instanceInfo.locked ? null : {
+            "type": "toggle",
+            "name": "Update Content",
+            "default": true,
+            "tab": "installation",
+            "desc": "Update all mods, resource packs or shaders to be compatible with the new version. Any content that isn't compatible will be disabled.",
+            "id": "update_content"
+        },
         {
             "type": "number",
             "name": "Width",
@@ -4724,6 +4837,18 @@ function showInstanceSettings(instanceInfo) {
         instanceInfo.setLoaderVersion(info.loader_version);
         instanceInfo.setMcInstalled(false);
         await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
+        if (info.update_content) {
+            let content = instanceInfo.getContent();
+            for (let i = 0; i < content.length; i++) {
+                let c = content[i];
+                try {
+                    await updateContent(instanceInfo, c);
+                } catch (e) {
+                    displayError(`Unable to update '${c.name}'`);
+                }
+            }
+            displaySuccess("Successfully updated all content for instance " + instanceInfo.name);
+        }
         instanceInfo.setMcInstalled(true);
     });
 }
@@ -4734,7 +4859,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
     let instanceLockedBanner = document.createElement("div");
     instanceLockedBanner.className = "instance-locked-banner";
     let instanceLockedText = document.createElement("span");
-    instanceLockedText.innerHTML = "Instance is locked. Unlock to edit it's content.";
+    instanceLockedText.innerHTML = "Instance is locked. Unlock to edit its content.";
     let instanceLockedButton = document.createElement("button");
     instanceLockedButton.className = "instance-locked-button";
     instanceLockedButton.innerHTML = '<i class="fa-solid fa-unlock"></i>Unlock';
@@ -4754,7 +4879,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
     importContent.innerHTML = '<i class="fa-solid fa-plus"></i>Import Content';
     importContent.onclick = () => {
         let dialog = new Dialog();
-        dialog.showDialog("Select Worlds to Import", "form", [
+        dialog.showDialog("Select Content to Import", "form", [
             {
                 "type": "text",
                 "id": "file_path",
@@ -4918,10 +5043,11 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "content": "Confirm Deletion"
                         }
                     ], [], async () => {
-                        let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
+                        let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
                         if (success) {
                             ele.remove();
                             displaySuccess("Deleted " + e.name);
+                            e.delete();
                         } else {
                             displayError("Unable to delete " + e.name);
                         }
@@ -4936,10 +5062,32 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                 window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`)
                             }
                         },
+                        e.source == "modrinth" ? {
+                            "title": "View Content",
+                            "icon": '<i class="fa-solid fa-circle-info"></i>',
+                            "func": () => {
+                                displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+                            }
+                        } : e.source == "curseforge" ? {
+                            "title": "View Content",
+                            "icon": '<i class="fa-solid fa-circle-info"></i>',
+                            "func": () => {
+                                displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+                            }
+                        } : null,
                         instanceInfo.locked ? null : {
                             "title": translate("app.content.update"),
                             "icon": '<i class="fa-solid fa-download"></i>',
-                            "func_id": "update"
+                            "func_id": "update",
+                            "func": async () => {
+                                try {
+                                    let s = await updateContent(instanceInfo, e);
+                                    if (s !== false) displaySuccess(`Updated '${e.name}' to the latest version.`);
+                                } catch (f) {
+                                    displayError(`Unable to update '${e.name}'`);
+                                    throw f;
+                                }
+                            }
                         },
                         instanceInfo.locked ? null : {
                             "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
@@ -4967,6 +5115,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                     if (success) {
                                         ele.remove();
                                         displaySuccess("Deleted " + e.name);
+                                        e.delete();
                                     } else {
                                         displayError("Unable to delete " + e.name);
                                     }
@@ -4976,13 +5125,59 @@ function setInstanceTabContentContent(instanceInfo, element) {
                     ].filter(e => e)
                 },
                 "disabled": e.disabled,
-                "instance_info": instanceInfo
+                "instance_info": instanceInfo,
+                "pass_to_checkbox": e
             })
         }
         let contentList = new ContentList(contentListWrap, content, searchBar, {
             "checkbox": {
                 "enabled": instanceInfo.locked ? false : true,
-                "actionsList": null
+                "actionsList": [
+                    instanceInfo.locked ? null : {
+                        "title": "Update",
+                        "icon": '<i class="fa-solid fa-download"></i>',
+                        "func": async (ele, e) => {
+                            try {
+                                let s = await updateContent(instanceInfo, e);
+                                if (s !== false) displaySuccess(`Updated '${e.name}' to the latest version.`);
+                            } catch (f) {
+                                displayError(`Unable to update '${e.name}'`);
+                                throw f;
+                            }
+                        }
+                    },
+                    instanceInfo.locked ? null : {
+                        "title": "Enable",
+                        "icon": '<i class="fa-solid fa-eye"></i>',
+                        "func_id": "enable",
+                        "func": () => { }
+                    },
+                    instanceInfo.locked ? null : {
+                        "title": "Disable",
+                        "icon": '<i class="fa-solid fa-eye-slash"></i>',
+                        "func_id": "disable",
+                        "func": () => { }
+                    },
+                    instanceInfo.locked ? null : {
+                        "title": "Delete",
+                        "icon": '<i class="fa-solid fa-trash-can"></i>',
+                        "danger": true,
+                        "func": async (ele, e) => {
+                            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess("Deleted " + e.name);
+                                e.delete();
+                            } else {
+                                displayError("Unable to delete " + e.name);
+                            }
+                        },
+                        "show_confirmation_dialog": true,
+                        "dialog_title": "Are you sure?",
+                        "dialog_content": "Are you sure that you want to delete %s entries?",
+                        "dialog_button": "Confirm Deletion"
+                    }
+                ].filter(e => e)
             },
             "disable": {
                 "enabled": instanceInfo.locked ? false : true
@@ -5004,7 +5199,22 @@ function setInstanceTabContentContent(instanceInfo, element) {
             },
             "update_all": {
                 "enabled": instanceInfo.locked ? false : true,
-                "func": () => { }
+                "func": async (b) => {
+                    b.innerHTML = "<i class='spinner'></i>Updating..."
+                    let content = instanceInfo.getContent();
+                    for (let i = 0; i < content.length; i++) {
+                        let c = content[i];
+                        try {
+                            await updateContent(instanceInfo, c);
+                        } catch (e) {
+                            displayError(`Unable to update '${c.name}'`);
+                        }
+                    }
+                    displaySuccess("Successfully updated all content for instance " + instanceInfo.name);
+                    if (document.body.contains(b)) {
+                        setInstanceTabContentContent(instanceInfo, element);
+                    }
+                }
             }
         }, dropdownInfo, "No Content Found");
     }
@@ -5309,7 +5519,8 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             }
                         }
                     ].filter(e => e)
-                }
+                },
+                "pass_to_checkbox": { "type": "singleplayer", "id": worlds[i].id, "name": worlds[i].name }
             });
     }
     for (let i = 0; i < worldsMultiplayer.length; i++) {
@@ -5394,7 +5605,8 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             }
                         }
                     ].filter(e => e)
-                }
+                },
+                "pass_to_checkbox": { "type": "multiplayer", "id": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name }
             });
     }
 
@@ -5402,7 +5614,30 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     let contentList = new ContentList(contentListWrap, worldList, searchBar, {
         "checkbox": {
             "enabled": true,
-            "actionsList": null
+            "actionsList": [
+                {
+                    "title": "Delete",
+                    "icon": '<i class="fa-solid fa-trash-can"></i>',
+                    "danger": true,
+                    "func": async (ele, e) => {
+                        if (e.type == "singleplayer") {
+                            let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess("Deleted " + parseMinecraftFormatting(e.name));
+                            } else {
+                                displayError("Unable to delete " + parseMinecraftFormatting(e.name));
+                            }
+                        } else if (e.type == "multiplayer") {
+                            // DELETE WORLD HERE
+                        }
+                    },
+                    "show_confirmation_dialog": true,
+                    "dialog_title": "Are you sure?",
+                    "dialog_content": "Are you sure that you want to delete %s entries?",
+                    "dialog_button": "Confirm Deletion"
+                }
+            ]
         },
         "disable": {
             "enabled": false
@@ -6762,7 +6997,6 @@ class DownloadLog {
         })
         this.logs = this.logs.filter((e) => e.getProgress != 100);
         if (this.logs[0]) {
-            console.log(this.logs[0].getProgress);
             this.toggle.style.setProperty("--percent-preview", this.logs[0].getProgress + "%");
         }
     }
@@ -8343,7 +8577,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
         submitButton.onclick = instance_id ? async () => {
             submitButton.innerHTML = '<i class="spinner"></i>Installing';
             submitButton.onclick = () => { };
-            await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
+            let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
             // let initialContent = {
             //     "name": "Vanilla Tweaks Resource Pack",
             //     "file_name": "vanilla_tweaks.zip",
@@ -8356,7 +8590,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             //     "author": "Vanilla Tweaks"
             // }
             let instance = new Instance(instance_id);
-            instance.addContent("Vanilla Tweaks Resource Pack", "Vanilla Tweaks", "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+            instance.addContent("Vanilla Tweaks Resource Pack", "Vanilla Tweaks", "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
             submitButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
         } : () => {
             let instances = data.getInstances();
@@ -8536,9 +8770,10 @@ async function installContent(source, project_id, instance_id, project_type, tit
     return true;
 }
 
-async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id) {
+async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate) {
     let instance_id = instance.instance_id;
     let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename);
+    if (isUpdate) return initialContent;
     let version = version_info.version_number;
     let dependencies = version_info.dependencies;
     if (instance.getContent().map(e => e.source_id).includes(project_id)) {
@@ -8919,20 +9154,25 @@ function getRecentlyPlayedInstances() {
 
 function getPinnedInstances() {
     let instances = db.prepare("SELECT * FROM pins WHERE type = ?").all("instance");
-    return instances.map(e => new Instance(e.instance_id));
+    return instances.map(e => {
+        try {
+            return new Instance(e.instance_id)
+        } catch (f) {
+            unpinInstance({ "instance_id": e.instance_id }, true);
+            return null;
+        }
+    }).filter(e => e);
 }
 async function getPinnedWorlds() {
     return (await window.electronAPI.getPinnedWorlds());
 }
 function pinInstance(instanceInfo) {
-    console.log("Pinning " + instanceInfo.name);
     db.prepare("INSERT INTO pins (type, instance_id) VALUES (?, ?)").run("instance", instanceInfo.instance_id);
     displaySuccess("Instance pinned");
 }
-function unpinInstance(instanceInfo) {
-    console.log("Unpinning " + instanceInfo.name);
+function unpinInstance(instanceInfo, dontDisplay) {
     db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ?").run("instance", instanceInfo.instance_id);
-    displaySuccess("Instance unpinned");
+    if (!dontDisplay) displaySuccess("Instance unpinned");
 }
 function pinSingleplayerWorld(world_id, instance_id) {
     db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, world_id, "singleplayer");
@@ -9028,6 +9268,12 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             });
             return;
         }
+        let author = "";
+        team_members.forEach(e => {
+            if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
+                author = e.user.username;
+            }
+        })
         loading.element.remove();
         let topBar = document.createElement("div");
         topBar.classList.add("content-top");
@@ -9146,7 +9392,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             button.innerHTML = '<i class="spinner"></i>Installing...';
             button.classList.add("disabled");
             button.onclick = () => { };
-            await installContent("modrinth", content.id, instance_id, project_type, content.title, content.author, content.icon_url);
+            await installContent("modrinth", content.id, instance_id, project_type, content.title, author, content.icon_url);
             button.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
         } : (i) => {
             let dialog = new Dialog();
@@ -9165,7 +9411,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 contentInfo.close();
                 let info = {};
                 e.forEach(e => { info[e.id] = e.value });
-                await installContent("modrinth", content.id, info.instance, project_type, content.title, content.author, content.icon_url);
+                await installContent("modrinth", content.id, info.instance, project_type, content.title, author, content.icon_url);
                 displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
             });
         }
@@ -9460,99 +9706,118 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         let installButton = document.createElement("button");
                         installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
                         installButton.setAttribute("title", "Install Specific Version");
-                        if (installedVersion && installedVersionIndex > i) {
-                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Update';
-                            installButton.setAttribute("title", "Update to this Version");
-                        } else if (installedVersion && installedVersionIndex < i) {
-                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Downgrade';
-                            installButton.setAttribute("title", "Downgrade to this Version");
-                        }
                         installButton.className = "version-file-install"
-                        installButton.onclick = project_type == "modpack" ? () => {
-                            let options = [];
-                            let dialog = new Dialog();
-                            dialog.showDialog(translate("app.button.instances.create"), "form", [
-                                {
-                                    "type": "image-upload",
-                                    "id": "icon",
-                                    "name": "Icon", //TODO: replace with translate
-                                    "default": content.icon_url
-                                },
-                                {
-                                    "type": "text",
-                                    "name": "Name", //TODO
-                                    "id": "name",
-                                    "default": content.title,
-                                    "maxlength": 50
-                                },
-                                {
-                                    "type": "dropdown",
-                                    "name": "Game Version",
-                                    "id": "game_version",
-                                    "options": e.game_versions.map(e => ({ "name": e, "value": e })).reverse()
-                                },
-                                {
-                                    "type": "dropdown",
-                                    "name": "Mod Loader",
-                                    "id": "loader",
-                                    "options": e.loaders.map(e => ({ "name": loaders[e], "value": e }))
-                                }
-                            ], [
-                                { "content": "Cancel", "type": "cancel" },
-                                { "content": "Submit", "type": "confirm" }
-                            ], [], async (v) => {
-                                contentInfo.close();
-                                let info = {};
-                                v.forEach(e => { info[e.id] = e.value });
-                                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                                let version = e;
-                                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
-                                instance.setInstalledVersion(version.id);
-                                showSpecificInstanceContent(instance);
-                                await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
-                                let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
-                                if (!mr_pack_info.loader_version) {
-                                    displayError(mr_pack_info);
-                                    return;
-                                }
-                                instance.setLoaderVersion(mr_pack_info.loader_version);
-                                mr_pack_info.content.forEach(e => {
-                                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                                });
-                                instance.setInstalling(false);
-                                let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-                                instance.setJavaPath(r.java_installation);
-                                instance.setJavaVersion(r.java_version);
-                                instance.setMcInstalled(true);
-                            })
-                        } : instance_id ? async () => {
+                        let updateToSpecificVersion = async () => {
+                            let instanceInfo = new Instance(instance_id);
+                            let contentList = instanceInfo.getContent();
                             installButton.innerHTML = '<i class="spinner"></i>Installing...';
                             installButton.classList.add("disabled");
                             installButton.onclick = () => { };
-                            await installSpecificVersion(e, "modrinth", new Instance(instance_id), project_type, content.title, content.author, content.icon_url, content_id)
-                            // await installContent("modrinth", content.id, instance_id, project_type, content.title, content.author, content.icon_url);
-                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
-                        } : (i) => {
-                            let dialog = new Dialog();
-                            let instances = data.getInstances();
-                            dialog.showDialog(`Select Instance to install ${content.title}`, "form", [
-                                {
-                                    "type": "dropdown",
-                                    "name": "Instance",
-                                    "id": "instance",
-                                    "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
+                            let theContent = null;
+                            for (let i = 0; i < contentList.length; i++) {
+                                if (contentList[i].source_info == content.id) {
+                                    theContent = contentList[i];
                                 }
-                            ], [
-                                { "content": "Cancel", "type": "cancel" },
-                                { "content": "Submit", "type": "confirm" }
-                            ], null, async (v) => {
-                                contentInfo.close();
-                                let info = {};
-                                v.forEach(e => { info[e.id] = e.value });
-                                await installSpecificVersion(e, "modrinth", new Instance(info.instance), project_type, content.title, content.author, content.icon_url, content_id)
-                                // await installContent("modrinth", content.id, info.instance, project_type, content.title, content.author, content.icon_url);
-                                displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
-                            });
+                            }
+                            if (!theContent) return;
+                            await updateContent(instanceInfo, theContent, e.version_number);
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+                        }
+                        if (installedVersion && installedVersionIndex > i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Update';
+                            installButton.setAttribute("title", "Update to this Version");
+                            installButton.onclick = updateToSpecificVersion;
+                        } else if (installedVersion && installedVersionIndex < i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>Downgrade';
+                            installButton.setAttribute("title", "Downgrade to this Version");
+                            installButton.onclick = updateToSpecificVersion;
+                        } else {
+                            installButton.onclick = project_type == "modpack" ? () => {
+                                let options = [];
+                                let dialog = new Dialog();
+                                dialog.showDialog(translate("app.button.instances.create"), "form", [
+                                    {
+                                        "type": "image-upload",
+                                        "id": "icon",
+                                        "name": "Icon", //TODO: replace with translate
+                                        "default": content.icon_url
+                                    },
+                                    {
+                                        "type": "text",
+                                        "name": "Name", //TODO
+                                        "id": "name",
+                                        "default": content.title,
+                                        "maxlength": 50
+                                    },
+                                    {
+                                        "type": "dropdown",
+                                        "name": "Game Version",
+                                        "id": "game_version",
+                                        "options": e.game_versions.map(e => ({ "name": e, "value": e })).reverse()
+                                    },
+                                    {
+                                        "type": "dropdown",
+                                        "name": "Mod Loader",
+                                        "id": "loader",
+                                        "options": e.loaders.map(e => ({ "name": loaders[e], "value": e }))
+                                    }
+                                ], [
+                                    { "content": "Cancel", "type": "cancel" },
+                                    { "content": "Submit", "type": "confirm" }
+                                ], [], async (v) => {
+                                    contentInfo.close();
+                                    let info = {};
+                                    v.forEach(e => { info[e.id] = e.value });
+                                    let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                                    let version = e;
+                                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
+                                    instance.setInstalledVersion(version.id);
+                                    showSpecificInstanceContent(instance);
+                                    await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
+                                    let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
+                                    if (!mr_pack_info.loader_version) {
+                                        displayError(mr_pack_info);
+                                        return;
+                                    }
+                                    instance.setLoaderVersion(mr_pack_info.loader_version);
+                                    mr_pack_info.content.forEach(e => {
+                                        instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+                                    });
+                                    instance.setInstalling(false);
+                                    let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+                                    instance.setJavaPath(r.java_installation);
+                                    instance.setJavaVersion(r.java_version);
+                                    instance.setMcInstalled(true);
+                                })
+                            } : instance_id ? async () => {
+                                installButton.innerHTML = '<i class="spinner"></i>Installing...';
+                                installButton.classList.add("disabled");
+                                installButton.onclick = () => { };
+                                await installSpecificVersion(e, "modrinth", new Instance(instance_id), project_type, content.title, author, content.icon_url, content_id)
+                                // await installContent("modrinth", content.id, instance_id, project_type, content.title, content.author, content.icon_url);
+                                installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+                            } : (i) => {
+                                let dialog = new Dialog();
+                                let instances = data.getInstances();
+                                dialog.showDialog(`Select Instance to install ${content.title}`, "form", [
+                                    {
+                                        "type": "dropdown",
+                                        "name": "Instance",
+                                        "id": "instance",
+                                        "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
+                                    }
+                                ], [
+                                    { "content": "Cancel", "type": "cancel" },
+                                    { "content": "Submit", "type": "confirm" }
+                                ], null, async (v) => {
+                                    contentInfo.close();
+                                    let info = {};
+                                    v.forEach(e => { info[e.id] = e.value });
+                                    await installSpecificVersion(e, "modrinth", new Instance(info.instance), project_type, content.title, author, content.icon_url, content_id)
+                                    // await installContent("modrinth", content.id, info.instance, project_type, content.title, content.author, content.icon_url);
+                                    displaySuccess(`${content.title} installed to instance ${(new Instance(info.instance)).name}`);
+                                });
+                            }
                         }
 
                         if (installedVersion == e.version_number) {
@@ -10743,4 +11008,226 @@ async function openShareDialog(title, url, text) {
             "content": "Close"
         }
     ], [], () => { });
+}
+
+async function updateContent(instanceInfo, content, contentversion, forced) {
+    instanceInfo = instanceInfo.refresh();
+    if (content.source == "modrinth") {
+        let res = await fetch(`https://api.modrinth.com/v2/project/${content.source_info}/version`);
+        let version_json = await res.json();
+
+        let foundVersion = false;
+        let initialContent = {};
+        let newVersion = "";
+
+        for (let j = 0; j < version_json.length; j++) {
+            if (version_json[j].game_versions.includes(instanceInfo.vanilla_version) && (content.type != "mod" || version_json[j].loaders.includes(instanceInfo.loader)) && (version_json[j].version_number == contentversion || !contentversion)) {
+                if (version_json[j].version_number == content.version && !forced) {
+                    return;
+                }
+                initialContent = await installSpecificVersion(version_json[j], "modrinth", instanceInfo, content.type, content.name, content.author, content.image, content.source_info, true);
+                newVersion = version_json[j].version_number;
+                foundVersion = true;
+                break;
+            }
+        }
+
+        if (!foundVersion) {
+            content = content.refresh();
+            let alreadyDisabled = content.disabled;
+            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_disable"));
+                return false;
+            }
+            content.setDisabled(true);
+            content.setFileName(new_file_name);
+            if (!alreadyDisabled) displayError(`Disabling '${content.name}' because we can't find a compatible version.`);
+            return false;
+        }
+
+        content = content.refresh();
+
+        let oldFileName = content.file_name;
+        let oldVersion = content.version;
+
+        content.setFileName(initialContent.file_name);
+        content.setVersion(newVersion);
+
+        if (content.disabled) {
+            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_disable"));
+                content.setDisabled(false);
+                return false;
+            }
+            content.setFileName(new_file_name);
+        }
+
+        if (oldFileName != content.file_name) {
+            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
+            if (!success) {
+                displayError("Unable to delete old file (" + oldFileName + ") when updating. Undoing update.");
+                content.setVersion(oldVersion);
+                content.setFileName(oldFileName);
+                let success2 = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
+                if (!success2) {
+                    displayError("Unable to delete new file (" + initialContent.file_name + "). You need to manually fix this or you will have duplicate content");
+                }
+            }
+        }
+    } else if (content.source == "curseforge") {
+        let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instanceInfo.loader);
+        let version_json = await window.electronAPI.getCurseforgePage(content.source_info, 1, content.type == "mod" ? game_flavor : -1);
+        max_pages = Math.ceil(version_json.pagination.totalCount / version_json.pagination.pageSize) + 1;
+        version_json = version_json.data.map(e => ({
+            "game_versions": e.gameVersions,
+            "files": [
+                {
+                    "filename": e.fileName,
+                    "url": (`https://mediafilez.forgecdn.net/files/${Number(e.id.toString().substring(0, 4))}/${Number(e.id.toString().substring(4, 7))}/${encodeURIComponent(e.fileName)}`)
+                }
+            ],
+            "loaders": e.gameVersions.map(e => {
+                return e.toLowerCase();
+            }),
+            "version_number": e.id
+        }));
+
+        let foundVersion = false;
+        let initialContent = {};
+        let newVersion = "";
+
+        for (let j = 0; j < version_json.length; j++) {
+            if (version_json[j].game_versions.includes(instanceInfo.vanilla_version) && (content.type != "mod" || version_json[j].loaders.includes(instanceInfo.loader)) && (version_json[j].version_number == contentversion || !contentversion)) {
+                if (version_json[j].version_number == content.version && !forced) {
+                    return;
+                }
+                initialContent = await installSpecificVersion(version_json[j], "curseforge", instanceInfo, content.type, content.name, content.author, content.image, content.source_info, true);
+                newVersion = version_json[j].version_number;
+                foundVersion = true;
+                break;
+            }
+        }
+
+        if (!initialContent?.type) {
+            let not_found = true;
+            let count = 1;
+            while (not_found) {
+                count++;
+                console.log("Checking page ", count);
+                if (count >= max_pages) {
+                    not_found = false;
+                    continue;
+                }
+                let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instanceInfo.loader);
+                version_json = await window.electronAPI.getCurseforgePage(content.source_info, count, game_flavor);
+                version_json = version_json.data.map(e => ({
+                    "game_versions": e.gameVersions,
+                    "files": [
+                        {
+                            "filename": e.fileName,
+                            "url": (`https://mediafilez.forgecdn.net/files/${Number(e.id.toString().substring(0, 4))}/${Number(e.id.toString().substring(4, 7))}/${encodeURIComponent(e.fileName)}`)
+                        }
+                    ],
+                    "loaders": e.gameVersions.map(e => {
+                        return e.toLowerCase();
+                    }),
+                    "version_number": e.id
+                }));
+                let initialContent = {};
+                for (let j = 0; j < version_json.length; j++) {
+                    if (version_json[j].game_versions.includes(instanceInfo.vanilla_version) && (content.type != "mod" || version_json[j].loaders.includes(instanceInfo.loader)) && (version_json[j].version_number == contentversion || !contentversion)) {
+                        if (version_json[j].version_number == content.version && !forced) {
+                            return;
+                        }
+                        initialContent = await installSpecificVersion(version_json[j], "curseforge", instanceInfo, content.type, content.name, content.author, content.image, content.source_info, true);
+                        newVersion = version_json[j].version_number;
+                        foundVersion = true;
+                        break;
+                    }
+                }
+                if (initialContent?.type) {
+                    not_found = false;
+                }
+            }
+        }
+
+        if (!foundVersion) {
+            content = content.refresh();
+            let alreadyDisabled = content.disabled;
+            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_disable"));
+                return false;
+            }
+            content.setDisabled(true);
+            content.setFileName(new_file_name);
+            if (!alreadyDisabled) displayError(`Disabling '${content.name}' because we can't find a compatible version.`);
+            return false;
+        }
+
+        content = content.refresh();
+
+        let oldFileName = content.file_name;
+        let oldVersion = content.version;
+
+        content.setFileName(initialContent.file_name);
+        content.setVersion(newVersion);
+
+        if (content.disabled) {
+            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_disable"));
+                content.setDisabled(false);
+                return false;
+            }
+            content.setFileName(new_file_name);
+        }
+
+        if (oldFileName != content.file_name) {
+            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
+            if (!success) {
+                displayError("Unable to delete old file (" + oldFileName + ") when updating. Undoing update.");
+                content.setVersion(oldVersion);
+                content.setFileName(oldFileName);
+                let success2 = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
+                if (!success2) {
+                    displayError("Unable to delete new file (" + initialContent.file_name + "). You need to manually fix this or you will have duplicate content");
+                }
+            }
+        }
+    } else if (content.source == "vanilla_tweaks") {
+        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instanceInfo.vanilla_version, instanceInfo.instance_id);
+
+        let oldFileName = content.file_name;
+
+        content.setFileName(file_name);
+
+        if (content.disabled) {
+            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_disable"));
+                content.setDisabled(false);
+                return false;
+            }
+            content.setFileName(new_file_name);
+        }
+
+        if (oldFileName != content.file_name) {
+            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
+            if (!success) {
+                displayError("Unable to delete old file (" + oldFileName + ") when updating. Undoing update.");
+                content.setFileName(oldFileName);
+                let success2 = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, file_name);
+                if (!success2) {
+                    displayError("Unable to delete new file (" + file_name + "). You need to manually fix this or you will have duplicate content");
+                }
+            }
+        }
+    }
+}
+
+function fixPathForImage(path) {
+    return path.replaceAll(" ", "%20").replaceAll("#", "%23");
 }

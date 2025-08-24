@@ -308,8 +308,6 @@ class Minecraft {
     }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) {
         if (!javaArgs || !javaArgs.length) javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(__dirname, "log_config.xml")];
-        console.log(javaArgs);
-        let newJava = new Java();
         this.libs = "";
         this.libNames = [];
         const platform = os.platform();
@@ -483,59 +481,53 @@ class Minecraft {
                 }) : [];
             }
         }
-        if (!fs.existsSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`)) {
-            console.log("Needing to download game.");
-            console.log(`Initializing downloading version ${version}`)
-            await this.downloadGame(loader, version);
-        } else {
-            console.log("Version already installed, collecting info.")
-            let version_json = fs.readFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`);
-            version_json = JSON.parse(version_json);
-            let paths = "";
-            libs: for (let i = 0; i < version_json.libraries.length; i++) {
-                if (version_json.libraries[i].rules) {
-                    rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
-                        let rule = version_json.libraries[i].rules[j];
-                        if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
-                            continue libs;
-                        }
-                        if (rule.action == "disallow" && rule?.os?.name == platformString) {
-                            continue libs;
-                        }
+        console.log("Version already installed, collecting info.")
+        let version_json = fs.readFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`);
+        version_json = JSON.parse(version_json);
+        let paths = "";
+        libs: for (let i = 0; i < version_json.libraries.length; i++) {
+            if (version_json.libraries[i].rules) {
+                rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
+                    let rule = version_json.libraries[i].rules[j];
+                    if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
+                        continue libs;
+                    }
+                    if (rule.action == "disallow" && rule?.os?.name == platformString) {
+                        continue libs;
                     }
                 }
-                let e = version_json.libraries[i];
-                let libName = e.name.split(":");
-                libName.splice(libName.length - 1, 1);
-                libName = libName.join(":");
-                if (!this.libNames?.includes(libName)) {
-                    if (e.downloads.artifact) {
-                        paths += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
-                    }
-                    if (e.downloads.natives && e.downloads.natives[platformString]) {
-                        paths += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.classifiers[e.downloads.natives[platformString]].path}`) + ";";
-                    }
+            }
+            let e = version_json.libraries[i];
+            let libName = e.name.split(":");
+            libName.splice(libName.length - 1, 1);
+            libName = libName.join(":");
+            if (!this.libNames?.includes(libName)) {
+                if (e.downloads.artifact) {
+                    paths += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
                 }
-            };
-            this.libs += paths;
-            this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
-            let java = new Java();
-            this.java_installation = javaPath ? javaPath : await java.getJavaInstallation(version_json.javaVersion.majorVersion);
-            this.java_version = version_json.javaVersion.majorVersion;
-            if (version_json?.arguments?.game) {
-                this.args = version_json.arguments;
-            } else if (version_json?.minecraftArguments) {
-                this.args = version_json.minecraftArguments.split(" ");
+                if (e.downloads.natives && e.downloads.natives[platformString]) {
+                    paths += path.resolve(__dirname, `minecraft/meta/libraries/${e.downloads.classifiers[e.downloads.natives[platformString]].path}`) + ";";
+                }
             }
-            if (loader == "vanilla") this.main_class = version_json.mainClass;
-            this.version_type = version_json.type;
-            this.assets_index = version_json.assets;
-            this.asset_dir = path.resolve(__dirname, "minecraft/meta/assets");
-            if (version_json.assets == "legacy") {
-                this.asset_dir = path.resolve(__dirname, "minecraft/meta/assets/legacy");
-            } else if (version_json.assets == "pre-1.6") {
-                this.asset_dir = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`);
-            }
+        };
+        this.libs += paths;
+        this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+        let java = new Java();
+        this.java_installation = javaPath ? javaPath : await java.getJavaInstallation(version_json.javaVersion.majorVersion);
+        this.java_version = version_json.javaVersion.majorVersion;
+        if (version_json?.arguments?.game) {
+            this.args = version_json.arguments;
+        } else if (version_json?.minecraftArguments) {
+            this.args = version_json.minecraftArguments.split(" ");
+        }
+        if (loader == "vanilla") this.main_class = version_json.mainClass;
+        this.version_type = version_json.type;
+        this.assets_index = version_json.assets;
+        this.asset_dir = path.resolve(__dirname, "minecraft/meta/assets");
+        if (version_json.assets == "legacy") {
+            this.asset_dir = path.resolve(__dirname, "minecraft/meta/assets/legacy");
+        } else if (version_json.assets == "pre-1.6") {
+            this.asset_dir = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`);
         }
         if (loader == "forge" || loader == "neoforge") {
             this.jarfile = this.modded_jarfile;
