@@ -9395,7 +9395,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 let info = {};
                 e.forEach(e => { info[e.id] = e.value });
                 await installContent("modrinth", content.id, info.instance, project_type, content.title, author, content.icon_url);
-                displaySuccess("app.discover.select_instance.success", "%t", content.title, "%i", (new Instance(info.instance)).name);
+                displaySuccess(translate("app.discover.select_instance.success", "%t", content.title, "%i", (new Instance(info.instance)).name));
             });
         }
         let installedVersion = "";
