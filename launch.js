@@ -16,7 +16,7 @@ class Minecraft {
     constructor(instance_id) {
         this.instance_id = instance_id;
     }
-    async installFabric(mcversion, fabricversion) {
+    async installFabric(mcversion, fabricversion, isRepair) {
         ipcRenderer.send('progress-update', "Downloading Fabric", 0, "Download fabric info...");
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${mcversion}/${fabricversion}/profile/json`);
         const data = await fabric_json.json();
@@ -31,7 +31,7 @@ class Minecraft {
             let patha = data.libraries[i].name.split(":");
             patha[0] = patha[0].replaceAll(".", "/");
             patha = patha.join("/") + "/" + fileName;
-            if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+            if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`) || isRepair) {
                 await urlToFile(`https://maven.fabricmc.net/${patha}`, `./minecraft/meta/libraries/${patha}`);
             }
             this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
@@ -43,7 +43,7 @@ class Minecraft {
         this.modded_args_game = data.arguments.game;
         this.modded_args_jvm = data.arguments.jvm;
     }
-    async installQuilt(mcversion, quiltversion) {
+    async installQuilt(mcversion, quiltversion, isRepair) {
         ipcRenderer.send('progress-update', "Downloading Quilt", 0, "Download quilt info...");
         const quilt_json = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcversion}/${quiltversion}/profile/json`);
         const data = await quilt_json.json();
@@ -58,7 +58,7 @@ class Minecraft {
             let patha = data.libraries[i].name.split(":");
             patha[0] = patha[0].replaceAll(".", "/");
             patha = patha.join("/") + "/" + fileName;
-            if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+            if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`) || isRepair) {
                 await urlToFile(data.libraries[i].url + `${patha}`, `./minecraft/meta/libraries/${patha}`);
             }
             this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
@@ -70,7 +70,7 @@ class Minecraft {
         if (data?.arguments?.jvm) this.modded_args_game = data.arguments.game;
         if (data?.arguments?.jvm) this.modded_args_jvm = data.arguments.jvm;
     }
-    async installForge(mcversion, forgeversion) {
+    async installForge(mcversion, forgeversion, isRepair) {
         ipcRenderer.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...");
         const forgeInstallerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
         const forgeMetaDir = path.resolve(__dirname, `minecraft/meta/forge/${mcversion}/${forgeversion}`);
@@ -144,7 +144,7 @@ class Minecraft {
             let installation_path = `${package_.replace(".", "/")}/${name}/${version}`;
             installation_path = path.resolve(__dirname, "minecraft/meta/libraries", installation_path);
             let installation_path_w_file = path.resolve(installation_path, forge_library_path);
-            if (!fs.existsSync(installation_path_w_file)) {
+            if (!fs.existsSync(installation_path_w_file) || isRepair) {
                 zip.extractEntryTo(forge_library_path, installation_path);
             }
 
@@ -161,7 +161,7 @@ class Minecraft {
                     let patha = entry.name.split(":");
                     patha[0] = patha[0].replaceAll(".", "/");
                     patha = patha.join("/") + "/" + fileName;
-                    if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+                    if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`) || isRepair) {
                         await urlToFile(`${entry.url}${patha}`, `./minecraft/meta/libraries/${patha}`);
                     }
                     this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
@@ -175,7 +175,7 @@ class Minecraft {
                     let patha = entry.name.split(":");
                     patha[0] = patha[0].replaceAll(".", "/");
                     patha = patha.join("/") + "/" + fileName;
-                    if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`)) {
+                    if (!fs.existsSync(`./minecraft/meta/libraries/${patha}`) || isRepair) {
                         await urlToFile(`https://maven.creeperhost.net/${patha}`, `./minecraft/meta/libraries/${patha}`);
                     }
                     this.libs += path.resolve(__dirname, `minecraft/meta/libraries/${patha}`) + ";";
@@ -225,7 +225,7 @@ class Minecraft {
 
         ipcRenderer.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
     }
-    async installNeoForge(mcversion, neoforgeversion) {
+    async installNeoForge(mcversion, neoforgeversion, isRepair) {
         ipcRenderer.send('progress-update', "Downloading NeoForge", 0, "Downloading NeoForge installer...");
         const neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeversion}/neoforge-${neoforgeversion}-installer.jar`;
         const neoForgeMetaDir = path.resolve(__dirname, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}`);
@@ -481,7 +481,6 @@ class Minecraft {
                 }) : [];
             }
         }
-        console.log("Version already installed, collecting info.")
         let version_json = fs.readFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`);
         version_json = JSON.parse(version_json);
         let paths = "";
@@ -723,29 +722,26 @@ class Minecraft {
         child.unref();
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
-    async downloadGame(loader, version) {
+    async downloadGame(loader, version, isRepair) {
         if (!this.libNames) this.libNames = [];
         try {
             ipcRenderer.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
-            console.log("Creating directories");
             fs.mkdirSync(`./minecraft/instances/${this.instance_id}/versions/${version}`, { recursive: true });
             fs.mkdirSync(`./minecraft/meta/natives/${this.instance_id}-${version}`, { recursive: true });
             fs.mkdirSync(`./minecraft/instances/${this.instance_id}/logs`, { recursive: true });
-            console.log("Creating empty jar file");
             let files = [`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`]
             files.forEach((e) => {
+                if (isRepair && fs.existsSync(e)) fs.unlinkSync(e);
                 const fd = fs.openSync(e, 'w');
                 fs.closeSync(fd);
             });
             this.version = version;
             ipcRenderer.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
-            console.log("Downloading version manifest");
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
             const version_manifest = await obtainVersionManifest.json();
             let version_json = {};
             for (let i = 0; i < version_manifest.versions.length; i++) {
                 if (version_manifest.versions[i].id == version) {
-                    console.log("Downloading version json");
                     ipcRenderer.send('progress-update', "Downloading Minecraft", 3, "Downloading version info...");
                     const obtainVersionJSON = await fetch(version_manifest.versions[i].url);
                     version_json = await obtainVersionJSON.json();
@@ -757,7 +753,6 @@ class Minecraft {
                 return;
             }
             fs.writeFileSync(`./minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`, JSON.stringify(version_json));
-            console.log("Downloading asset json");
             ipcRenderer.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
             const assetJSON = await fetch(version_json.assetIndex.url);
             let asset_json = await assetJSON.json();
@@ -765,36 +760,31 @@ class Minecraft {
             fs.mkdirSync(`./minecraft/meta/assets/objects`, { recursive: true });
             fs.writeFileSync(`./minecraft/meta/assets/indexes/${version_json.assets}.json`, JSON.stringify(asset_json));
             let assetKeys = Object.keys(asset_json.objects);
-            console.log("Downloading Assets");
             for (let i = 0; i < assetKeys.length; i++) {
                 ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
-                console.log(`Downloading asset ${i + 1} of ${assetKeys.length}`);
                 let asset_data = asset_json.objects[assetKeys[i]];
                 if (version_json.assets == "legacy") {
-                    if (!fs.existsSync(`./minecraft/meta/assets/legacy/${assetKeys[i]}`)) {
+                    if (!fs.existsSync(`./minecraft/meta/assets/legacy/${assetKeys[i]}`) || isRepair) {
                         await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, `./minecraft/meta/assets/legacy/${assetKeys[i]}`);
                     }
                 } else if (version_json.assets == "pre-1.6") {
-                    if (!fs.existsSync(`./minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`)) {
+                    if (!fs.existsSync(`./minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`) || isRepair) {
                         await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, `./minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`);
                     }
                 } else {
-                    if (!fs.existsSync(`./minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`)) {
+                    if (!fs.existsSync(`./minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`) || isRepair) {
                         await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, `./minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`);
                     }
                 }
             }
             this.asset_dir = version_json.assets == "legacy" ? path.resolve(__dirname, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(__dirname, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(__dirname, "minecraft/meta/assets");
-            console.log("asset directory set to " + this.asset_dir);
-            console.log("Downloading jar file");
             ipcRenderer.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
             await urlToFile(version_json.downloads.client.url, `./minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             this.jarfile = path.resolve(__dirname, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
             let java = new Java();
             let paths = "";
-            console.log("Checking java installation");
             ipcRenderer.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
-            this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion);
+            this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion, isRepair);
             this.java_version = version_json.javaVersion.majorVersion;
             const platform = os.platform();
             const getPlatformString = () => {
@@ -828,8 +818,7 @@ class Minecraft {
                     }
                 }
                 if (version_json.libraries[i].downloads.artifact) {
-                    console.log("Downloading library " + version_json.libraries[i].downloads.artifact.path);
-                    if (!fs.existsSync(`./minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`)) {
+                    if (!fs.existsSync(`./minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`) || isRepair) {
                         await urlToFile(version_json.libraries[i].downloads.artifact.url, `./minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`);
                     }
                     let libName = version_json.libraries[i].name.split(":");
@@ -841,8 +830,7 @@ class Minecraft {
                     this.libNames.push(libName);
                 }
                 if (version_json.libraries[i].natives && version_json.libraries[i].natives[platformString]) {
-                    console.log("Downloading library (with natives) " + version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path);
-                    if (!fs.existsSync(`./minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`)) {
+                    if (!fs.existsSync(`./minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`) || isRepair) {
                         await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].url, `./minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`);
                     }
                     let libName = version_json.libraries[i].name.split(":");
@@ -852,7 +840,6 @@ class Minecraft {
                         paths += path.resolve(__dirname, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`) + ";";
                     }
                     this.libNames.push(libName);
-                    console.log("Native found, extracting jar file.");
                     await extractJar(`./minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`, `./minecraft/meta/natives/${this.instance_id}-${version}`);
                 }
             }
@@ -898,9 +885,8 @@ class Java {
             }
         }
     }
-    async downloadJava(version) {
+    async downloadJava(version, isRepair) {
         ipcRenderer.send('progress-update', "Downloading Java", 0, "Starting java download...");
-        console.log("Initializing downloading java " + version);
         const installDir = `./java/java-${version}`;
         const platform = os.platform(); // 'win32', 'linux', 'darwin'
         const arch = os.arch(); // 'x64', 'arm64', etc.
@@ -908,9 +894,6 @@ class Java {
             if (platform === 'win32') return 'windows';
             if (platform === 'darwin') return 'macos';
             return 'linux';
-        };
-        const getArchiveExtension = () => {
-            return platform === 'win32' ? 'zip' : 'tar.gz';
         };
         const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${getPlatformString()}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
 
@@ -922,18 +905,14 @@ class Java {
             throw new Error('No JRE binaries found.');
         }
 
-        console.log(data);
-
         const binary = data[0];
         const downloadUrl = binary.download_url;
         const fileName = path.basename(downloadUrl);
         const downloadPath = "./java/" + fileName;
 
-        console.log(`Downloading java...`);
         ipcRenderer.send('progress-update', "Downloading Java", 10, "Fetching java zip...");
         await urlToFile(downloadUrl, downloadPath);
         ipcRenderer.send('progress-update', "Downloading Java", 60, "Extracting java zip...");
-        console.log(`Extracting java...`);
         let name = "";
         if (fileName.endsWith('.zip')) {
             const zip = new AdmZip(downloadPath);
@@ -941,54 +920,21 @@ class Java {
             const items = fs.readdirSync(installDir, { withFileTypes: true });
             const dirs = items.filter(item => item.isDirectory());
 
-            if (dirs.length === 1) {
-                name = dirs[0].name;
-            }
+            name = dirs[dirs.length - 1].name;
         } else {
-            console.error("AHHHHHHHHHH");
+            throw new Error("Isn't a .zip file?");
         }
         ipcRenderer.send('progress-update', "Downloading Java", 95, "Deleting old zip...");
 
         fs.unlinkSync(downloadPath);
         ipcRenderer.send('progress-update', "Downloading Java", 98, "Remembering version...");
         this.versions["java-" + version] = path.resolve(__dirname, `java/java-${version}/${name}/bin/javaw.exe`);
-        console.log(this.versions);
         fs.writeFileSync("./java/versions.json", JSON.stringify(this.versions), 'utf-8');
-        console.log("Java installation complete");
         ipcRenderer.send('progress-update', "Downloading Java", 100, "Done");
-
-        // const JAVAC = path.resolve(__dirname, `java/java-${version}/${name}/bin/javac.exe`);
-        // const JAR = path.resolve(__dirname, `java/java-${version}/${name}/bin/jar.exe`);
-
-        // execFile(JAVAC, [
-        //     '--release', version,
-        //     '-d',`./java/java-${version}`,
-        //     './quit_agent/QuitAgentImpl.java',
-        //     './quit_agent/QuitAgent.java'
-        // ], (err, stdout, stderr) => {
-        //     if (err) {
-        //         console.error('Compile error:', stderr);
-        //         return;
-        //     }
-        //     console.log('✔ Java files compiled');
-
-        //     execFile(JAR, [
-        //         'cmf',
-        //         './quit_agent/MANIFEST.MF',
-        //         `./java/java-${version}/QuitAgentImpl.jar`,
-        //         `./java/java-${version}/QuitAgentImpl.class`,
-        //     ], (err2, stdout2, stderr2) => {
-        //         if (err2) {
-        //             console.error('JAR error:', stderr2);
-        //             return;
-        //         }
-        //         console.log('✔ QuitAgentImpl.jar created');
-        //     });
-        // });
     }
-    async getJavaInstallation(version) {
-        if (!this.versions["java-" + version]) {
-            await this.downloadJava(version);
+    async getJavaInstallation(version, isRepair) {
+        if (!this.versions["java-" + version] || isRepair) {
+            await this.downloadJava(version, isRepair);
         }
         return this.versions["java-" + version];
     }

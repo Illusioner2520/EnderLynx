@@ -803,7 +803,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             req.write(h);
             req.end();
         });
-        console.log(data_vt);
         data_vt = JSON.parse(data_vt);
         if (data_vt.link) {
             const resourcepacksDir = `./minecraft/instances/${instance_id}/resourcepacks`;
@@ -999,6 +998,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
             await mc.installNeoForge(vanilla_version, loader_version);
         } else if (loader == "quilt") {
             await mc.installQuilt(vanilla_version, loader_version);
+        }
+        return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
+    },
+    repairMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
+        let mc = new Minecraft(instance_id);
+        let r = await mc.downloadGame(loader, vanilla_version, true);
+        if (loader == "fabric") {
+            await mc.installFabric(vanilla_version, loader_version, true);
+        } else if (loader == "forge") {
+            await mc.installForge(vanilla_version, loader_version, true);
+        } else if (loader == "neoforge") {
+            await mc.installNeoForge(vanilla_version, loader_version, true);
+        } else if (loader == "quilt") {
+            await mc.installQuilt(vanilla_version, loader_version, true);
         }
         return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
     },

@@ -2032,8 +2032,16 @@ dialog[open]::backdrop {
     cursor: pointer;
 }
 
+.discover-item.incompatible {
+    background-color: color-mix(in srgb, 80% transparent, var(--danger-color));
+}
+
 .discover-item:not(:has(.discover-item-install:hover)):hover {
     background-color: var(--color-2);
+}
+
+.discover-item.incompatible:not(:has(.discover-item-install:hover)):hover {
+    background-color: color-mix(in srgb, 60% transparent, var(--danger-color));
 }
 
 .discover-item-image {
