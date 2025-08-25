@@ -7808,7 +7808,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     title.innerHTML = translate("app.discover.add_content");
     titleTop.appendChild(title);
     if (instance_id) titleTop.appendChild(backButton);
-    if (!instance_id) title.innerHTML = translate("app.discover.discover");
+    if (!instance_id) title.innerHTML = translate("app.discover.title");
     let ele = document.createElement("div");
     ele.classList.add("instance-content");
     ele.appendChild(titleTop);
