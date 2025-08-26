@@ -4657,7 +4657,7 @@ function showInstanceSettings(instanceInfo) {
             "type": "button",
             "name": translate("app.instances.repair"),
             "icon": '<i class="fa-solid fa-wrench"></i>',
-            "tab": "installation",
+            "tab": instanceInfo.locked ? "general" : "installation",
             "func": () => {
                 let dialog = new Dialog();
                 dialog.showDialog(translate("app.instances.repair.title"), "notice", translate("app.instances.repair.notice"), [
@@ -8215,108 +8215,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
         element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.hits.length; i++) {
             let e = apiresult.hits[i];
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), project_type == "modpack" ? (i) => {
-                let options = [];
-                i.categories.forEach((e) => {
-                    if (loaders[e]) {
-                        options.push({ "name": loaders[e], "value": e })
-                    }
-                })
-                let dialog = new Dialog();
-                dialog.showDialog(translate("app.button.instances.create"), "form", [
-                    {
-                        "type": "image-upload",
-                        "id": "icon",
-                        "name": translate("app.instances.icon"),
-                        "default": i.icon_url
-                    },
-                    {
-                        "type": "text",
-                        "name": translate("app.instances.name"),
-                        "id": "name",
-                        "default": i.title,
-                        "maxlength": 50
-                    },
-                    {
-                        "type": "dropdown",
-                        "name": translate("app.instances.game_version"),
-                        "id": "game_version",
-                        "options": i.versions.map(e => ({ "name": e, "value": e })).reverse()
-                    },
-                    {
-                        "type": "dropdown",
-                        "name": translate("app.instances.loader"),
-                        "id": "loader",
-                        "options": options
-                    }
-                ], [
-                    { "content": translate("app.instances.cancel"), "type": "cancel" },
-                    { "content": translate("app.instances.submit"), "type": "confirm" }
-                ], [], async (e) => {
-                    let info = {};
-                    e.forEach(e => { info[e.id] = e.value });
-                    let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                    let res = await fetch(`https://api.modrinth.com/v2/project/${i.project_id}/version`);
-                    let version_json = await res.json();
-                    let version = {};
-                    for (let j = 0; j < version_json.length; j++) {
-                        if (version_json[j].game_versions.includes(info.game_version) && version_json[j].loaders.includes(info.loader)) {
-                            version = version_json[j];
-                            break;
-                        }
-                    }
-                    if (!version.files) {
-                        displayError(translate("app.discover.error_creating_modpack", "%t", i.title, "%v", info.game_version, "%l", loaders[info.loader]));
-                        return;
-                    }
-                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", i.project_id, true, false);
-                    instance.setInstalledVersion(version.id);
-                    showSpecificInstanceContent(instance);
-                    await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, i.title);
-                    let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, i.title);
-                    if (!mr_pack_info.loader_version) {
-                        displayError(mr_pack_info);
-                        return;
-                    }
-                    instance.setLoaderVersion(mr_pack_info.loader_version);
-                    mr_pack_info.content.forEach(e => {
-                        instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                    });
-                    instance.setInstalling(false);
-                    let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-                    instance.setJavaPath(r.java_installation);
-                    instance.setJavaVersion(r.java_version);
-                    instance.setMcInstalled(true);
-                })
-            } : instance_id ? async (i, button) => {
-                button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                button.classList.add("disabled");
-                button.onclick = () => { };
-                let success = await installContent("modrinth", i.project_id, instance_id, project_type, i.title, i.author, i.icon_url);
-                if (success) {
-                    button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                } else {
-                    button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
-                }
-            } : (i) => {
-                let dialog = new Dialog();
-                let instances = data.getInstances();
-                dialog.showDialog(translate("app.discover.select_instance.title", "%t", i.title), "form", [
-                    {
-                        "type": "dropdown",
-                        "name": translate("app.discover.select_instance.instance"),
-                        "id": "instance",
-                        "options": project_type == "mod" ? instances.filter(e => i.categories.includes(e.loader)).filter(e => i.versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => i.versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => i.versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(i.versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
-                    }
-                ], [
-                    { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                    { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-                ], null, async (e) => {
-                    let info = {};
-                    e.forEach(e => { info[e.id] = e.value });
-                    await installContent("modrinth", i.project_id, info.instance, project_type, i.title, i.author, i.icon_url);
-                    displaySuccess(translate("app.discover.select_instance.success", "%t", i.title, "%i", (new Instance(info.instance)).name));
-                });
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
+                installButtonClick(project_type, "modrinth", i.categories, i.icon_url, i.title, i.author, i.versions, i.project_id, instance_id, button, null)
             }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id));
             element.appendChild(entry.element);
         }
@@ -8416,84 +8316,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
         element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.data.length; i++) {
             let e = apiresult.data[i];
-            let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), project_type == "modpack" ? (i) => {
-                let options = [];
-                let dialog = new Dialog();
-                dialog.showDialog(translate("app.button.instances.create"), "form", [
-                    {
-                        "type": "image-upload",
-                        "id": "icon",
-                        "name": translate("app.instances.icon"),
-                        "default": e.thumbnailUrl
-                    },
-                    {
-                        "type": "text",
-                        "name": translate("app.instances.name"),
-                        "id": "name",
-                        "default": e.name,
-                        "maxlength": 50
-                    }
-                ], [
-                    { "content": translate("app.instances.cancel"), "type": "cancel" },
-                    { "content": translate("app.instances.submit"), "type": "confirm" }
-                ], [], async (ed) => {
-                    let info = {};
-                    ed.forEach(ed => { info[ed.id] = ed.value });
-                    let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                    let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
-                    let res = await fetch(`https://www.curseforge.com/api/v1/mods/${e.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true${project_type == "mod" ? "&gameFlavorId=" + game_flavor : ""}`);
-                    let version_json = await res.json();
-                    let version = version_json.data[0];
-                    let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", e.id, true, false);
-                    instance.setInstalledVersion(version.id);
-                    showSpecificInstanceContent(instance);
-                    await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), e.name);
-                    let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, e.id, e.name);
-                    if (!mr_pack_info.loader_version) {
-                        displayError(mr_pack_info);
-                        return;
-                    }
-                    instance.setLoader(mr_pack_info.loader);
-                    instance.setVanillaVersion(mr_pack_info.vanilla_version);
-                    instance.setLoaderVersion(mr_pack_info.loader_version);
-                    mr_pack_info.content.forEach(e => {
-                        instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                    });
-                    instance.setInstalling(false);
-                    let r = await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
-                    instance.setJavaPath(r.java_installation);
-                    instance.setJavaVersion(r.java_version);
-                    instance.setMcInstalled(true);
-                })
-            } : instance_id ? async (i, button) => {
-                button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                button.classList.add("disabled");
-                button.onclick = () => { };
-                let success = await installContent("curseforge", i.id, instance_id, project_type, i.name, i.author.username, i.thumbnailUrl);
-                if (success) {
-                    button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                } else {
-                    button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
-                }
-            } : (i) => {
-                let dialog = new Dialog();
-                let instances = data.getInstances();
-                dialog.showDialog(translate("app.discover.select_instance.title", "%t", i.name), "form", [
-                    {
-                        "type": "dropdown",
-                        "name": translate("app.discover.select_instance.instance"),
-                        "id": "instance",
-                        "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
-                    }
-                ], [
-                    { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                    { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-                ], null, async (e) => {
-                    let info = {};
-                    e.forEach(e => { info[e.id] = e.value });
-                    await installContent("curseforge", i.id, info.instance, project_type, i.name, i.author.username, i.thumbnailUrl);
-                    displaySuccess(translate("app.discover.select_instance.success", "%t", i.name, "%i", (new Instance(info.instance)).name));
-                });
+            let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
+                installButtonClick(project_type, "curseforge", [], e.thumbnailUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
             }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"));
             element.appendChild(entry.element);
         }
@@ -9295,108 +9119,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         let installButton = document.createElement("button");
         installButton.className = "content-top-install-button";
         installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
-        let button = installButton;
-        let project_type = content.project_type;
-        installButton.onclick = project_type == "modpack" ? () => {
-            let options = [];
-            content.loaders.forEach((e) => {
-                if (loaders[e]) {
-                    options.push({ "name": loaders[e], "value": e })
-                }
-            })
-            let dialog = new Dialog();
-            dialog.showDialog(translate("app.button.instances.create"), "form", [
-                {
-                    "type": "image-upload",
-                    "id": "icon",
-                    "name": translate("app.instances.icon"),
-                    "default": content.icon_url
-                },
-                {
-                    "type": "text",
-                    "name": translate("app.instances.name"),
-                    "id": "name",
-                    "default": content.title,
-                    "maxlength": 50
-                },
-                {
-                    "type": "dropdown",
-                    "name": translate("app.instances.game_version"),
-                    "id": "game_version",
-                    "options": content.game_versions.map(e => ({ "name": e, "value": e })).reverse()
-                },
-                {
-                    "type": "dropdown",
-                    "name": translate("app.instances.loader"),
-                    "id": "loader",
-                    "options": options
-                }
-            ], [
-                { "content": translate("app.instances.cancel"), "type": "cancel" },
-                { "content": translate("app.instances.submit"), "type": "confirm" }
-            ], [], async (e) => {
-                contentInfo.close();
-                let info = {};
-                e.forEach(e => { info[e.id] = e.value });
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                let res = await fetch(`https://api.modrinth.com/v2/project/${content.id}/version`);
-                let version_json = await res.json();
-                let version = {};
-                for (let j = 0; j < version_json.length; j++) {
-                    if (version_json[j].game_versions.includes(info.game_version) && version_json[j].loaders.includes(info.loader)) {
-                        version = version_json[j];
-                        break;
-                    }
-                }
-                if (!version.files) {
-                    displayError(translate("app.discover.error_creating_modpack", "%t", content.title, "%v", info.game_version, "%l", loaders[info.loader]));
-                    return;
-                }
-                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
-                instance.setInstalledVersion(version.id);
-                showSpecificInstanceContent(instance);
-                await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
-                let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
-                if (!mr_pack_info.loader_version) {
-                    displayError(mr_pack_info);
-                    return;
-                }
-                instance.setLoaderVersion(mr_pack_info.loader_version);
-                mr_pack_info.content.forEach(e => {
-                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                });
-                instance.setInstalling(false);
-                let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setMcInstalled(true);
-            })
-        } : instance_id ? async () => {
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-            button.classList.add("disabled");
-            button.onclick = () => { };
-            await installContent("modrinth", content.id, instance_id, project_type, content.title, author, content.icon_url);
-            button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-        } : (i) => {
-            let dialog = new Dialog();
-            let instances = data.getInstances();
-            dialog.showDialog(translate("app.discover.select_instance.title", "%t", content.title), "form", [
-                {
-                    "type": "dropdown",
-                    "name": translate("app.discover.select_instance.instance"),
-                    "id": "instance",
-                    "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
-                }
-            ], [
-                { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-            ], null, async (e) => {
-                contentInfo.close();
-                let info = {};
-                e.forEach(e => { info[e.id] = e.value });
-                await installContent("modrinth", content.id, info.instance, project_type, content.title, author, content.icon_url);
-                displaySuccess(translate("app.discover.select_instance.success", "%t", content.title, "%i", (new Instance(info.instance)).name));
-            });
+        installButton.onclick = () => {
+            installButtonClick(content.project_type, "modrinth", content.loaders, content.icon_url, content.title, author, content.game_versions, content.id, instance_id, installButton, contentInfo);
         }
         let installedVersion = "";
         if (content_ids.includes(content.id.toString())) {
@@ -9567,7 +9291,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         filterVersions(versionDropdown.value, loaderDropdown.value, v);
                     })
                     topFilters.appendChild(mcVersionFilter);
-                    if (["modpack", "mod"].includes(project_type)) topFilters.appendChild(mcLoaderFilter);
+                    if (["modpack", "mod"].includes(content.project_type)) topFilters.appendChild(mcLoaderFilter);
                     topFilters.appendChild(channelFilter);
                     tabContent.appendChild(topFilters);
                     let wrapper = document.createElement("div");
@@ -9715,89 +9439,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
                             installButton.onclick = updateToSpecificVersion;
                         } else {
-                            installButton.onclick = project_type == "modpack" ? () => {
-                                let options = [];
-                                let dialog = new Dialog();
-                                dialog.showDialog(translate("app.button.instances.create"), "form", [
-                                    {
-                                        "type": "image-upload",
-                                        "id": "icon",
-                                        "name": translate("app.instances.icon"),
-                                        "default": content.icon_url
-                                    },
-                                    {
-                                        "type": "text",
-                                        "name": translate("app.instances.name"),
-                                        "id": "name",
-                                        "default": content.title,
-                                        "maxlength": 50
-                                    },
-                                    {
-                                        "type": "dropdown",
-                                        "name": translate("app.instances.game_version"),
-                                        "id": "game_version",
-                                        "options": e.game_versions.map(e => ({ "name": e, "value": e })).reverse()
-                                    },
-                                    {
-                                        "type": "dropdown",
-                                        "name": translate("app.instances.loader"),
-                                        "id": "loader",
-                                        "options": e.loaders.map(e => ({ "name": loaders[e], "value": e }))
-                                    }
-                                ], [
-                                    { "content": translate("app.instances.cancel"), "type": "cancel" },
-                                    { "content": translate("app.instances.submit"), "type": "confirm" }
-                                ], [], async (v) => {
-                                    contentInfo.close();
-                                    let info = {};
-                                    v.forEach(e => { info[e.id] = e.value });
-                                    let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                                    let version = e;
-                                    let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, "modrinth", content.id, true, false);
-                                    instance.setInstalledVersion(version.id);
-                                    showSpecificInstanceContent(instance);
-                                    await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, content.title);
-                                    let mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, content.title);
-                                    if (!mr_pack_info.loader_version) {
-                                        displayError(mr_pack_info);
-                                        return;
-                                    }
-                                    instance.setLoaderVersion(mr_pack_info.loader_version);
-                                    mr_pack_info.content.forEach(e => {
-                                        instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                                    });
-                                    instance.setInstalling(false);
-                                    let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-                                    instance.setJavaPath(r.java_installation);
-                                    instance.setJavaVersion(r.java_version);
-                                    instance.setMcInstalled(true);
-                                })
-                            } : instance_id ? async () => {
-                                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                                installButton.classList.add("disabled");
-                                installButton.onclick = () => { };
-                                await installSpecificVersion(e, "modrinth", new Instance(instance_id), project_type, content.title, author, content.icon_url, content_id)
-                                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                            } : (i) => {
-                                let dialog = new Dialog();
-                                let instances = data.getInstances();
-                                dialog.showDialog(translate("app.discover.select_instance.title", "%t", content.title), "form", [
-                                    {
-                                        "type": "dropdown",
-                                        "name": translate("app.discover.select_instance.instance"),
-                                        "id": "instance",
-                                        "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
-                                    }
-                                ], [
-                                    { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                                    { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-                                ], null, async (v) => {
-                                    contentInfo.close();
-                                    let info = {};
-                                    v.forEach(e => { info[e.id] = e.value });
-                                    await installSpecificVersion(e, "modrinth", new Instance(info.instance), project_type, content.title, author, content.icon_url, content_id)
-                                    displaySuccess(translate("app.discover.select_instance.success", "%t", content.title, "%i", (new Instance(info.instance)).name));
-                                });
+                            installButton.onclick = () => {
+                                installButtonClick(content.project_type, "modrinth", e.loaders, content.icon_url, content.title, author, e.game_versions, content_id, instance_id, installButton, contentInfo, e);
                             }
                         }
 
@@ -10057,87 +9700,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         let installButton = document.createElement("button");
         installButton.className = "content-top-install-button";
         installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
-        let button = installButton;
-        installButton.onclick = project_type == "modpack" ? (i) => {
-            let options = [];
-            let dialog = new Dialog();
-            dialog.showDialog(translate("app.button.instances.create"), "form", [
-                {
-                    "type": "image-upload",
-                    "id": "icon",
-                    "name": translate("app.instances.icon"),
-                    "default": content.data.logo.thumbnailUrl
-                },
-                {
-                    "type": "text",
-                    "name": translate("app.instances.name"),
-                    "id": "name",
-                    "default": content.data.name,
-                    "maxlength": 50
-                }
-            ], [
-                { "content": translate("app.instances.cancel"), "type": "cancel" },
-                { "content": translate("app.instances.submit"), "type": "confirm" }
-            ], [], async (ed) => {
-                contentInfo.close();
-                let info = {};
-                ed.forEach(ed => { info[ed.id] = ed.value });
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
-                let res = await fetch(`https://www.curseforge.com/api/v1/mods/${content.data.id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true${project_type == "mod" ? "&gameFlavorId=" + game_flavor : ""}`);
-                let version_json = await res.json();
-                let version = version_json.data[0];
-                let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", content.data.id, true, false);
-                instance.setInstalledVersion(version.id);
-                showSpecificInstanceContent(instance);
-                await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), content.data.name);
-                let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, content.data.id, content.data.name);
-                if (!mr_pack_info.loader_version) {
-                    displayError(mr_pack_info);
-                    return;
-                }
-                instance.setLoader(mr_pack_info.loader);
-                instance.setVanillaVersion(mr_pack_info.vanilla_version);
-                instance.setLoaderVersion(mr_pack_info.loader_version);
-                mr_pack_info.content.forEach(e => {
-                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                });
-                instance.setInstalling(false);
-                let r = await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setMcInstalled(true);
-            })
-        } : instance_id ? async () => {
-            installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-            installButton.classList.add("disabled");
-            installButton.onclick = () => { };
-            let success = await installContent("curseforge", content.data.id, instance_id, project_type, content.data.name, content.data.authors[0].name, content.data.logo.thumbnailUrl);
-            if (success) {
-                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-            } else {
-                installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
-            }
-        } : (i) => {
-            let dialog = new Dialog();
-            let instances = data.getInstances();
-            dialog.showDialog(translate("app.discover.select_instance.title", "%t", content.data.name), "form", [
-                {
-                    "type": "dropdown",
-                    "name": translate("app.discover.select_instance.instance"),
-                    "id": "instance",
-                    "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
-                }
-            ], [
-                { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-            ], null, async (e) => {
-                contentInfo.close();
-                let info = {};
-                e.forEach(e => { info[e.id] = e.value });
-                await installContent("curseforge", content.data.id, info.instance, project_type, content.data.name, content.data.authors[0].name, content.data.logo.thumbnailUrl);
-                displaySuccess(translate("app.discover.select_instance.success"), "%t", content.data.name, "%i", (new Instance(info.instance)).name);
-            });
+        installButton.onclick = () => {
+            installButtonClick(project_type, "curseforge", [], content.data.logo.thumbnailUrl, content.data.name, content.data.authors[0].name, [], content.data.id, instance_id, installButton, contentInfo);
         }
         let installedVersion = "";
         if (content_ids.includes(content.data.id + ".0")) {
@@ -10437,110 +10001,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
                         }
                         installButton.className = "version-file-install"
-                        installButton.onclick = project_type == "modpack" ? () => {
-                            let dialog = new Dialog();
-                            dialog.showDialog(translate("app.button.instances.create"), "form", [
-                                {
-                                    "type": "image-upload",
-                                    "id": "icon",
-                                    "name": translate("app.instances.icon"),
-                                    "default": content.data.logo.thumbnailUrl
-                                },
-                                {
-                                    "type": "text",
-                                    "name": translate("app.instances.name"),
-                                    "id": "name",
-                                    "default": content.data.name,
-                                    "maxlength": 50
-                                }
-                            ], [
-                                { "content": translate("app.instances.cancel"), "type": "cancel" },
-                                { "content": translate("app.instances.submit"), "type": "confirm" }
-                            ], [], async (ed) => {
-                                contentInfo.close();
-                                let info = {};
-                                ed.forEach(ed => { info[ed.id] = ed.value });
-                                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                                let version = e;
-                                let instance = data.addInstance(info.name, new Date(), new Date(), "", "", "", "", true, true, "", info.icon, instance_id, 0, "curseforge", content.data.id, true, false);
-                                instance.setInstalledVersion(version.id);
-                                showSpecificInstanceContent(instance);
-                                await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), content.data.name);
-                                let mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, content.data.id, content.data.name);
-                                if (!mr_pack_info.loader_version) {
-                                    displayError(mr_pack_info);
-                                    return;
-                                }
-                                instance.setLoader(mr_pack_info.loader);
-                                instance.setVanillaVersion(mr_pack_info.vanilla_version);
-                                instance.setLoaderVersion(mr_pack_info.loader_version);
-                                mr_pack_info.content.forEach(e => {
-                                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
-                                });
-                                instance.setInstalling(false);
-                                let r = await window.electronAPI.downloadMinecraft(instance_id, mr_pack_info.loader, mr_pack_info.vanilla_version, mr_pack_info.loader_version);
-                                instance.setJavaPath(r.java_installation);
-                                instance.setJavaVersion(r.java_version);
-                                instance.setMcInstalled(true);
-                            })
-                        } : instance_id ? async () => {
-                            installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                            installButton.classList.add("disabled");
-                            installButton.onclick = () => { };
-                            let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${content_id}/dependencies?index=0&pageSize=100`);
-                            let dependencies_json = await dependencies.json();
-                            let dependency_list = dependencies_json.data;
-                            await installSpecificVersion({
-                                "game_versions": e.gameVersions,
-                                "files": [
-                                    {
-                                        "filename": e.fileName,
-                                        "url": (`https://mediafilez.forgecdn.net/files/${Number(e.id.toString().substring(0, 4))}/${Number(e.id.toString().substring(4, 7))}/${encodeURIComponent(e.fileName)}`)
-                                    }
-                                ],
-                                "loaders": e.gameVersions.map(e => {
-                                    return e.toLowerCase();
-                                }),
-                                "version_number": e.id,
-                                "dependencies": dependency_list
-                            }, "curseforge", new Instance(instance_id), project_type, content.data.name, content.data.authors[0].name, content.data.logo.thumbnailUrl, content_id)
-                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                        } : (i) => {
-                            let dialog = new Dialog();
-                            let instances = data.getInstances();
-                            dialog.showDialog(translate("app.discover.select_instance.title", "%t", content.title), "form", [
-                                {
-                                    "type": "dropdown",
-                                    "name": translate("app.discover.select_instance.instance"),
-                                    "id": "instance",
-                                    "options": project_type == "mod" ? instances.filter(e => content.loaders.includes(e.loader)).filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(content.game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id }))
-                                }
-                            ], [
-                                { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                                { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-                            ], null, async (v) => {
-                                contentInfo.close();
-                                let info = {};
-                                v.forEach(e => { info[e.id] = e.value });
-                                let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${content_id}/dependencies?index=0&pageSize=100`);
-                                let dependencies_json = await dependencies.json();
-                                let dependency_list = dependencies_json.data;
-                                await installSpecificVersion({
-                                    "game_versions": e.gameVersions,
-                                    "files": [
-                                        {
-                                            "filename": e.fileName,
-                                            "url": (`https://mediafilez.forgecdn.net/files/${Number(e.id.toString().substring(0, 4))}/${Number(e.id.toString().substring(4, 7))}/${encodeURIComponent(e.fileName)}`)
-                                        }
-                                    ],
-                                    "loaders": e.gameVersions.map(e => {
-                                        return e.toLowerCase();
-                                    }),
-                                    "version_number": e.id,
-                                    "dependencies": dependency_list
-                                }, "curseforge", new Instance(info.instance), project_type, content.data.name, content.data.authors[0].name, content.data.logo.thumbnailUrl, content_id)
-                                displaySuccess(translate("app.discover.select_instance.success", "%t", content.data.name, "%i", (new Instance(info.instance)).name));
-                            });
+                        installButton.onclick = () => {
+                            installButtonClick(project_type, "curseforge", [], content.data.logo.thumbnailUrl, content.data.name, content.data.authors[0].name, e.gameVersions, content_id, instance_id, installButton, contentInfo, e);
                         }
 
                         if (Number(installedVersion) == Number(e.id)) {
@@ -11215,4 +10677,191 @@ async function repairInstance(instance) {
     instance.setJavaPath(r.java_installation);
     instance.setJavaVersion(r.java_version);
     instance.setMcInstalled(true);
+}
+
+async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version) {
+    if (project_type == "modpack") {
+        let options = [];
+        if (source == "modrinth") content_loaders.forEach((e) => {
+            if (loaders[e]) {
+                options.push({ "name": loaders[e], "value": e })
+            }
+        })
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.button.instances.create"), "form", [
+            {
+                "type": "image-upload",
+                "id": "icon",
+                "name": translate("app.instances.icon"),
+                "default": icon
+            },
+            {
+                "type": "text",
+                "name": translate("app.instances.name"),
+                "id": "name",
+                "default": title,
+                "maxlength": 50
+            },
+            source == "modrinth" ? {
+                "type": "dropdown",
+                "name": translate("app.instances.game_version"),
+                "id": "game_version",
+                "options": game_versions.map(e => ({ "name": e, "value": e })).reverse()
+            } : null,
+            source == "modrinth" ? {
+                "type": "dropdown",
+                "name": translate("app.instances.loader"),
+                "id": "loader",
+                "options": options
+            } : null
+        ].filter(e => e), [
+            { "content": translate("app.instances.cancel"), "type": "cancel" },
+            { "content": translate("app.instances.submit"), "type": "confirm" }
+        ], [], async (e) => {
+            if (dialog_to_close) dialog_to_close.close();
+            let info = {};
+            e.forEach(e => { info[e.id] = e.value });
+            let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+            let files_url = `https://api.modrinth.com/v2/project/${project_id}/version`;
+            if (source == "curseforge") {
+                files_url = `https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true`
+            }
+            let version_json = {};
+            if (!override_version) {
+                let res = await fetch(files_url);
+                version_json = await res.json();
+            }
+            let version = override_version ? override_version : {};
+            if (source == "modrinth" && !override_version) {
+                for (let j = 0; j < version_json.length; j++) {
+                    if (version_json[j].game_versions.includes(info.game_version) && version_json[j].loaders.includes(info.loader)) {
+                        version = version_json[j];
+                        break;
+                    }
+                }
+            } else if (source == "curseforge" && !override_version) {
+                version = version_json.data[0];
+            }
+            if (!version.files && source == "modrinth" && !override_version) {
+                displayError(translate("app.discover.error_creating_modpack", "%t", title, "%v", info.game_version, "%l", loaders[info.loader]));
+                return;
+            }
+            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
+            instance.setInstalledVersion(version.id);
+            showSpecificInstanceContent(instance);
+            if (source == "modrinth") {
+                await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, title);
+            } else if (source == "curseforge") {
+                await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), title);
+            }
+            let mr_pack_info = {};
+            if (source == "modrinth") {
+                mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, title);
+            } else if (source == "curseforge") {
+                mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, project_id, title);
+
+                instance.setLoader(mr_pack_info.loader);
+                instance.setVanillaVersion(mr_pack_info.vanilla_version);
+                info.loader = mr_pack_info.loader;
+                info.game_version = mr_pack_info.vanilla_version;
+            }
+            if (!mr_pack_info.loader_version) {
+                displayError(mr_pack_info);
+                return;
+            }
+            instance.setLoaderVersion(mr_pack_info.loader_version);
+            mr_pack_info.content.forEach(e => {
+                instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+            });
+            instance.setInstalling(false);
+            let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+            instance.setJavaPath(r.java_installation);
+            instance.setJavaVersion(r.java_version);
+            instance.setMcInstalled(true);
+        })
+    } else if (instance_id) {
+        button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+        button.classList.add("disabled");
+        button.onclick = () => { };
+        let success;
+        if (override_version) {
+            if (source == "modrinth") {
+                success = await installSpecificVersion(override_version, source, new Instance(instance_id), project_type, title, author, icon, project_id);
+            } else if (source == "curseforge") {
+                let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
+                let dependencies_json = await dependencies.json();
+                let dependency_list = dependencies_json.data;
+                success = await installSpecificVersion({
+                    "game_versions": game_versions,
+                    "files": [
+                        {
+                            "filename": override_version.fileName,
+                            "url": (`https://mediafilez.forgecdn.net/files/${Number(override_version.id.toString().substring(0, 4))}/${Number(override_version.id.toString().substring(4, 7))}/${encodeURIComponent(override_version.fileName)}`)
+                        }
+                    ],
+                    "loaders": game_versions.map(e => {
+                        return e.toLowerCase();
+                    }),
+                    "version_number": override_version.id,
+                    "dependencies": dependency_list
+                }, "curseforge", new Instance(instance_id), project_type, title, author, icon, project_id)
+            }
+        } else {
+            success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
+        }
+        if (success) {
+            button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+        } else {
+            button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+        }
+    } else {
+        let dialog = new Dialog();
+        let instances = data.getInstances();
+        dialog.showDialog(translate("app.discover.select_instance.title", "%t", title), "form", [
+            {
+                "type": "dropdown",
+                "name": translate("app.discover.select_instance.instance"),
+                "id": "instance",
+                "options": source == "curseforge" ? instances.map(e => ({ "name": e.name, "value": e.instance_id })) : (project_type == "mod" ? instances.filter(e => content_loaders.includes(e.loader)).filter(e => game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })))
+            }
+        ], [
+            { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
+            { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
+        ], null, async (e) => {
+            if (dialog_to_close) dialog_to_close.close();
+            let info = {};
+            e.forEach(e => { info[e.id] = e.value });
+            let success;
+            if (override_version) {
+                if (source == "modrinth") {
+                    success = await installSpecificVersion(override_version, source, new Instance(info.instance), project_type, title, author, icon, project_id);
+                } else if (source == "curseforge") {
+                    let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
+                    let dependencies_json = await dependencies.json();
+                    let dependency_list = dependencies_json.data;
+                    success = await installSpecificVersion({
+                        "game_versions": game_versions,
+                        "files": [
+                            {
+                                "filename": override_version.fileName,
+                                "url": (`https://mediafilez.forgecdn.net/files/${Number(override_version.id.toString().substring(0, 4))}/${Number(override_version.id.toString().substring(4, 7))}/${encodeURIComponent(override_version.fileName)}`)
+                            }
+                        ],
+                        "loaders": game_versions.map(e => {
+                            return e.toLowerCase();
+                        }),
+                        "version_number": override_version.id,
+                        "dependencies": dependency_list
+                    }, "curseforge", new Instance(info.instance), project_type, title, author, icon, project_id)
+                }
+            } else {
+                success = await installContent(source, project_id, info.instance, project_type, title, author, icon);
+            }
+            if (success) {
+                displaySuccess(translate("app.discover.select_instance.success", "%t", title, "%i", (new Instance(info.instance)).name));
+            } else {
+                displaySuccess(translate("app.discover.select_instance.fail", "%t", title, "%i", (new Instance(info.instance)).name));
+            }
+        });
+    }
 }
