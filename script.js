@@ -1587,6 +1587,7 @@ class SearchDropdown {
                 this.selectOption(options[i].value);
                 this.onchange(options[i].value);
             }
+            optEle.dataset.value = options[i].value;
             if (options[i].value == initial) {
                 optEle.classList.add("selected");
             }
@@ -1604,7 +1605,7 @@ class SearchDropdown {
         }
         this.selectedElement.innerHTML = sanitize(name);
         for (let i = 0; i < this.optEles.length; i++) {
-            if (this.optEles[i].innerHTML == sanitize(name)) {
+            if (this.optEles[i].dataset.value == option) {
                 this.optEles[i].classList.add("selected");
             } else {
                 this.optEles[i].classList.remove("selected");
@@ -1682,6 +1683,7 @@ class DialogDropdown {
             optEle.onclick = (e) => {
                 this.selectOption(options[i].value);
             }
+            optEle.dataset.value = options[i].value;
             if (options[i].value == initial) {
                 optEle.classList.add("selected");
             }
@@ -1699,7 +1701,7 @@ class DialogDropdown {
         }
         this.selectedElement.innerHTML = sanitize(name);
         for (let i = 0; i < this.optEles.length; i++) {
-            if (this.optEles[i].innerHTML == sanitize(name)) {
+            if (this.optEles[i].dataset.value == option) {
                 this.optEles[i].classList.add("selected");
             } else {
                 this.optEles[i].classList.remove("selected");
@@ -1920,7 +1922,7 @@ class ContentList {
                 if (e.danger) {
                     actionElement.classList.add("danger");
                 }
-                actionElement.onclick = () => {
+                actionElement.onclick = async () => {
                     if (e.func_id) {
                         if (e.func_id == "disable") {
                             this.checkBoxes.forEach(c => {
@@ -1952,22 +1954,24 @@ class ContentList {
                                 "type": "confirm",
                                 "content": e.dialog_button
                             }
-                        ], [], () => {
-                            this.checkBoxes.forEach(c => {
+                        ], [], async () => {
+                            for (let i = 0; i < this.checkBoxes.length; i++) {
+                                let c = this.checkBoxes[i];
                                 if (c.element.checked && isNotDisplayNone(c.element)) {
                                     e.func(c.element.parentElement, c.content_info);
                                 }
-                            });
+                            }
                             this.uncheckCheckboxes();
                             this.figureOutMainCheckedState();
                         });
                         return;
                     }
-                    this.checkBoxes.forEach(c => {
+                    for (let i = 0; i < this.checkBoxes.length; i++) {
+                        let c = this.checkBoxes[i];
                         if (c.element.checked && isNotDisplayNone(c.element)) {
                             e.func(c.element.parentElement, c.content_info);
                         }
-                    });
+                    }
                     this.uncheckCheckboxes();
                     this.figureOutMainCheckedState();
                 }
@@ -5397,11 +5401,11 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
         {
             "name": translate("app.worlds.multiplayer"),
             "value": "multiplayer"
-        },
-        {
-            "name": translate("app.worlds.realms"),
-            "value": "realms"
-        }
+        }//,
+        // {
+        //     "name": translate("app.worlds.realms"),
+        //     "value": "realms"
+        // }
     ], typeDropdown, "all", () => { });
     typeDropdown.style.minWidth = "200px";
     searchAndFilter.appendChild(contentSearch);
@@ -5541,7 +5545,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 },
                 "type": "multiplayer",
                 "image": worldsMultiplayer[i].icon ?? "default.png",
-                "onremove": () => {
+                "onremove": (ele) => {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
                         {
@@ -5552,8 +5556,14 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "type": "confirm",
                             "content": translate("app.worlds.delete.confirm")
                         }
-                    ], [], () => {
-                        // DELETE WORLD HERE
+                    ], [], async () => {
+                        let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                        if (success) {
+                            ele.remove();
+                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                        } else {
+                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                        }
                     });
                 },
                 "more": {
@@ -5592,7 +5602,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
-                            "func": () => {
+                            "func": (ele) => {
                                 let dialog = new Dialog();
                                 dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
                                     {
@@ -5603,14 +5613,20 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                         "type": "confirm",
                                         "content": translate("app.worlds.delete.confirm")
                                     }
-                                ], [], () => {
-                                    // DELETE WORLD HERE
+                                ], [], async () => {
+                                    let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                                    if (success) {
+                                        ele.remove();
+                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                                    } else {
+                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                                    }
                                 });
                             }
                         }
                     ].filter(e => e)
                 },
-                "pass_to_checkbox": { "type": "multiplayer", "id": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name }
+                "pass_to_checkbox": { "type": "multiplayer", "ip": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name, "index": worldsMultiplayer[i].index }
             });
     }
 
@@ -5633,7 +5649,13 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
                             }
                         } else if (e.type == "multiplayer") {
-                            // DELETE WORLD HERE
+                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, e.ip, e.index);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                            }
                         }
                     },
                     "show_confirmation_dialog": true,
@@ -7858,13 +7880,13 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
         //         contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id);
         //     }
         // },
-        // {
-        //     "name": translate("app.discover.data_packs"),
-        //     "value": "datapack",
-        //     "func": () => {
-        //         contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id);
-        //     }
-        // }
+        {
+            "name": translate("app.discover.data_packs"),
+            "value": "datapack",
+            "func": () => {
+                contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id);
+            }
+        }
     ].filter(e => e));
     let tabInfo = document.createElement("div");
     tabInfo.className = "tab-info";
@@ -8510,7 +8532,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
     }
 }
 
-async function installContent(source, project_id, instance_id, project_type, title, author, icon_url) {
+async function installContent(source, project_id, instance_id, project_type, title, author, icon_url, data_pack_world) {
     let instance = new Instance(instance_id);
     let version_json;
     let max_pages = 10;
@@ -8523,7 +8545,6 @@ async function installContent(source, project_id, instance_id, project_type, tit
         let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
         let dependencies_json = await dependencies.json();
         let dependency_list = dependencies_json.data;
-        console.log(dependency_list);
         max_pages = Math.ceil(version_json.pagination.totalCount / version_json.pagination.pageSize) + 1;
         version_json = version_json.data.map(e => ({
             "game_versions": e.gameVersions,
@@ -8546,8 +8567,8 @@ async function installContent(source, project_id, instance_id, project_type, tit
         return false;
     }
     for (let j = 0; j < version_json.length; j++) {
-        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type != "mod" || version_json[j].loaders.includes(instance.loader))) {
-            initialContent = await installSpecificVersion(version_json[j], source, instance, project_type, title, author, icon_url, project_id);
+        if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type != "mod" || version_json[j].loaders.includes(instance.loader)) && (source != "modrinth" || project_type != "datapack" || version_json[j].loaders.includes("datapack"))) {
+            initialContent = await installSpecificVersion(version_json[j], source, instance, project_type, title, author, icon_url, project_id, false, data_pack_world);
             break;
         }
     }
@@ -8567,7 +8588,6 @@ async function installContent(source, project_id, instance_id, project_type, tit
             let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
             let dependencies_json = await dependencies.json();
             let dependency_list = dependencies_json.data;
-            console.log(dependency_list);
             version_json = version_json.data.map(e => ({
                 "game_versions": e.gameVersions,
                 "files": [
@@ -8588,7 +8608,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
             }
             for (let j = 0; j < version_json.length; j++) {
                 if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type != "mod" || version_json[j].loaders.includes(instance.loader))) {
-                    initialContent = await installSpecificVersion(version_json[j], source, instance, project_type, title, author, icon_url, project_id);
+                    initialContent = await installSpecificVersion(version_json[j], source, instance, project_type, title, author, icon_url, project_id, false, data_pack_world);
                     break;
                 }
             }
@@ -8606,16 +8626,16 @@ async function installContent(source, project_id, instance_id, project_type, tit
     return true;
 }
 
-async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate) {
+async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate, data_pack_world) {
     let instance_id = instance.instance_id;
-    let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename);
+    let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename, data_pack_world);
     if (isUpdate) return initialContent;
     let version = version_info.version_number;
     let dependencies = version_info.dependencies;
     if (instance.getContent().map(e => e.source_id).includes(project_id)) {
         return;
     }
-    if (dependencies && source == "modrinth") {
+    if (dependencies && source == "modrinth" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
             let res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}`);
@@ -8632,7 +8652,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
                 await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
             }
         }
-    } else if (dependencies && source == "curseforge") {
+    } else if (dependencies && source == "curseforge" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
             console.log(dependency.name);
@@ -8644,7 +8664,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
             }
         }
     }
-    if (project_type != "world") instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false);
+    if (project_type != "world" && project_type != "datapack") instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false);
     return initialContent;
 }
 
@@ -8658,8 +8678,8 @@ function toTitleCase(str) {
     });
 }
 
-async function addContent(instance_id, project_type, project_url, filename) {
-    return await window.electronAPI.addContent(instance_id, project_type, project_url, filename);
+async function addContent(instance_id, project_type, project_url, filename, data_pack_world) {
+    return await window.electronAPI.addContent(instance_id, project_type, project_url, filename, data_pack_world);
 }
 
 class LoadingContainer {
@@ -10680,7 +10700,66 @@ async function repairInstance(instance) {
 }
 
 async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version) {
-    if (project_type == "modpack") {
+    if (project_type == "datapack") {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.discover.datapacks.title"), "form", [
+            instance_id ? null : {
+                "type": "dropdown",
+                "id": "instance",
+                "name": translate("app.discover.datapacks.instance"),
+                "options": data.getInstances().map(e => ({ "name": e.name, "value": e.instance_id }))
+            },
+            {
+                "type": "dropdown",
+                "id": "world",
+                "name": translate("app.discover.datapacks.world"),
+                "options": instance_id ? getInstanceWorlds(new Instance(instance_id)).map(e => ({ "name": e.name, "value": e.id })) : [],
+                "input_source": instance_id ? null : "instance",
+                "source": instance_id ? null : (i) => {
+                    return getInstanceWorlds(new Instance(i)).map(e => ({ "name": e.name, "value": e.id }));
+                }
+            }
+        ].filter(e => e), [
+            { "content": translate("app.instances.cancel"), "type": "cancel" },
+            { "content": translate("app.instances.submit"), "type": "confirm" }
+        ], [], async (e) => {
+            let info = {};
+            e.forEach(e => { info[e.id] = e.value });
+            let instance = instance_id ? instance_id : info.instance;
+            let world = info.world;
+            let success;
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+            button.classList.add("disabled");
+            button.onclick = () => { };
+            if (override_version) {
+                if (source == "modrinth") {
+                    success = await installSpecificVersion(override_version, source, new Instance(instance), project_type, title, author, icon, project_id, false, world);
+                } else if (source == "curseforge") {
+                    success = await installSpecificVersion({
+                        "game_versions": game_versions,
+                        "files": [
+                            {
+                                "filename": override_version.fileName,
+                                "url": (`https://mediafilez.forgecdn.net/files/${Number(override_version.id.toString().substring(0, 4))}/${Number(override_version.id.toString().substring(4, 7))}/${encodeURIComponent(override_version.fileName)}`)
+                            }
+                        ],
+                        "loaders": game_versions.map(e => {
+                            return e.toLowerCase();
+                        }),
+                        "version_number": override_version.id,
+                        "dependencies": []
+                    }, "curseforge", new Instance(instance), project_type, title, author, icon, project_id, false, world)
+                }
+            } else {
+                success = await installContent(source, project_id, instance, project_type, title, author, icon, world);
+            }
+            if (success) {
+                button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+            } else {
+                button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+            }
+        })
+    } else if (project_type == "modpack") {
         let options = [];
         if (source == "modrinth") content_loaders.forEach((e) => {
             if (loaders[e]) {

@@ -1837,6 +1837,7 @@ dialog[open]::backdrop {
     border-radius: 5px;
     transition: background-color .25s, scale .1s;
     margin-left: auto;
+    flex-shrink: 0;
 }
 
 .dialog-x:hover {

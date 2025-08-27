@@ -437,6 +437,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getWorlds,
     getSinglePlayerWorlds,
+    deleteServer: async (instance_id, ip, index) => {
+        let patha = `./minecraft/instances/${instance_id}`;
+        let serversDatPath = path.resolve(patha, 'servers.dat');
+
+        if (!fs.existsSync(serversDatPath)) return false;
+        try {
+            const buffer = fs.readFileSync(serversDatPath);
+            const data = await nbt.parse(buffer);
+            let servers = data.parsed.value.servers.value.value || [];
+            const originalLength = servers.length;
+            for (let i = 0; i < ip.length; i++) {
+                if (servers[index[i]].ip?.value == ip[i]) {
+                    servers[index[i]] = null;
+                }
+            }
+            servers = servers.filter(e => e);
+            if (servers.length === originalLength) return false;
+
+            data.parsed.value.servers.value.value = servers;
+
+            const newBuffer = nbt.writeUncompressed(data.parsed);
+            fs.writeFileSync(serversDatPath, newBuffer);
+            return true;
+        } catch (e) {
+            console.error("Failed to delete server from servers.dat:", e);
+            return false;
+        }
+    },
     getMultiplayerWorlds: async (instance_id) => {
         let patha = `./minecraft/instances/${instance_id}`;
         fs.mkdirSync(patha, { recursive: true });
@@ -450,8 +478,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         try {
             const buffer = fs.readFileSync(serversDatPath);
             const data = await nbt.parse(buffer);
+            console.log(data);
             const servers = data.parsed?.value?.servers?.value?.value || [];
 
+            let i = 0;
             for (const server of servers) {
                 worlds.push({
                     name: server.name?.value || "Unknown",
@@ -459,8 +489,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
                     acceptTextures: server.acceptTextures?.value ?? false,
                     hideAddress: server.hideAddress?.value ?? false,
-                    last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null
+                    last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null,
+                    index: i
                 });
+                i++;
             }
         } catch (e) {
             console.error(`Failed to parse servers.dat:`, e);
@@ -1161,7 +1193,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return false;
     },
-    addContent: async (instance_id, project_type, project_url, filename) => {
+    addContent: async (instance_id, project_type, project_url, filename, data_pack_world) => {
         let install_path = "";
         if (project_type == "mod") {
             install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`, filename);
@@ -1171,6 +1203,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`, filename);
         } else if (project_type == "world") {
             install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/temp_worlds`, filename);
+        } else if (project_type == "datapack") {
+            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves/${data_pack_world}/datapacks`, filename);
         }
 
         console.log("Installing", project_url, "to", install_path);
@@ -1233,7 +1267,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "mod": "mod",
             "resourcepack": "resource_pack",
             "shader": "shader",
-            "world": "world"
+            "world": "world",
+            "datapack": "data_pack"
         }
 
         return {

@@ -635,5 +635,10 @@
     "app.share.close": "Close",
     "app.content.update.failed": "Disabling '%c' because we can't find a compatible version.",
     "app.content.update.old_file_fail": "Unable to delete old file (%f) when updating. Undoing update.",
-    "app.content.update.new_file_fail": "Unable to delete new file (%f). You need to manually fix this or you will have duplicate content."
+    "app.content.update.new_file_fail": "Unable to delete new file (%f). You need to manually fix this or you will have duplicate content.",
+    "app.discover.datapacks.title": "Select World to install Data Pack",
+    "app.discover.datapacks.cancel": "Cancel",
+    "app.discover.datapacks.confirm": "Install",
+    "app.discover.datapacks.instance": "Instance",
+    "app.discover.datapacks.world": "World"
 }
