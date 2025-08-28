@@ -373,11 +373,14 @@
     "app.instances.settings.confirm": "Save",
     "app.instances.settings.tab.general": "General",
     "app.instances.settings.tab.installation": "Installation",
+    "app.instances.settings.tab.modpack": "Modpack",
     "app.instances.settings.tab.window": "Window",
     "app.instances.settings.tab.java": "Java",
     "app.instances.settings.tab.launch_hooks": "Launch Hooks",
+    "app.instances.settings.modpack.installed_via": "Modpack installed via %c",
+    "app.instances.settings.modpack.view": "View Modpack",
     "app.instances.updated_all": "Successfully updated all content for instance %i",
-    "app.instance.locked": "Instance is locked. Unlock it to edit its content.",
+    "app.instance.locked": "Instance is locked. Unlock it to edit its content and unlink it from Modrinth / CurseForge.",
     "app.instance.unlock": "Unlock",
     "app.content.import": "Import Content",
     "app.content.import.title": "Select Content to Import",
@@ -640,5 +643,7 @@
     "app.discover.datapacks.cancel": "Cancel",
     "app.discover.datapacks.confirm": "Install",
     "app.discover.datapacks.instance": "Instance",
-    "app.discover.datapacks.world": "World"
+    "app.discover.datapacks.world": "World",
+    "app.instances.settings.modpack.version.title": "Modpack Version",
+    "app.instances.settings.modpack.version.description": "If you change this value, the launcher will update or downgrade this modpack to the new version. Your worlds, screenshots and options will be preserved."
 }

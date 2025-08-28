@@ -761,6 +761,198 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "deleteContent": deleteFromContent
         }
     },
+    downloadVanillaTweaksDataPacks: async (packs, version, instance_id, world_id) => {
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let data_json = vt_dp[version];
+        let data_ct_json = vt_ct[version];
+        if (!vt_dp[version]) {
+            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
+            data_json = await data.json();
+            vt_dp[version] = data_json;
+        }
+        if (!vt_ct[version]) {
+            let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
+            data_ct_json = await data_ct.json();
+            vt_ct[version] = data_ct_json;
+        }
+        let pack_info = {};
+        let pack_ct_info = {};
+
+        console.log(data_json);
+        console.log(data_ct_json);
+
+        let process_category = (category, previous_categories = [], type) => {
+            previous_categories.push(category.category);
+            let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
+            let packs = category.packs.map(e => e.name);
+            packs.forEach(e => {
+                if (type == "dp") pack_info[e] = id;
+                if (type == "ct") pack_ct_info[e] = id;
+            });
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e, structuredClone(previous_categories), type);
+                })
+            }
+        }
+        for (let i = 0; i < data_json.categories.length; i++) {
+            process_category(data_json.categories[i], [], "dp");
+        }
+        for (let i = 0; i < data_ct_json.categories.length; i++) {
+            process_category(data_ct_json.categories[i], [], "ct");
+        }
+
+        let useDatapacks = false;
+        let useCraftingTweaks = false;
+
+        let packs_send = {};
+        let packs_ct_send = {};
+        for (let i = 0; i < packs.length; i++) {
+            if (packs[i].type == "ct") {
+                useCraftingTweaks = true;
+                let info = pack_ct_info[packs[i].id];
+                if (!packs_ct_send[info]) {
+                    packs_ct_send[info] = [packs[i].id]
+                } else {
+                    packs_ct_send[info].push(packs[i].id);
+                }
+            } else {
+                useDatapacks = true;
+                let info = pack_info[packs[i].id];
+                if (!packs_send[info]) {
+                    packs_send[info] = [packs[i].id]
+                } else {
+                    packs_send[info].push(packs[i].id);
+                }
+            }
+        }
+
+        let h = querystring.stringify({
+            "packs": JSON.stringify(packs_send),
+            "version": version
+        });
+        let h_ct = querystring.stringify({
+            "packs": JSON.stringify(packs_ct_send),
+            "version": version
+        });
+
+        const options = (type) => ({
+            hostname: 'vanillatweaks.net',
+            path: type == "dp" ? '/assets/server/zipdatapacks.php' : '/assets/server/zipcraftingtweaks.php',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': type == "dp" ? h.length : h_ct.length
+            }
+        });
+        let data_vt = "{}";
+        let data_ct_vt = "{}";
+        if (useDatapacks) data_vt = await new Promise((resolve, reject) => {
+            const req = https.request(options("dp"), (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve(data);
+                });
+            });
+
+            req.on('error', (error) => {
+                reject(error);
+            });
+
+            req.write(h);
+            req.end();
+        });
+
+        if (useCraftingTweaks) data_ct_vt = await new Promise((resolve, reject) => {
+            const req = https.request(options("ct"), (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve(data);
+                });
+            });
+
+            req.on('error', (error) => {
+                reject(error);
+            });
+
+            req.write(h_ct);
+            req.end();
+        });
+
+        data_vt = JSON.parse(data_vt);
+        data_ct_vt = JSON.parse(data_ct_vt);
+
+        const datapacksDir = `./minecraft/instances/${instance_id}/saves/${world_id}/datapacks`;
+        if (data_ct_vt.link) {
+            fs.mkdirSync(datapacksDir, { recursive: true });
+            let baseName = "vanilla_tweaks.zip";
+            let filePath = path.join(datapacksDir, baseName);
+            let counter = 1;
+            while (fs.existsSync(filePath)) {
+                baseName = `vanilla_tweaks_${counter}.zip`;
+                filePath = path.join(datapacksDir, baseName);
+                counter++;
+            }
+            await urlToFile("https://vanillatweaks.net" + data_ct_vt.link, filePath);
+
+            // return baseName;
+        }
+        if (data_vt.link) {
+            const tempDir = `./minecraft/instances/${instance_id}/temp_datapacks`;
+            fs.mkdirSync(tempDir, { recursive: true });
+            let baseName = "vanilla_tweaks.zip";
+            let filePath = path.join(tempDir, baseName);
+            let counter = 1;
+            while (fs.existsSync(filePath)) {
+                baseName = `vanilla_tweaks_${counter}.zip`;
+                filePath = path.join(tempDir, baseName);
+                counter++;
+            }
+            await urlToFile("https://vanillatweaks.net" + data_vt.link, filePath);
+
+            const zip = new AdmZip(filePath);
+            const entries = zip.getEntries();
+
+            for (const entry of entries) {
+                let entryName = entry.entryName;
+                let destPath = path.join(datapacksDir, entryName);
+
+                if (fs.existsSync(destPath)) {
+                    let ext = path.extname(entryName);
+                    let base = path.basename(entryName, ext);
+                    let dir = path.dirname(destPath);
+                    let i = 1;
+                    let newName;
+                    do {
+                        newName = ext
+                            ? `${base}_${i}${ext}`
+                            : `${base}_${i}`;
+                        destPath = path.join(dir, newName);
+                        i++;
+                    } while (fs.existsSync(destPath));
+                }
+
+                if (entry.isDirectory) {
+                    fs.mkdirSync(destPath, { recursive: true });
+                } else {
+                    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+                    fs.writeFileSync(destPath, entry.getData());
+                }
+            }
+
+            fs.unlinkSync(filePath);
+        }
+
+        return true;
+    },
     downloadVanillaTweaksResourcePacks: async (packs, version, instance_id) => {
         if (version.split(".").length > 2) {
             version = version.split(".").splice(0, 2).join(".");
@@ -927,7 +1119,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 ],
                 "author": "Vanilla Tweaks",
                 "incompatible": e.incompatible,
-                "vt_id": e.name
+                "vt_id": e.name,
+                "type": type
             }));
             packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
             return_data.hits = return_data.hits.concat(packs);
@@ -1907,6 +2100,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 resolve(dataUrl);
             });
         })
+    },
+    deleteFoldersForModpackUpdate: async (instance_id) => {
+        let instancePath = `./minecraft/instances/${instance_id}`
+        let folders = ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "scripts", "kubejs", "overrides", "libraries"];
+        try {
+            for (let i = 0; i < folders.length; i++) {
+                let pathToDelete = path.resolve(instancePath, folders[i]);
+                if (fs.existsSync(pathToDelete)) {
+                    fs.rmSync(pathToDelete, { recursive: true, force: true });
+                }
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 });
 
@@ -2032,29 +2240,6 @@ function getSinglePlayerWorlds(instance_id) {
     let patha = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
     return getWorlds(patha);
 }
-
-// async function processFolder(instance_id, folder_path, title) {
-//     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-//     const destPath = path.resolve(__dirname, `minecraft/instances/${instance_id}`);
-//     fs.mkdirSync(destPath, { recursive: true });
-
-//     const files = fs.readdirSync(folder_path);
-//     for (let i = 0; i < files.length; i++) {
-//         let file = files[i];
-//         ipcRenderer.send('progress-update', `Installing ${title}`, (i+1)/files.length*100, `Moving ${file} (${i+1} of ${files.length})`);
-//         const src = path.join(folder_path, file);
-//         const dest = path.join(destPath, file);
-
-//         const stat = fs.statSync(src);
-//         if (stat.isDirectory()) {
-//             fs.cpSync(src, dest, { recursive: true });
-//         } else {
-//             fs.copyFileSync(src, dest);
-//         }
-//     }
-//     ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-//     return true;
-// }
 
 async function hashImageFromDataUrl(dataUrl) {
     const base64Data = dataUrl.split(',')[1];

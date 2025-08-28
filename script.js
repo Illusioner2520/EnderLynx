@@ -1164,22 +1164,26 @@ class NavigationButton {
 
 let currentTab = "";
 
+function resetDiscordStatus(bypassLock) {
+    if (!rpcLocked || bypassLock) {
+        window.electronAPI.setActivity({
+            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "my_account" ? translate("app.discord_rpc.my_account") : translate("app.discord_rpc.unknown"),
+            "state": translate("app.discord_rpc.not_playing"),
+            startTimestamp: new Date(),
+            largeImageKey: 'icon',
+            largeImageText: translate("app.discord_rpc.logo"),
+            instance: false
+        });
+    }
+}
+
 class PageContent {
     constructor(func, title) {
         this.func = func;
         this.title = title;
     }
     async displayContent() {
-        if (!rpcLocked) {
-            window.electronAPI.setActivity({
-                "details": this.title == "home" ? translate("app.discord_rpc.home") : this.title == "instances" ? translate("app.discord_rpc.instances") : this.title == "discover" ? translate("app.discord_rpc.discover") : this.title == "my_account" ? translate("app.discord_rpc.my_account") : translate("app.discord_rpc.unknown"),
-                "state": translate("app.discord_rpc.not_playing"),
-                startTimestamp: new Date(),
-                largeImageKey: 'icon',
-                largeImageText: translate("app.discord_rpc.logo"),
-                instance: false
-            });
-        }
+        resetDiscordStatus();
         if (this.title == "discover") {
             showAddContent();
             currentTab = "discover";
@@ -1277,14 +1281,7 @@ class LiveMinecraft {
         this.element.oncontextmenu = () => { };
         this.stopButton.onclick = () => { };
         this.logButton.onclick = () => { };
-        window.electronAPI.setActivity({
-            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "my_account" ? translate("app.discord_rpc.my_account") : translate("app.discord_rpc.unknown"),
-            "state": translate("app.discord_rpc.not_playing"),
-            startTimestamp: new Date(),
-            largeImageKey: 'icon',
-            largeImageText: translate("app.discord_rpc.logo"),
-            instance: false
-        });
+        resetDiscordStatus(true);
         rpcLocked = false;
     }
     async findLive() {
@@ -2158,6 +2155,7 @@ class ContentList {
         element.appendChild(contentMainElement);
     }
     figureOutMainCheckedState() {
+        if (!this.checkBox) return;
         let total = 0;
         let checked = 0;
         let checkboxes = this.checkBoxes.map(e => e.element);
@@ -2614,16 +2612,7 @@ settingsButtonEle.onclick = () => {
         }
         if (info.discord_rpc) {
             live.findLive();
-            if (!rpcLocked) {
-                window.electronAPI.setActivity({
-                    "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "my_account" ? translate("app.discord_rpc.my_account") : translate("app.discord_rpc.unknown"),
-                    "state": translate("app.discord_rpc.not_playing"),
-                    startTimestamp: new Date(),
-                    largeImageKey: 'icon',
-                    largeImageText: translate("app.discord_rpc.logo"),
-                    instance: false
-                });
-            }
+            resetDiscordStatus();
         } else {
             window.electronAPI.clearActivity();
         }
@@ -4508,7 +4497,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         {
             "icon": '<i class="fa-solid fa-desktop"></i>',
             "title": translate("app.instances.desktop_shortcut"),
-            "func": (e) => {
+            "func": () => {
                 addDesktopShortcut(instanceInfo);
             }
         },
@@ -4657,6 +4646,33 @@ function showInstanceSettings(instanceInfo) {
             "desc": translate("app.instances.settings.update_content.description"),
             "id": "update_content"
         },
+        instanceInfo.installed_version ? {
+            "type": "notice",
+            "content": translate("app.instances.settings.modpack.installed_via", "%c", translate("app.discover." + instanceInfo.install_source)),
+            "tab": "modpack"
+        } : null,
+        instanceInfo.installed_version ? {
+            "type": "button",
+            "name": translate("app.instances.settings.modpack.view"),
+            "tab": "modpack",
+            "icon": '<i class="fa-solid fa-eye"></i>',
+            "func": () => {
+                displayContentInfo(instanceInfo.install_source, instanceInfo.install_source == "curseforge" ? parseInt(instanceInfo.install_id) : instanceInfo.install_id);
+            }
+        } : null,
+        instanceInfo.installed_version ? {
+            "type": "dropdown",
+            "name": translate("app.instances.settings.modpack.version.title"),
+            "desc": translate("app.instances.settings.modpack.version.description"),
+            "tab": "modpack",
+            "id": "modpack_version",
+            "options": [],
+            "input_source": "",
+            "source": async () => {
+                return await getModpackVersions(instanceInfo.install_source, instanceInfo.install_id);
+            },
+            "default": instanceInfo.installed_version
+        } : null,
         {
             "type": "button",
             "name": translate("app.instances.repair"),
@@ -4825,6 +4841,7 @@ function showInstanceSettings(instanceInfo) {
     ], [
         { "name": translate("app.instances.settings.tab.general"), "value": "general" },
         instanceInfo.locked ? null : { "name": translate("app.instances.settings.tab.installation"), "value": "installation" },
+        instanceInfo.installed_version ? { "name": translate("app.instances.settings.tab.modpack"), "value": "modpack" } : null,
         { "name": translate("app.instances.settings.tab.window"), "value": "window" },
         { "name": translate("app.instances.settings.tab.java"), "value": "java" },
         { "name": translate("app.instances.settings.tab.launch_hooks"), "value": "launch_hooks" }
@@ -4843,12 +4860,17 @@ function showInstanceSettings(instanceInfo) {
         instanceInfo.setPreLaunchHook(info.pre_launch_hook);
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
+        if (info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") {
+            console.log("initializing update");
+            // TODOTODOTODOTODO
+        }
         if (instanceInfo.loader == info.loader && instanceInfo.vanilla_version == info.game_version && instanceInfo.loader_version == info.loader_version) {
             return;
         }
         if ([info.game_version, info.loader_version].includes("loading")) {
             return;
         }
+        if (!info.loader || !info.game_version || !info.loader_version) return;
         instanceInfo.setLoader(info.loader);
         instanceInfo.setVanillaVersion(info.game_version);
         instanceInfo.setLoaderVersion(info.loader_version);
@@ -4882,6 +4904,9 @@ function setInstanceTabContentContent(instanceInfo, element) {
     instanceLockedButton.innerHTML = '<i class="fa-solid fa-unlock"></i>' + translate("app.instance.unlock");
     instanceLockedButton.onclick = () => {
         instanceInfo.setLocked(false);
+        instanceInfo.setInstallSource("custom");
+        instanceInfo.setInstallId("");
+        instanceInfo.setInstalledVersion("");
         showSpecificInstanceContent(instanceInfo);
     }
     instanceLockedBanner.appendChild(instanceLockedText);
@@ -7628,8 +7653,10 @@ class Dialog {
                         info[i].onchange(multiSelect.value, this.values, wrapper);
                     });
                     if (info[i].source) {
+                        let found = false;
                         for (let j = 0; j < this.values.length; j++) {
                             if (this.values[j].id != info[i].input_source) continue;
+                            found = true;
                             // Use a token to ensure only the latest async result is displayed
                             let updateToken = 0;
                             this.values[j].element.addOnChange(async () => {
@@ -7674,6 +7701,30 @@ class Dialog {
                                         multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
                                     }
                                     if (multiSelect.onchange) multiSelect.onchange();
+                                    label.innerHTML = sanitize(info[i].name);
+                                } catch (err) {
+                                    if (currentToken !== updateToken) return;
+                                    displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
+                                    if (multiSelect.onchange) multiSelect.onchange();
+                                    label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
+                                    multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
+                                }
+                            }
+                            setInitialValues();
+                        }
+                        if (!found) {
+                            let setInitialValues = async () => {
+                                label.innerHTML = translate("app.dialog.loading");
+                                multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
+                                try {
+                                    let list = await info[i].source();
+                                    console.log(list);
+                                    if (label.innerHTML != translate("app.dialog.loading")) return;
+                                    if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
+                                        multiSelect.setOptions(list, list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
+                                    } else {
+                                        multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(info[i].default) ? info[i].default : list[0]);
+                                    }
                                     label.innerHTML = sanitize(info[i].name);
                                 } catch (err) {
                                     if (currentToken !== updateToken) return;
@@ -8012,6 +8063,8 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
             "value": "vanilla_tweaks",
             "func": () => { }
         });
+        added_vt_dp_packs = [];
+        added_vt_rp_packs = [];
     }
     // if (tab == "world") {
     //     sources.push({
@@ -8434,33 +8487,72 @@ async function getContent(element, instance_id, source, query, loader, version, 
         let submitButton = document.createElement("button");
         submitButton.className = "vt-submit-button";
         submitButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.vt.install");
-        submitButton.onclick = instance_id ? async () => {
-            submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-            submitButton.onclick = () => { };
-            let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
-            let instance = new Instance(instance_id);
-            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
-            submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-        } : () => {
-            let instances = data.getInstances();
-            let dialog = new Dialog();
-            dialog.showDialog(translate("app.discover.select_instance.vt.title"), "form", [
-                {
-                    "type": "dropdown",
-                    "name": translate("app.discover.select_instance.instance"),
-                    "id": "instance",
-                    "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
-                }
-            ], [
-                { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-                { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-            ], null, async (e) => {
-                let info = {};
-                e.forEach(e => { info[e.id] = e.value });
-                await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
+        submitButton.onclick = async () => {
+            if (project_type == "datapack") {
+                let dialog = new Dialog();
+                dialog.showDialog(translate("app.discover.datapacks.title"), "form", [
+                    instance_id ? null : {
+                        "type": "dropdown",
+                        "id": "instance",
+                        "name": translate("app.discover.datapacks.instance"),
+                        "options": data.getInstances().map(e => ({ "name": e.name, "value": e.instance_id }))
+                    },
+                    {
+                        "type": "dropdown",
+                        "id": "world",
+                        "name": translate("app.discover.datapacks.world"),
+                        "options": instance_id ? getInstanceWorlds(new Instance(instance_id)).map(e => ({ "name": e.name, "value": e.id })) : [],
+                        "input_source": instance_id ? null : "instance",
+                        "source": instance_id ? null : (i) => {
+                            return getInstanceWorlds(new Instance(i)).map(e => ({ "name": e.name, "value": e.id }));
+                        }
+                    }
+                ].filter(e => e), [
+                    { "content": translate("app.instances.cancel"), "type": "cancel" },
+                    { "content": translate("app.instances.submit"), "type": "confirm" }
+                ], [], async (e) => {
+                    let info = {};
+                    e.forEach(e => { info[e.id] = e.value });
+                    let instance = instance_id ? instance_id : info.instance;
+                    let world = info.world;
+                    submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                    submitButton.classList.add("disabled");
+                    submitButton.onclick = () => { };
+                    let success = await window.electronAPI.downloadVanillaTweaksDataPacks(added_vt_dp_packs, version ? version : vt_version, instance, world);
+                    if (success) {
+                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                    } else {
+                        submitButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+                    }
+                })
+            } else if (instance_id) {
+                submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                submitButton.onclick = () => { };
+                let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
                 let instance = new Instance(instance_id);
-                instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
-            });
+                instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+            } else {
+                let instances = data.getInstances();
+                let dialog = new Dialog();
+                dialog.showDialog(translate("app.discover.select_instance.vt.title"), "form", [
+                    {
+                        "type": "dropdown",
+                        "name": translate("app.discover.select_instance.instance"),
+                        "id": "instance",
+                        "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
+                    }
+                ], [
+                    { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
+                    { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
+                ], null, async (e) => {
+                    let info = {};
+                    e.forEach(e => { info[e.id] = e.value });
+                    await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
+                    let instance = new Instance(instance_id);
+                    instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                });
+            }
         }
         buttonWrapper.append(submitButton);
         element.appendChild(buttonWrapper);
@@ -8503,10 +8595,10 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 }
                 displaySuccess(translate("app.discover.vt.add.message", "%t", e.title));
                 if (project_type == "resourcepack") {
-                    added_vt_rp_packs.push({ "id": info.vt_id, "name": e.title });
+                    added_vt_rp_packs.push({ "id": info.vt_id, "name": e.title, "type": e.type });
                     checkForIncompatibilities();
                 } else if (project_type == "datapack") {
-                    added_vt_dp_packs.push({ "id": info.vt_id, "name": e.title });
+                    added_vt_dp_packs.push({ "id": info.vt_id, "name": e.title, "type": e.type });
                     checkForIncompatibilities();
                 }
             }
@@ -9016,6 +9108,17 @@ function unpinMultiplayerWorld(ip, instance_id) {
 function isWorldPinned(world_id, instance_id, world_type) {
     let world = db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type);
     return Boolean(world);
+}
+
+async function getModpackVersions(source, content_id) {
+    if (source == "modrinth") {
+        let versions_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}/version`);
+        let versions = await versions_pre_json.json();
+        return versions.map(e => ({"name": e.name, "value": e.id}));
+    } else if (source == "curseforge") {
+        let versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
+        return versions.map(e => ({"name": e.displayName, "value": e.id.toString() + ".0"}));
+    }
 }
 
 let contentInfoHistory = [];
