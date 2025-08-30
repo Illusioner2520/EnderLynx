@@ -645,5 +645,6 @@
     "app.discover.datapacks.instance": "Instance",
     "app.discover.datapacks.world": "World",
     "app.instances.settings.modpack.version.title": "Modpack Version",
-    "app.instances.settings.modpack.version.description": "If you change this value, the launcher will update or downgrade this modpack to the new version. Your worlds, screenshots and options will be preserved."
+    "app.instances.settings.modpack.version.description": "If you change this value, the launcher will update or downgrade this modpack to the new version. Your worlds, screenshots and options will be preserved.",
+    "app.modpack.update.progress_already": "Cannot update or downgrade the modpack right now, as there is already an installation in progress for this instance."
 }

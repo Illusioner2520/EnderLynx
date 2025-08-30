@@ -4413,3 +4413,28 @@ body.hide_ip .hidden-text.shown::after {
 .share-special-link:hover {
     background-color: var(--color-2);
 }
+
+.dropdown-search-input {
+    position: absolute;
+    inset: 0;
+    font-size: 1.2rem;
+    font-family: Arial;
+    border: none;
+    background: var(--color-1);
+    padding: 8px;
+    padding-inline: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+    display: none;
+    opacity: 0;
+    transition: display .25s allow-discrete, opacity .25s;
+}
+
+.search-dropdown:has(:popover-open) .dropdown-search-input {
+    display: block;
+    opacity: 1;
+
+    @starting-style {
+        opacity: 0;
+    }
+}

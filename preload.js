@@ -106,17 +106,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return mkd.render(md);
     },
     openInBrowser,
-    getRandomModpacks: (callback, errcallback) => {
-        let indexes = ["relevance", "downloads", "follows", "newest", "updated"];
-        let index = indexes[Math.floor(Math.random() * indexes.length)];
-        let offset = Math.floor(Math.random() * 10000);
-        try {
-            fetch(`https://api.modrinth.com/v2/search?facets=[["project_type:modpack"]]&index=${index}&offset=${offset}&limit=10`).then(response => {
-                response.json().then(data => callback(data));
-            });
-        } catch (e) {
-            errcallback(e);
-        }
+    getRandomModpacks: () => {
+        return new Promise((resolve) => {
+            let indexes = ["relevance", "downloads", "follows", "newest", "updated"];
+            let index = indexes[Math.floor(Math.random() * indexes.length)];
+            let offset = Math.floor(Math.random() * 10000);
+            try {
+                fetch(`https://api.modrinth.com/v2/search?facets=[["project_type:modpack"]]&index=${index}&offset=${offset}&limit=10`).then(response => {
+                    response.json().then(data => resolve(data));
+                });
+            } catch (e) {
+                resolve([]);
+            }
+        });
     },
     getPinnedWorlds: async () => {
         let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");

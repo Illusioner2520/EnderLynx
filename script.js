@@ -527,6 +527,13 @@ class Instance {
         return content.map(e => new Content(e.id));
     }
 
+    clearContent() {
+        let content = this.getContent();
+        content.forEach(e => {
+            e.delete();
+        });
+    }
+
     delete() {
         db.prepare("DELETE FROM instances WHERE id = ?").run(this.id);
         db.prepare("DELETE FROM content WHERE instance = ?").run(this.instance_id);
@@ -1562,6 +1569,9 @@ class SearchDropdown {
         this.setOptions(options, initial);
         element.appendChild(dropdownList);
     }
+    getPass() {
+        return this.options.filter(e => e.value == this.selected)[0].pass;
+    }
     setOptions(options, initial) {
         this.options = options;
         this.selected = initial;
@@ -1635,6 +1645,11 @@ class DialogDropdown {
         dropdownButton.classList.add('dropdown-button');
         element.appendChild(dropdownButton);
         element.classList.add('search-dropdown');
+        let dropdownSearchInput = document.createElement("input");
+        dropdownSearchInput.className = "dropdown-search-input";
+        dropdownSearchInput.placeholder = "Search...";
+        element.appendChild(dropdownSearchInput);
+        this.dropdownSearchInput = dropdownSearchInput;
         let dropdownInfo = document.createElement("div");
         dropdownInfo.classList.add("dropdown-info");
         let dropdownTitle = document.createElement("div");
@@ -1658,6 +1673,9 @@ class DialogDropdown {
         this.popover = dropdownList;
         this.setOptions(options, initial);
         element.appendChild(dropdownList);
+    }
+    getPass() {
+        return this.options.filter(e => e.value == this.selected)[0].pass;
     }
     setOptions(options, initial) {
         this.options = options;
@@ -3026,9 +3044,9 @@ async function showHomeContent(e) {
     let discoverModsContainer = document.createElement("div");
     discoverModsContainer.className = "home-discover-container";
     discoverModsWrapper.appendChild(discoverModsContainer);
-    window.electronAPI.getRandomModpacks((e) => {
+
+    let updateHomeModpacksList = (e) => {
         discoverModsWrapper.style.display = "grid";
-        console.log(e);
         e.hits.forEach(e => {
             let item = document.createElement("button");
             item.className = "home-discover";
@@ -3056,10 +3074,21 @@ async function showHomeContent(e) {
             item.appendChild(itemDownloadCount);
             discoverModsContainer.appendChild(item);
         })
-    }, () => { });
+    }
+    let getRandomModpacks = async () => {
+        home_modpacks = await window.electronAPI.getRandomModpacks();
+        updateHomeModpacksList(home_modpacks);
+    }
+    if (!home_modpacks.hits) {
+        getRandomModpacks();
+    } else {
+        updateHomeModpacksList(home_modpacks);
+    }
     ele.appendChild(discoverModsWrapper);
     return ele;
 }
+
+let home_modpacks = {};
 
 if (data.getDefault("default_mode") == "light") {
     document.body.classList.add("light");
@@ -4657,7 +4686,7 @@ function showInstanceSettings(instanceInfo) {
             "tab": "modpack",
             "icon": '<i class="fa-solid fa-eye"></i>',
             "func": () => {
-                displayContentInfo(instanceInfo.install_source, instanceInfo.install_source == "curseforge" ? parseInt(instanceInfo.install_id) : instanceInfo.install_id);
+                displayContentInfo(instanceInfo.install_source, instanceInfo.install_source == "curseforge" ? parseInt(instanceInfo.install_id) : instanceInfo.install_id, instanceInfo.instance_id);
             }
         } : null,
         instanceInfo.installed_version ? {
@@ -4861,8 +4890,12 @@ function showInstanceSettings(instanceInfo) {
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
         if (info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") {
-            console.log("initializing update");
-            // TODOTODOTODOTODO
+            if (instanceInfo.installing || !instanceInfo.mc_installed) {
+                displayError("app.modpack.update.progress_already");
+            }
+            let source = instanceInfo.install_source;
+            let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
+            runModpackUpdate(instanceInfo, source, modpack_info);
         }
         if (instanceInfo.loader == info.loader && instanceInfo.vanilla_version == info.game_version && instanceInfo.loader_version == info.loader_version) {
             return;
@@ -5251,16 +5284,21 @@ function setInstanceTabContentContent(instanceInfo, element) {
             }
         }, dropdownInfo, translate("app.content.not_found"));
     }
+    let currently_installing = new CurrentlyInstalling();
+    contentListWrap.appendChild(currently_installing.element);
+    instanceInfo.watchForChange("installing", (v) => {
+        if (!v) {
+            showContent();
+        } else {
+            contentListWrap.innerHTML = "";
+            contentListWrap.appendChild(currently_installing.element);
+        }
+    });
     if (!instanceInfo.refresh().installing) {
         showContent();
     } else {
-        let currently_installing = new CurrentlyInstalling();
+        contentListWrap.innerHTML = "";
         contentListWrap.appendChild(currently_installing.element);
-        instanceInfo.watchForChange("installing", (v) => {
-            if (!v) {
-                showContent();
-            }
-        })
     }
     element.appendChild(contentListWrap);
     clearMoreMenus();
@@ -7843,7 +7881,7 @@ class Dialog {
             } else if (buttons[i].type == "confirm") {
                 buttonElement.classList.add("confirm");
                 buttonElement.onclick = async () => {
-                    let info = this.values.map(e => ({ "id": e.id, "value": e.element.value }));
+                    let info = this.values.map(e => ({ "id": e.id, "value": e.element.value, "pass": e.element.getPass ? e.element.getPass() : null }));
                     info.push({ "id": "selected_tab", "value": selectedTab });
                     onsubmit(info, buttonElement);
                     this.element.close();
@@ -9114,10 +9152,10 @@ async function getModpackVersions(source, content_id) {
     if (source == "modrinth") {
         let versions_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}/version`);
         let versions = await versions_pre_json.json();
-        return versions.map(e => ({"name": e.name, "value": e.id}));
+        return versions.map(e => ({ "name": e.name, "value": e.id, "pass": e }));
     } else if (source == "curseforge") {
         let versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
-        return versions.map(e => ({"name": e.displayName, "value": e.id.toString() + ".0"}));
+        return versions.map(e => ({ "name": e.displayName, "value": e.id.toString() + ".0", "pass": e }));
     }
 }
 
@@ -9252,6 +9290,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             installButton.onclick = () => { };
             installedVersion = instance_content[content_ids.indexOf(content.id.toString())].version;
         }
+        if (content.project_type == "modpack" && instance_id) {
+            installedVersion = new Instance(instance_id).installed_version;
+        }
         let threeDots = document.createElement("button");
         threeDots.classList.add("content-top-more");
         threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -9313,7 +9354,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             }
         ].concat(links));
         let moreMenu = new MoreMenu(threeDots, buttons);
-        topBar.appendChild(installButton);
+        if (content.project_type != "modpack" || !instance_id) topBar.appendChild(installButton);
+        else threeDots.style.marginLeft = "auto";
         topBar.appendChild(threeDots);
         topBar.appendChild(moreMenu.element);
         contentWrapper.appendChild(topBar);
@@ -9538,6 +9580,11 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         installButton.setAttribute("title", translate("app.discover.install_specific_version"));
                         installButton.className = "version-file-install"
                         let updateToSpecificVersion = async () => {
+                            if (content.project_type == "modpack") {
+                                contentInfo.close();
+                                runModpackUpdate(new Instance(instance_id), "modrinth", e);
+                                return;
+                            }
                             let instanceInfo = new Instance(instance_id);
                             let contentList = instanceInfo.getContent();
                             installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
@@ -9833,6 +9880,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             installButton.onclick = () => { };
             installedVersion = instance_content[content_ids.indexOf(content.data.id + ".0")].version;
         }
+        if (project_type == "modpack" && instance_id) {
+            installedVersion = new Instance(instance_id).installed_version;
+        }
         let threeDots = document.createElement("button");
         threeDots.classList.add("content-top-more");
         threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -9894,7 +9944,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             }
         ].concat(links));
         let moreMenu = new MoreMenu(threeDots, buttons);
-        topBar.appendChild(installButton);
+        if (project_type != "modpack" || !instance_id) topBar.appendChild(installButton);
+        else threeDots.style.marginLeft = "auto";
         topBar.appendChild(threeDots);
         topBar.appendChild(moreMenu.element);
         contentWrapper.appendChild(topBar);
@@ -10116,16 +10167,41 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         let installButton = document.createElement("button");
                         installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
                         installButton.setAttribute("title", translate("app.discover.install_specific_version"));
+                        installButton.className = "version-file-install"
+                        let updateToSpecificVersion = async () => {
+                            if (project_type == "modpack") {
+                                contentInfo.close();
+                                runModpackUpdate(new Instance(instance_id), "curseforge", e);
+                                return;
+                            }
+                            let instanceInfo = new Instance(instance_id);
+                            let contentList = instanceInfo.getContent();
+                            installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                            installButton.classList.add("disabled");
+                            installButton.onclick = () => { };
+                            let theContent = null;
+                            for (let i = 0; i < contentList.length; i++) {
+                                console.log(contentList[i].source_info, content.data.id);
+                                if (Number(contentList[i].source_info) == Number(content.data.id)) {
+                                    theContent = contentList[i];
+                                }
+                            }
+                            if (!theContent) return;
+                            await updateContent(instanceInfo, theContent, e.id);
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                        }
                         if (installedVersion && installedVersionIndex > i) {
                             installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
                             installButton.setAttribute("title", translate("app.discover.update.tooltip"));
+                            installButton.onclick = updateToSpecificVersion;
                         } else if (installedVersion && installedVersionIndex < i) {
                             installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.downgrade");
                             installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
-                        }
-                        installButton.className = "version-file-install"
-                        installButton.onclick = () => {
-                            installButtonClick(project_type, "curseforge", [], content.data.logo.thumbnailUrl, content.data.name, content.data.authors[0].name, e.gameVersions, content_id, instance_id, installButton, contentInfo, e);
+                            installButton.onclick = updateToSpecificVersion;
+                        } else {
+                            installButton.onclick = () => {
+                                installButtonClick(project_type, "curseforge", [], content.data.logo.thumbnailUrl, content.data.name, content.data.authors[0].name, e.gameVersions, content_id, instance_id, installButton, contentInfo, e);
+                            }
                         }
 
                         if (Number(installedVersion) == Number(e.id)) {
@@ -11046,4 +11122,54 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             }
         });
     }
+}
+
+async function runModpackUpdate(instanceInfo, source, modpack_info) {
+    closeAllDialogs();
+    instanceInfo.setInstalling(true);
+    instanceInfo.setMcInstalled(false);
+    await window.electronAPI.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
+    instanceInfo.clearContent();
+    if (source == "modrinth") {
+        await window.electronAPI.downloadModrinthPack(instanceInfo.instance_id, modpack_info.files[0].url, instanceInfo.name);
+        instanceInfo.setVanillaVersion(modpack_info.game_versions[0]);
+        instanceInfo.setLoader(modpack_info.loaders[0]);
+    } else if (source == "curseforge") {
+        await window.electronAPI.downloadCurseforgePack(instanceInfo.instance_id, (`https://mediafilez.forgecdn.net/files/${Number(modpack_info.id.toString().substring(0, 4))}/${Number(modpack_info.id.toString().substring(4, 7))}/${encodeURIComponent(modpack_info.fileName)}`), instanceInfo.name);
+    }
+    let mr_pack_info = {};
+    if (source == "modrinth") {
+        mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, `./minecraft/instances/${instanceInfo.instance_id}/pack.mrpack`, instanceInfo.loader, instanceInfo.name);
+    } else if (source == "curseforge") {
+        mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, `./minecraft/instances/${instanceInfo.instance_id}/pack.zip`, instanceInfo.install_id, instanceInfo.name);
+
+        instanceInfo.setLoader(mr_pack_info.loader);
+        instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version);
+    }
+    if (!mr_pack_info.loader_version) {
+        displayError(mr_pack_info);
+        return;
+    }
+    instanceInfo.setInstalledVersion(modpack_info.id);
+    instanceInfo.setLoaderVersion(mr_pack_info.loader_version);
+    mr_pack_info.content.forEach(e => {
+        instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled);
+    });
+    instanceInfo.setInstalling(false);
+    let r = await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, instanceInfo.loader, instanceInfo.vanilla_version, mr_pack_info.loader_version);
+    instanceInfo.setJavaPath(r.java_installation);
+    instanceInfo.setJavaVersion(r.java_version);
+    instanceInfo.setMcInstalled(true);
+}
+
+function closeAllDialogs() {
+    let dialogs = [...document.getElementsByTagName("dialog")];
+    dialogs.forEach(e => {
+        e.close();
+    });
+    setTimeout(() => {
+        dialogs.forEach(e => {
+            e.remove();
+        });
+    }, 500);
 }
