@@ -1648,6 +1648,9 @@ class DialogDropdown {
         let dropdownSearchInput = document.createElement("input");
         dropdownSearchInput.className = "dropdown-search-input";
         dropdownSearchInput.placeholder = "Search...";
+        dropdownSearchInput.oninput = () => {
+            this.filter();
+        }
         element.appendChild(dropdownSearchInput);
         this.dropdownSearchInput = dropdownSearchInput;
         let dropdownInfo = document.createElement("div");
@@ -1670,12 +1673,35 @@ class DialogDropdown {
         dropdownList.classList.add("dropdown-list-dialog");
         dropdownList.setAttribute("popover", "");
         dropdownList.style.positionAnchor = "--" + this.id;
+        dropdownList.ontoggle = () => {
+            this.dropdownSearchInput.value = "";
+            this.filter();
+            this.dropdownSearchInput.focus();
+        }
+        dropdownList.popover = "manual";
+        document.addEventListener('pointerdown', (e) => {
+            if (!dropdownList.matches(':popover-open')) return;
+            const t = e.target;
+            if (dropdownList.contains(t)) return;
+            if (t === dropdownSearchInput || dropdownSearchInput.contains(t)) return;
+            dropdownList.hidePopover();
+        }, true);
         this.popover = dropdownList;
         this.setOptions(options, initial);
         element.appendChild(dropdownList);
     }
     getPass() {
         return this.options.filter(e => e.value == this.selected)[0].pass;
+    }
+    filter() {
+        let value = this.dropdownSearchInput.value.toLowerCase().trim();
+        this.optEles.forEach(e => {
+            if (!e.innerHTML.toLowerCase().includes(value)) {
+                e.style.display = "none";
+            } else {
+                e.style.display = "";
+            }
+        });
     }
     setOptions(options, initial) {
         this.options = options;

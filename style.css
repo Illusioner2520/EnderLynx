@@ -4416,15 +4416,14 @@ body.hide_ip .hidden-text.shown::after {
 
 .dropdown-search-input {
     position: absolute;
-    inset: 0;
-    font-size: 1.2rem;
+    inset: 3.5px;
+    font-size: 1rem;
     font-family: Arial;
     border: none;
     background: var(--color-1);
     padding: 8px;
-    padding-inline: 16px;
     font-weight: bold;
-    border-radius: 8px;
+    border-radius: 8px 8px 0px 0px;
     display: none;
     opacity: 0;
     transition: display .25s allow-discrete, opacity .25s;
