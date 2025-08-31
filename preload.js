@@ -25,10 +25,11 @@ const stringArgv = require('string-argv').default;
 const { Jimp, ResizeStrategy } = require('jimp');
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
+const readline = require('readline');
 
 const db = new Database('app.db');
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
@@ -37,6 +38,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT,
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
 
 db.pragma('journal_mode = WAL');
 
@@ -53,8 +55,6 @@ class LoginError extends Error {
 function openInBrowser(url) {
     shell.openExternal(url);
 }
-
-console.log(process);
 
 contextBridge.exposeInMainWorld('electronAPI', {
     version,
@@ -2117,6 +2117,59 @@ contextBridge.exposeInMainWorld('electronAPI', {
         } catch (e) {
             return false;
         }
+    },
+    analyzeLogs: async (instance_id, last_log_date) => {
+        const logs_path = `./minecraft/instances/${instance_id}/logs`;
+        fs.mkdirSync(logs_path, { recursive: true });
+        let allMatches = [];
+
+        const logs = fs.readdirSync(logs_path)
+            .filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz"));
+
+        for (let i = 0; i < logs.length; i++) {
+            const log = logs[i];
+            let date = log.replace(".log", "").split("_");
+            if (date[1]) date[1] = date[1].replaceAll("-", ":");
+            let dateStr = date.join(" ");
+            let parsedDate = new Date(dateStr);
+            if (isNaN(parsedDate.getTime())) continue;
+            if (last_log_date && parsedDate < last_log_date) continue;
+
+            const logPath = path.join(logs_path, log);
+
+            try {
+                const fileStream = fs.createReadStream(logPath, "utf8");
+                const rl = readline.createInterface({
+                    input: fileStream,
+                    crlfDelay: Infinity
+                });
+
+                for await (const line of rl) {
+                    if (line.includes("Connecting to ")) {
+                        // Timestamp
+                        const tsEnd = line.indexOf("]");
+                        if (tsEnd === -1) continue;
+                        const timestamp = line.slice(1, tsEnd); // remove leading "["
+
+                        // Extract host/port part
+                        const marker = "Connecting to ";
+                        const start = line.indexOf(marker) + marker.length;
+                        const after = line.slice(start); // "mc.example.net, 25565"
+
+                        const [host, port] = after.split(",").map(s => s.trim());
+
+                        if (host && port) {
+                            allMatches.push([timestamp, host, port]);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error reading log:", logPath, e);
+                continue;
+            }
+        }
+
+        return allMatches;
     }
 });
 

@@ -2099,6 +2099,7 @@ class ContentList {
             let imageElement = document.createElement("img");
             imageElement.className = "content-list-image";
             imageElement.src = fixPathForImage(content[i].image ? content[i].image : "default.png");
+            imageElement.loading = "lazy";
             contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
             infoElement1.className = "content-list-info";

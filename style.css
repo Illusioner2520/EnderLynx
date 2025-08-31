@@ -203,13 +203,13 @@ body.compact .sidebar {
 }
 
 #player-dropdown:popover-open {
-    height: max-content;
     display: grid;
-    padding-block: 8px;
+    scale: 1;
+    opacity: 1;
 
     @starting-style {
-        height: 0px;
-        padding-block: 0px;
+        scale: .8;
+        opacity: 0;
     }
 }
 
@@ -230,14 +230,14 @@ body.compact .sidebar {
     top: calc(anchor(bottom) + 10px);
     left: anchor(left);
     border-radius: 10px;
-    height: 0px;
-    padding-block: 0px;
     interpolate-size: allow-keywords;
-    transition: padding-block .25s, height .25s, overlay .25s allow-discrete, display .25s allow-discrete;
+    transition: opacity .25s, scale .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
     box-shadow: 0 0 10px black;
+    scale: .8;
+    opacity: 0;
 }
 
 .context-menu {
