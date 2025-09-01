@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,10 +8,51 @@
     <link href="style.css" rel="stylesheet" type="text/css">
     <link href="fontawesome/css/all.min.css" rel="stylesheet" type="text/css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src data: *; connect-src *; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'nonce-starting-script-enderlynx'; style-src 'self' 'unsafe-inline'; img-src data: *; connect-src *; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;">
 </head>
+
 <body>
-    <div class="sidebar">
+    <div id="spinner-wrapper">
+        <div class="start-spinner"></div>
+    </div>
+    <style>
+        body {
+            background-color: #0a0a0a;
+        }
+
+        #spinner-wrapper {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+        }
+
+        .start-spinner {
+            height: 100px;
+            width: 100px;
+            border-radius: 50%;
+            border-color: white transparent transparent transparent;
+            border-width: 10px;
+            border-style: solid;
+            animation-name: spin;
+            animation-iteration-count: infinite;
+            animation-duration: 1s;
+            display: block;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            from {
+                rotate: 0deg;
+            }
+
+            to {
+                rotate: 360deg;
+            }
+        }
+    </style>
+    <div class="sidebar" style="display: none">
         <button id="playerSwitch"></button>
         <button id="homeButtonEle"></button>
         <button id="instanceButtonEle"></button>
@@ -20,12 +62,23 @@
         <button id="settingsButtonEle"></button>
         <div id="liveMinecraft"></div>
     </div>
-    <div class="content" id="content"></div>
-    <script src="node_modules/skinview3d/bundles/skinview3d.bundle.js"></script>
-    <dialog class="screenshot-preview" id="screenshotPreview"></dialog>
-    <dialog class="content-info" id="contentInfo"></dialog>
-    <div class="toasts" popover="manual"></div>
-    <div id="tooltip" class="tooltip" popover="manual"></div>
-    <script src="script.js"></script>
+    <div class="content" id="content" style="display: none"></div>
+    <!-- <script src="node_modules/skinview3d/bundles/skinview3d.bundle.js"></script> -->
+    <dialog class="screenshot-preview" id="screenshotPreview" style="display: none"></dialog>
+    <dialog class="content-info" id="contentInfo" style="display: none"></dialog>
+    <div class="toasts" popover="manual" style="display: none"></div>
+    <div id="tooltip" class="tooltip" popover="manual" style="display: none"></div>
+    <!-- <script src="script.js"></script> -->
+    <script nonce="starting-script-enderlynx">
+        requestAnimationFrame(() => {
+            const script = document.createElement("script");
+            script.src = "script.js";
+            const script2 = document.createElement("script");
+            script2.src = "node_modules/skinview3d/bundles/skinview3d.bundle.js";
+            document.body.appendChild(script);
+            document.body.appendChild(script2);
+        });
+    </script>
 </body>
+
 </html>

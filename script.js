@@ -341,11 +341,19 @@ class Instance {
         this.wrapper = content.wrapper;
         this.post_exit_hook = content.post_exit_hook;
         this.installed_version = content.installed_version;
+        this.last_analyzed_log = content.last_analyzed_log;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
     get pinned() {
         let inst = db.prepare("SELECT * FROM pins WHERE instance_id = ? AND type = ?").get(this.instance_id, "instance");
         return Boolean(inst);
+    }
+    setLastAnalyzedLog(last_analyzed_log) {
+        db.prepare("UPDATE instances SET last_analyzed_log = ? WHERE id = ?").run(last_analyzed_log, this.id);
+        this.last_analyzed_log = last_analyzed_log;
+        if (instance_watches[this.instance_id].onchangelast_analyzed_log) {
+            instance_watches[this.instance_id].onchangelast_analyzed_log(last_analyzed_log);
+        }
     }
     setInstalledVersion(installed_version) {
         db.prepare("UPDATE instances SET installed_version = ? WHERE id = ?").run(installed_version, this.id);
@@ -1197,7 +1205,7 @@ class PageContent {
             return;
         }
         content.innerHTML = "";
-        content.appendChild(await this.func());
+        content.appendChild(this.func());
         if (this.title == "instances") {
             groupInstances(data.getDefault("default_group"));
         }
@@ -1640,7 +1648,9 @@ class DialogDropdown {
         this.element = element;
         this.id = createId();
         let dropdownButton = document.createElement('button');
-        dropdownButton.setAttribute("popovertarget", this.id);
+        dropdownButton.onclick = () => {
+            dropdownList.showPopover();
+        }
         element.style.anchorName = "--" + this.id;
         dropdownButton.classList.add('dropdown-button');
         element.appendChild(dropdownButton);
@@ -1686,12 +1696,17 @@ class DialogDropdown {
             if (t === dropdownSearchInput || dropdownSearchInput.contains(t)) return;
             dropdownList.hidePopover();
         }, true);
+        document.addEventListener('keydown', (e) => {
+            if (e.key == "Escape") {
+                dropdownList.hidePopover();
+            }
+        }, true);
         this.popover = dropdownList;
         this.setOptions(options, initial);
         element.appendChild(dropdownList);
     }
     getPass() {
-        return this.options.filter(e => e.value == this.selected)[0].pass;
+        return this.options.filter(e => e.value == this.selected)[0] ? this.options.filter(e => e.value == this.selected)[0].pass : null;
     }
     filter() {
         let value = this.dropdownSearchInput.value.toLowerCase().trim();
@@ -2302,7 +2317,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
     return true;
 }
 
-let homeContent = new PageContent(showHomeContent, "home");
+let homeContent = new PageContent(showHome, "home");
 let instanceContent = new PageContent(showInstanceContent, "instances");
 let worldContent = new PageContent(null, "discover");
 let myAccountContent = new PageContent(showMyAccountContent, "my_account");
@@ -2688,7 +2703,19 @@ async function toggleMicrosoftSignIn() {
     }
 }
 
-async function showHomeContent(e) {
+function showHome() {
+    let ele = document.createElement("div");
+    ele.className = "home-element";
+    let loading = new LoadingContainer();
+    loading.element.style.gridColumn = "span 2";
+    ele.appendChild(loading.element);
+    setTimeout(() => {
+        showHomeContent(ele);
+    }, 0);
+    return ele;
+}
+
+async function showHomeContent(oldEle) {
     let ele = document.createElement("div");
     ele.className = "home-element";
     let column1 = document.createElement("div");
@@ -2700,7 +2727,7 @@ async function showHomeContent(e) {
     let pinnedWorlds = await getPinnedWorlds();
     let pinnedInstances = getPinnedInstances();
     pinnedInstances.forEach(e => e.actuallyPinned = true);
-    let lastPlayedWorlds = getRecentlyPlayedWorlds();
+    let lastPlayedWorlds = await getRecentlyPlayedWorlds();
     let lastPlayedInstances = getRecentlyPlayedInstances();
     pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -2721,8 +2748,8 @@ async function showHomeContent(e) {
     let lastPlayedInstanceGrid = document.createElement("div");
     lastPlayedInstanceGrid.className = "home-list-section";
     pinnedWorlds.concat(lastPlayedWorlds).forEach(e => {
-        // TEMPORARY: ALLOW MULTIPLAYER WORLDS TO BE RECENTLY PLAYED LATER!!!
-        if (!e.pinned) e.type = "singleplayer";
+        if (!e.ip) e.type = "singleplayer";
+        else e.type = "multiplayer";
 
         let item = document.createElement("div");
         item.className = "home-entry";
@@ -3112,6 +3139,8 @@ async function showHomeContent(e) {
         updateHomeModpacksList(home_modpacks);
     }
     ele.appendChild(discoverModsWrapper);
+    content.appendChild(ele);
+    oldEle.remove();
     return ele;
 }
 
@@ -4031,43 +4060,43 @@ function showInstanceContent(e) {
                         }
                     }*/
                 ]
-            },
-            {
-                "type": "dropdown",
-                "id": "launcher",
-                "tab": "launcher",
-                "name": translate("app.instances.launcher"),
-                "options": [
-                    {
-                        "name": translate("app.launcher.modrinth"),
-                        "value": "modrinth"
-                    },
-                    {
-                        "name": translate("app.launcher.curseforge"),
-                        "value": "curseforge"
-                    },
-                    {
-                        "name": translate("app.launcher.multimc"),
-                        "value": "multimc"
-                    },
-                    {
-                        "name": translate("app.launcher.prism"),
-                        "value": "prism"
-                    },
-                    {
-                        "name": translate("app.launcher.atlauncher"),
-                        "value": "atlauncher"
-                    },
-                    {
-                        "name": translate("app.launcher.gdlauncher"),
-                        "value": "gdlauncher"
-                    },
-                    {
-                        "name": translate("app.launcher.vanilla"),
-                        "value": "vanilla"
-                    }
-                ]
-            }
+            }//,
+            // {
+            //     "type": "dropdown",
+            //     "id": "launcher",
+            //     "tab": "launcher",
+            //     "name": translate("app.instances.launcher"),
+            //     "options": [
+            //         {
+            //             "name": translate("app.launcher.modrinth"),
+            //             "value": "modrinth"
+            //         },
+            //         {
+            //             "name": translate("app.launcher.curseforge"),
+            //             "value": "curseforge"
+            //         },
+            //         {
+            //             "name": translate("app.launcher.multimc"),
+            //             "value": "multimc"
+            //         },
+            //         {
+            //             "name": translate("app.launcher.prism"),
+            //             "value": "prism"
+            //         },
+            //         {
+            //             "name": translate("app.launcher.atlauncher"),
+            //             "value": "atlauncher"
+            //         },
+            //         {
+            //             "name": translate("app.launcher.gdlauncher"),
+            //             "value": "gdlauncher"
+            //         },
+            //         {
+            //             "name": translate("app.launcher.vanilla"),
+            //             "value": "vanilla"
+            //         }
+            //     ]
+            // }
         ], [
             { "content": translate("app.instances.cancel"), "type": "cancel" },
             { "content": translate("app.instances.submit"), "type": "confirm" }
@@ -4079,11 +4108,11 @@ function showInstanceContent(e) {
             {
                 "name": translate("app.instances.tab.file"),
                 "value": "file"
-            },
-            {
-                "name": translate("app.instances.tab.launcher"),
-                "value": "launcher"
-            }
+            }//,
+            // {
+            //     "name": translate("app.instances.tab.launcher"),
+            //     "value": "launcher"
+            // }
         ], async (e) => {
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
@@ -4353,6 +4382,7 @@ function showInstanceContent(e) {
     return ele;
 }
 function showSpecificInstanceContent(instanceInfo, default_tab) {
+    instanceInfo = instanceInfo.refresh();
     for (let i = 0; i < navButtons.length; i++) {
         navButtons[i].removeSelected();
     }
@@ -4403,16 +4433,25 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
     let instTopPlaytime = document.createElement("div");
     instTopPlaytime.classList.add("instance-top-sub-info-specific");
     instTopPlaytime.setAttribute("title", translate("app.instances.play_time"));
+    let playtime = instanceInfo.playtime;
+    let last_played = instanceInfo.last_played;
     instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(instanceInfo.playtime))}`;
     instanceInfo.watchForChange("playtime", (v) => {
-        instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(v))}`
+        if (!running) instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(v))}`
+        playtime = v;
     });
+    let playtimeInterval = setInterval(() => {
+        if (!document.body.contains(instTopPlaytime)) clearInterval(playtimeInterval);
+        if (!running) return;
+        instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(playtime + Math.floor((new Date().getTime() - new Date(last_played).getTime()) / 1000)))}`
+    }, 1000);
     let instTopLastPlayed = document.createElement("div");
     instTopLastPlayed.classList.add("instance-top-sub-info-specific");
     instTopLastPlayed.setAttribute("title", translate("app.instances.last_played"));
     instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatDate(instanceInfo.last_played))}`;
     instanceInfo.watchForChange("last_played", (v) => {
         instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatDate(v))}`;
+        last_played = v;
     });
     instTopSubInfo.appendChild(instTopVersions);
     instTopSubInfo.appendChild(instTopPlaytime);
@@ -4441,7 +4480,10 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             playButton.classList.add("instance-top-play-button");
             playButton.onclick = playButtonClick;
             live.findLive();
+            running = false;
+            analyzeLogs();
         });
+        running = true;
     }
     let stopButtonClick = async () => {
         playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
@@ -4454,6 +4496,8 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             playButton.classList.remove("instance-top-stop-button");
             playButton.classList.add("instance-top-play-button");
             playButton.onclick = playButtonClick;
+            running = false;
+            analyzeLogs();
         } else {
             playButton.classList.remove("instance-top-loading-button");
             playButton.classList.add("instance-top-stop-button");
@@ -4466,6 +4510,8 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
                 playButton.classList.add("instance-top-play-button");
                 playButton.onclick = playButtonClick;
                 live.findLive();
+                running = false;
+                analyzeLogs();
             });
         }
     }
@@ -4488,6 +4534,8 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             playButton.classList.add("instance-top-play-button");
             playButton.onclick = playButtonClick;
             live.findLive();
+            running = false;
+            analyzeLogs();
         });
     }
     instanceInfo.watchForChange("mc_installed", (v) => {
@@ -4632,6 +4680,29 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
         }
     ]);
     tabs.selectOptionAdvanced(default_tab ?? "content");
+    let analyzeLogs = async () => {
+        instanceInfo = instanceInfo.refresh();
+        let info = await window.electronAPI.analyzeLogs(instanceInfo.instance_id, instanceInfo.last_analyzed_log, running ? instanceInfo.current_log_file : "");
+        instanceInfo.setPlaytime(info.total_playtime + instanceInfo.playtime);
+        if (info.most_recent_log) instanceInfo.setLastAnalyzedLog(info.most_recent_log);
+        for (let i = 0; i < info.last_played_servers.length; i++) {
+            let entry = info.last_played_servers[i];
+            console.log(entry);
+            let existing = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instanceInfo.instance_id, entry[1] + ":" + entry[2]);
+            if (!existing) {
+                db.prepare("INSERT INTO last_played_servers (ip, instance_id, date) VALUES (?, ?, ?)").run(entry[1] + ":" + entry[2], instanceInfo.instance_id, entry[0]);
+            } else {
+                db.prepare("UPDATE last_played_servers SET date = ? WHERE instance_id = ? AND ip = ?").run(entry[0], instanceInfo.instance_id, entry[1] + ":" + entry[2]);
+            }
+        }
+    }
+    analyzeLogs();
+}
+
+function getServerLastPlayed(instance_id, ip) {
+    if (!ip.includes(":")) ip += ":25565";
+    let result = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instance_id, ip);
+    return result ? new Date(result.date) : new Date(null);
 }
 
 function showInstanceSettings(instanceInfo) {
@@ -5622,11 +5693,12 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             });
     }
     for (let i = 0; i < worldsMultiplayer.length; i++) {
+        let last_played = getServerLastPlayed(instanceInfo.instance_id, worldsMultiplayer[i].ip);
         worldList.push(
             {
                 "primary_column": {
                     "title": worldsMultiplayer[i].name,
-                    "desc": (new Date(worldsMultiplayer[i].last_played)).getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(worldsMultiplayer[i].last_played))
+                    "desc": last_played.getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
                 },
                 "secondary_column": {
                     "title": translate("app.worlds.description.multiplayer"),
@@ -5879,7 +5951,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     }
     let currentLog = "";
     logDisplay.onscroll = render;
-    let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", (e) => {
+    let onChangeLogDropdown = (e) => {
         try {
             window.electronAPI.stopWatching(instanceInfo.current_log_file);
         } catch (e) { }
@@ -5909,7 +5981,12 @@ function setInstanceTabContentLogs(instanceInfo, element) {
             });
         }
         render();
-    });
+    }
+    if (log_info.length > 9) {
+        let dropdownInfo = new DialogDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+    } else {
+        let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+    }
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
@@ -8039,6 +8116,7 @@ class ContentSearchEntry {
         let image = document.createElement("img");
         image.src = imageURL ? imageURL : "default.png";
         image.className = "discover-item-image";
+        image.loading = "lazy";
         element.appendChild(image);
         let info = document.createElement("div");
         info.className = "discover-item-info";
@@ -8614,7 +8692,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
                     await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
-                    let instance = new Instance(instance_id);
+                    let instance = new Instance(info.instance);
                     instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
                 });
             }
@@ -9126,8 +9204,16 @@ function duplicateInstance(instanceInfo) {
     })
 }
 
-function getRecentlyPlayedWorlds() {
-    return window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
+async function getRecentlyPlayedWorlds() {
+    let all_servers = await window.electronAPI.getAllServers(data.getInstances().map(e => e.instance_id));
+    all_servers = all_servers.map(server => ({
+        ...server,
+        "last_played": getServerLastPlayed(server.instance_id, server.ip)
+    }))
+    let last_played_worlds = window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
+    let all = last_played_worlds.concat(all_servers);
+    all.sort((a, b) => b.last_played - a.last_played);
+    return all.slice(0, 5);
 }
 
 function getRecentlyPlayedInstances() {
@@ -11200,3 +11286,9 @@ function closeAllDialogs() {
         });
     }, 500);
 }
+
+document.getElementById("spinner-wrapper").remove();
+
+[...document.body.children].forEach(e => {
+    e.style.display = "";
+})

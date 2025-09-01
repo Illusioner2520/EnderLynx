@@ -167,6 +167,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return allWorlds;
     },
+    getAllServers: async (instance_ids) => {
+        if (!Array.isArray(instance_ids) || instance_ids.length === 0) return [];
+        const instancesPath = path.resolve(__dirname, "minecraft/instances");
+        let allServers = [];
+        for (const instanceId of instance_ids) {
+            const servers = (await getMultiplayerWorlds(instanceId)).map(server => ({
+                ...server,
+                instance_id: instanceId
+            }));
+            allServers = allServers.concat(servers);
+        }
+        return allServers;
+    },
     getRecentlyPlayedWorlds: (instance_ids) => {
         if (!Array.isArray(instance_ids) || instance_ids.length === 0) return [];
         const instancesPath = path.resolve(__dirname, "minecraft/instances");
@@ -467,41 +480,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    getMultiplayerWorlds: async (instance_id) => {
-        let patha = `./minecraft/instances/${instance_id}`;
-        fs.mkdirSync(patha, { recursive: true });
-        let serversDatPath = path.resolve(patha, 'servers.dat');
-        let worlds = [];
-
-        if (!fs.existsSync(serversDatPath)) {
-            return worlds;
-        }
-
-        try {
-            const buffer = fs.readFileSync(serversDatPath);
-            const data = await nbt.parse(buffer);
-            console.log(data);
-            const servers = data.parsed?.value?.servers?.value?.value || [];
-
-            let i = 0;
-            for (const server of servers) {
-                worlds.push({
-                    name: server.name?.value || "Unknown",
-                    ip: server.ip?.value || "",
-                    icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
-                    acceptTextures: server.acceptTextures?.value ?? false,
-                    hideAddress: server.hideAddress?.value ?? false,
-                    last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null,
-                    index: i
-                });
-                i++;
-            }
-        } catch (e) {
-            console.error(`Failed to parse servers.dat:`, e);
-        }
-
-        return worlds;
-    },
+    getMultiplayerWorlds,
     openFolder: (folderPath) => {
         let command;
         switch (process.platform) {
@@ -2118,13 +2097,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    analyzeLogs: async (instance_id, last_log_date) => {
+    analyzeLogs: async (instance_id, last_log_date, current_log_path) => {
+        let lastDate = null;
+        if (last_log_date) {
+            let date = last_log_date.replace(".log", "").split("_");
+            if (date[1]) date[1] = date[1].replaceAll("-", ":");
+            let dateStr = date.join(" ");
+            lastDate = new Date(dateStr);
+            if (isNaN(lastDate.getTime())) lastDate = null;
+        }
+
         const logs_path = `./minecraft/instances/${instance_id}/logs`;
         fs.mkdirSync(logs_path, { recursive: true });
         let allMatches = [];
+        let totalPlaytime = 0;
 
         const logs = fs.readdirSync(logs_path)
             .filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz"));
+
+        let most_recent_log = "";
 
         for (let i = 0; i < logs.length; i++) {
             const log = logs[i];
@@ -2133,9 +2124,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
             let dateStr = date.join(" ");
             let parsedDate = new Date(dateStr);
             if (isNaN(parsedDate.getTime())) continue;
-            if (last_log_date && parsedDate < last_log_date) continue;
+            if (lastDate && parsedDate <= lastDate) continue;
 
             const logPath = path.join(logs_path, log);
+
+            let startTimestamp = "";
+            let endTimestamp = "";
 
             try {
                 const fileStream = fs.createReadStream(logPath, "utf8");
@@ -2143,12 +2137,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     input: fileStream,
                     crlfDelay: Infinity
                 });
-
+                let startFound = false;
                 for await (const line of rl) {
-                    if (line.includes("Connecting to ")) {
+                    let searchForStart = () => {
+                        const tsEnd = line.indexOf("]");
+                        if (tsEnd === -1) return;
+                        const timestamp = line.slice(1, tsEnd);
+                        if (isNaN(new Date(timestamp).getTime())) return;
+                        startTimestamp = timestamp;
+                        startFound = true;
+                    }
+                    let searchForEnd = () => {
+                        const tsEnd = line.indexOf("]");
+                        if (tsEnd === -1) return;
+                        const timestamp = line.slice(1, tsEnd);
+                        if (isNaN(new Date(timestamp).getTime())) return;
+                        endTimestamp = timestamp;
+                    }
+                    if (!startFound) searchForStart();
+                    else searchForEnd();
+
+                    let searchForConnectingTo = () => {
+                        if (line.includes("[CHAT]")) return;
+
                         // Timestamp
                         const tsEnd = line.indexOf("]");
-                        if (tsEnd === -1) continue;
+                        if (tsEnd === -1) return;
                         const timestamp = line.slice(1, tsEnd); // remove leading "["
 
                         // Extract host/port part
@@ -2162,14 +2176,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
                             allMatches.push([timestamp, host, port]);
                         }
                     }
+                    if (line.includes("Connecting to ")) searchForConnectingTo();
                 }
             } catch (e) {
                 console.error("Error reading log:", logPath, e);
                 continue;
             }
+
+            if (current_log_path && path.resolve(logPath) === path.resolve(current_log_path)) {
+                break;
+            }
+
+            let playtime = new Date(endTimestamp).getTime() - new Date(startTimestamp).getTime();
+            if (!isNaN(playtime)) totalPlaytime += playtime;
+
+            most_recent_log = log;
         }
 
-        return allMatches;
+        return ({
+            "last_played_servers": allMatches,
+            "total_playtime": (totalPlaytime / 1000),
+            "most_recent_log": most_recent_log
+        });
     }
 });
 
@@ -2812,4 +2840,42 @@ function checkForProcess(pid) {
         }
         throw err;
     }
+}
+
+async function getMultiplayerWorlds(instance_id) {
+    let patha = `./minecraft/instances/${instance_id}`;
+    fs.mkdirSync(patha, { recursive: true });
+    let serversDatPath = path.resolve(patha, 'servers.dat');
+    let worlds = [];
+
+    if (!fs.existsSync(serversDatPath)) {
+        return worlds;
+    }
+
+    try {
+        const buffer = fs.readFileSync(serversDatPath);
+        const data = await nbt.parse(buffer);
+        const servers = data.parsed?.value?.servers?.value?.value || [];
+
+        let i = 0;
+        for (const server of servers) {
+            worlds.push({
+                name: server.name?.value || "Unknown",
+                ip: server.ip?.value || "",
+                icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
+                acceptTextures: server.acceptTextures?.value ?? false,
+                hideAddress: server.hideAddress?.value ?? false,
+                last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null,
+                index: i
+            });
+            i++;
+        }
+    } catch (e) {
+        console.error(`Failed to parse servers.dat:`, e);
+        return [];
+    }
+
+    console.log(worlds);
+
+    return worlds;
 }

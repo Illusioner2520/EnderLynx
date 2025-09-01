@@ -19,6 +19,7 @@ const createWindow = () => {
             sandbox: false,
             devTools: isDev
         },
+        backgroundColor: "#0a0a0a",
         icon: path.join(__dirname, 'icon.ico')
     });
     win.loadFile('index.html');
@@ -34,9 +35,9 @@ const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
 const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
 
 if (instanceArg) {
-    if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0,1).join('=');
-    if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0,1).join('=');
-    if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0,1).join('=');
+    if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
+    if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
+    if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
 }
 
 app.whenReady().then(() => {
