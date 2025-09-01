@@ -1462,6 +1462,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
     },
     processPackFile: async (file_path, instance_id, title) => {
+        if (/^https?:\/\//.test(file_path)) {
+            const destPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/pack.zip`);
+            try {
+                await urlToFile(file_path, destPath);
+            } catch (e) {
+                return false;
+            }
+            file_path = destPath;
+        }
         let extension = path.extname(file_path);
         console.log(extension);
         if (extension == ".mrpack") {

@@ -123,6 +123,8 @@
     "app.instances.tab.custom": "Custom",
     "app.instances.tab.file": "File Import",
     "app.instances.tab.launcher": "Import from Launcher",
+    "app.instances.tab.code": "CurseForge Code",
+    "app.instances.cf_code": "CurseForge Profile Code",
     "app.skins.steve": "Steve",
     "app.skins.alex": "Alex",
     "app.skins.ari": "Ari",
@@ -205,8 +207,11 @@
     "app.settings.theme.dark": "Dark Mode",
     "app.settings.theme.light": "Light Mode",
     "app.settings.sidebar": "Sidebar Mode",
+    "app.settings.sidebar.side": "Sidebar Side",
     "app.settings.sidebar.spacious": "Spacious Mode",
     "app.settings.sidebar.compact": "Compact Mode",
+    "app.settings.sidebar.left": "Left Side",
+    "app.settings.sidebar.right": "Right Side",
     "app.settings.page": "Default Page",
     "app.settings.page.description": "The page that the launcher opens on",
     "app.settings.page.home": "Home",
@@ -468,6 +473,7 @@
     "app.options.notice_1": "Changing these settings while the game is open may not function correctly.",
     "app.options.notice_2": "The launcher will attempt to apply any default settings to any new instance you create, regardless of version. It is then up to Minecraft to correctly parse and use those settings.",
     "app.options.updated": "Updated options.txt!",
+    "app.options.updated_default": "Updated default options",
     "app.options.failed": "Unable to update options.txt",
     "app.options.default.remove": "Remove Default",
     "app.options.default.set": "Set Default",
@@ -646,5 +652,7 @@
     "app.discover.datapacks.world": "World",
     "app.instances.settings.modpack.version.title": "Modpack Version",
     "app.instances.settings.modpack.version.description": "If you change this value, the launcher will update or downgrade this modpack to the new version. Your worlds, screenshots and options will be preserved.",
-    "app.modpack.update.progress_already": "Cannot update or downgrade the modpack right now, as there is already an installation in progress for this instance."
+    "app.modpack.update.progress_already": "Cannot update or downgrade the modpack right now, as there is already an installation in progress for this instance.",
+    "app.cf.code.error": "Unable to download modpack from CurseForge code. Check that the code hasn't expired and that it is actually valid.",
+    "app.settings.def_opts.notice": "To add a default option to this list, go to an instance's option tab and set some as default. These defaults will then be applied to any new instance you create."
 }

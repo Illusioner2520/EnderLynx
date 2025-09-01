@@ -89,6 +89,13 @@ button {
     backdrop-filter: blur(15px);
 }
 
+body.sidebar-right .sidebar {
+    left: unset;
+    right: 0;
+    border-right-style: none;
+    border-left-style: solid;
+}
+
 body.compact .sidebar {
     width: 76px;
 }
@@ -456,9 +463,19 @@ body.compact #playerSwitch .player-chevron {
     height: 100%;
 }
 
+body.sidebar-right .content {
+    right: 301px;
+    left: unset;
+}
+
 body.compact .content {
     left: 77px;
     width: calc(100% - 77px);
+}
+
+body.compact.sidebar-right .content {
+    right: 77px;
+    left: unset;
 }
 
 .instance-content {
@@ -2950,8 +2967,12 @@ dialog[open]::backdrop {
     display: grid;
     background-color: var(--color-1t);
     border-radius: 10px;
-    margin-top: 10px;
     grid-template-columns: 1fr 1fr auto;
+    overflow: hidden;
+}
+
+.tab-info:has(.option-list):has(.info) .option-list {
+    margin-top: 10px;
 }
 
 .option-item {
