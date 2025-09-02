@@ -447,10 +447,11 @@ class Instance {
         this.loader = loader;
         if (instance_watches[this.instance_id].onchangeloader) instance_watches[this.instance_id].onchangeloader(loader);
     }
-    setVanillaVersion(vanilla_version) {
+    setVanillaVersion(vanilla_version, do_not_set_options_txt) {
         db.prepare("UPDATE instances SET vanilla_version = ? WHERE id = ?").run(vanilla_version, this.id);
         this.vanilla_version = vanilla_version;
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
+        if (do_not_set_options_txt) return;
         let default_options = new DefaultOptions(vanilla_version);
         let v = window.electronAPI.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false);
         this.setAttemptedOptionsTxtVersion(v);
@@ -2096,12 +2097,13 @@ class ContentList {
         }
 
         this.items = [];
+        this.second_column_elements = [];
         for (let i = 0; i < content.length; i++) {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
             if (content[i].class) contentEle.classList.add(content[i].class);
             if (content[i].type) contentEle.setAttribute("data-type", content[i].type);
-            this.items.push({ "name": [content[i].primary_column.title, content[i].primary_column.desc, content[i].secondary_column.title, content[i].secondary_column.desc].join("!!!!!!!!!!"), "element": contentEle, "type": content[i].type });
+            this.items.push({ "name": [content[i].primary_column.title, content[i].primary_column.desc, content[i].secondary_column.title(), content[i].secondary_column.desc()].join("!!!!!!!!!!"), "element": contentEle, "type": content[i].type });
             let checkboxElement;
             if (features?.checkbox?.enabled) {
                 checkboxElement = document.createElement("input");
@@ -2133,11 +2135,17 @@ class ContentList {
             contentEle.appendChild(infoElement2);
             let infoElement2Title = document.createElement("div");
             infoElement2Title.className = "content-list-info-title-2";
-            infoElement2Title.innerHTML = sanitize(content[i].secondary_column.title);
+            infoElement2Title.innerHTML = sanitize(content[i].secondary_column.title());
             infoElement2.appendChild(infoElement2Title);
             let infoElement2Desc = document.createElement("div");
             infoElement2Desc.className = "content-list-info-desc-2";
-            infoElement2Desc.innerHTML = (content[i].secondary_column.desc);
+            infoElement2Desc.innerHTML = (content[i].secondary_column.desc());
+            this.second_column_elements.push({
+                infoElement2Title,
+                infoElement2Desc,
+                "title_func": content[i].secondary_column.title,
+                "desc_func": content[i].secondary_column.desc
+            })
             if (content[i]?.secondary_column?.desc_hidden) {
                 infoElement2Desc.style.width = "fit-content";
                 infoElement2Desc.classList.add("hidden-text");
@@ -2215,6 +2223,15 @@ class ContentList {
         }
         element.appendChild(contentMainElement);
     }
+
+    updateSecondaryColumn() {
+        let list = this.second_column_elements;
+        list.forEach(e => {
+            e.infoElement2Title.innerHTML = sanitize(e.title_func());
+            e.infoElement2Desc.innerHTML = sanitize(e.desc_func());
+        });
+    }
+
     figureOutMainCheckedState() {
         if (!this.checkBox) return;
         let total = 0;
@@ -3317,11 +3334,11 @@ async function showHomeContent(oldEle) {
                     homeContent.displayContent();
                 }
             },
-            {
-                "title": translate("app.worlds.share"),
-                "icon": '<i class="fa-solid fa-share"></i>',
-                "func": () => { }
-            },
+            // {
+            //     "title": translate("app.worlds.share"),
+            //     "icon": '<i class="fa-solid fa-share"></i>',
+            //     "func": () => { }
+            // },
             (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions ? {
                 "icon": '<i class="fa-solid fa-desktop"></i>',
                 "title": translate("app.worlds.desktop_shortcut"),
@@ -3468,11 +3485,11 @@ async function showHomeContent(oldEle) {
                     window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}`);
                 }
             },
-            {
-                "icon": '<i class="fa-solid fa-share"></i>',
-                "title": translate("app.button.instances.share"),
-                "func": (e) => { }
-            },
+            // {
+            //     "icon": '<i class="fa-solid fa-share"></i>',
+            //     "title": translate("app.button.instances.share"),
+            //     "func": (e) => { }
+            // },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
@@ -4858,11 +4875,11 @@ function showInstanceContent(e) {
                     window.electronAPI.openFolder(`./minecraft/instances/${instances[i].instance_id}`);
                 }
             },
-            {
-                "icon": '<i class="fa-solid fa-share"></i>',
-                "title": translate("app.button.instances.share"),
-                "func": (e) => { }
-            },
+            // {
+            //     "icon": '<i class="fa-solid fa-share"></i>',
+            //     "title": translate("app.button.instances.share"),
+            //     "func": (e) => { }
+            // },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
@@ -5126,11 +5143,11 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
                 window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}`);
             }
         },
-        {
-            "icon": '<i class="fa-solid fa-share"></i>',
-            "title": translate("app.button.instances.share"),
-            "func": (e) => { }
-        },
+        // {
+        //     "icon": '<i class="fa-solid fa-share"></i>',
+        //     "title": translate("app.button.instances.share"),
+        //     "func": (e) => { }
+        // },
         {
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
@@ -5509,7 +5526,8 @@ function showInstanceSettings(instanceInfo) {
             "id": "post_exit_hook",
             "name": translate("app.instances.settings.post_exit_hook"),
             "default": instanceInfo.post_exit_hook,
-            "tab": "launch_hooks"
+            "tab": "launch_hooks",
+            "desc": translate("app.post_exit.notice")
         }
     ].filter(e => e), [
         { "type": "cancel", "content": translate("app.instances.settings.cancel") },
@@ -5550,9 +5568,9 @@ function showInstanceSettings(instanceInfo) {
         if ([info.game_version, info.loader_version].includes("loading")) {
             return;
         }
-        if (!info.loader || !info.game_version || !info.loader_version) return;
+        if (!info.loader || !info.game_version) return;
         instanceInfo.setLoader(info.loader);
-        instanceInfo.setVanillaVersion(info.game_version);
+        instanceInfo.setVanillaVersion(info.game_version, true);
         instanceInfo.setLoaderVersion(info.loader_version);
         instanceInfo.setMcInstalled(false);
         await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
@@ -5738,8 +5756,8 @@ function setInstanceTabContentContent(instanceInfo, element) {
                     "desc": e.author ? "by " + e.author : ""
                 },
                 "secondary_column": {
-                    "title": e.version,
-                    "desc": e.file_name
+                    "title": () => e.refresh().version,
+                    "desc": () => e.refresh().file_name
                 },
                 "type": e.type,
                 "class": e.source,
@@ -5779,13 +5797,13 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
                             "func": () => {
-                                displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+                                displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, false, contentList);
                             }
                         } : e.source == "curseforge" ? {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
                             "func": () => {
-                                displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
+                                displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, false, contentList);
                             }
                         } : null,
                         instanceInfo.locked ? null : e.source == "player_install" ? null : {
@@ -5796,6 +5814,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                 try {
                                     let s = await updateContent(instanceInfo, e);
                                     if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
+                                    contentList.updateSecondaryColumn();
                                 } catch (f) {
                                     displayError(translate("app.content.update_failed", "%c", e.name));
                                     throw f;
@@ -5853,6 +5872,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             try {
                                 let s = await updateContent(instanceInfo, e);
                                 if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
+                                contentList.updateSecondaryColumn();
                             } catch (f) {
                                 displayError(translate("app.content.update_failed", "%c", e.name));
                                 throw f;
@@ -6136,8 +6156,8 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     "desc": translate("app.worlds.last_played").replace("%s", formatDate(worlds[i].last_played))
                 },
                 "secondary_column": {
-                    "title": translate("app.worlds.description.singleplayer"),
-                    "desc": translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "") + (worlds[i].flat ? " - " + translate("app.worlds.description.flat") : "")
+                    "title": () => translate("app.worlds.description.singleplayer"),
+                    "desc": () => translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "") + (worlds[i].flat ? " - " + translate("app.worlds.description.flat") : "")
                 },
                 "type": "singleplayer",
                 "image": worlds[i].icon ?? "default.png",
@@ -6197,11 +6217,11 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                             }
                         },
-                        {
-                            "title": translate("app.worlds.share"),
-                            "icon": '<i class="fa-solid fa-share"></i>',
-                            "func": () => { }
-                        },
+                        // {
+                        //     "title": translate("app.worlds.share"),
+                        //     "icon": '<i class="fa-solid fa-share"></i>',
+                        //     "func": () => { }
+                        // },
                         minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
                             "icon": '<i class="fa-solid fa-desktop"></i>',
                             "title": translate("app.worlds.desktop_shortcut"),
@@ -6250,8 +6270,8 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     "desc": last_played.getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
                 },
                 "secondary_column": {
-                    "title": translate("app.worlds.description.multiplayer"),
-                    "desc": worldsMultiplayer[i].ip,
+                    "title": () => translate("app.worlds.description.multiplayer"),
+                    "desc": () => worldsMultiplayer[i].ip,
                     "desc_hidden": true
                 },
                 "type": "multiplayer",
@@ -6297,11 +6317,11 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                             }
                         },
-                        {
-                            "title": translate("app.worlds.share"),
-                            "icon": '<i class="fa-solid fa-share"></i>',
-                            "func": () => { }
-                        },
+                        // {
+                        //     "title": translate("app.worlds.share"),
+                        //     "icon": '<i class="fa-solid fa-share"></i>',
+                        //     "func": () => { }
+                        // },
                         minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
                             "icon": '<i class="fa-solid fa-desktop"></i>',
                             "title": translate("app.worlds.desktop_shortcut"),
@@ -6487,7 +6507,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                         lineElement.classList.add("log-info");
                     } else if (e.includes("WARN")) {
                         lineElement.classList.add("log-warn");
-                    } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                         lineElement.classList.add("log-error");
                     }
                     logs.push({ "element": lineElement, "content": e });
@@ -6523,7 +6543,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                     lineElement.classList.add("log-info");
                 } else if (e.includes("WARN")) {
                     lineElement.classList.add("log-warn");
-                } else if (e.includes("ERROR") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                     lineElement.classList.add("log-error");
                 }
                 logs.push({ "element": lineElement, "content": e });
@@ -6991,6 +7011,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
                 "title": translate("app.screenshots.share"),
                 "func": (e) => {
                     // Share screenshot
+                    displayError("Not implemented yet.");
                 }
             },
             {
@@ -7049,6 +7070,8 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
         screenshotAction4.onclick = () => {
             if (file.includes("https://") || file.includes("http://")) {
                 openShareDialog(word, file, translate("app.screenshots.share.text"))
+            } else {
+                displayError("Not implemented yet.");
             }
         }
         if (instanceInfo) {
@@ -9563,7 +9586,7 @@ async function getModpackVersions(source, content_id) {
 let contentInfoHistory = [];
 let contentInfoIndex = 0;
 
-async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false) {
+async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false, content_list_to_update) {
     if (!disableAddToHistory) {
         if (contentInfo.open) {
             contentInfoHistory = contentInfoHistory.slice(0, contentInfoIndex + 1);
@@ -10002,6 +10025,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 if (!theContent) return;
                                 await updateContent(instanceInfo, theContent, e.version_number);
                                 installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                                if (content_list_to_update) content_list_to_update.updateSecondaryColumn();
                                 if (instance_id) {
                                     installedVersion = e.version_number;
                                     installedVersionIndex = i;
@@ -10611,6 +10635,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 if (!theContent) return;
                                 await updateContent(instanceInfo, theContent, e.id);
                                 installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                                if (content_list_to_update) content_list_to_update.updateSecondaryColumn();
                                 if (instance_id) {
                                     installedVersion = e.id;
                                     installedVersionIndex = i;
@@ -11572,7 +11597,7 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     instanceInfo.clearContent();
     if (source == "modrinth") {
         await window.electronAPI.downloadModrinthPack(instanceInfo.instance_id, modpack_info.files[0].url, instanceInfo.name);
-        instanceInfo.setVanillaVersion(modpack_info.game_versions[0]);
+        instanceInfo.setVanillaVersion(modpack_info.game_versions[0], true);
         instanceInfo.setLoader(modpack_info.loaders[0]);
     } else if (source == "curseforge") {
         await window.electronAPI.downloadCurseforgePack(instanceInfo.instance_id, (`https://mediafilez.forgecdn.net/files/${Number(modpack_info.id.toString().substring(0, 4))}/${Number(modpack_info.id.toString().substring(4, 7))}/${encodeURIComponent(modpack_info.fileName)}`), instanceInfo.name);
@@ -11584,7 +11609,7 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
         mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, `./minecraft/instances/${instanceInfo.instance_id}/pack.zip`, instanceInfo.install_id, instanceInfo.name);
 
         instanceInfo.setLoader(mr_pack_info.loader);
-        instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version);
+        instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
     }
     if (!mr_pack_info.loader_version) {
         displayError(mr_pack_info);

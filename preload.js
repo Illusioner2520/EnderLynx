@@ -388,7 +388,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     "accessToken": player_info.access_token,
                     "xuid": player_info.xuid,
                     "clientId": player_info.client_id
-                }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), parseEnvString(envVars), preLaunch, wrapper, postExit), "player_info": player_info
+                }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), parseEnvString(envVars), preLaunch, parseJavaArgs(wrapper), postExit), "player_info": player_info
             };
         } catch (err) {
             throw new Error("Unable to launch Minecraft");

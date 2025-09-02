@@ -5,7 +5,7 @@ const urlModule = require('url');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const os = require('os');
-const { spawn, exec, execFile } = require('child_process');
+const { spawn, exec, execFile, execSync } = require('child_process');
 const fsPromises = require('fs').promises;
 const { ipcRenderer } = require('electron');
 
@@ -702,15 +702,33 @@ class Minecraft {
         fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
         let fd = fs.openSync(LOG_PATH, 'w');
         fs.closeSync(fd);
-        const child = spawn(this.java_installation, args, {
-            env: {
-                ...process.env,
-                ...envVars
-            },
-            cwd: `./minecraft/instances/${this.instance_id}`,
-            detached: true,
-            stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')]
-        });
+        let child;
+        if (preLaunch) {
+            execSync(preLaunch, { stdio: "inherit" });
+        }
+        if (wrapper && wrapper.length) {
+            let fullCommand = wrapper.concat([this.java_installation]).concat(args);
+            child = spawn(fullCommand[0], fullCommand.slice(1), {
+                env: {
+                    ...process.env,
+                    ...envVars
+                },
+                cwd: `./minecraft/instances/${this.instance_id}`,
+                detached: true,
+                stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')],
+                shell: true
+            });
+        } else {
+            child = spawn(this.java_installation, args, {
+                env: {
+                    ...process.env,
+                    ...envVars
+                },
+                cwd: `./minecraft/instances/${this.instance_id}`,
+                detached: true,
+                stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')]
+            });
+        }
 
         child.once('error', (err) => {
             if (err.code === 'ENOENT') {
@@ -719,6 +737,13 @@ class Minecraft {
                 ipcRenderer.send('display-error', "Unable to launch Minecraft (" + err + ")");
             }
         });
+
+        child.on("exit", (code) => {
+            if (postExit) {
+                execSync(postExit, { stdio: "inherit" });
+            }
+        });
+
         child.unref();
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
