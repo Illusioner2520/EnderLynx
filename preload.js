@@ -26,8 +26,11 @@ const { Jimp, ResizeStrategy } = require('jimp');
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
+const { pathToFileURL } = require('url');
 
-const db = new Database('app.db');
+const userPath = path.join(app.getPath('userData'), 'EnderLynx');
+
+const db = new Database(path.resolve(userPath, "app.db"));
 
 db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
@@ -126,7 +129,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         for (const world of worlds) {
             if (!world.world_id) continue;
             if (world.world_type == "singleplayer") {
-                const worldPath = path.resolve(__dirname, "minecraft/instances", world.instance_id || "", "saves", world.world_id, "level.dat");
+                const worldPath = path.resolve(userPath, "minecraft/instances", world.instance_id || "", "saves", world.world_id, "level.dat");
                 if (fs.existsSync(worldPath)) {
                     try {
                         const worldInfo = getWorld(worldPath);
@@ -140,7 +143,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 } else { }
             } else {
                 // Multiplayer: find the server info from servers.dat in the instance
-                const serversDatPath = path.resolve(__dirname, "minecraft/instances", world.instance_id || "", "servers.dat");
+                const serversDatPath = path.resolve(userPath, "minecraft/instances", world.instance_id || "", "servers.dat");
                 if (fs.existsSync(serversDatPath)) {
                     console.log("FOUND servers.dat");
                     try {
@@ -169,7 +172,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getAllServers: async (instance_ids) => {
         if (!Array.isArray(instance_ids) || instance_ids.length === 0) return [];
-        const instancesPath = path.resolve(__dirname, "minecraft/instances");
         let allServers = [];
         for (const instanceId of instance_ids) {
             const servers = (await getMultiplayerWorlds(instanceId)).map(server => ({
@@ -182,7 +184,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getRecentlyPlayedWorlds: (instance_ids) => {
         if (!Array.isArray(instance_ids) || instance_ids.length === 0) return [];
-        const instancesPath = path.resolve(__dirname, "minecraft/instances");
+        const instancesPath = path.resolve(userPath, "minecraft/instances");
         let allWorlds = [];
         for (const instanceId of instance_ids) {
             const savesPath = path.join(instancesPath, instanceId, "saves");
@@ -197,7 +199,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return allWorlds.slice(0, 5);
     },
     setOptionsTXT: (instance_id, content, dont_complete_if_already_exists) => {
-        const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
+        const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
         if (dont_complete_if_already_exists && fs.existsSync(optionsPath)) {
             return content.version;
         }
@@ -205,7 +207,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return content.version;
     },
     deleteWorld: (instance_id, world_id) => {
-        const savesPath = path.resolve(`./minecraft/instances/${instance_id}/saves`);
+        const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
         const worldPath = path.join(savesPath, world_id);
 
         try {
@@ -219,7 +221,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     deleteInstanceFiles: async (instance_id) => {
-        const instancePath = path.resolve(__dirname, `minecraft/instances/${instance_id}`);
+        const instancePath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
         if (!fs.existsSync(instancePath)) {
             return false;
         }
@@ -267,8 +269,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     duplicateInstanceFiles: async (old_instance_id, new_instance_id) => {
-        const src = path.resolve(__dirname, `minecraft/instances/${old_instance_id}`);
-        const dest = path.resolve(__dirname, `minecraft/instances/${new_instance_id}`);
+        const src = path.resolve(userPath, `minecraft/instances/${old_instance_id}`);
+        const dest = path.resolve(userPath, `minecraft/instances/${new_instance_id}`);
         if (!fs.existsSync(src)) return false;
         await fs.promises.mkdir(dest, { recursive: true });
         // Get all files and folders in the source directory
@@ -306,11 +308,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteContent: (instance_id, project_type, file_name) => {
         let folder;
         if (project_type === "mod") {
-            folder = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`);
+            folder = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`);
         } else if (project_type === "resource_pack") {
-            folder = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`);
+            folder = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`);
         } else if (project_type === "shader") {
-            folder = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`);
+            folder = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`);
         } else {
             return false;
         }
@@ -333,7 +335,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     updateOptionsTXT: (instance_id, key, value) => {
         console.log("Updating " + key + " to " + value);
-        const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
+        const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
         let lines = [];
         if (fs.existsSync(optionsPath)) {
             lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
@@ -453,7 +455,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getWorlds,
     getSinglePlayerWorlds,
     deleteServer: async (instance_id, ip, index) => {
-        let patha = `./minecraft/instances/${instance_id}`;
+        let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
         let serversDatPath = path.resolve(patha, 'servers.dat');
 
         if (!fs.existsSync(serversDatPath)) return false;
@@ -524,7 +526,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     getInstanceLogs: (instance_id) => {
-        let patha = `./minecraft/instances/${instance_id}/logs`;
+        let patha = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
         fs.mkdirSync(patha, { recursive: true });
         return fs.readdirSync(patha).filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz")).map(e => {
             let date = e.replace(".log", "").split("_");
@@ -549,7 +551,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     deleteAllLogs: (instance_id, current_log_file) => {
-        let folderPath = `./minecraft/instances/${instance_id}/logs`;
+        let folderPath = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
         if (!fs.existsSync(folderPath)) {
             console.error('Folder does not exist:', folderPath);
             return;
@@ -568,9 +570,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getInstanceContent: (loader, instance_id, old_content) => {
         let old_files = old_content.map((e) => e.file_name);
-        let patha = `./minecraft/instances/${instance_id}/mods`;
-        let pathb = `./minecraft/instances/${instance_id}/resourcepacks`;
-        let pathc = `./minecraft/instances/${instance_id}/shaderpacks`;
+        let patha = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`);
+        let pathb = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`);
+        let pathc = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`);
         fs.mkdirSync(patha, { recursive: true });
         fs.mkdirSync(pathb, { recursive: true });
         fs.mkdirSync(pathc, { recursive: true });
@@ -871,7 +873,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         data_vt = JSON.parse(data_vt);
         data_ct_vt = JSON.parse(data_ct_vt);
 
-        const datapacksDir = `./minecraft/instances/${instance_id}/saves/${world_id}/datapacks`;
+        const datapacksDir = path.resolve(userPath, `minecraft/instances/${instance_id}/saves/${world_id}/datapacks`);
         if (data_ct_vt.link) {
             fs.mkdirSync(datapacksDir, { recursive: true });
             let baseName = "vanilla_tweaks.zip";
@@ -887,7 +889,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             // return baseName;
         }
         if (data_vt.link) {
-            const tempDir = `./minecraft/instances/${instance_id}/temp_datapacks`;
+            const tempDir = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_datapacks`);
             fs.mkdirSync(tempDir, { recursive: true });
             let baseName = "vanilla_tweaks.zip";
             let filePath = path.join(tempDir, baseName);
@@ -1010,7 +1012,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         });
         data_vt = JSON.parse(data_vt);
         if (data_vt.link) {
-            const resourcepacksDir = `./minecraft/instances/${instance_id}/resourcepacks`;
+            const resourcepacksDir = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`);
             fs.mkdirSync(resourcepacksDir, { recursive: true });
             let baseName = "vanilla_tweaks.zip";
             let filePath = path.join(resourcepacksDir, baseName);
@@ -1166,15 +1168,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         let baseInstanceId = instance_id.trim();
         let counter = 1;
-        while (folderExists(`./minecraft/instances/${instance_id}`)) {
+        while (folderExists(path.resolve(userPath, `minecraft/instances/${instance_id}`))) {
             instance_id = `${baseInstanceId}_${counter}`;
             counter++;
         }
-        fs.mkdirSync(`./minecraft/instances/${instance_id}`, { recursive: true });
+        fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${instance_id}`), { recursive: true });
         return instance_id;
     },
     getInstanceFolders: (instance_id) => {
-        const instancePath = path.resolve(__dirname, `minecraft/instances/${instance_id}`);
+        const instancePath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
         if (!fs.existsSync(instancePath)) return [];
         const entries = fs.readdirSync(instancePath).map(name => {
             const fullPath = path.join(instancePath, name);
@@ -1355,11 +1357,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteContent: async (instance_id, project_type, filename) => {
         let install_path = "";
         if (project_type == "mod") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`, filename);
         } else if (project_type == "resource_pack") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`, filename);
         } else if (project_type == "shader") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`, filename);
         }
         if (fs.existsSync(install_path)) {
             fs.unlinkSync(install_path);
@@ -1370,15 +1372,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     addContent: async (instance_id, project_type, project_url, filename, data_pack_world) => {
         let install_path = "";
         if (project_type == "mod") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/mods`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`, filename);
         } else if (project_type == "resourcepack") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/resourcepacks`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`, filename);
         } else if (project_type == "shader") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/shaderpacks`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`, filename);
         } else if (project_type == "world") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/temp_worlds`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_worlds`, filename);
         } else if (project_type == "datapack") {
-            install_path = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves/${data_pack_world}/datapacks`, filename);
+            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/saves/${data_pack_world}/datapacks`, filename);
         }
 
         console.log("Installing", project_url, "to", install_path);
@@ -1386,7 +1388,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         await urlToFile(project_url, install_path);
 
         if (project_type === "world") {
-            const savesPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
+            const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
             fs.mkdirSync(savesPath, { recursive: true });
             const zip = new AdmZip(install_path);
 
@@ -1431,7 +1433,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
             // Optionally delete the temp world zip after extraction
             fs.unlinkSync(install_path);
-            const tempWorldPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/temp_worlds`);
+            const tempWorldPath = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_worlds`);
             if (fs.existsSync(tempWorldPath)) {
                 fs.rmSync(tempWorldPath, { recursive: true, force: true });
             }
@@ -1453,17 +1455,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     parseJavaArgs,
     downloadModrinthPack: async (instance_id, url, title) => {
         ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-        await urlToFile(url, `./minecraft/instances/${instance_id}/pack.mrpack`);
+        await urlToFile(url, path.resolve(userPath, `minecraft/instances/${instance_id}/pack.mrpack`));
         ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
     },
     downloadCurseforgePack: async (instance_id, url, title) => {
         ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-        await urlToFile(url, `./minecraft/instances/${instance_id}/pack.zip`);
+        await urlToFile(url, path.resolve(userPath, `minecraft/instances/${instance_id}/pack.zip`));
         ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
     },
     processPackFile: async (file_path, instance_id, title) => {
         if (/^https?:\/\//.test(file_path)) {
-            const destPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/pack.zip`);
+            const destPath = path.resolve(userPath, `minecraft/instances/${instance_id}/pack.zip`);
             try {
                 await urlToFile(file_path, destPath);
             } catch (e) {
@@ -1485,7 +1487,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     processMrPack,
     processCfZip,
     getScreenshots: (instance_id) => {
-        let screenshotsPath = `./minecraft/instances/${instance_id}/screenshots`;
+        let screenshotsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots`);
         fs.mkdirSync(screenshotsPath, { recursive: true });
         let files = fs.readdirSync(screenshotsPath)
             .filter(file => /\.(png|jpg|jpeg|bmp|gif)$/i.test(file))
@@ -1498,7 +1500,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
                 return {
                     file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
-                    file_path: `minecraft/instances/${instance_id}/screenshots/` + file
+                    file_path: path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots/` + file)
                 }
             });
         return files;
@@ -1556,7 +1558,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     downloadSkin,
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-        await urlToFile(url, `./minecraft/capes/${id}.png`);
+        await urlToFile(url, path.resolve(userPath, `minecraft/capes/${id}.png`));
     },
     setCape: async (player_info, cape_id) => {
         let date = new Date();
@@ -1640,7 +1642,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 throw new Error("Unable to update access token.");
             }
         }
-        let filePath = path.resolve(__dirname, `minecraft/skins/${skin_id}.png`);
+        let filePath = path.resolve(userPath, `minecraft/skins/${skin_id}.png`);
         if (!fs.existsSync(filePath)) {
             throw new Error(`Skin file not found at ${filePath}`);
         }
@@ -1722,7 +1724,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const base64Data = dataurl.split(',')[1];
         if (!base64Data) throw new Error("Invalid data URL");
         const buffer = Buffer.from(base64Data, "base64");
-        fs.writeFileSync(`./minecraft/skins/${hash.hash}.png`, buffer);
+        fs.writeFileSync(path.resolve(userPath, `minecraft/skins/${hash.hash}.png`), buffer);
         return hash.hash;
     },
     getTotalRAM: () => {
@@ -1802,7 +1804,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return result.filePaths[0];
     },
     getInstanceFolderPath: () => {
-        return path.resolve(__dirname, "minecraft/instances");
+        return path.resolve(userPath, "minecraft/instances");
     },
     triggerFileBrowse: async (file_path) => {
         let startDir = file_path;
@@ -1829,7 +1831,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getJavaInstallations: () => {
         let javaPaths = [];
-        const versionsJsonPath = path.join(__dirname, "java", "versions.json");
+        const versionsJsonPath = path.resolve(userPath, "java", "versions.json");
         if (fs.existsSync(versionsJsonPath)) {
             try {
                 const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");
@@ -1853,7 +1855,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return getWorlds(the_path).map(e => ({ "name": e.name, "value": path.resolve(the_path, e.id) }));
     },
     transferWorld: (old_world_path, instance_id, delete_previous_files) => {
-        const savesPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
+        const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
         fs.mkdirSync(savesPath, { recursive: true });
 
         const worldName = path.basename(old_world_path);
@@ -1928,7 +1930,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 return fs.existsSync(p) ? p : "";
             }
             case "current": {
-                const p = path.join(__dirname, "minecraft/instances");
+                const p = path.join(userPath, "minecraft/instances");
                 return fs.existsSync(p) ? p : "";
             }
             default:
@@ -1936,7 +1938,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     getInstanceOptions: (instance_id) => {
-        const optionsPath = path.resolve(`./minecraft/instances/${instance_id}/options.txt`);
+        const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
         if (!fs.existsSync(optionsPath)) return [];
         const lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
         const options = [];
@@ -2010,10 +2012,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let base_path_name = instance_id;
         let current_count = 1;
 
-        let iconPath = path.resolve(__dirname, "temp_icons", instance_id + '.ico');
+        let iconPath = path.resolve(userPath, "temp_icons", instance_id + '.ico');
 
         while (fs.existsSync(iconPath)) {
-            iconPath = path.resolve(__dirname, "temp_icons", base_path_name + "_" + current_count + ".ico");
+            iconPath = path.resolve(userPath, "temp_icons", base_path_name + "_" + current_count + ".ico");
             current_count++;
         }
 
@@ -2092,7 +2094,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         })
     },
     deleteFoldersForModpackUpdate: async (instance_id) => {
-        let instancePath = `./minecraft/instances/${instance_id}`
+        let instancePath = path.resolve(userPath, `minecraft/instances/${instance_id}`)
         let folders = ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "scripts", "kubejs", "overrides", "libraries"];
         try {
             for (let i = 0; i < folders.length; i++) {
@@ -2116,7 +2118,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             if (isNaN(lastDate.getTime())) lastDate = null;
         }
 
-        const logs_path = `./minecraft/instances/${instance_id}/logs`;
+        const logs_path = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
         fs.mkdirSync(logs_path, { recursive: true });
         let allMatches = [];
         let totalPlaytime = 0;
@@ -2207,6 +2209,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "total_playtime": (totalPlaytime / 1000),
             "most_recent_log": most_recent_log
         });
+    },
+    getDirName: () => {
+        return path.resolve(userPath);
     }
 });
 
@@ -2329,7 +2334,10 @@ function getWorlds(patha) {
 }
 
 function getSinglePlayerWorlds(instance_id) {
-    let patha = path.resolve(__dirname, `minecraft/instances/${instance_id}/saves`);
+    let patha = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
+    if (!fs.existsSync(patha)) {
+        fs.mkdirSync(patha, { recursive: true });
+    }
     return getWorlds(patha);
 }
 
@@ -2391,7 +2399,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
     const zip = new AdmZip(zip_path);
 
-    let extractToPath = `./minecraft/instances/${instance_id}`;
+    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
     if (!fs.existsSync(extractToPath)) {
         fs.mkdirSync(extractToPath, { recursive: true });
@@ -2399,8 +2407,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
 
     zip.extractAllTo(extractToPath, true);
 
-    let srcDir = `./minecraft/instances/${instance_id}/overrides`;
-    let destDir = `./minecraft/instances/${instance_id}`;
+    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
     fs.mkdirSync(srcDir, { recursive: true });
     fs.mkdirSync(destDir, { recursive: true });
@@ -2530,7 +2538,7 @@ async function importContent(file_path, content_type, instance_id) {
     }
 
     // Ensure destination folder exists
-    const destPath = path.resolve(__dirname, `minecraft/instances/${instance_id}/${destFolder}`);
+    const destPath = path.resolve(userPath, `minecraft/instances/${instance_id}/${destFolder}`);
     fs.mkdirSync(destPath, { recursive: true });
 
     // Copy file
@@ -2562,7 +2570,7 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
     const zip = new AdmZip(zip_path);
 
-    let extractToPath = `./minecraft/instances/${instance_id}`;
+    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
     if (!fs.existsSync(extractToPath)) {
         fs.mkdirSync(extractToPath, { recursive: true });
@@ -2570,8 +2578,8 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
 
     zip.extractAllTo(extractToPath, true);
 
-    let srcDir = `./minecraft/instances/${instance_id}/overrides`;
-    let destDir = `./minecraft/instances/${instance_id}`;
+    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
     fs.mkdirSync(srcDir, { recursive: true });
     fs.mkdirSync(destDir, { recursive: true });
@@ -2655,7 +2663,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
     const zip = new AdmZip(mrpack_path);
 
-    let extractToPath = `./minecraft/instances/${instance_id}`;
+    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
     if (!fs.existsSync(extractToPath)) {
         fs.mkdirSync(extractToPath, { recursive: true });
@@ -2663,8 +2671,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
 
     zip.extractAllTo(extractToPath, true);
 
-    let srcDir = `./minecraft/instances/${instance_id}/overrides`;
-    let destDir = `./minecraft/instances/${instance_id}`;
+    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
     fs.mkdirSync(srcDir, { recursive: true });
     fs.mkdirSync(destDir, { recursive: true });
@@ -2805,7 +2813,7 @@ async function downloadSkin(url) {
         .update(data)
         .digest('hex');
 
-    fs.writeFileSync(`./minecraft/skins/${hash}.png`, imageBuffer);
+    fs.writeFileSync(path.resolve(userPath, `minecraft/skins/${hash}.png`), imageBuffer);
 
     const base64 = imageBuffer.toString('base64');
     const dataUrl = `data:image/png;base64,${base64}`;
@@ -2852,7 +2860,7 @@ function checkForProcess(pid) {
 }
 
 async function getMultiplayerWorlds(instance_id) {
-    let patha = `./minecraft/instances/${instance_id}`;
+    let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
     fs.mkdirSync(patha, { recursive: true });
     let serversDatPath = path.resolve(patha, 'servers.dat');
     let worlds = [];

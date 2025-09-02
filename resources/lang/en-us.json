@@ -656,5 +656,6 @@
     "app.cf.code.error": "Unable to download modpack from CurseForge code. Check that the code hasn't expired and that it is actually valid.",
     "app.settings.def_opts.notice": "To add a default option to this list, go to an instance's option tab and set some as default. These defaults will then be applied to any new instance you create.",
     "app.login_error": "Unable to login. Please make sure you have an account associated with that Microsoft account.",
-    "app.post_exit.notice": "Note that the Post-Exit Hook will only run if the launcher is open for the entirety of the Minecraft session."
+    "app.post_exit.notice": "Note that the Post-Exit Hook will only run if the launcher is open for the entirety of the Minecraft session.",
+    "app.wardrobe.sign_in": "Sign in to view your wardrobe."
 }

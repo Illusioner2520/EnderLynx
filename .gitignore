@@ -13,3 +13,4 @@ app.db-wal
 .devdbrc
 
 temp_icons/
+out/

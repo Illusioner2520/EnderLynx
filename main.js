@@ -17,7 +17,7 @@ const createWindow = () => {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
-            devTools: isDev
+            devTools: true
         },
         backgroundColor: "#0a0a0a",
         icon: path.join(__dirname, 'icon.ico')

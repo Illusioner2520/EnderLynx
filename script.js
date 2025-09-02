@@ -2280,7 +2280,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
     for (let i = 0; i < content.length; i++) {
         let e = content[i];
         if (e.file_name == contentInfo.secondary_column.desc) {
-            let file_path = `./minecraft/instances/${contentInfo.instance_info.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + e.file_name;
+            let file_path = processRelativePath(`./minecraft/instances/${contentInfo.instance_info.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + e.file_name);
             if (e.disabled) {
                 let new_file_name = window.electronAPI.enableFile(file_path);
                 if (!new_file_name) {
@@ -3312,7 +3312,7 @@ async function showHomeContent(oldEle) {
                 "title": translate("app.worlds.open"),
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "func": () => {
-                    window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`)
+                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`))
                 }
             } : null,
             e.type == "singleplayer" ? (e.seed ? {
@@ -3482,7 +3482,7 @@ async function showHomeContent(oldEle) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}`);
+                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}`));
                 }
             },
             // {
@@ -3669,6 +3669,13 @@ if (data.getDefault("hide_ip") == "true") {
 let skinViewer;
 
 function showMyAccountContent(e) {
+    if (!data.getDefaultProfile()) {
+        let ele = document.createElement("div");
+        ele.style.padding = "8px";
+        let signInWarning = new NoResultsFound(translate("app.wardrobe.sign_in"));
+        ele.appendChild(signInWarning.element);
+        return ele;
+    }
     if (skinViewer) skinViewer.dispose();
     let ele = document.createElement("div");
     ele.className = "my-account-grid";
@@ -3737,7 +3744,7 @@ function showMyAccountContent(e) {
             model: activeSkin?.model == "slim" ? "slim" : "default",
         });
         let activeCape = default_profile.getActiveCape();
-        skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+        skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
         skinList.innerHTML = '';
         capeList.innerHTML = '';
         if (document.getElementsByClassName("details")[0]) document.getElementsByClassName("details")[0].remove();
@@ -4009,7 +4016,7 @@ function showMyAccountContent(e) {
                     oldEle.classList.remove("selected");
                     currentEle.classList.add("selected");
                     e.setActive();
-                    skinViewer.loadCape(`minecraft/capes/${e.cape_id}.png`);
+                    skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
                     viewerInfo.innerHTML = translate("app.wardrobe.current");
                     activeCape = e;
                 }
@@ -4019,7 +4026,7 @@ function showMyAccountContent(e) {
             capeEle.className = "my-account-option";
             capeEle.classList.add("cape");
             let capeImg = document.createElement("img");
-            extractImageRegionToDataURL(`minecraft/capes/${e.cape_id}.png`, 1, 1, 10, 16, (e) => {
+            extractImageRegionToDataURL(processRelativePath(`./minecraft/capes/${e.cape_id}.png`), 1, 1, 10, 16, (e) => {
                 if (e) capeImg.src = e;
             });
             capeImg.classList.add("option-image");
@@ -4033,20 +4040,20 @@ function showMyAccountContent(e) {
             capeName.innerHTML = sanitize(e.cape_name);
             capeList.appendChild(capeEle);
             capeEle.onmouseenter = () => {
-                skinViewer.loadCape(`minecraft/capes/${e.cape_id}.png`);
+                skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
                 viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
             }
             capeEle.onfocus = () => {
-                skinViewer.loadCape(`minecraft/capes/${e.cape_id}.png`);
+                skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
                 viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
             }
             capeEle.onmouseleave = () => {
-                skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+                skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
                 viewerInfo.innerHTML = translate("app.wardrobe.current");
             }
             capeEle.onblur = (e) => {
                 if (e.relatedTarget?.matches(".my-account-option.cape")) return;
-                skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+                skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
                 viewerInfo.innerHTML = translate("app.wardrobe.current");
             }
             if (e.active) {
@@ -4078,12 +4085,12 @@ function showMyAccountContent(e) {
             viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
         }
         capeEle.onmouseleave = () => {
-            skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+            skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
             viewerInfo.innerHTML = translate("app.wardrobe.current");
         }
         capeEle.onblur = (e) => {
             if (e.relatedTarget?.matches(".my-account-option.cape")) return;
-            skinViewer.loadCape(activeCape ? `minecraft/capes/${activeCape.cape_id}.png` : null);
+            skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
             viewerInfo.innerHTML = translate("app.wardrobe.current");
         }
         if (!activeCape) {
@@ -4872,7 +4879,7 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.electronAPI.openFolder(`./minecraft/instances/${instances[i].instance_id}`);
+                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instances[i].instance_id}`));
                 }
             },
             // {
@@ -5140,7 +5147,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             "icon": '<i class="fa-solid fa-folder"></i>',
             "title": translate("app.button.instances.open_folder"),
             "func": (e) => {
-                window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}`);
+                window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}`));
             }
         },
         // {
@@ -5790,7 +5797,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "title": translate("app.content.open"),
                             "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                             "func": () => {
-                                window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`)
+                                window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`))
                             }
                         },
                         e.source == "modrinth" ? {
@@ -6196,7 +6203,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": translate("app.worlds.open"),
                             "icon": '<i class="fa-solid fa-folder"></i>',
                             "func": () => {
-                                window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`)
+                                window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`))
                             }
                         },
                         worlds[i].seed ? {
@@ -6984,7 +6991,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.screenshots.open_in_folder"),
                 "func": (e) => {
-                    window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`);
+                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`));
                 }
             },
             {
@@ -7154,7 +7161,7 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
     screenshotAction1.className = "screenshot-action";
     screenshotAction1.innerHTML = '<i class="fa-solid fa-folder"></i>' + translate("app.screenshots.open_in_folder");
     screenshotAction1.onclick = () => {
-        window.electronAPI.openFolder(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`);
+        window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`));
     };
     if (instanceInfo) {
         screenshotActions.appendChild(screenshotAction1);
@@ -7305,7 +7312,7 @@ function formatDateAndTime(dateString) {
 }
 
 function getLangFile(locale) {
-    return JSON.parse(window.electronAPI.readFile(`./lang/${locale}.json`));
+    return JSON.parse(window.electronAPI.readFile(`./resources/lang/${locale}.json`));
 }
 
 function checkForProcess(pid) {
@@ -9412,6 +9419,7 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
         }
     } catch (e) {
         displayError(translate("app.wardrobe.skin.cache.fail"));
+        console.error(e);
     }
     if (skin_and_cape_data.name) {
         profile.setName(skin_and_cape_data.name);
@@ -11137,7 +11145,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name);
+            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name));
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -11157,7 +11165,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setVersion(newVersion);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name);
+            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name));
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -11257,7 +11265,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name);
+            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name));
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -11277,7 +11285,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setVersion(newVersion);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name);
+            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name));
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -11306,7 +11314,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setFileName(file_name);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + file_name);
+            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + file_name));
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -11478,9 +11486,9 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             }
             let mr_pack_info = {};
             if (source == "modrinth") {
-                mr_pack_info = await window.electronAPI.processMrPack(instance_id, `./minecraft/instances/${instance_id}/pack.mrpack`, info.loader, title);
+                mr_pack_info = await window.electronAPI.processMrPack(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.mrpack`), info.loader, title);
             } else if (source == "curseforge") {
-                mr_pack_info = await window.electronAPI.processCfZip(instance_id, `./minecraft/instances/${instance_id}/pack.zip`, project_id, title);
+                mr_pack_info = await window.electronAPI.processCfZip(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.zip`), project_id, title);
 
                 instance.setLoader(mr_pack_info.loader);
                 instance.setVanillaVersion(mr_pack_info.vanilla_version);
@@ -11604,9 +11612,9 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     }
     let mr_pack_info = {};
     if (source == "modrinth") {
-        mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, `./minecraft/instances/${instanceInfo.instance_id}/pack.mrpack`, instanceInfo.loader, instanceInfo.name);
+        mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/pack.mrpack`), instanceInfo.loader, instanceInfo.name);
     } else if (source == "curseforge") {
-        mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, `./minecraft/instances/${instanceInfo.instance_id}/pack.zip`, instanceInfo.install_id, instanceInfo.name);
+        mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/pack.zip`), instanceInfo.install_id, instanceInfo.name);
 
         instanceInfo.setLoader(mr_pack_info.loader);
         instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
@@ -11643,4 +11651,8 @@ document.getElementById("spinner-wrapper").remove();
 
 [...document.body.children].forEach(e => {
     e.style.display = "";
-})
+});
+
+function processRelativePath(path) {
+    return path.replace("./", window.electronAPI.getDirName() + "/").replaceAll("\\","/");
+}

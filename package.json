@@ -3,12 +3,22 @@
   "version": "0.0.1",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "author": "Illusioner",
   "license": "ISC",
   "description": "The best Minecraft launcher.",
   "devDependencies": {
+    "@electron-forge/cli": "^7.8.3",
+    "@electron-forge/maker-deb": "^7.8.3",
+    "@electron-forge/maker-rpm": "^7.8.3",
+    "@electron-forge/maker-squirrel": "^7.8.3",
+    "@electron-forge/maker-zip": "^7.8.3",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.8.3",
+    "@electron-forge/plugin-fuses": "^7.8.3",
+    "@electron/fuses": "^1.8.0",
     "electron": "^36.7.0",
     "electron-rebuild": "^3.2.9"
   },
@@ -18,6 +28,7 @@
     "axios": "^1.10.0",
     "better-sqlite3": "^12.0.0",
     "discord-rpc": "^4.0.1",
+    "electron-squirrel-startup": "^1.0.1",
     "form-data": "^4.0.3",
     "jimp": "^1.6.0",
     "lzma-native": "^8.0.6",
