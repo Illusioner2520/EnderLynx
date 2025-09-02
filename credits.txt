@@ -14,7 +14,7 @@ CurseForge: https://www.curseforge.com/
 Vanilla Tweaks: https://vanillatweaks.net/
 
 Artists:
-Fruit Salad
+Pink Parfait
 Font Awesome: https://fontawesome.com/
 
 Java Distributions from Zulu by Azul: https://www.azul.com/

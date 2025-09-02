@@ -3167,18 +3167,22 @@ settingsButtonEle.onclick = () => {
 let navButtons = [homeButton, instanceButton, worldButton, myAccountButton];
 
 async function toggleMicrosoftSignIn() {
-    let newData = await window.electronAPI.triggerMicrosoftLogin();
-    let players = data.getProfiles().map(e => e.uuid);
-    if (players.includes(newData.uuid)) {
-        let player = data.getProfileFromUUID(newData.uuid);
-        player.setDefault();
-        accountSwitcher.selectPlayer(player);
-        await updateSkinsAndCapes(newData);
-    } else {
-        let newPlayer = data.addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
-        newPlayer.setDefault();
-        accountSwitcher.addPlayer(newPlayer);
-        await updateSkinsAndCapes(newData);
+    try {
+        let newData = await window.electronAPI.triggerMicrosoftLogin();
+        let players = data.getProfiles().map(e => e.uuid);
+        if (players.includes(newData.uuid)) {
+            let player = data.getProfileFromUUID(newData.uuid);
+            player.setDefault();
+            accountSwitcher.selectPlayer(player);
+            await updateSkinsAndCapes(newData);
+        } else {
+            let newPlayer = data.addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
+            newPlayer.setDefault();
+            accountSwitcher.addPlayer(newPlayer);
+            await updateSkinsAndCapes(newData);
+        }
+    } catch (e) {
+        displayError(translate("app.login_error"));
     }
 }
 

@@ -8,19 +8,19 @@ body:
       options:
         - label: I checked the [existing issues](https://github.com/Illusioner2520/EnderLynx/issues?q=is%3Aissue) for duplicate problems
           required: true
-        - label: I have ensured the EnderLynx app is up to date
+        - label: I have ensured that EnderLynx is up to date
           required: true
   - type: input
     id: version
     attributes:
       label: What version of EnderLynx are you using?
-      description: Find this in ⚙️ Settings (bottom left) -> App Info -> EnderLynx Version
+      description: Find this in ⚙️ Settings -> App Info -> EnderLynx Version
     validations:
       required: true
   - type: textarea
     attributes:
       label: Describe the bug
-      description: A clear and concise description of what the bug is. Include screenshots if applicable.
+      description: A clear and concise description of what the bug is.
     validations:
       required: true
   - type: textarea
