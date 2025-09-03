@@ -1182,6 +1182,7 @@ class NavigationButton {
 let currentTab = "";
 
 function resetDiscordStatus(bypassLock) {
+    console.log("current tab", currentTab);
     if (!rpcLocked || bypassLock) {
         window.electronAPI.setActivity({
             "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "my_account" ? translate("app.discord_rpc.my_account") : translate("app.discord_rpc.unknown"),
@@ -1199,8 +1200,7 @@ class PageContent {
         this.func = func;
         this.title = title;
     }
-    async displayContent() {
-        resetDiscordStatus();
+    displayContent() {
         if (this.title == "discover") {
             showAddContent();
             currentTab = "discover";
@@ -1212,6 +1212,7 @@ class PageContent {
             groupInstances(data.getDefault("default_group"));
         }
         currentTab = this.title;
+        resetDiscordStatus();
         clearMoreMenus();
     }
 }
@@ -3192,11 +3193,15 @@ async function toggleMicrosoftSignIn() {
             player.setDefault();
             accountSwitcher.selectPlayer(player);
             await updateSkinsAndCapes(newData);
+            accountSwitcher.selectPlayer(player);
+            accountSwitcher.reloadHeads();
         } else {
             let newPlayer = data.addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
             newPlayer.setDefault();
             accountSwitcher.addPlayer(newPlayer);
             await updateSkinsAndCapes(newData);
+            accountSwitcher.selectPlayer(newPlayer);
+            accountSwitcher.reloadHeads();
         }
     } catch (e) {
         displayError(translate("app.login_error"));
@@ -3461,6 +3466,7 @@ async function showHomeContent(oldEle) {
                 "icon": '<i class="fa-solid fa-plus"></i>',
                 "title": translate("app.button.content.add"),
                 "func": (e) => {
+                    instanceInfo = instanceInfo.refresh();
                     showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
                 }
             },
@@ -5819,7 +5825,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "func_id": "update",
                             "func": async () => {
                                 try {
-                                    let s = await updateContent(instanceInfo, e);
+                                    let s = await updateContent(instanceInfo, e.refresh());
                                     if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
                                     contentList.updateSecondaryColumn();
                                 } catch (f) {
@@ -9938,6 +9944,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     }
 
                     let installedVersionIndex = versions.findIndex(v => v.version_number === installedVersion);
+                    if (installedVersionIndex === -1) installedVersionIndex = versions.findIndex(v => v.id == installedVersion);
 
                     let showVersions = () => {
                         versionInfo = [];
@@ -10060,7 +10067,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 }
                             }
 
-                            if (installedVersion == e.version_number) {
+                            if (installedVersion == e.version_number || installedVersion == e.id) {
                                 installButton.classList.add("disabled");
                                 installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                                 installButton.onclick = () => { }
@@ -11642,6 +11649,9 @@ function closeAllDialogs() {
     });
     setTimeout(() => {
         dialogs.forEach(e => {
+            if (e.id == "screenshotPreview" || e.id == "contentInfo") {
+                return;
+            }
             e.remove();
         });
     }, 500);

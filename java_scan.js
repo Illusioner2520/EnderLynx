@@ -4,8 +4,12 @@ const os = require("os");
 const { promisify } = require("util");
 const { execFile } = require("child_process");
 const WinReg = require("winreg");
+// const { process } = require('electron');
 
 const execFileAsync = promisify(execFile);
+
+const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
+  .split('=')[1], 'EnderLynx');
 
 const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\JavaSoft\\Java Runtime Environment",
@@ -23,7 +27,7 @@ const COMMON_JAVA_DIRS = [
     "C:\\Program Files (x86)\\Java",
     "C:\\Program Files\\Eclipse Adoptium",
     "C:\\Program Files (x86)\\Eclipse Adoptium",
-    path.resolve(__dirname,"java")
+    path.resolve(userPath,"java")
 ];
 
 async function getJavaVersion(javawPath) {
@@ -107,7 +111,7 @@ async function findJavaInstallations(v) {
         }
     }
 
-    // const versionsJsonPath = path.join(__dirname, "java", "versions.json");
+    // const versionsJsonPath = path.join(userPath, "java", "versions.json");
     // if (fs.existsSync(versionsJsonPath)) {
     //     try {
     //         const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");

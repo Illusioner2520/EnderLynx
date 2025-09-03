@@ -28,7 +28,22 @@ const QRCode = require('qrcode');
 const readline = require('readline');
 const { pathToFileURL } = require('url');
 
-const userPath = path.join(app.getPath('userData'), 'EnderLynx');
+const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
+  .split('=')[1], 'EnderLynx');
+
+if (!fs.existsSync(userPath)) {
+    fs.mkdirSync(userPath, { recursive: true });
+}
+if (!fs.existsSync(path.resolve(userPath, "log_config.xml"))) {
+    const srcConfigPath = path.resolve(__dirname, "log_config.xml");
+    let configData;
+    try {
+        configData = fs.readFileSync(srcConfigPath);
+        fs.writeFileSync(path.resolve(userPath, "log_config.xml"), configData);
+    } catch (e) {
+        fs.writeFileSync(path.resolve(userPath, "log_config.xml"), "");
+    }
+}
 
 const db = new Database(path.resolve(userPath, "app.db"));
 
@@ -2812,6 +2827,8 @@ async function downloadSkin(url) {
     const hash = crypto.createHash('sha256')
         .update(data)
         .digest('hex');
+
+    fs.mkdirSync(path.resolve(userPath, "minecraft/skins"), { recursive: true });
 
     fs.writeFileSync(path.resolve(userPath, `minecraft/skins/${hash}.png`), imageBuffer);
 

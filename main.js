@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
+
+const userDataPath = app.getPath('userData');
 
 let win;
 
@@ -17,12 +19,16 @@ const createWindow = () => {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
-            devTools: true
+            devTools: true,
+            additionalArguments: [`--userDataPath=${userDataPath}`]
         },
         backgroundColor: "#0a0a0a",
         icon: path.join(__dirname, 'icon.ico')
     });
     win.loadFile('index.html');
+    if (!isDev) {
+        Menu.setApplicationMenu(null);
+    }
 }
 
 let instance_id_to_launch = "";
