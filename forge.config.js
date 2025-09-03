@@ -1,12 +1,13 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const path = require('path');
 
 module.exports = {
   packagerConfig: {
     asar: {
       unpack: '**/node_modules/@img/**'
     },
-    icon: '/icon',
+    icon: path.resolve(__dirname, 'icon'),
     ignore: [
       /^\/java($|\/)/,
       /^\/minecraft($|\/)/,
