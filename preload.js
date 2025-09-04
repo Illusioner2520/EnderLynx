@@ -29,7 +29,7 @@ const readline = require('readline');
 const { pathToFileURL } = require('url');
 
 const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
-  .split('=')[1], 'EnderLynx');
+    .split('=')[1], 'EnderLynx');
 
 if (!fs.existsSync(userPath)) {
     fs.mkdirSync(userPath, { recursive: true });
@@ -50,7 +50,7 @@ const db = new Database(path.resolve(userPath, "app.db"));
 db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, instance TEXT, source_info TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, file_name TEXT, last_used TEXT, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, last_used TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
@@ -498,28 +498,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     getMultiplayerWorlds,
-    openFolder: (folderPath) => {
-        let command;
-        switch (process.platform) {
-            case 'win32':
-                command = `explorer "${path.resolve(folderPath)}"`;
-                break;
-            case 'darwin':
-                command = `open "${path.resolve(folderPath)}"`;
-                break;
-            case 'linux':
-                command = `xdg-open "${path.resolve(folderPath)}"`;
-                break;
-            default:
-                console.error('Unsupported operating system.');
-                return;
-        }
-
-        exec(command, (error) => {
-            if (error && error.code !== 1) {
-                console.error(`Error opening folder: ${error}`);
-            }
-        });
+    openFolder,
+    openFolderFromFile: (file_path) => {
+        const folder = path.dirname(file_path);
+        openFolder(folder);
     },
     triggerMicrosoftLogin: async () => {
         let date = new Date();
@@ -1515,7 +1497,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
                 return {
                     file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
-                    file_path: path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots/` + file)
+                    file_path: path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots/` + file).replace(/\\/g, '/')
                 }
             });
         return files;
@@ -2227,6 +2209,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getDirName: () => {
         return path.resolve(userPath);
+    },
+    saveToDisk: async (file_path) => {
+        let result = await ipcRenderer.invoke('show-save-dialog', {
+            title: 'Save file',
+            defaultPath: file_path,
+            buttonLabel: 'Save',
+            filters: [
+                { name: 'All Files', extensions: ['*'] }
+            ]
+        });
+        if (result.canceled || !result.filePath) return;
+        fs.copyFileSync(file_path, result.filePath);
     }
 });
 
@@ -2483,7 +2477,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
             "source": "curseforge",
             "source_id": manifest_json.files[i].projectID,
             "type": type,
-            "version": manifest_json.files[i].fileID,
+            "version": "",
+            "version_id": manifest_json.files[i].fileID,
             "name": dependency_item?.name ?? file_name
         })
     }
@@ -2757,7 +2752,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                     "source_id": project_id,
                     "type": project_type,
                     "version": version,
-                    "name": res_1_json.title
+                    "name": res_1_json.title,
+                    "version_id": res_json.id
                 })
             }
         }
@@ -2912,4 +2908,28 @@ async function getMultiplayerWorlds(instance_id) {
     console.log(worlds);
 
     return worlds;
+}
+
+function openFolder(folderPath) {
+    let command;
+    switch (process.platform) {
+        case 'win32':
+            command = `explorer "${path.resolve(folderPath)}"`;
+            break;
+        case 'darwin':
+            command = `open "${path.resolve(folderPath)}"`;
+            break;
+        case 'linux':
+            command = `xdg-open "${path.resolve(folderPath)}"`;
+            break;
+        default:
+            console.error('Unsupported operating system.');
+            return;
+    }
+
+    exec(command, (error) => {
+        if (error && error.code !== 1) {
+            console.error(`Error opening folder: ${error}`);
+        }
+    });
 }

@@ -2327,7 +2327,8 @@ dialog[open]::backdrop {
     position: relative;
     overflow: hidden;
     background-image: var(--image);
-    aspect-ratio: 1920 / 1009;
+    /* aspect-ratio: 1920 / 991; */
+    aspect-ratio: 16 / 9;
     cursor: pointer;
     transition: scale .1s;
 }
@@ -4332,6 +4333,12 @@ body.hide_ip .hidden-text.shown::after {
 .share-wrapper {
     display: grid;
     grid-template-columns: 98px auto;
+    grid-template-rows: 44px 44px;
+    gap: 10px;
+}
+
+.share-file-wrapper {
+    display: grid;
     grid-template-rows: 44px 44px;
     gap: 10px;
 }

@@ -8,6 +8,7 @@ const os = require('os');
 const { spawn, exec, execFile, execSync } = require('child_process');
 const fsPromises = require('fs').promises;
 const { ipcRenderer } = require('electron');
+const { pathToFileURL } = require('url');
 
 let launchername = "EnderLynx";
 let launcherversion = "0.0.1";
@@ -310,7 +311,7 @@ class Minecraft {
         ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
     }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) {
-        if (!javaArgs || !javaArgs.length) javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + path.resolve(userPath, "log_config.xml")];
+        if (!javaArgs || !javaArgs.length) javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + pathToFileURL(path.resolve(userPath, "log_config.xml")).href];
         this.libs = "";
         this.libNames = [];
         const platform = os.platform();

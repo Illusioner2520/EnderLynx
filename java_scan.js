@@ -4,7 +4,6 @@ const os = require("os");
 const { promisify } = require("util");
 const { execFile } = require("child_process");
 const WinReg = require("winreg");
-// const { process } = require('electron');
 
 const execFileAsync = promisify(execFile);
 
@@ -110,28 +109,6 @@ async function findJavaInstallations(v) {
             }
         }
     }
-
-    // const versionsJsonPath = path.join(userPath, "java", "versions.json");
-    // if (fs.existsSync(versionsJsonPath)) {
-    //     try {
-    //         const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");
-    //         const paths = JSON.parse(versionsData);
-    //         if (paths && typeof paths === "object") {
-    //             for (const key of Object.keys(paths)) {
-    //                 const p = paths[key];
-    //                 if (typeof p === "string") {
-    //                     let cleanedPath = p;
-    //                     if (cleanedPath.toLowerCase().endsWith("javaw.exe")) {
-    //                         cleanedPath = path.dirname(cleanedPath);
-    //                     }
-    //                     jrePaths.add(cleanedPath);
-    //                 }
-    //             }
-    //         }
-    //     } catch (e) {
-    //         // Ignore JSON errors
-    //     }
-    // }
 
     // From registry (both 32-bit and 64-bit views)
     const [reg32, reg64] = await Promise.all([

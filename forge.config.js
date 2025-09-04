@@ -13,13 +13,15 @@ module.exports = {
       /^\/minecraft($|\/)/,
       /^\/temp_icons($|\/)/,
       /^\/\.github($|\/)/,
+      /^\/installer($|\/)/,
       /\.gitignore$/,
       /\.devdbrc$/,
       /app\.db$/,
       /app\.db-shm$/,
       /app\.db-wal$/,
       /credits\.txt$/,
-      /forge\.config\.js$/
+      /forge\.config\.js$/,
+      /package-lock\.json$/
     ],
     extraResource: ['./resources/lang']
   },

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
+const windowStateKeeper = require('electron-window-state');
 
 const userDataPath = app.getPath('userData');
 
@@ -9,9 +10,15 @@ let win;
 const isDev = !app.isPackaged;
 
 const createWindow = () => {
+    let state = windowStateKeeper({
+        defaultWidth: 1000,
+        defaultHeight: 600,
+    });
     win = new BrowserWindow({
-        width: 1000,
-        height: 600,
+        x: state.x,
+        y: state.y,
+        width: state.width,
+        height: state.height,
         minWidth: 1000,
         minHeight: 600,
         webPreferences: {
@@ -26,6 +33,7 @@ const createWindow = () => {
         icon: path.join(__dirname, 'icon.ico')
     });
     win.loadFile('index.html');
+    state.manage(win);
     if (!isDev) {
         Menu.setApplicationMenu(null);
     }
@@ -76,6 +84,11 @@ ipcMain.handle('get-instance-to-launch', (_) => {
 
 ipcMain.handle('show-open-dialog', async (event, options) => {
     const result = await dialog.showOpenDialog(win, options);
+    return result;
+});
+
+ipcMain.handle('show-save-dialog', async (event, options) => {
+    const result = await dialog.showSaveDialog(win, options);
     return result;
 });
 
