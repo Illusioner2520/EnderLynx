@@ -2285,7 +2285,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
     let content = contentInfo.instance_info.getContent();
     for (let i = 0; i < content.length; i++) {
         let e = content[i];
-        if (e.file_name == contentInfo.secondary_column.desc) {
+        if (e.file_name == contentInfo.secondary_column.desc()) {
             let file_path = processRelativePath(`./minecraft/instances/${contentInfo.instance_info.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + e.file_name);
             if (e.disabled) {
                 let new_file_name = window.electronAPI.enableFile(file_path);
@@ -2295,9 +2295,10 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
                 }
                 e.setDisabled(false);
                 e.setFileName(new_file_name);
-                contentInfo.secondary_column.desc = new_file_name;
+                contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
             } else {
+                console.log("disabling file: " + file_path);
                 let new_file_name = window.electronAPI.disableFile(file_path);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_disable"));
@@ -2305,7 +2306,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
                 }
                 e.setDisabled(true);
                 e.setFileName(new_file_name);
-                contentInfo.secondary_column.desc = new_file_name;
+                contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_disable").replace("%s", e.name));
             }
             break;

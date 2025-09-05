@@ -1,1 +1,88 @@
-# Write installer code here
+!include "MUI2.nsh"
+
+Name "EnderLynx"
+OutFile "EnderLynxInstaller.exe"
+InstallDir "$LOCALAPPDATA\EnderLynx"
+InstallDirRegKey HKCU "Software\EnderLynx" "InstallDir"
+RequestExecutionLevel user
+
+Icon "../icon.ico"
+UninstallIcon "../icon.ico"
+
+Var CheckboxDesktop
+Var CheckboxStartMenu
+
+Var DoDesktop
+Var DoStartMenu
+
+!define MUI_ABORTWARNING
+!define MUI_ICON "../icon.ico"
+!define MUI_UNICON "../icon.ico"
+
+!insertmacro MUI_PAGE_DIRECTORY
+Page Custom OptionsPage LeaveOptionsPage
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "English"
+
+Function OptionsPage
+    nsDialogs::Create 1018
+    Pop $0
+    ${If} $0 == error
+        Abort
+    ${EndIf}
+
+    ${NSD_CreateCheckbox} 0 0 100% 12u "Create Desktop Shortcut"
+    Pop $CheckboxDesktop
+    ${NSD_SetState} $CheckboxDesktop ${BST_CHECKED}
+
+    ${NSD_CreateCheckbox} 0 14u 100% 12u "Create Start Menu Shortcut"
+    Pop $CheckboxStartMenu
+    ${NSD_SetState} $CheckboxStartMenu ${BST_CHECKED}
+
+    nsDialogs::Show
+FunctionEnd
+
+Function LeaveOptionsPage
+    ${NSD_GetState} $CheckboxDesktop $DoDesktop
+    ${NSD_GetState} $CheckboxStartMenu $DoStartMenu
+FunctionEnd
+
+Section "MainSection" SecMain
+    WriteRegStr HKCU "Software\EnderLynx" "InstallDir" "$INSTDIR"
+
+    SetOutPath "$INSTDIR"
+    File /r "..\out\EnderLynx-win32-x64\*.*"
+
+    WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "DisplayName" "EnderLynx"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "DisplayIcon" "$INSTDIR\EnderLynx.exe"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "DisplayVersion" "0.0.1"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "InstallLocation" "$INSTDIR"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "Publisher" "EnderLynx"
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "NoModify" 1
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "NoRepair" 1
+
+    ${If} $DoDesktop == ${BST_CHECKED}
+        CreateShortcut "$DESKTOP\EnderLynx.lnk" "$INSTDIR\EnderLynx.exe"
+    ${EndIf}
+
+    ${If} $DoStartMenu == ${BST_CHECKED}
+        CreateDirectory "$SMPROGRAMS\EnderLynx"
+        CreateShortcut "$SMPROGRAMS\EnderLynx\EnderLynx.lnk" "$INSTDIR\EnderLynx.exe"
+        CreateShortcut "$SMPROGRAMS\EnderLynx\Uninstall EnderLynx.lnk" "$INSTDIR\Uninstall.exe"
+    ${EndIf}
+SectionEnd
+
+Section "Uninstall"
+    RMDir /r "$INSTDIR"
+
+    DeleteRegKey HKCU "Software\EnderLynx"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx"
+
+    Delete "$DESKTOP\EnderLynx.lnk"
+    RMDir /r "$SMPROGRAMS\EnderLynx"
+SectionEnd
