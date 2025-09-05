@@ -4,7 +4,7 @@ EnderLynx is a Minecraft launcher that is currently a work in progress. All vers
 
 ## Technologies
 
-EnderLynx is built using [Electron](https://www.electronjs.org/) and packaged by [Electron Forge](https://www.electronforge.io/). It uses (NSIS)[https://nsis.sourceforge.io/Main_Page] for its installer.
+EnderLynx is built using [Electron](https://www.electronjs.org/) and packaged by [Electron Forge](https://www.electronforge.io/). It uses [NSIS](https://nsis.sourceforge.io/Main_Page) for its installer.
 
 ## License
 
