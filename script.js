@@ -3202,6 +3202,10 @@ async function toggleMicrosoftSignIn() {
             accountSwitcher.selectPlayer(player);
             accountSwitcher.reloadHeads();
         } else {
+            if (!newData.name) {
+                displayError(translate("app.login_error.no_username"));
+                return;
+            }
             let newPlayer = data.addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
             newPlayer.setDefault();
             accountSwitcher.addPlayer(newPlayer);
