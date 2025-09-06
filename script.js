@@ -7028,7 +7028,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
             {
                 "icon": '<i class="fa-solid fa-share"></i>',
                 "title": translate("app.screenshots.share"),
-                "func": (e) => {
+                "func": () => {
                     openShareDialogForFile(e.file_path);
                 }
             },
