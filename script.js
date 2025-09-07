@@ -3180,7 +3180,7 @@ settingsButtonEle.onclick = () => {
             window.electronAPI.clearActivity();
         }
         v.forEach(e => {
-            if (e.id.includes("java_")) {
+            if (e.id.startsWith("java_")) {
                 let version = e.id.replace("java_", "");
                 window.electronAPI.setJavaInstallation(version, e.value);
             }
