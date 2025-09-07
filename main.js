@@ -55,7 +55,7 @@ if (instanceArg) {
 }
 
 app.whenReady().then(() => {
-    app.setAppUserModelId('net.illusioner.enderlynx');
+    app.setAppUserModelId('me.illusioner.enderlynx');
     createWindow();
     rpc.login({ clientId }).catch(console.error);
 });
