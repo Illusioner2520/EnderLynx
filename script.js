@@ -7300,7 +7300,7 @@ function formatTime(secs) {
 function formatDate(dateString, year_to_show_never_played_before) {
     let months = [translate("app.date.jan"), translate("app.date.feb"), translate("app.date.mar"), translate("app.date.apr"), translate("app.date.may"), translate("app.date.jun"), translate("app.date.jul"), translate("app.date.aug"), translate("app.date.sep"), translate("app.date.oct"), translate("app.date.nov"), translate("app.date.dec")];
     let date = new Date(dateString);
-    if (isNaN(date.getTime()) || !year_to_show_never_played_before || date.getFullYear() < year_to_show_never_played_before) {
+    if (isNaN(date.getTime()) || (year_to_show_never_played_before && date.getFullYear() < year_to_show_never_played_before)) {
         return translate("app.worlds.description.never_played");
     }
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
