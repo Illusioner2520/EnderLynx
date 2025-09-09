@@ -1,15 +1,16 @@
 {
   "name": "EnderLynx",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
     "installer": "makensis installer/installer.nsi",
-    "compile": "npm run package && npm run installer"
+    "updater": "pkg updater.js --targets node18-win-x64 --output updater.exe",
+    "build": "npm run updater && npm run package && npm run installer"
   },
   "author": "Illusioner",
-  "license": "ISC",
+  "license": "MIT",
   "description": "The best Minecraft launcher.",
   "devDependencies": {
     "@electron-forge/cli": "^7.8.3",
@@ -43,6 +44,7 @@
     "string-argv": "^0.3.2",
     "three": "^0.177.0",
     "toml": "^3.0.0",
+    "unzipper": "^0.12.3",
     "windows-shortcuts": "^0.1.6",
     "winreg": "^1.2.5"
   }

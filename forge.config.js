@@ -21,7 +21,8 @@ module.exports = {
       /app\.db-wal$/,
       /credits\.txt$/,
       /forge\.config\.js$/,
-      /package-lock\.json$/
+      /package-lock\.json$/,
+      /updater\.js$/
     ],
     extraResource: ['./resources/lang']
   },

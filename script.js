@@ -2944,6 +2944,18 @@ settingsButtonEle.onclick = () => {
         window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=2-feature_request.yml");
     }
     app_info.appendChild(featureButton);
+    let updatesButton = document.createElement("button");
+    updatesButton.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> ' + translate("app.settings.info.update");
+    updatesButton.className = "bug-button";
+    let updateButtonClick = async () => {
+        updatesButton.onclick = () => { }
+        updatesButton.children[0].classList.add("spinning");
+        await checkForUpdates(true);
+        updatesButton.children[0].classList.remove("spinning");
+        updatesButton.onclick = updateButtonClick;
+    }
+    updatesButton.onclick = updateButtonClick;
+    app_info.appendChild(updatesButton);
     dialog.showDialog("Settings", "form", [
         {
             "type": "dropdown",
@@ -11742,5 +11754,50 @@ document.getElementById("spinner-wrapper").remove();
 });
 
 function processRelativePath(path) {
-    return path.replace("./", window.electronAPI.getDirName() + "/").replaceAll("\\","/");
+    return path.replace("./", window.electronAPI.getDirName() + "/").replaceAll("\\", "/");
 }
+
+async function checkForUpdates(isManual) {
+    try {
+        let result = await window.electronAPI.checkForUpdates();
+        if (!result.update) {
+            if (isManual) displaySuccess("app.settings.updates.none_found");
+        } else {
+            let dialog = new Dialog;
+            dialog.showDialog(translate("app.settings.updates.found.title"), "notice", translate("app.settings.updates.found.description", "%v", result.new_version, "%s", result.file_size), [
+                {
+                    "type": "cancel",
+                    "content": translate("app.settings.updates.found.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.settings.updates.found.confirm")
+                }
+            ], [], async () => {
+                try {
+                    await window.electronAPI.downloadUpdate(result.download_url, result.new_version, result.checksum);
+                } catch (e) {
+                    displayError("app.settings.updates.download_failed");
+                    return;
+                }
+                let dialog = new Dialog;
+                dialog.showDialog(translate("app.settings.updates.complete.title"), "notice", translate("app.settings.updates.complete.description"), [
+                    {
+                        "type": "cancel",
+                        "content": translate("app.settings.updates.complete.cancel")
+                    },
+                    {
+                        "type": "confirm",
+                        "content": translate("app.settings.updates.complete.confirm")
+                    }
+                ], [], () => {
+                    window.electronAPI.updateEnderLynx();
+                });
+            });
+        }
+    } catch (e) {
+        if (isManual) displayError(translate("app.settings.updates.error"));
+    }
+}
+
+checkForUpdates();

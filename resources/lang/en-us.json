@@ -203,6 +203,7 @@
     "app.settings.info.ram": "RAM Usage",
     "app.settings.info.bug": "Report a Bug",
     "app.settings.info.feature": "Request a Feature",
+    "app.settings.info.update": "Check for Updates",
     "app.settings.theme": "Color Theme",
     "app.settings.theme.dark": "Dark Mode",
     "app.settings.theme.light": "Light Mode",
@@ -664,5 +665,16 @@
     "app.login_error": "Unable to login. Please make sure you have an account associated with that Microsoft account.",
     "app.login_error.no_username": "Unable to login. Please make sure that you have a Java Edition username",
     "app.post_exit.notice": "Note that the Post-Exit Hook will only run if the launcher is open for the entirety of the Minecraft session.",
-    "app.wardrobe.sign_in": "Sign in to view your wardrobe."
+    "app.wardrobe.sign_in": "Sign in to view your wardrobe.",
+    "app.settings.updates.none_found": "No updates found. You are on the latest version.",
+    "app.settings.updates.found.title": "Update found!",
+    "app.settings.updates.found.description": "Would you like to download the update now? (Version %v) (Size: %s)",
+    "app.settings.updates.found.cancel": "Cancel",
+    "app.settings.updates.found.confirm": "Download Update",
+    "app.settings.updates.error": "Unable to check for updates",
+    "app.settings.updates.complete.title": "Update download complete",
+    "app.settings.updates.complete.description": "Update download completed. Restart EnderLynx any time to update. Would you like to restart EnderLynx now?",
+    "app.settings.updates.complete.cancel": "Later",
+    "app.settings.updates.complete.confirm": "Restart EnderLynx",
+    "app.settings.updates.download_failed": "Failed to download update"
 }

@@ -27,6 +27,7 @@ const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
 const { pathToFileURL } = require('url');
+const unzipper = require("unzipper");
 
 const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1], 'EnderLynx');
@@ -43,6 +44,15 @@ if (!fs.existsSync(path.resolve(userPath, "log_config.xml"))) {
     } catch (e) {
         fs.writeFileSync(path.resolve(userPath, "log_config.xml"), "");
     }
+}
+const srcConfigPath = path.resolve(__dirname, "updater.exe");
+fs.mkdirSync(path.resolve(userPath, "updater"), { recursive: true })
+let updaterData;
+try {
+    updaterData = fs.readFileSync(srcConfigPath);
+    fs.writeFileSync(path.resolve(userPath, "updater", "updater.exe"), updaterData);
+} catch (e) {
+
 }
 
 const db = new Database(path.resolve(userPath, "app.db"));
@@ -2221,7 +2231,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         });
         if (result.canceled || !result.filePath) return;
         fs.copyFileSync(file_path, result.filePath);
-    }
+    },
+    checkForUpdates,
+    compareVersions,
+    updateEnderLynx,
+    downloadUpdate
 });
 
 async function convertToIco(input, outputPath) {
@@ -2932,4 +2946,121 @@ function openFolder(folderPath) {
             console.error(`Error opening folder: ${error}`);
         }
     });
+}
+
+async function checkForUpdates() {
+    try {
+        let all_releases = await fetch("https://api.github.com/repos/Illusioner2520/EnderLynx/releases");
+        let all_releases_json = await all_releases.json();
+        let recent_release_version = all_releases_json[0].tag_name.replace("v", "");
+        if (compareVersions(recent_release_version, version) == 1) {
+            let download_url = "";
+            let file_size = 0;
+            let checksum = "";
+            for (let i = 0; i < all_releases_json[0].assets.length; i++) {
+                let asset = all_releases_json[0].assets[i];
+                if (asset.content_type == "application/x-zip-compressed") {
+                    download_url = asset.browser_download_url;
+                    file_size = asset.size;
+                    checksum = asset.digest;
+                    break;
+                }
+            }
+            if (!download_url) {
+                return ({
+                    "update": false
+                });
+            }
+            return ({
+                "update": true,
+                "new_version": recent_release_version,
+                "current_version": version,
+                "download_url": download_url,
+                "checksum": checksum,
+                "file_size": Math.round(file_size / 1048576) + "MB",
+                "changelog": all_releases_json[0].body
+            });
+        } else {
+            return ({
+                "update": false
+            });
+        }
+    } catch (e) {
+        return ({
+            "update": false
+        });
+    }
+}
+
+async function downloadUpdate(download_url, new_version, checksum) {
+    ipcRenderer.send('progress-update', `Downloading Update`, 0, "Beginning download...");
+    const tempDir = path.resolve(userPath, "temp", new_version);
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    const zipPath = path.join(tempDir, "update.zip");
+
+    const response = await axios.get(download_url, {
+        responseType: "arraybuffer",
+        onDownloadProgress: (progressEvent) => {
+            const percentCompleted = progressEvent.loaded * 80 / progressEvent.total;
+            ipcRenderer.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...");
+        }
+    });
+    let data = Buffer.from(response.data);
+    fs.writeFileSync(zipPath, data);
+
+    try {
+        let hash = crypto.createHash('sha256')
+            .update(data)
+            .digest('hex');
+        if ("sha256:" + hash != checksum) throw new Error();
+    } catch (e) {
+        fs.unlinkSync(zipPath);
+        ipcRenderer.send('progress-update', `Downloading Update`, 100, "err");
+        throw new Error("Failed to verify download. Stopping update.");
+    }
+
+    const zip = new AdmZip(zipPath);
+
+    const prev = process.noAsar;
+    process.noAsar = true;
+
+    ipcRenderer.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...");
+
+    zip.extractAllTo(tempDir);
+
+    process.noAsar = prev;
+
+    fs.unlinkSync(zipPath);
+
+    ipcRenderer.send('progress-update', `Downloading Update`, 100, "Done!");
+
+    const updaterPath = path.join(userPath, "updater", "updater.exe");
+    const sourceDir = path.resolve(tempDir);
+    const targetDir = process.execPath.replace(/\\[^\\]+$/, "");
+    const exeToLaunch = process.execPath;
+    const oldPid = process.pid.toString();
+
+    spawn(updaterPath, [sourceDir, targetDir, exeToLaunch, oldPid], {
+        detached: true,
+        stdio: "ignore"
+    }).unref();
+}
+
+function updateEnderLynx() {
+    ipcRenderer.invoke('quit');
+}
+
+function compareVersions(v1, v2) {
+    const a = v1.split('.').map(Number);
+    const b = v2.split('.').map(Number);
+    const length = Math.max(a.length, b.length);
+
+    for (let i = 0; i < length; i++) {
+        const num1 = a[i] || 0;
+        const num2 = b[i] || 0;
+        if (num1 < num2) return -1;
+        if (num1 > num2) return 1;
+    }
+    return 0;
 }

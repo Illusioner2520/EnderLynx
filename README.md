@@ -5,7 +5,7 @@ EnderLynx is a Minecraft launcher that is currently a work in progress. All vers
 ## Requirements
 
 Currently, EnderLynx only supports Windows 64-bit. Unfortunately, you will not be able to run the program if this is not your system.
-For space required on the disk, the app itself requires 437 MB, however any installed instances (especially large modpacks) can significantly increase the amount of space required.
+For space required on the disk, the app itself requires less than 512 MB, however any installed instances (especially large modpacks) can significantly increase the amount of space required.
 
 ## Technologies
 

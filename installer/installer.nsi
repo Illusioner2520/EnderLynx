@@ -59,7 +59,6 @@ Section "MainSection" SecMain
 
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "DisplayName" "EnderLynx"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "DisplayIcon" "$INSTDIR\EnderLynx.exe"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "DisplayVersion" "0.0.1"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "InstallLocation" "$INSTDIR"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "Publisher" "EnderLynx"

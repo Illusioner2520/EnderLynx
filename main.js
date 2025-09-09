@@ -35,7 +35,7 @@ const createWindow = () => {
     win.loadFile('index.html');
     state.manage(win);
     if (!isDev) {
-        Menu.setApplicationMenu(null);
+        // Menu.setApplicationMenu(null);
     }
 }
 
@@ -102,7 +102,11 @@ ipcMain.handle('is-dev', (event) => {
 
 ipcMain.handle('get-desktop', (_) => {
     return app.getPath("desktop");
-})
+});
+
+ipcMain.handle('quit', (_) => {
+    return app.quit();
+});
 
 const clientId = '1392227892594999368';
 

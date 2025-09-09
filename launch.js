@@ -11,7 +11,7 @@ const { ipcRenderer } = require('electron');
 const { pathToFileURL } = require('url');
 
 let launchername = "EnderLynx";
-let launcherversion = "0.0.1";
+let launcherversion = "0.0.2";
 
 const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
   .split('=')[1], 'EnderLynx');
