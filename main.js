@@ -26,7 +26,7 @@ const createWindow = () => {
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
-            devTools: true,
+            devTools: isDev,
             additionalArguments: [`--userDataPath=${userDataPath}`]
         },
         backgroundColor: "#0a0a0a",
@@ -35,7 +35,7 @@ const createWindow = () => {
     win.loadFile('index.html');
     state.manage(win);
     if (!isDev) {
-        // Menu.setApplicationMenu(null);
+        Menu.setApplicationMenu(null);
     }
 }
 
@@ -122,7 +122,3 @@ rpc.on('ready', () => {
         rpc.clearActivity().catch(console.error);
     })
 });
-
-// setInterval(() => {
-//     console.log(app.getAppMetrics());
-// }, 5000);
