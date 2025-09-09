@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
 const { promisify } = require("util");
 const { execFile } = require("child_process");
 const WinReg = require("winreg");

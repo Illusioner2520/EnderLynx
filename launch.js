@@ -5,8 +5,7 @@ const urlModule = require('url');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const os = require('os');
-const { spawn, exec, execFile, execSync } = require('child_process');
-const fsPromises = require('fs').promises;
+const { spawn, execSync } = require('child_process');
 const { ipcRenderer } = require('electron');
 const { pathToFileURL } = require('url');
 

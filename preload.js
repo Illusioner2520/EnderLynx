@@ -21,7 +21,6 @@ const ws = require("windows-shortcuts");
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
 const stringArgv = require('string-argv').default;
-const { Jimp } = require('jimp');
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
@@ -2269,9 +2268,9 @@ async function convertToIco(input, outputPath) {
 
         imageBuffer = data;
     }
-
-    const image = await Jimp.read(imageBuffer);
-    const resized = await image.resize({ w: 256, h: 256, mode: "nearestNeighbor" }).getBuffer("image/png");
+    const resized = await sharp(imageBuffer).resize(256, 256, {
+        kernel: sharp.kernel.nearest
+    }).png().toBuffer();
 
     const icoBuffer = await pngToIco(resized);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
