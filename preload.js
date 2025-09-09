@@ -2946,15 +2946,15 @@ function openFolder(folderPath) {
 
 async function checkForUpdates() {
     try {
-        let all_releases = await fetch("https://api.github.com/repos/Illusioner2520/EnderLynx/releases");
-        let all_releases_json = await all_releases.json();
-        let recent_release_version = all_releases_json[0].tag_name.replace("v", "");
+        let latest = await fetch("https://api.github.com/repos/Illusioner2520/EnderLynx/releases/latest");
+        let latest_json = await latest.json();
+        let recent_release_version = latest_json.tag_name.replace("v", "");
         if (compareVersions(recent_release_version, version) == 1) {
             let download_url = "";
             let file_size = 0;
             let checksum = "";
-            for (let i = 0; i < all_releases_json[0].assets.length; i++) {
-                let asset = all_releases_json[0].assets[i];
+            for (let i = 0; i < latest_json.assets.length; i++) {
+                let asset = latest_json.assets[i];
                 if (asset.content_type == "application/x-zip-compressed") {
                     download_url = asset.browser_download_url;
                     file_size = asset.size;
@@ -2974,7 +2974,7 @@ async function checkForUpdates() {
                 "download_url": download_url,
                 "checksum": checksum,
                 "file_size": Math.round(file_size / 1048576) + "MB",
-                "changelog": all_releases_json[0].body
+                "changelog": latest_json.body
             });
         } else {
             return ({
