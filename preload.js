@@ -26,7 +26,6 @@ const { Jimp, ResizeStrategy } = require('jimp');
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
-const { pathToFileURL } = require('url');
 
 const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1], 'EnderLynx');
