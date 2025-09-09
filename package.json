@@ -44,7 +44,6 @@
     "string-argv": "^0.3.2",
     "three": "^0.177.0",
     "toml": "^3.0.0",
-    "unzipper": "^0.12.3",
     "windows-shortcuts": "^0.1.6",
     "winreg": "^1.2.5"
   }
