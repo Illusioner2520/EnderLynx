@@ -463,7 +463,17 @@ body.compact #playerSwitch .player-chevron {
     height: 100%;
 }
 
+body.offline .content {
+    top: 30px;
+    height: calc(100% - 30px);
+}
+
 body.sidebar-right .content {
+    right: 301px;
+    left: unset;
+}
+
+body.sidebar-right #offline-notice {
     right: 301px;
     left: unset;
 }
@@ -473,7 +483,17 @@ body.compact .content {
     width: calc(100% - 77px);
 }
 
+body.compact #offline-notice {
+    left: 77px;
+    width: calc(100% - 77px);
+}
+
 body.compact.sidebar-right .content {
+    right: 77px;
+    left: unset;
+}
+
+body.compact.sidebar-right #offline-notice {
     right: 77px;
     left: unset;
 }
@@ -4464,4 +4484,26 @@ body.hide_ip .hidden-text.shown::after {
     @starting-style {
         opacity: 0;
     }
+}
+
+#offline-notice {
+    padding: 8px;
+    padding-block: 4px;
+    background-color: var(--accent-color);
+    font-weight: bold;
+    display: none;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 10px;
+    align-items: center;
+    text-align: center;
+    height: 30px;
+    left: 301px;
+    width: calc(100% - 301px);
+    position: absolute;
+    top: 0;
+}
+
+body.offline #offline-notice {
+    display: flex;
 }

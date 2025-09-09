@@ -17,10 +17,6 @@
         <div class="start-spinner"></div>
     </div>
     <style>
-        /* body {
-            background-color: #0a0a0a;
-        } */
-
         #spinner-wrapper {
             position: absolute;
             inset: 0;
@@ -62,13 +58,12 @@
         <button id="settingsButtonEle"></button>
         <div id="liveMinecraft"></div>
     </div>
+    <div class="offline-notice" id="offline-notice" style="display: none"></div>
     <div class="content" id="content" style="display: none"></div>
-    <!-- <script src="node_modules/skinview3d/bundles/skinview3d.bundle.js"></script> -->
     <dialog class="screenshot-preview" id="screenshotPreview" style="display: none"></dialog>
     <dialog class="content-info" id="contentInfo" style="display: none"></dialog>
     <div class="toasts" popover="manual" style="display: none"></div>
     <div id="tooltip" class="tooltip" popover="manual" style="display: none"></div>
-    <!-- <script src="script.js"></script> -->
     <script nonce="starting-script-enderlynx">
         requestAnimationFrame(() => {
             const script = document.createElement("script");

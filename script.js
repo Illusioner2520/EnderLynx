@@ -11749,6 +11749,16 @@ function closeAllDialogs() {
 
 document.getElementById("spinner-wrapper").remove();
 
+document.getElementById("offline-notice").innerHTML = translate("app.offline");
+
+window.ononline = () => {
+    document.body.classList.remove("offline");
+}
+
+window.onoffline = () => {
+    document.body.classList.add("offline");
+}
+
 [...document.body.children].forEach(e => {
     e.style.display = "";
 });

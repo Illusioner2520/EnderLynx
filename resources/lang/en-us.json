@@ -676,5 +676,6 @@
     "app.settings.updates.complete.description": "Update download completed. Restart EnderLynx any time to update. Would you like to restart EnderLynx now?",
     "app.settings.updates.complete.cancel": "Later",
     "app.settings.updates.complete.confirm": "Restart EnderLynx",
-    "app.settings.updates.download_failed": "Failed to download update"
+    "app.settings.updates.download_failed": "Failed to download update",
+    "app.offline": "You are currently offline. You can still play Singleplayer as long as you previously signed in."
 }
