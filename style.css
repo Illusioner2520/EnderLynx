@@ -461,6 +461,7 @@ body.compact #playerSwitch .player-chevron {
     left: 301px;
     width: calc(100% - 301px);
     height: 100%;
+    transition: top .25s, height .25s;
 }
 
 body.offline .content {
@@ -4502,8 +4503,18 @@ body.hide_ip .hidden-text.shown::after {
     width: calc(100% - 301px);
     position: absolute;
     top: 0;
+    scale: .8;
+    opacity: 0;
+    transition: display .25s allow-discrete, scale .25s, opacity .25s;
 }
 
 body.offline #offline-notice {
     display: flex;
+    scale: 1;
+    opacity: 1;
+
+    @starting-style {
+        scale: .8;
+        opacity: 0;
+    }
 }

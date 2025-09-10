@@ -8,9 +8,10 @@ const os = require('os');
 const { spawn, execSync } = require('child_process');
 const { ipcRenderer } = require('electron');
 const { pathToFileURL } = require('url');
+const { version } = require('./package.json');
 
 let launchername = "EnderLynx";
-let launcherversion = "0.0.2";
+let launcherversion = version;
 
 const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
   .split('=')[1], 'EnderLynx');
