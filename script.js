@@ -11771,7 +11771,7 @@ async function checkForUpdates(isManual) {
     try {
         let result = await window.electronAPI.checkForUpdates();
         if (!result.update) {
-            if (isManual) displaySuccess("app.settings.updates.none_found");
+            if (isManual) displaySuccess(translate("app.settings.updates.none_found"));
         } else {
             let dialog = new Dialog;
             dialog.showDialog(translate("app.settings.updates.found.title"), "notice", translate("app.settings.updates.found.description", "%v", result.new_version, "%s", result.file_size), [
