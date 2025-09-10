@@ -311,7 +311,8 @@ class Minecraft {
         ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
     }
     async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) {
-        if (!javaArgs || !javaArgs.length) javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M", "-Dlog4j.configurationFile=" + pathToFileURL(path.resolve(userPath, "log_config.xml")).href];
+        if (!javaArgs || !javaArgs.length) javaArgs = ["-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"];
+        javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-Dlog4j.configurationFile=" + pathToFileURL(path.resolve(userPath, "log_config.xml")).href].concat(javaArgs);
         this.libs = "";
         this.libNames = [];
         const platform = os.platform();

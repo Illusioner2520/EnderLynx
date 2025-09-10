@@ -784,7 +784,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false" };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -5530,7 +5530,6 @@ function showInstanceSettings(instanceInfo) {
         {
             "type": "text",
             "id": "java_args",
-            "desc": translate("app.instances.settings.custom_args.description"),
             "name": translate("app.instances.settings.custom_args"),
             "default": instanceInfo.java_args,
             "tab": "java"
