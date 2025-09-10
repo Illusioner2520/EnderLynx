@@ -1898,7 +1898,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         switch (launcher.toLowerCase()) {
             case "modrinth": {
                 // Default Modrinth AppData path
-                const p = path.join(os.homedir(), "AppData", "Roaming", "ModrinthApp", "profiles");
+                const p = path.join(os.homedir(), "AppData", "Roaming", "com.modrinth.theseus", "profiles");
                 return fs.existsSync(p) ? p : "";
             }
             case "curseforge": {
