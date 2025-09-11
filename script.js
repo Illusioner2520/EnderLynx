@@ -532,6 +532,7 @@ class Instance {
     }
 
     addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
+        if (!file_name) throw new Error("File Name not set");
         db.prepare('INSERT into content (name,author,image,file_name,source,type,version,instance,source_info,disabled,version_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(name, author, image, file_name, source, type, version, this.instance_id, source_info, Number(disabled), version_id);
         return new Content(this.instance_id, file_name);
     }
@@ -5590,7 +5591,7 @@ function showInstanceSettings(instanceInfo) {
         instanceInfo.setPostExitHook(info.post_exit_hook);
         if (info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") {
             if (instanceInfo.installing || !instanceInfo.mc_installed) {
-                displayError("app.modpack.update.progress_already");
+                displayError(translate("app.modpack.update.progress_already"));
             }
             let source = instanceInfo.install_source;
             let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
@@ -8442,9 +8443,13 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental) {
         let element = document.createElement("div");
         element.className = "discover-item";
+        if (experimental) {
+            element.classList.add("experimental");
+            element.title = translate("app.discover.experimental");
+        }
         element.onclick = () => {
             displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
         }
@@ -9002,20 +9007,34 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     e.forEach(e => { info[e.id] = e.value });
                     let instance = instance_id ? instance_id : info.instance;
                     let world = info.world;
-                    submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                    submitButton.classList.add("disabled");
-                    submitButton.onclick = () => { };
+                    if (instance_id) {
+                        submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                        submitButton.classList.add("disabled");
+                        submitButton.onclick = () => { };
+                    }
                     let success = await window.electronAPI.downloadVanillaTweaksDataPacks(added_vt_dp_packs, version ? version : vt_version, instance, world);
-                    if (success) {
-                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                    if (instance_id) {
+                        if (success) {
+                            submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                        } else {
+                            submitButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+                        }
                     } else {
-                        submitButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+                        if (success) {
+                            displaySuccess(translate("app.discover.vt.success", "%i", instance.name));
+                        } else {
+                            displayError(translate("app.discover.vt.fail"));
+                        }
                     }
                 })
             } else if (instance_id) {
                 submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                 submitButton.onclick = () => { };
                 let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
+                if (!file_name) {
+                    displayError(translate("app.discover.vt.fail"));
+                    return;
+                }
                 let instance = new Instance(instance_id);
                 instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
                 submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
@@ -9035,9 +9054,14 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 ], null, async (e) => {
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
-                    await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
+                    let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
+                    if (!file_name) {
+                        displayError(translate("app.discover.vt.fail"));
+                        return;
+                    }
                     let instance = new Instance(info.instance);
-                    instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", "vanilla_tweaks.zip", "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                    instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                    displaySuccess(translate("app.discover.vt.success", "%i", instance.name));
                 });
             }
         }
@@ -9055,7 +9079,11 @@ async function getContent(element, instance_id, source, query, loader, version, 
         let checkForIncompatibilities = () => {
             result.hits.map(e => e.entry.element).forEach(e => {
                 e.classList.remove("incompatible");
-                e.removeAttribute("title");
+                if (e.classList.contains("experimental")) {
+                    e.title = translate("app.discover.experimental");
+                } else {
+                    e.removeAttribute("title");
+                }
             });
             let added_packs_ids = project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id) : added_vt_dp_packs.map(e => e.id);
             result.hits.forEach(e => {
@@ -9103,7 +9131,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     checkForIncompatibilities();
                 }
             }
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id);
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment);
             e.entry = entry;
             element.appendChild(entry.element);
         }
@@ -9593,15 +9621,19 @@ function unpinInstance(instanceInfo, dontDisplay) {
 }
 function pinSingleplayerWorld(world_id, instance_id) {
     db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, world_id, "singleplayer");
+    displaySuccess(translate("app.worlds.pin.success"));
 }
 function unpinSingleplayerWorld(world_id, instance_id) {
     db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, world_id, "singleplayer");
+    displaySuccess(translate("app.worlds.unpin.success"));
 }
 function pinMultiplayerWorld(ip, instance_id) {
     db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, ip, "multiplayer");
+    displaySuccess(translate("app.worlds.pin.success"));
 }
 function unpinMultiplayerWorld(ip, instance_id) {
     db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, ip, "multiplayer");
+    displaySuccess(translate("app.worlds.unpin.success"));
 }
 function isWorldPinned(world_id, instance_id, world_type) {
     let world = db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type);
@@ -11786,7 +11818,7 @@ async function checkForUpdates(isManual) {
                 try {
                     await window.electronAPI.downloadUpdate(result.download_url, result.new_version, result.checksum);
                 } catch (e) {
-                    displayError("app.settings.updates.download_failed");
+                    displayError(translate("app.settings.updates.download_failed"));
                     return;
                 }
                 let dialog = new Dialog;

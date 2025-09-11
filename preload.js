@@ -1028,6 +1028,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             await urlToFile("https://vanillatweaks.net" + data_vt.link, filePath);
 
             return baseName;
+        } else {
+            return false;
         }
     },
     getVanillaTweaksResourcePacks: async (query = "", version = "1.21") => {
@@ -1057,7 +1059,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 ],
                 "author": "Vanilla Tweaks",
                 "incompatible": e.incompatible,
-                "vt_id": e.name
+                "vt_id": e.name,
+                "experiment": e.experiment
             }));
             packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
             return_data.hits = return_data.hits.concat(packs);
@@ -1106,7 +1109,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 "author": "Vanilla Tweaks",
                 "incompatible": e.incompatible,
                 "vt_id": e.name,
-                "type": type
+                "type": type,
+                "experiment": e.experiment
             }));
             packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
             return_data.hits = return_data.hits.concat(packs);

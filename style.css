@@ -2075,12 +2075,20 @@ dialog[open]::backdrop {
     background-color: color-mix(in srgb, 80% transparent, var(--danger-color));
 }
 
+.discover-item.experimental {
+    background-color: color-mix(in srgb, 80% transparent, var(--accent-color));
+}
+
 .discover-item:not(:has(.discover-item-install:hover)):hover {
     background-color: var(--color-2);
 }
 
 .discover-item.incompatible:not(:has(.discover-item-install:hover)):hover {
     background-color: color-mix(in srgb, 60% transparent, var(--danger-color));
+}
+
+.discover-item.experimental:not(:has(.discover-item-install:hover)):hover {
+    background-color: color-mix(in srgb, 60% transparent, var(--accent-color));
 }
 
 .discover-item-image {
