@@ -3958,7 +3958,7 @@ function showMyAccountContent(e) {
                             if (oldEle) oldEle.classList.remove("selected");
                             currentEle.classList.add("selected");
                             e.setActive(default_profile.uuid);
-                            skinViewer.loadSkin(e.url, {
+                            skinViewer.loadSkin(e.skin_url, {
                                 model: e.model == "wide" ? "default" : "slim"
                             });
                             viewerInfo.innerHTML = translate("app.wardrobe.current");
@@ -4064,6 +4064,7 @@ function showMyAccountContent(e) {
             loader.className = "loading-container-spinner";
             loader.style.display = "none";
             let capeName = document.createElement("div");
+            capeName.className = "cape-name";
             capeEle.appendChild(capeImg);
             capeEle.appendChild(loader);
             capeEle.appendChild(capeName);
@@ -4101,6 +4102,7 @@ function showMyAccountContent(e) {
         loader.className = "loading-container-spinner";
         loader.style.display = "none";
         let capeName = document.createElement("div");
+        capeName.className = "cape-name";
         capeEle.appendChild(capeImg);
         capeEle.appendChild(loader);
         capeEle.appendChild(capeName);
@@ -11499,6 +11501,21 @@ async function repairInstance(instance) {
 }
 
 async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version, oncomplete) {
+    let plugin_loaders = ["folia", "spigot", "paper", "bungeecord", "purpur", "waterfall", "velocity", "bukkit", "sponge"];
+    let count = 0;
+    content_loaders.forEach(e => {
+        if (plugin_loaders.includes(e)) count++;
+    });
+    if (count == content_loaders.length) {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.discover.plugin.title"), "notice", translate("app.discover.plugin.description"), [
+            {
+                "type": "confirm",
+                "content": translate("app.discover.plugin.confirm")
+            }
+        ],[],() => {});
+        return;
+    }
     if (project_type == "datapack" || content_loaders.includes("datapack")) {
         let dialog = new Dialog();
         dialog.showDialog(translate("app.discover.datapacks.title"), "form", [
@@ -11805,6 +11822,10 @@ document.getElementById("offline-notice").innerHTML = translate("app.offline");
 
 window.ononline = () => {
     document.body.classList.remove("offline");
+}
+
+if (!navigator.onLine) {
+    document.body.classList.add("offline");
 }
 
 window.onoffline = () => {

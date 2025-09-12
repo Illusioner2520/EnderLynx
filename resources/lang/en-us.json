@@ -683,5 +683,8 @@
     "app.offline": "You are currently offline. You can still play Singleplayer as long as you previously signed in.",
     "app.discover.vt.fail": "Unable to download Vanilla Tweaks Packs.",
     "app.discover.vt.success": "Vanilla Tweaks Packs installed to %i",
-    "app.discover.experimental": "Experimental Pack. May produce errors when trying to download."
+    "app.discover.experimental": "Experimental Pack. May produce errors when trying to download.",
+    "app.discover.plugin.title": "That's a plugin",
+    "app.discover.plugin.description": "You are trying to install a plugin, which are for Minecraft servers. Select a version that is a data pack or a mod instead.",
+    "app.discover.plugin.confirm": "Okay"
 }
