@@ -3940,6 +3940,7 @@ function showMyAccountContent(e) {
         detailContent.appendChild(defaultSkinList);
 
         let showDefSkins = async () => {
+            detailChevron.innerHTML = '<i class="spinner"></i>';
             let eles = document.querySelectorAll(".my-account-option.default-skin");
             if (eles.length == 0) {
                 let defaultSkins = await data.getDefaultSkins();
@@ -4018,7 +4019,7 @@ function showMyAccountContent(e) {
                 });
             }
             detailsWrapper.classList.add("open");
-
+            detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
         }
         let hideDefSkins = () => {
             detailsWrapper.classList.remove("open");
@@ -4181,33 +4182,6 @@ function showMyAccountContent(e) {
         }
     }
     skinButtonContainer.appendChild(refreshButton);
-    let usernameImport = document.createElement("button");
-    usernameImport.className = "skin-button";
-    usernameImport.innerHTML = '<i class="fa-solid fa-user"></i>' + translate("app.wardrobe.username_import");
-    usernameImport.onclick = () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.wardrobe.username_import.title"), "form", [
-            {
-                "type": "text",
-                "id": "username",
-                "name": translate("app.wardrobe.username_import.username")
-            }
-        ], [
-            {
-                "type": "cancel",
-                "content": translate("app.wardrobe.username_import.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.wardrobe.username_import.confirm")
-            }
-        ], [], async (v) => {
-            let info = {};
-            v.forEach(e => info[e.id] = e.value);
-            await getSkinFromUsername(info.username);
-            showContent();
-        })
-    }
     let importButton = document.createElement("button");
     importButton.innerHTML = '<i class="fa-solid fa-file-import"></i>' + translate("app.wardrobe.import");
     importButton.className = "skin-button";
@@ -4217,12 +4191,14 @@ function showMyAccountContent(e) {
             {
                 "type": "image-upload",
                 "id": "skin",
-                "name": translate("app.wardrobe.import.skin")
+                "name": translate("app.wardrobe.import.skin"),
+                "tab": "file"
             },
             {
                 "type": "text",
                 "id": "name",
-                "name": translate("app.wardrobe.import.name")
+                "name": translate("app.wardrobe.import.name"),
+                "tab": "file"
             },
             {
                 "type": "dropdown",
@@ -4232,14 +4208,93 @@ function showMyAccountContent(e) {
                     { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
                     { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
                     { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
-                ]
+                ],
+                "tab": "file"
+            },
+            {
+                "type": "text",
+                "id": "username",
+                "name": translate("app.wardrobe.username_import.username"),
+                "tab": "username"
+            },
+            {
+                "type": "text",
+                "id": "name_u",
+                "name": translate("app.wardrobe.import.name"),
+                "tab": "username"
+            },
+            {
+                "type": "dropdown",
+                "id": "model_u",
+                "name": translate("app.wardrobe.import.model"),
+                "options": [
+                    { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
+                    { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
+                    { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
+                ],
+                "tab": "username"
+            },
+            {
+                "type": "text",
+                "id": "url",
+                "name": translate("app.wardrobe.import.url"),
+                "tab": "url"
+            },
+            {
+                "type": "text",
+                "id": "name_l",
+                "name": translate("app.wardrobe.import.name"),
+                "tab": "url"
+            },
+            {
+                "type": "dropdown",
+                "id": "model_l",
+                "name": translate("app.wardrobe.import.model"),
+                "options": [
+                    { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
+                    { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
+                    { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
+                ],
+                "tab": "url"
             }
         ], [
             { "type": "cancel", "content": translate("app.wardrobe.import.cancel") },
             { "type": "confirm", "content": translate("app.wardrobe.import.confirm") }
-        ], [], async (e) => {
+        ], [
+            {
+                "name": translate("app.wardrobe.import.tab.file"),
+                "value": "file"
+            },
+            {
+                "name": translate("app.wardrobe.import.tab.username"),
+                "value": "username"
+            },
+            {
+                "name": translate("app.wardrobe.import.tab.url"),
+                "value": "url"
+            }
+        ], async (e) => {
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
+            if (info.selected_tab == "username") {
+                try {
+                    info.skin = (await window.electronAPI.getSkinFromUsername(info.username)).url;
+                } catch (e) {
+                    displayError(translate("app.wardrobe.import.username.fail"));
+                    return;
+                }
+                info.name = info.name_u;
+                info.model = info.model_u;
+            } else if (info.selected_tab == "url") {
+                try {
+                    info.skin = (await window.electronAPI.getSkinFromURL(info.url)).url;
+                } catch (e) {
+                    displayError(translate("app.wardrobe.import.url.fail"));
+                    return;
+                }
+                info.name = info.name_l;
+                info.model = info.model_l;
+            }
             if (!info.skin) {
                 displayError(translate("app.wardrobe.import.no_file"));
                 return;
@@ -4270,17 +4325,16 @@ function showMyAccountContent(e) {
                     } else {
                         model = "wide";
                     }
-                    data.addSkin("", info.name ? info.name : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+                    data.addSkin("", info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
                     showContent();
                 };
                 tempImg.src = info.skin;
                 return;
             }
-            data.addSkin("", info.name ? info.name : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+            data.addSkin("", info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
             showContent();
         });
     }
-    skinButtonContainer.appendChild(usernameImport);
     skinButtonContainer.appendChild(importButton);
     optionsContainer.appendChild(skinButtonContainer);
     optionsContainer.appendChild(skinOptions);
@@ -11017,39 +11071,6 @@ document.addEventListener("scroll", function (e) {
     if (!tooltip) return;
     tooltip.hidePopover();
 }, true);
-
-async function getSkinFromUsername(username) {
-    let info;
-    try {
-        info = await window.electronAPI.getSkinFromUsername(username);
-        if (!info) throw new Error();
-        console.log(info);
-    } catch (e) {
-        displayError(translate("app.wardrobe.username_import.fail"));
-        return;
-    }
-    return new Promise(async (resolve, reject) => {
-        const tempImg = new Image();
-        let dims = await getImageDimensionsFromDataURL(info.url);
-        tempImg.onload = async () => {
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = dims.width;
-            tempCanvas.height = dims.height;
-            const ctx = tempCanvas.getContext("2d");
-            ctx.drawImage(tempImg, 0, 0);
-            const pixel = ctx.getImageData(54, 24, 1, 1).data;
-            // pixel is [r, g, b, a]
-            if (pixel[3] === 0) {
-                model = "slim";
-            } else {
-                model = "wide";
-            }
-            let skin = data.addSkin("", translate("app.wardrobe.username_import.default_name", "%u", username), model, "", info.hash, info.url, true);
-            resolve(skin);
-        };
-        tempImg.src = info.url;
-    })
-}
 
 async function addDesktopShortcut(instanceInfo) {
     let success = await window.electronAPI.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.refresh().name, instanceInfo.refresh().image);

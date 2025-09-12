@@ -1562,6 +1562,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     getSkinFromUsername,
+    getSkinFromURL,
     downloadSkin,
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
@@ -2375,7 +2376,6 @@ async function hashImageFromDataUrl(dataUrl) {
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-    console.log(data);
     const hash = crypto.createHash('sha256').update(data).digest('hex');
     return { "hash": hash, "buffer": data };
 }
@@ -2794,6 +2794,11 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
     })
 }
 
+async function getSkinFromURL(url) {
+    let hash = await downloadSkin(url);
+    return { "hash": hash.hash, "url": hash.dataUrl };
+}
+
 async function getSkinFromUsername(username) {
     try {
         // Step 1: Get UUID from username
@@ -2824,8 +2829,6 @@ async function getSkinFromUsername(username) {
 }
 
 async function downloadSkin(url) {
-    if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-
     const response = await axios.get(url, { responseType: "arraybuffer" });
     const imageBuffer = Buffer.from(response.data);
 
