@@ -1192,7 +1192,7 @@ i {
     margin-left: auto;
 }
 
-.content-list-item:not(.hidden):not(:last-of-type) {
+.content-list-item:not(:nth-last-child(1 of :not(.hidden))) {
     border-bottom-style: solid;
     border-bottom-color: var(--color-1t);
     border-bottom-width: 1px;
