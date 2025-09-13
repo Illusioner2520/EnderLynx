@@ -288,6 +288,7 @@
     "app.wardrobe.skin.edit.cancel": "Cancel",
     "app.wardrobe.skin.edit.confirm": "Submit",
     "app.wardrobe.skin.delete": "Delete Skin",
+    "app.wardrobe.skin.delete.in_use": "Cannot delete skin because it is currently in use.",
     "app.wardrobe.skin.preview": "Skin Preview",
     "app.wardrobe.cape.preview": "Cape Preview",
     "app.wardrobe.no_cape": "No Cape",

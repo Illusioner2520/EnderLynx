@@ -3845,8 +3845,12 @@ function showMyAccountContent(e) {
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "danger": true,
                     "func": () => {
+                        if (e.skin_id == data.getDefaultProfile().getActiveSkin().skin_id) {
+                            displayError(translate("app.wardrobe.skin.delete.in_use"));
+                            return;
+                        }
                         e.delete();
-                        showContent();
+                        skinEle.remove();
                     }
                 }
             ]);
@@ -11513,7 +11517,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 "type": "confirm",
                 "content": translate("app.discover.plugin.confirm")
             }
-        ],[],() => {});
+        ], [], () => { });
         return;
     }
     if (project_type == "datapack" || content_loaders.includes("datapack")) {
