@@ -13,8 +13,8 @@ const { version } = require('./package.json');
 let launchername = "EnderLynx";
 let launcherversion = version;
 
-const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
-  .split('=')[1], 'EnderLynx');
+const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
+    .split('=')[1]);
 
 class Minecraft {
     constructor(instance_id) {

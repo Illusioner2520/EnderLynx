@@ -25,8 +25,8 @@ const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
 
-const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
-    .split('=')[1], 'EnderLynx');
+const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
+    .split('=')[1]);
 
 if (!fs.existsSync(userPath)) {
     fs.mkdirSync(userPath, { recursive: true });
@@ -82,6 +82,7 @@ function openInBrowser(url) {
 
 contextBridge.exposeInMainWorld('electronAPI', {
     version,
+    userPath,
     osplatform: () => os.platform(),
     osrelease: () => os.release(),
     osarch: () => os.arch(),
@@ -1792,6 +1793,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return result.filePaths[0];
     },
+    triggerFolderBrowse: async (file_path) => {
+        let startDir = file_path;
+        if (fs.existsSync(file_path)) {
+            const stat = fs.statSync(file_path);
+            if (stat.isFile()) {
+                startDir = path.dirname(file_path);
+            }
+        }
+        const result = await ipcRenderer.invoke('show-open-dialog', {
+            title: "Select Folder",
+            defaultPath: startDir,
+            properties: ['openDirectory']
+        });
+        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
+            return null;
+        }
+        return result.filePaths[0];
+    },
     triggerFileImportBrowseWithOptions: async (file_path, type, extensions, extName) => {
         let startDir = file_path;
         if (fs.existsSync(file_path)) {
@@ -2236,7 +2255,49 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkForUpdates,
     compareVersions,
     updateEnderLynx,
-    downloadUpdate
+    downloadUpdate,
+    changeFolder: async (old_path, new_path) => {
+        let src = path.resolve(old_path);
+        let dest = path.resolve(new_path);
+
+        if (src === dest) return false;
+
+        if (!fs.existsSync(src)) return false;
+        await fs.promises.mkdir(dest, { recursive: true });
+        const entries = await fs.promises.readdir(src, { withFileTypes: true });
+        const total = entries.length;
+        let completed = 0;
+
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+            
+            const percent = Math.round((completed / total) * 100);
+            ipcRenderer.send('progress-update', `Moving User Path`, percent, `Copying ${entry.name} (${completed + 1} of ${total})`);
+
+            if (entry.isDirectory()) {
+                await fs.promises.mkdir(destPath, { recursive: true });
+                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
+                for (const subEntry of subEntries) {
+                    const subSrcPath = path.join(srcPath, subEntry.name);
+                    const subDestPath = path.join(destPath, subEntry.name);
+                    if (subEntry.isDirectory()) {
+                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
+                    } else {
+                        await fs.promises.copyFile(subSrcPath, subDestPath);
+                    }
+                }
+            } else {
+                await fs.promises.copyFile(srcPath, destPath);
+            }
+
+            completed++;
+        }
+        ipcRenderer.send('progress-update', `Moving User Path`, 100, `Done`);
+
+        await ipcRenderer.invoke("set-user-path", dest, src);
+        return true;
+    }
 });
 
 async function convertToIco(input, outputPath) {

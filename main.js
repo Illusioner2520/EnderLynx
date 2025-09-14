@@ -2,8 +2,35 @@ const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
+const fs = require('fs');
 
-const userDataPath = app.getPath('userData');
+let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
+
+let pathPath = path.resolve(app.getPath('userData'), "path.json");
+let user_path;
+
+if (!fs.existsSync(pathPath)) {
+    user_path = userDataPath;
+    fs.writeFileSync(pathPath, JSON.stringify({ user_path }), 'utf8');
+} else {
+    try {
+        const data = fs.readFileSync(pathPath, 'utf8');
+        const json = JSON.parse(data);
+        user_path = json.user_path;
+        if (json.old_path) {
+            if (fs.existsSync(json.old_path)) {
+                fs.rmSync(json.old_path, { recursive: true, force: true });
+            }
+            delete json.old_path;
+            fs.writeFileSync(pathPath, JSON.stringify(json), 'utf8');
+        }
+    } catch (err) {
+        user_path = userDataPath;
+        fs.writeFileSync(pathPath, JSON.stringify({ user_path }), 'utf8');
+    }
+}
+
+if (!fs.existsSync(user_path)) user_path = userDataPath;
 
 let win;
 
@@ -27,7 +54,7 @@ const createWindow = () => {
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
             devTools: isDev,
-            additionalArguments: [`--userDataPath=${userDataPath}`]
+            additionalArguments: [`--userDataPath=${user_path}`]
         },
         backgroundColor: "#0a0a0a",
         icon: path.join(__dirname, 'icon.ico')
@@ -58,6 +85,12 @@ app.whenReady().then(() => {
     app.setAppUserModelId('me.illusioner.enderlynx');
     createWindow();
     rpc.login({ clientId }).catch(console.error);
+});
+
+ipcMain.handle('set-user-path', (event, new_path, old_path) => {
+    user_path = new_path;
+    fs.writeFileSync(pathPath, JSON.stringify({ user_path, old_path }), 'utf8');
+    return true;
 });
 
 ipcMain.on('progress-update', (event, title, progress, desc) => {

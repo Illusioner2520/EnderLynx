@@ -6,8 +6,8 @@ const WinReg = require("winreg");
 
 const execFileAsync = promisify(execFile);
 
-const userPath = path.join(process.argv.find(arg => arg.startsWith('--userDataPath='))
-  .split('=')[1], 'EnderLynx');
+const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
+    .split('=')[1]);
 
 const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\JavaSoft\\Java Runtime Environment",
