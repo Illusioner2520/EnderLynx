@@ -3668,12 +3668,56 @@ async function showHomeContent(oldEle) {
         updateHomeModpacksList(home_modpacks);
     }
     ele.appendChild(discoverModsWrapper);
+
+    let mcNewsWrapper = document.createElement("div");
+    mcNewsWrapper.className = "home-discover-wrapper";
+    mcNewsWrapper.style.display = "none";
+    let mcNewsTitle = document.createElement("div");
+    mcNewsTitle.innerHTML = translate("app.home.mc_news");
+    mcNewsTitle.className = "home-news-title";
+    mcNewsWrapper.appendChild(mcNewsTitle);
+    let mcNewsContainer = document.createElement("div");
+    mcNewsContainer.className = "home-discover-container";
+    mcNewsWrapper.appendChild(mcNewsContainer);
+
+    let updateMCNews = (e) => {
+        mcNewsWrapper.style.display = "";
+        e.article_grid.forEach(e => {
+            let article = document.createElement("button");
+            article.className = "mc-news";
+            article.style.backgroundImage = `url("https://minecraft.net${e.default_tile.image.imageURL}")`;
+            article.onclick = () => {
+                window.electronAPI.openInBrowser("https://minecraft.net" + e.article_url);
+            }
+            let article_title = document.createElement("div");
+            article_title.innerHTML = e.default_tile.title;
+            article_title.className = "mc-news-title";
+            article_title.dataset.type = e.primary_category;
+            article.appendChild(article_title);
+            mcNewsContainer.appendChild(article);
+        });
+    }
+
+    let getMCNews = async () => {
+        mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/_jcr_content.articles.page-1.json")).json();
+        updateMCNews(mc_news);
+    }
+
+    if (!mc_news.article_grid){
+        getMCNews();
+    } else {
+        updateMCNews(mc_news);
+    }
+
+    ele.appendChild(mcNewsWrapper);
+
     content.appendChild(ele);
     oldEle.remove();
     return ele;
 }
 
 let home_modpacks = {};
+let mc_news = {};
 
 if (data.getDefault("default_mode") == "light") {
     document.body.classList.add("light");

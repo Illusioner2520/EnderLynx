@@ -687,5 +687,6 @@
     "app.discover.experimental": "Experimental Pack. May produce errors when trying to download.",
     "app.discover.plugin.title": "That's a plugin",
     "app.discover.plugin.description": "You are trying to install a plugin, which are for Minecraft servers. Select a version that is a data pack or a mod instead.",
-    "app.discover.plugin.confirm": "Okay"
+    "app.discover.plugin.confirm": "Okay",
+    "app.home.mc_news": "Minecraft News"
 }
