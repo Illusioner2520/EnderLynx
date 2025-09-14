@@ -41,6 +41,9 @@ async function main() {
     console.log("[Updater] Waiting for old process to exit...");
     await waitForProcessToExit(oldPid);
 
+    console.log("[Updater] Waiting a second for Windows to catch up...");
+    await sleep(1000);
+
     console.log("[Updater] Starting copy...");
     await copyUpdate(sourceDir, targetDir);
 
