@@ -2023,6 +2023,21 @@ class ContentList {
                                 "content": e.dialog_button
                             }
                         ], [], async () => {
+                            if (e.dont_loop) {
+                                let eles = [];
+                                let infos = [];
+                                for (let i = 0; i < this.checkBoxes.length; i++) {
+                                    let c = this.checkBoxes[i];
+                                    if (c.element.checked && isNotDisplayNone(c.element)) {
+                                        eles.push(c.element.parentElement);
+                                        infos.push(c.content_info);
+                                    }
+                                }
+                                e.func(eles, infos);
+                                this.uncheckCheckboxes();
+                                this.figureOutMainCheckedState();
+                                return;
+                            }
                             for (let i = 0; i < this.checkBoxes.length; i++) {
                                 let c = this.checkBoxes[i];
                                 if (c.element.checked && isNotDisplayNone(c.element)) {
@@ -2032,6 +2047,21 @@ class ContentList {
                             this.uncheckCheckboxes();
                             this.figureOutMainCheckedState();
                         });
+                        return;
+                    }
+                    if (e.dont_loop) {
+                        let eles = [];
+                        let infos = [];
+                        for (let i = 0; i < this.checkBoxes.length; i++) {
+                            let c = this.checkBoxes[i];
+                            if (c.element.checked && isNotDisplayNone(c.element)) {
+                                eles.push(c.element.parentElement);
+                                infos.push(c.content_info);
+                            }
+                        }
+                        e.func(eles, infos);
+                        this.uncheckCheckboxes();
+                        this.figureOutMainCheckedState();
                         return;
                     }
                     for (let i = 0; i < this.checkBoxes.length; i++) {
@@ -6546,23 +6576,36 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     "title": translate("app.worlds.selection.delete"),
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "danger": true,
-                    "func": async (ele, e) => {
-                        if (e.type == "singleplayer") {
-                            let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
-                            if (success) {
-                                ele.remove();
-                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                            } else {
-                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                    "dont_loop": true,
+                    "func": async (eles, es) => {
+                        let ips = [];
+                        let indexes = [];
+                        let elesm = [];
+                        let names = [];
+                        for (let i = 0; i < es.length; i++) {
+                            let e = es[i];
+                            if (e.type == "singleplayer") {
+                                let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                                if (success) {
+                                    eles[i].remove();
+                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                                } else {
+                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                                }
+                            } else if (e.type == "multiplayer") {
+                                ips.push(e.ip);
+                                indexes.push(e.index);
+                                elesm.push(eles[i]);
+                                names.push(e.name);
                             }
-                        } else if (e.type == "multiplayer") {
-                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
-                            if (success) {
-                                ele.remove();
-                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                            } else {
-                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
-                            }
+                        }
+                        if (!ips.length) return;
+                        let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, ips, indexes);
+                        if (success) {
+                            elesm.forEach(e => e.remove());
+                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(names.join(", "))));
+                        } else {
+                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(names.join(", "))));
                         }
                     },
                     "show_confirmation_dialog": true,
