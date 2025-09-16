@@ -3229,6 +3229,9 @@ async function toggleMicrosoftSignIn() {
     try {
         let newData = await window.electronAPI.triggerMicrosoftLogin();
         let players = data.getProfiles().map(e => e.uuid);
+        if (!newData.access_token) throw new Error();
+        if (!newData.refresh_token) throw new Error();
+        if (!newData.client_id) throw new Error();
         if (players.includes(newData.uuid)) {
             let player = data.getProfileFromUUID(newData.uuid);
             player.setDefault();
