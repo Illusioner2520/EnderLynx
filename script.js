@@ -7754,17 +7754,20 @@ window.electronAPI.onErrorMessage((message) => {
 });
 
 window.electronAPI.onLaunchInstance(async (launch_info) => {
-    console.log(launch_info.instance_id);
-    let instance = new Instance(launch_info.instance_id);
-    showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
-    if (launch_info.world_type == "singleplayer") {
-        await playSingleplayerWorld(instance, launch_info.world_id);
-    } else if (launch_info.world_type == "multiplayer") {
-        await playMultiplayerWorld(instance, launch_info.world_id);
-    } else {
-        await playInstance(instance);
+    try {
+        let instance = new Instance(launch_info.instance_id);
+        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+        if (launch_info.world_type == "singleplayer") {
+            await playSingleplayerWorld(instance, launch_info.world_id);
+        } else if (launch_info.world_type == "multiplayer") {
+            await playMultiplayerWorld(instance, launch_info.world_id);
+        } else {
+            await playInstance(instance);
+        }
+        showSpecificInstanceContent(instance.refresh(), launch_info.world_type ? "worlds" : "content");
+    } catch (e) {
+        displayError(translate("app.launch_error"));
     }
-    showSpecificInstanceContent(instance.refresh(), launch_info.world_type ? "worlds" : "content");
 });
 
 class MultiSelect {

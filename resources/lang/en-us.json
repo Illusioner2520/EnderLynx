@@ -691,5 +691,6 @@
     "app.home.mc_news": "Minecraft News",
     "app.settings.folder_location": "Folder Location",
     "app.settings.folder_location.browse": "Browse",
-    "app.settings.folder_location.description": "Location to store all of your Minecraft instances and data. Only change this if you need to, as you will need to update the java path for all of your instances. Requires app restart after folder is moved."
+    "app.settings.folder_location.description": "Location to store all of your Minecraft instances and data. Only change this if you need to, as you will need to update the java path for all of your instances. Requires app restart after folder is moved.",
+    "app.launch_error": "Unable to launch instance"
 }
