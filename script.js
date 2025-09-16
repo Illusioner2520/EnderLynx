@@ -8631,7 +8631,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type) {
         let element = document.createElement("div");
         element.className = "discover-item";
         if (experimental) {
@@ -8639,13 +8639,13 @@ class ContentSearchEntry {
             element.title = translate("app.discover.experimental");
         }
         element.onclick = () => {
-            displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
+            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader);
         }
         element.setAttribute("tabindex", "0");
         element.setAttribute("role", "button");
         element.onkeydown = (e) => {
             if (e.key == "Enter" || e.key == " ") {
-                displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
+                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader);
             }
         }
         this.element = element;
@@ -8972,7 +8972,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             let e = apiresult.hits[i];
             let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
                 installButtonClick(project_type, "modrinth", i.categories, i.icon_url, i.title, i.author, i.versions, i.project_id, instance_id, button, null)
-            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id));
+            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id), false, project_type);
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -9073,7 +9073,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             let e = apiresult.data[i];
             let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
                 installButtonClick(project_type, "curseforge", [], e.thumbnailUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
-            }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"));
+            }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type);
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -9319,7 +9319,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     checkForIncompatibilities();
                 }
             }
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment);
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment, project_type);
             e.entry = entry;
             element.appendChild(entry.element);
         }
