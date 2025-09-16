@@ -3414,11 +3414,22 @@ async function showHomeContent(oldEle) {
                             "content": translate("app.worlds.delete.confirm")
                         }
                     ], [], async () => {
-                        let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
-                        if (success) {
-                            displaySuccess(translate("app.worlds.delete.success").replace("%w", parseMinecraftFormatting(e.name)));
-                        } else {
-                            displayError(translate("app.worlds.delete.fail").replace("%w", parseMinecraftFormatting(e.name)));
+                        if (e.type == "singleplayer") {
+                            let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                            }
+                        } else if (e.type == "multiplayer") {
+                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                            }
                         }
                         homeContent.displayContent();
                     });
@@ -3722,7 +3733,7 @@ async function showHomeContent(oldEle) {
         updateMCNews(mc_news);
     }
 
-    if (!mc_news.article_grid){
+    if (!mc_news.article_grid) {
         getMCNews();
     } else {
         updateMCNews(mc_news);
@@ -6538,7 +6549,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
                             }
                         } else if (e.type == "multiplayer") {
-                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, e.ip, e.index);
+                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
                             if (success) {
                                 ele.remove();
                                 displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
