@@ -6473,7 +6473,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             {
                 "primary_column": {
                     "title": worldsMultiplayer[i].name,
-                    "desc": last_played.getFullYear() < 1950 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
+                    "desc": last_played.getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
                 },
                 "secondary_column": {
                     "title": () => translate("app.worlds.description.multiplayer"),
