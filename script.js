@@ -1137,6 +1137,9 @@ class MinecraftAccountSwitcher {
             }
         }
         this.setPlayerInfo();
+        if (currentTab == "my_account") {
+            myAccountContent.displayContent();
+        }
     }
 }
 
