@@ -361,7 +361,7 @@ body.compact .sidebar {
     background-color: var(--color-1t);
     width: max-content;
     cursor: pointer;
-    transition: background-color .25s;
+    transition: background-color .25s, scale .1s;
     display: flex;
     gap: 8px;
     align-items: center;
@@ -369,6 +369,10 @@ body.compact .sidebar {
 
 .add-player:hover {
     background-color: var(--color-2t);
+}
+
+.add-player:active {
+    scale: .95;
 }
 
 .add-content-button {
