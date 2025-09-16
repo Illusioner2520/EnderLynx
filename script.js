@@ -3970,6 +3970,7 @@ function showMyAccountContent(e) {
             }
             skinEle.className = "my-account-option";
             skinEle.classList.add("skin");
+            skinEle.title = e.name;
             skinEle.setAttribute("role", "button");
             skinEle.setAttribute("tabindex", 0);
             let skinMore = document.createElement("button");
@@ -4063,6 +4064,7 @@ function showMyAccountContent(e) {
                     let skinEle = document.createElement("button");
                     skinEle.className = "my-account-option";
                     skinEle.classList.add("default-skin");
+                    skinEle.title = e.name;
                     let equipSkin = async () => {
                         loader.style.display = "block";
                         skinImg.style.display = "none";
@@ -4169,6 +4171,7 @@ function showMyAccountContent(e) {
                 capeImg.style.display = "block";
             }
             capeEle.className = "my-account-option";
+            capeEle.title = e.cape_name;
             capeEle.classList.add("cape");
             let capeImg = document.createElement("img");
             extractImageRegionToDataURL(processRelativePath(`./minecraft/capes/${e.cape_id}.png`), 1, 1, 10, 16, (e) => {
@@ -4210,6 +4213,7 @@ function showMyAccountContent(e) {
         let capeEle = document.createElement("button");
         capeEle.className = "my-account-option";
         capeEle.classList.add("cape");
+        capeEle.title = translate("app.wardrobe.no_cape");
         let capeImg = document.createElement("div");
         capeImg.classList.add("option-image");
         capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
