@@ -1137,6 +1137,9 @@ class MinecraftAccountSwitcher {
             }
         }
         this.setPlayerInfo();
+        if (currentTab == "my_account") {
+            myAccountContent.displayContent();
+        }
     }
 }
 
@@ -2020,6 +2023,21 @@ class ContentList {
                                 "content": e.dialog_button
                             }
                         ], [], async () => {
+                            if (e.dont_loop) {
+                                let eles = [];
+                                let infos = [];
+                                for (let i = 0; i < this.checkBoxes.length; i++) {
+                                    let c = this.checkBoxes[i];
+                                    if (c.element.checked && isNotDisplayNone(c.element)) {
+                                        eles.push(c.element.parentElement);
+                                        infos.push(c.content_info);
+                                    }
+                                }
+                                e.func(eles, infos);
+                                this.uncheckCheckboxes();
+                                this.figureOutMainCheckedState();
+                                return;
+                            }
                             for (let i = 0; i < this.checkBoxes.length; i++) {
                                 let c = this.checkBoxes[i];
                                 if (c.element.checked && isNotDisplayNone(c.element)) {
@@ -2029,6 +2047,21 @@ class ContentList {
                             this.uncheckCheckboxes();
                             this.figureOutMainCheckedState();
                         });
+                        return;
+                    }
+                    if (e.dont_loop) {
+                        let eles = [];
+                        let infos = [];
+                        for (let i = 0; i < this.checkBoxes.length; i++) {
+                            let c = this.checkBoxes[i];
+                            if (c.element.checked && isNotDisplayNone(c.element)) {
+                                eles.push(c.element.parentElement);
+                                infos.push(c.content_info);
+                            }
+                        }
+                        e.func(eles, infos);
+                        this.uncheckCheckboxes();
+                        this.figureOutMainCheckedState();
                         return;
                     }
                     for (let i = 0; i < this.checkBoxes.length; i++) {
@@ -3226,6 +3259,9 @@ async function toggleMicrosoftSignIn() {
     try {
         let newData = await window.electronAPI.triggerMicrosoftLogin();
         let players = data.getProfiles().map(e => e.uuid);
+        if (!newData.access_token) throw new Error();
+        if (!newData.refresh_token) throw new Error();
+        if (!newData.client_id) throw new Error();
         if (players.includes(newData.uuid)) {
             let player = data.getProfileFromUUID(newData.uuid);
             player.setDefault();
@@ -3246,6 +3282,7 @@ async function toggleMicrosoftSignIn() {
             accountSwitcher.reloadHeads();
         }
     } catch (e) {
+        if (e == "error.gui.closed") return;
         displayError(translate("app.login_error"));
     }
 }
@@ -3414,11 +3451,22 @@ async function showHomeContent(oldEle) {
                             "content": translate("app.worlds.delete.confirm")
                         }
                     ], [], async () => {
-                        let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
-                        if (success) {
-                            displaySuccess(translate("app.worlds.delete.success").replace("%w", parseMinecraftFormatting(e.name)));
-                        } else {
-                            displayError(translate("app.worlds.delete.fail").replace("%w", parseMinecraftFormatting(e.name)));
+                        if (e.type == "singleplayer") {
+                            let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                            }
+                        } else if (e.type == "multiplayer") {
+                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
+                            if (success) {
+                                ele.remove();
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                            }
                         }
                         homeContent.displayContent();
                     });
@@ -3722,7 +3770,7 @@ async function showHomeContent(oldEle) {
         updateMCNews(mc_news);
     }
 
-    if (!mc_news.article_grid){
+    if (!mc_news.article_grid) {
         getMCNews();
     } else {
         updateMCNews(mc_news);
@@ -3922,6 +3970,7 @@ function showMyAccountContent(e) {
             }
             skinEle.className = "my-account-option";
             skinEle.classList.add("skin");
+            skinEle.title = e.name;
             skinEle.setAttribute("role", "button");
             skinEle.setAttribute("tabindex", 0);
             let skinMore = document.createElement("button");
@@ -4015,6 +4064,7 @@ function showMyAccountContent(e) {
                     let skinEle = document.createElement("button");
                     skinEle.className = "my-account-option";
                     skinEle.classList.add("default-skin");
+                    skinEle.title = e.name;
                     let equipSkin = async () => {
                         loader.style.display = "block";
                         skinImg.style.display = "none";
@@ -4121,6 +4171,7 @@ function showMyAccountContent(e) {
                 capeImg.style.display = "block";
             }
             capeEle.className = "my-account-option";
+            capeEle.title = e.cape_name;
             capeEle.classList.add("cape");
             let capeImg = document.createElement("img");
             extractImageRegionToDataURL(processRelativePath(`./minecraft/capes/${e.cape_id}.png`), 1, 1, 10, 16, (e) => {
@@ -4162,6 +4213,7 @@ function showMyAccountContent(e) {
         let capeEle = document.createElement("button");
         capeEle.className = "my-account-option";
         capeEle.classList.add("cape");
+        capeEle.title = translate("app.wardrobe.no_cape");
         let capeImg = document.createElement("div");
         capeImg.classList.add("option-image");
         capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
@@ -6425,7 +6477,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             {
                 "primary_column": {
                     "title": worldsMultiplayer[i].name,
-                    "desc": last_played.getFullYear() < 1950 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
+                    "desc": last_played.getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
                 },
                 "secondary_column": {
                     "title": () => translate("app.worlds.description.multiplayer"),
@@ -6528,23 +6580,36 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                     "title": translate("app.worlds.selection.delete"),
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "danger": true,
-                    "func": async (ele, e) => {
-                        if (e.type == "singleplayer") {
-                            let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
-                            if (success) {
-                                ele.remove();
-                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                            } else {
-                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                    "dont_loop": true,
+                    "func": async (eles, es) => {
+                        let ips = [];
+                        let indexes = [];
+                        let elesm = [];
+                        let names = [];
+                        for (let i = 0; i < es.length; i++) {
+                            let e = es[i];
+                            if (e.type == "singleplayer") {
+                                let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                                if (success) {
+                                    eles[i].remove();
+                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                                } else {
+                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                                }
+                            } else if (e.type == "multiplayer") {
+                                ips.push(e.ip);
+                                indexes.push(e.index);
+                                elesm.push(eles[i]);
+                                names.push(e.name);
                             }
-                        } else if (e.type == "multiplayer") {
-                            let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, e.ip, e.index);
-                            if (success) {
-                                ele.remove();
-                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                            } else {
-                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
-                            }
+                        }
+                        if (!ips.length) return;
+                        let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, ips, indexes);
+                        if (success) {
+                            elesm.forEach(e => e.remove());
+                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(names.join(", "))));
+                        } else {
+                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(names.join(", "))));
                         }
                     },
                     "show_confirmation_dialog": true,
@@ -7689,17 +7754,20 @@ window.electronAPI.onErrorMessage((message) => {
 });
 
 window.electronAPI.onLaunchInstance(async (launch_info) => {
-    console.log(launch_info.instance_id);
-    let instance = new Instance(launch_info.instance_id);
-    showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
-    if (launch_info.world_type == "singleplayer") {
-        await playSingleplayerWorld(instance, launch_info.world_id);
-    } else if (launch_info.world_type == "multiplayer") {
-        await playMultiplayerWorld(instance, launch_info.world_id);
-    } else {
-        await playInstance(instance);
+    try {
+        let instance = new Instance(launch_info.instance_id);
+        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+        if (launch_info.world_type == "singleplayer") {
+            await playSingleplayerWorld(instance, launch_info.world_id);
+        } else if (launch_info.world_type == "multiplayer") {
+            await playMultiplayerWorld(instance, launch_info.world_id);
+        } else {
+            await playInstance(instance);
+        }
+        showSpecificInstanceContent(instance.refresh(), launch_info.world_type ? "worlds" : "content");
+    } catch (e) {
+        displayError(translate("app.launch_error"));
     }
-    showSpecificInstanceContent(instance.refresh(), launch_info.world_type ? "worlds" : "content");
 });
 
 class MultiSelect {
@@ -8566,7 +8634,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type) {
         let element = document.createElement("div");
         element.className = "discover-item";
         if (experimental) {
@@ -8574,13 +8642,13 @@ class ContentSearchEntry {
             element.title = translate("app.discover.experimental");
         }
         element.onclick = () => {
-            displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
+            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader);
         }
         element.setAttribute("tabindex", "0");
         element.setAttribute("role", "button");
         element.onkeydown = (e) => {
             if (e.key == "Enter" || e.key == " ") {
-                displayContentInfo(source, source_id, instance_id, vanilla_version, loader);
+                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader);
             }
         }
         this.element = element;
@@ -8907,7 +8975,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             let e = apiresult.hits[i];
             let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
                 installButtonClick(project_type, "modrinth", i.categories, i.icon_url, i.title, i.author, i.versions, i.project_id, instance_id, button, null)
-            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id));
+            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id), false, project_type);
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -9008,7 +9076,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             let e = apiresult.data[i];
             let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
                 installButtonClick(project_type, "curseforge", [], e.thumbnailUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
-            }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"));
+            }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type);
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -9254,7 +9322,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     checkForIncompatibilities();
                 }
             }
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment);
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment, project_type);
             e.entry = entry;
             element.appendChild(entry.element);
         }

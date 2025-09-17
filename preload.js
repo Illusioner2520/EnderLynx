@@ -477,6 +477,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getWorlds,
     getSinglePlayerWorlds,
     deleteServer: async (instance_id, ip, index) => {
+        console.log("instance_id:", instance_id);
+        console.log("ip:", ip);
+        console.log("index:", index);
         let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
         let serversDatPath = path.resolve(patha, 'servers.dat');
 
@@ -2345,15 +2348,13 @@ async function convertToIco(input, outputPath) {
 
 function getWorld(levelDatPath) {
     const buffer = fs.readFileSync(levelDatPath);
-    const decompressed = zlib.gunzipSync(buffer); // Decompress the GZip data
+    const decompressed = zlib.gunzipSync(buffer);
 
-    const data = nbt.parseUncompressed(decompressed); // Synchronous parsing
+    const data = nbt.parseUncompressed(decompressed);
     const levelData = data.value.Data.value;
 
     const parentFolder = path.basename(path.dirname(levelDatPath));
     const grandparentFolder = path.dirname(path.dirname(levelDatPath));
-
-    console.log(levelData);
 
     let seed = null;
     try {
@@ -2410,9 +2411,7 @@ function getWorlds(patha) {
         try {
 
             worlds.push(getWorld(levelDatPath));
-        } catch (e) {
-            console.error(`Failed to parse level.dat for world ${dir.name}:`, e);
-        }
+        } catch (e) {}
     }
     worldDirs.closeSync();
     return worlds;
