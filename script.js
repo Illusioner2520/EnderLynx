@@ -11641,7 +11641,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
     content_loaders.forEach(e => {
         if (plugin_loaders.includes(e)) count++;
     });
-    if (count == content_loaders.length) {
+    if (count == content_loaders.length && content_loaders.length) {
         let dialog = new Dialog();
         dialog.showDialog(translate("app.discover.plugin.title"), "notice", translate("app.discover.plugin.description"), [
             {
