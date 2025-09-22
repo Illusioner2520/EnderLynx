@@ -4639,3 +4639,8 @@ body.offline #offline-notice {
     display: none;
     content: none;
 }
+
+.def_opts_actions {
+    display: flex;
+    gap: 8px;
+}

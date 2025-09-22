@@ -356,7 +356,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     updateOptionsTXT: (instance_id, key, value) => {
-        console.log("Updating " + key + " to " + value);
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
         let lines = [];
         if (fs.existsSync(optionsPath)) {
@@ -1969,19 +1968,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getInstanceOptions: (instance_id) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
-        if (!fs.existsSync(optionsPath)) return [];
-        const lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
-        const options = [];
-        for (const line of lines) {
-            if (!line.trim() || line.trim().startsWith("#")) continue;
-            const idx = line.indexOf(":");
-            if (idx === -1) continue;
-            const key = line.slice(0, idx).trim();
-            const value = line.slice(idx + 1).trim();
-            options.push({ key, value });
-        }
-        return options;
+        return getOptions(optionsPath);
     },
+    getOptions,
     importContent,
     getAllCurseforgeFiles: async (project_id) => {
         let first_pre_json = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=50&sort=dateCreated&sortDescending=true&removeAlphas=false`);
@@ -2042,10 +2031,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let base_path_name = instance_id;
         let current_count = 1;
 
-        let iconPath = path.resolve(userPath, "temp_icons", instance_id + '.ico');
+        let iconPath = path.resolve(userPath, "icons", instance_id + '.ico');
 
         while (fs.existsSync(iconPath)) {
-            iconPath = path.resolve(userPath, "temp_icons", base_path_name + "_" + current_count + ".ico");
+            iconPath = path.resolve(userPath, "icons", base_path_name + "_" + current_count + ".ico");
             current_count++;
         }
 
@@ -2274,7 +2263,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         for (const entry of entries) {
             const srcPath = path.join(src, entry.name);
             const destPath = path.join(dest, entry.name);
-            
+
             const percent = Math.round((completed / total) * 100);
             ipcRenderer.send('progress-update', `Moving User Path`, percent, `Copying ${entry.name} (${completed + 1} of ${total})`);
 
@@ -2300,6 +2289,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         await ipcRenderer.invoke("set-user-path", dest, src);
         return true;
+    },
+    generateOptionsTXT: (values) => {
+        const tempDir = path.resolve(userPath, "temp");
+        fs.mkdirSync(tempDir, { recursive: true });
+        const filePath = path.join(tempDir, `options_${Date.now()}.txt`);
+        const lines = [];
+        for (const { key, value } of values) {
+            lines.push(`${key}:${value}`);
+        }
+        fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
+        return filePath;
     }
 });
 
@@ -2411,7 +2411,7 @@ function getWorlds(patha) {
         try {
 
             worlds.push(getWorld(levelDatPath));
-        } catch (e) {}
+        } catch (e) { }
     }
     worldDirs.closeSync();
     return worlds;
@@ -3126,4 +3126,19 @@ function compareVersions(v1, v2) {
         if (num1 > num2) return 1;
     }
     return 0;
+}
+
+function getOptions(optionsPath) {
+    if (!fs.existsSync(optionsPath)) return [];
+    const lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
+    const options = [];
+    for (const line of lines) {
+        if (!line.trim() || line.trim().startsWith("#")) continue;
+        const idx = line.indexOf(":");
+        if (idx === -1) continue;
+        const key = line.slice(0, idx).trim();
+        const value = line.slice(idx + 1).trim();
+        options.push({ key, value });
+    }
+    return options;
 }

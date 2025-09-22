@@ -2701,141 +2701,205 @@ settingsButtonEle.onclick = () => {
     let values = db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version");
     let def_opts = document.createElement("div");
     def_opts.className = "option-list";
-    for (let i = 0; i < values.length; i++) {
-        let e = values[i];
-        let item = document.createElement("div");
-        item.className = "option-item";
-        values[i].element = item;
-
-        let titleElement = document.createElement("div");
-        titleElement.className = "option-title";
-        titleElement.innerHTML = e.key;
-        item.appendChild(titleElement);
-
-        let onChange = (v) => {
-            values[i].value = (type == "text" ? '"' + v + '"' : v);
-            if (defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
-                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
-                setDefaultButton.onclick = onRemove;
-            } else {
-                setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
-                setDefaultButton.onclick = onSet;
-            }
-        }
-
-        let oldvalue = e.value;
-
-        let type = "unknown";
-        if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
-            type = "number";
-        }
-        if (e.value == "false" || e.value == "true") {
-            type = "boolean";
-        }
-        if (e.value.startsWith('"') && e.value.endsWith('"')) {
-            type = "text";
-        }
-        if (e.value.startsWith("key.")) {
-            type = "key";
-        }
-        let inputElement;
-        item.setAttribute("data-type", type);
-        if (type == "text") {
-            inputElement = document.createElement("input");
-            inputElement.className = "option-input";
-            inputElement.value = e.value.slice(1, -1);
-            inputElement.onchange = () => {
-                defaultOptions.setDefault(e.key, '"' + inputElement.value + '"');
-                displaySuccess(translate("app.options.updated_default"));
-                values[i].value = '"' + inputElement.value + '"';
-                oldvalue = inputElement.value;
-                onChange(inputElement.value);
-            }
-            item.appendChild(inputElement);
-        } else if (type == "number") {
-            inputElement = document.createElement("input");
-            inputElement.className = "option-input";
-            inputElement.value = e.value;
-            inputElement.type = "number";
-            inputElement.onchange = () => {
-                defaultOptions.setDefault(e.key, inputElement.value);
-                displaySuccess(translate("app.options.updated_default"));
-                values[i].value = inputElement.value;
-                oldvalue = inputElement.value;
-                onChange(inputElement.value);
-            }
-            item.appendChild(inputElement);
-        } else if (type == "boolean") {
-            let inputElement1 = document.createElement("div");
-            inputElement1.className = "option-input";
-            inputElement = new SearchDropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
-                defaultOptions.setDefault(e.key, v);
-                displaySuccess(translate("app.options.updated_default"));
-                values[i].value = v;
-                oldvalue = v;
-                onChange(v);
-            });
-            item.appendChild(inputElement1);
-        } else if (type == "unknown") {
-            inputElement = document.createElement("input");
-            inputElement.className = "option-input";
-            inputElement.value = e.value;
-            inputElement.onchange = () => {
-                defaultOptions.setDefault(e.key, inputElement.value);
-                displaySuccess(translate("app.options.updated_default"));
-                values[i].value = inputElement.value;
-                oldvalue = inputElement.value;
-                onChange(inputElement.value);
-            }
-            item.appendChild(inputElement);
-        } else if (type == "key") {
-            inputElement = document.createElement("button");
-            inputElement.className = "option-key-input";
-            inputElement.value = e.value;
-            inputElement.setAttribute("data-key", e.key);
-            inputElement.innerHTML = keys[e.value] ? keys[e.value] : e.value;
-            inputElement.onclick = () => {
-                [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
-                    e.classList.remove("selected");
-                });
-                inputElement.classList.add("selected");
-                selectedKeySelect = inputElement;
-                selectedKeySelectFunction = (v) => {
-                    onChange(v);
+    let generateUIForOptions = (values) => {
+        def_opts.innerHTML = "";
+        for (let i = 0; i < values.length; i++) {
+            let e = values[i];
+            let item = document.createElement("div");
+            item.className = "option-item";
+            values[i].element = item;
+    
+            let titleElement = document.createElement("div");
+            titleElement.className = "option-title";
+            titleElement.innerHTML = e.key;
+            item.appendChild(titleElement);
+    
+            let onChange = (v) => {
+                values[i].value = (type == "text" ? '"' + v + '"' : v);
+                if (defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
+                    setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                    setDefaultButton.onclick = onRemove;
+                } else {
+                    setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+                    setDefaultButton.onclick = onSet;
                 }
             }
-            item.appendChild(inputElement);
-        }
-
-        let setDefaultButton = document.createElement("button");
-        setDefaultButton.className = "option-button";
-        setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
-
-        let onSet = () => {
-            defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
-            setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
-            setDefaultButton.onclick = onRemove;
-            displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
-        }
-
-        setDefaultButton.onclick = onSet;
-
-        let onRemove = () => {
-            defaultOptions.deleteDefault(e.key);
+    
+            let type = "unknown";
+            if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
+                type = "number";
+            }
+            if (e.value == "false" || e.value == "true") {
+                type = "boolean";
+            }
+            if (e.value.startsWith('"') && e.value.endsWith('"')) {
+                type = "text";
+            }
+            if (e.value.startsWith("key.")) {
+                type = "key";
+            }
+            let inputElement;
+            item.setAttribute("data-type", type);
+            if (type == "text") {
+                inputElement = document.createElement("input");
+                inputElement.className = "option-input";
+                inputElement.value = e.value.slice(1, -1);
+                inputElement.onchange = () => {
+                    defaultOptions.setDefault(e.key, '"' + inputElement.value + '"');
+                    displaySuccess(translate("app.options.updated_default"));
+                    values[i].value = '"' + inputElement.value + '"';
+                    oldvalue = inputElement.value;
+                    onChange(inputElement.value);
+                }
+                item.appendChild(inputElement);
+            } else if (type == "number") {
+                inputElement = document.createElement("input");
+                inputElement.className = "option-input";
+                inputElement.value = e.value;
+                inputElement.type = "number";
+                inputElement.onchange = () => {
+                    defaultOptions.setDefault(e.key, inputElement.value);
+                    displaySuccess(translate("app.options.updated_default"));
+                    values[i].value = inputElement.value;
+                    oldvalue = inputElement.value;
+                    onChange(inputElement.value);
+                }
+                item.appendChild(inputElement);
+            } else if (type == "boolean") {
+                let inputElement1 = document.createElement("div");
+                inputElement1.className = "option-input";
+                inputElement = new SearchDropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
+                    defaultOptions.setDefault(e.key, v);
+                    displaySuccess(translate("app.options.updated_default"));
+                    values[i].value = v;
+                    oldvalue = v;
+                    onChange(v);
+                });
+                item.appendChild(inputElement1);
+            } else if (type == "unknown") {
+                inputElement = document.createElement("input");
+                inputElement.className = "option-input";
+                inputElement.value = e.value;
+                inputElement.onchange = () => {
+                    defaultOptions.setDefault(e.key, inputElement.value);
+                    displaySuccess(translate("app.options.updated_default"));
+                    values[i].value = inputElement.value;
+                    oldvalue = inputElement.value;
+                    onChange(inputElement.value);
+                }
+                item.appendChild(inputElement);
+            } else if (type == "key") {
+                inputElement = document.createElement("button");
+                inputElement.className = "option-key-input";
+                inputElement.value = e.value;
+                inputElement.setAttribute("data-key", e.key);
+                inputElement.innerHTML = keys[e.value] ? keys[e.value] : e.value;
+                inputElement.onclick = () => {
+                    [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
+                        e.classList.remove("selected");
+                    });
+                    inputElement.classList.add("selected");
+                    selectedKeySelect = inputElement;
+                    selectedKeySelectFunction = (v) => {
+                        onChange(v);
+                    }
+                }
+                item.appendChild(inputElement);
+            }
+    
+            let setDefaultButton = document.createElement("button");
+            setDefaultButton.className = "option-button";
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+    
+            let onSet = () => {
+                defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                setDefaultButton.onclick = onRemove;
+                displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
+            }
+    
             setDefaultButton.onclick = onSet;
-            displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
-        }
+    
+            let onRemove = () => {
+                defaultOptions.deleteDefault(e.key);
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+                setDefaultButton.onclick = onSet;
+                displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
+            }
+    
+            if (defaultOptions.getDefault(e.key) == e.value) {
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                setDefaultButton.onclick = onRemove;
+            }
+    
+            item.appendChild(setDefaultButton);
+    
+            def_opts.appendChild(item);
+        };
+    }
+    generateUIForOptions(values);
 
-        if (defaultOptions.getDefault(e.key) == e.value) {
-            setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
-            setDefaultButton.onclick = onRemove;
-        }
+    let def_opts_buttons = document.createElement("div");
+    def_opts_buttons.className = "def_opts_actions";
 
-        item.appendChild(setDefaultButton);
+    let importButton = document.createElement("button");
+    importButton.innerHTML = '<i class="fa-solid fa-file-import"></i> ' + translate("app.settings.def_opts.import");
+    importButton.onclick = () => {
+        let importDialog = new Dialog();
+        importDialog.showDialog(translate("app.settings.def_opts.import.title"), "form", [
+            {
+                "type": "notice",
+                "content": translate("app.settings.def_opts.import.description")
+            },
+            {
+                "type": "text",
+                "name": translate("app.settings.def_opts.import.location"),
+                "id": "options_txt_location",
+                "buttons": [
+                    {
+                        "name": translate("app.settings.def_opts.import.browse"),
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.electronAPI.triggerFileImportBrowseWithOptions(v, 0, ["txt"], "options.txt");
+                            if (newValue) i.value = newValue;
+                        }
+                    }
+                ]
+            }
+        ], [
+            {
+                "type": "confirm",
+                "content": translate("app.settings.def_opts.import.confirm")
+            },
+            {
+                "type": "cancel",
+                "content": translate("app.settings.def_opts.import.cancel")
+            }
+        ], [], (v) => {
+            let info = {};
+            v.forEach(e => info[e.id] = e.value);
+            let options = window.electronAPI.getOptions(info.options_txt_location);
+            db.prepare("DELETE FROM options_defaults WHERE key != ?").run("version");
+            let defaultOptions = new DefaultOptions();
+            console.log(options);
+            options.forEach(e => {
+                if (e.key == "version") return;
+                defaultOptions.setDefault(e.key, e.value);
+            });
+            generateUIForOptions(options);
+        })
+    }
+    importButton.className = "bug-button";
+    def_opts_buttons.appendChild(importButton);
 
-        def_opts.appendChild(item);
-    };
+    let exportButton = document.createElement("button");
+    exportButton.innerHTML = '<i class="fa-solid fa-file-export"></i> ' + translate("app.settings.def_opts.export");
+    exportButton.onclick = () => {
+        let file_location = window.electronAPI.generateOptionsTXT(values);
+        openShareDialogForFile(file_location);
+    }
+    exportButton.className = "bug-button";
+    def_opts_buttons.appendChild(exportButton);
 
     let dialog = new Dialog();
     let java_installations = [{
@@ -3180,6 +3244,11 @@ settingsButtonEle.onclick = () => {
         {
             "type": "notice",
             "content": translate("app.settings.def_opts.notice"),
+            "tab": "options"
+        },
+        {
+            "type": "notice",
+            "content": def_opts_buttons,
             "tab": "options"
         },
         {

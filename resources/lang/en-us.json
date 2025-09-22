@@ -692,5 +692,13 @@
     "app.settings.folder_location": "Folder Location",
     "app.settings.folder_location.browse": "Browse",
     "app.settings.folder_location.description": "Location to store all of your Minecraft instances and data. Only change this if you need to, as you will need to update the java path for all of your instances. Requires app restart after folder is moved.",
-    "app.launch_error": "Unable to launch instance"
+    "app.launch_error": "Unable to launch instance",
+    "app.settings.def_opts.import": "Import from options.txt",
+    "app.settings.def_opts.export": "Export to options.txt",
+    "app.settings.def_opts.import.title": "Import Options from options.txt",
+    "app.settings.def_opts.import.description": "Importing options will remove the default options that you have already selected.",
+    "app.settings.def_opts.import.location": "options.txt Location",
+    "app.settings.def_opts.import.browse": "Browse",
+    "app.settings.def_opts.import.cancel": "Cancel",
+    "app.settings.def_opts.import.confirm": "Import"
 }
