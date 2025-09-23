@@ -2708,12 +2708,12 @@ settingsButtonEle.onclick = () => {
             let item = document.createElement("div");
             item.className = "option-item";
             values[i].element = item;
-    
+
             let titleElement = document.createElement("div");
             titleElement.className = "option-title";
             titleElement.innerHTML = e.key;
             item.appendChild(titleElement);
-    
+
             let onChange = (v) => {
                 values[i].value = (type == "text" ? '"' + v + '"' : v);
                 if (defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
@@ -2724,7 +2724,7 @@ settingsButtonEle.onclick = () => {
                     setDefaultButton.onclick = onSet;
                 }
             }
-    
+
             let type = "unknown";
             if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
                 type = "number";
@@ -2806,34 +2806,34 @@ settingsButtonEle.onclick = () => {
                 }
                 item.appendChild(inputElement);
             }
-    
+
             let setDefaultButton = document.createElement("button");
             setDefaultButton.className = "option-button";
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
-    
+
             let onSet = () => {
                 defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 setDefaultButton.onclick = onRemove;
                 displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
             }
-    
+
             setDefaultButton.onclick = onSet;
-    
+
             let onRemove = () => {
                 defaultOptions.deleteDefault(e.key);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
                 setDefaultButton.onclick = onSet;
                 displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
             }
-    
+
             if (defaultOptions.getDefault(e.key) == e.value) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 setDefaultButton.onclick = onRemove;
             }
-    
+
             item.appendChild(setDefaultButton);
-    
+
             def_opts.appendChild(item);
         };
     }
@@ -9915,6 +9915,7 @@ let contentInfoHistory = [];
 let contentInfoIndex = 0;
 
 async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false, content_list_to_update) {
+    if (!content_source) return;
     if (!disableAddToHistory) {
         if (contentInfo.open) {
             contentInfoHistory = contentInfoHistory.slice(0, contentInfoIndex + 1);
@@ -9927,57 +9928,59 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     }
     let instance_content = [];
     if (instance_id) instance_content = (new Instance(instance_id)).getContent();
-    let content_ids = instance_content.map(e => e.source_info);
+
+    contentInfo.innerHTML = "";
+    contentInfo.showModal();
+    let dialogContextMenu = new ContextMenu();
+    contentInfo.appendChild(dialogContextMenu.element);
+    let contentWrapper = document.createElement("div");
+    contentWrapper.className = "content-wrapper";
+    let contentNav = document.createElement("div");
+    contentNav.className = "content-nav";
+    contentWrapper.appendChild(contentNav);
+    let buttonBack = document.createElement("button");
+    buttonBack.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+    buttonBack.className = "content-nav-button";
+    if (contentInfoIndex <= 0) {
+        buttonBack.classList.add("disabled");
+    } else {
+        buttonBack.onclick = () => {
+            contentInfoIndex--;
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+        }
+    }
+    contentNav.appendChild(buttonBack);
+    let buttonForward = document.createElement("button");
+    buttonForward.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
+    buttonForward.className = "content-nav-button";
+    if (contentInfoIndex >= contentInfoHistory.length - 1) {
+        buttonForward.classList.add("disabled");
+    } else {
+        buttonForward.onclick = () => {
+            contentInfoIndex++;
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+        }
+    }
+    contentNav.appendChild(buttonForward);
+    let contentX = document.createElement("button");
+    contentX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    contentX.className = "content-x";
+    contentX.onclick = () => {
+        contentInfo.close();
+    }
+    contentNav.appendChild(contentX);
+    contentInfo.appendChild(contentWrapper);
+    let loading = new LoadingContainer();
+    loading.className = "loading-container";
+    loading.element.style.height = "100%";
+    contentWrapper.appendChild(loading.element);
+
+    let content = {};
     if (content_source == "modrinth") {
-        contentInfo.innerHTML = "";
-        contentInfo.showModal();
-        let dialogContextMenu = new ContextMenu();
-        contentInfo.appendChild(dialogContextMenu.element);
-        let contentWrapper = document.createElement("div");
-        contentWrapper.className = "content-wrapper";
-        let contentNav = document.createElement("div");
-        contentNav.className = "content-nav";
-        contentWrapper.appendChild(contentNav);
-        let buttonBack = document.createElement("button");
-        buttonBack.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
-        buttonBack.className = "content-nav-button";
-        if (contentInfoIndex <= 0) {
-            buttonBack.classList.add("disabled");
-        } else {
-            buttonBack.onclick = () => {
-                contentInfoIndex--;
-                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
-            }
-        }
-        contentNav.appendChild(buttonBack);
-        let buttonForward = document.createElement("button");
-        buttonForward.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
-        buttonForward.className = "content-nav-button";
-        if (contentInfoIndex >= contentInfoHistory.length - 1) {
-            buttonForward.classList.add("disabled");
-        } else {
-            buttonForward.onclick = () => {
-                contentInfoIndex++;
-                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
-            }
-        }
-        contentNav.appendChild(buttonForward);
-        let contentX = document.createElement("button");
-        contentX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-        contentX.className = "content-x";
-        contentX.onclick = () => {
-            contentInfo.close();
-        }
-        contentNav.appendChild(contentX);
-        contentInfo.appendChild(contentWrapper);
-        let loading = new LoadingContainer();
-        loading.className = "loading-container";
-        loading.element.style.height = "100%";
-        contentWrapper.appendChild(loading.element);
-        let content, team_members, versions;
+        let mr_content, team_members, versions;
         try {
             let content_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}`);
-            content = await content_pre_json.json();
+            mr_content = await content_pre_json.json();
             let team_members_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}/members`);
             team_members = await team_members_pre_json.json();
             let versions_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}/version`);
@@ -9988,323 +9991,451 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             });
             return;
         }
-        let author = "";
+        content = mr_content;
+        content.author = "";
         team_members.forEach(e => {
             if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
-                author = e.user.username;
+                content.author = e.user.username;
+            }
+        });
+        content.urls = {};
+        content.urls.source = mr_content.source_url;
+        content.urls.issues = mr_content.issues_url;
+        content.urls.wiki = mr_content.wiki_url;
+        content.urls.discord = mr_content.discord_url;
+        content.urls.donations = mr_content.donation_urls;
+        content.urls.browser = `https://modrinth.com/project/${content.id}`
+        content.description = mr_content.body;
+        content.versions = versions.map(e => ({ ...e, "original_version_info": e }));
+        content.combine_versions_and_loaders = false;
+        content.authors = team_members.map(e => ({ ...e, "browser_url": `https://modrinth.com/user/${e.user.id}` }));
+        content.source = "modrinth";
+    } else if (content_source == "curseforge") {
+        let cf_content, description, versions;
+        try {
+            let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}`);
+            cf_content = await content_pre_json.json();
+            let description_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}/description`);
+            description = await description_pre_json.json();
+            versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
+            if (versions.data) versions = versions.data;
+        } catch (e) {
+            loading.errorOut(e, () => {
+                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, true);
+            });
+            return;
+        }
+        let project_type = "mod";
+        if (cf_content.data.classId == 6) {
+            project_type = "mod";
+        } else if (cf_content.data.classId == 4471) {
+            project_type = "modpack"
+        } else if (cf_content.data.classId == 12) {
+            project_type = "resourcepack";
+        } else if (cf_content.data.classId == 6552) {
+            project_type = "shader"
+        } else if (cf_content.data.classId == 17) {
+            project_type = "world";
+        } else if (cf_content.data.classId == 6945) {
+            project_type = "datapack"
+        }
+        content = {
+            "icon_url": cf_content.data.logo.thumbnailUrl,
+            "title": cf_content.data.name,
+            "project_type": project_type,
+            "downloads": cf_content.data.downloadCount,
+            "source": "curseforge",
+            "updated": cf_content.data.dateModified,
+            "author": cf_content.data.authors[0].name,
+            "loaders": [],
+            "game_versions": [],
+            "id": cf_content.data.id,
+            "urls": {
+                "source": cf_content.data.links.sourceUrl,
+                "wiki": cf_content.data.links.wikiUrl,
+                "issues": cf_content.data.links.issuesUrl,
+                "browser": cf_content.data.links.websiteUrl
+            },
+            "description": description.data,
+            "versions": versions.map(e => ({
+                "game_versions": e.gameVersions,
+                "version_number": e.id,
+                "name": e.displayName,
+                "loaders": [],
+                "date_published": e.dateCreated,
+                "downloads": e.totalDownloads,
+                "original_version_info": e,
+                "changelog": "",
+                "version_type": ["", "release", "beta", "alpha"][e.releaseType],
+                "id": e.id,
+                "is_curseforge_changelog": true
+            })),
+            "combine_versions_and_loaders": true,
+            "authors": cf_content.data.authors.map(e => ({
+                "user": {
+                    "bio": "",
+                    "avatar_url": e.avatarUrl,
+                    "username": e.name,
+                    "id": e.id
+                },
+                "role": "",
+                "browser_url": e.url
+            })),
+            "gallery": cf_content.data.screenshots.map(e => ({
+                "url": e.thumbnailUrl,
+                "raw_url": e.url,
+                "title": e.title,
+                "description": e.description
+            })),
+            "convert_version_ids_to_numbers": true
+        }
+    }
+    loading.element.remove();
+
+    let topBar = document.createElement("div");
+    topBar.classList.add("content-top");
+    let contentImage = document.createElement("img");
+    contentImage.classList.add("content-top-image");
+    contentImage.src = content.icon_url ? content.icon_url : "default.png";
+    topBar.appendChild(contentImage);
+    let contentTopInfo = document.createElement("div");
+    contentTopInfo.classList.add("content-top-info");
+    let contentTopTitle = document.createElement("h1");
+    contentTopTitle.innerHTML = sanitize(content.title);
+    contentTopTitle.classList.add("content-top-title");
+    contentTopInfo.appendChild(contentTopTitle);
+    let contentTopSubInfo = document.createElement("div");
+    contentTopSubInfo.classList.add("content-top-sub-info");
+    let contentTopType = document.createElement("div");
+    contentTopType.classList.add("content-top-sub-info-specific");
+    let type = translate("app.content.mod");
+    if (content.project_type == "modpack") type = translate("app.content.modpack");
+    if (content.project_type == "resourcepack") type = translate("app.content.resource_pack");
+    if (content.project_type == "shader") type = translate("app.content.shader");
+    if (content.project_type == "datapack") type = translate("app.content.data_pack");
+    if (content.project_type == "world") type = translate("app.content.world");
+    contentTopType.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
+    let contentTopDownloads = document.createElement("div");
+    contentTopDownloads.classList.add("content-top-sub-info-specific");
+    contentTopDownloads.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(content.downloads))}`;
+    let contentTopLastUpdated = document.createElement("div");
+    contentTopLastUpdated.classList.add("content-top-sub-info-specific");
+    contentTopLastUpdated.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.updated))}`;
+    contentTopLastUpdated.setAttribute("title", translate("app.discover.last_updated"));
+    contentTopSubInfo.appendChild(contentTopType);
+    contentTopSubInfo.appendChild(contentTopDownloads);
+    contentTopSubInfo.appendChild(contentTopLastUpdated);
+    contentTopInfo.appendChild(contentTopSubInfo);
+    topBar.appendChild(contentTopInfo);
+    let installButton = document.createElement("button");
+    installButton.className = "content-top-install-button";
+    installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
+    installButton.onclick = () => {
+        installButtonClick(content.project_type, content.source, content.loaders, content.icon_url, content.title, content.author, content.game_versions, content.id, instance_id, installButton, contentInfo, null);
+    }
+    let threeDots = document.createElement("button");
+    threeDots.classList.add("content-top-more");
+    threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+    let links = [];
+    if (content.urls.source) {
+        links.push({
+            "icon": '<i class="fa-solid fa-code"></i>',
+            "title": translate("app.discover.view.source"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.source);
             }
         })
-        loading.element.remove();
-        let topBar = document.createElement("div");
-        topBar.classList.add("content-top");
-        let instImg = document.createElement("img");
-        instImg.classList.add("content-top-image");
-        instImg.src = content.icon_url ? content.icon_url : "default.png";
-        topBar.appendChild(instImg);
-        let instTopInfo = document.createElement("div");
-        instTopInfo.classList.add("content-top-info");
-        let instTopTitle = document.createElement("h1");
-        instTopTitle.innerHTML = sanitize(content.title);
-        instTopTitle.classList.add("content-top-title");
-        instTopInfo.appendChild(instTopTitle);
-        let instTopSubInfo = document.createElement("div");
-        instTopSubInfo.classList.add("content-top-sub-info");
-        let instTopVersions = document.createElement("div");
-        instTopVersions.classList.add("content-top-sub-info-specific");
-        let type = translate("app.content.mod");
-        if (content.project_type == "modpack") type = translate("app.content.modpack");
-        if (content.project_type == "resourcepack") type = translate("app.content.resource_pack");
-        if (content.project_type == "shader") type = translate("app.content.shader");
-        if (content.project_type == "datapack") type = translate("app.content.data_pack");
-        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
-        let instTopPlaytime = document.createElement("div");
-        instTopPlaytime.classList.add("content-top-sub-info-specific");
-        instTopPlaytime.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(content.downloads))}`;
-        let instTopLastPlayed = document.createElement("div");
-        instTopLastPlayed.classList.add("content-top-sub-info-specific");
-        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.updated))}`;
-        instTopLastPlayed.setAttribute("title", translate("app.discover.last_updated"));
-        instTopSubInfo.appendChild(instTopVersions);
-        instTopSubInfo.appendChild(instTopPlaytime);
-        instTopSubInfo.appendChild(instTopLastPlayed);
-        instTopInfo.appendChild(instTopSubInfo);
-        topBar.appendChild(instTopInfo);
-        let installButton = document.createElement("button");
-        installButton.className = "content-top-install-button";
-        installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
-        installButton.onclick = () => {
-            installButtonClick(content.project_type, "modrinth", content.loaders, content.icon_url, content.title, author, content.game_versions, content.id, instance_id, installButton, contentInfo, null);
-        }
-        let installedVersion = "";
-        if (content_ids.includes(content.id.toString())) {
-            installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
-            installButton.classList.add("disabled");
-            installButton.onclick = () => { };
-            installedVersion = instance_content[content_ids.indexOf(content.id.toString())].version_id;
-        }
-        if (content.project_type == "modpack" && instance_id) {
-            installedVersion = new Instance(instance_id).installed_version;
-        }
-        let threeDots = document.createElement("button");
-        threeDots.classList.add("content-top-more");
-        threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-        let links = [];
-        if (content.source_url) {
-            links.push({
-                "icon": '<i class="fa-solid fa-code"></i>',
-                "title": translate("app.discover.view.source"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.source_url);
-                }
-            })
-        }
-        if (content.wiki_url) {
-            links.push({
-                "icon": '<i class="fa-solid fa-book-atlas"></i>',
-                "title": translate("app.discover.view.wiki"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.wiki_url);
-                }
-            })
-        }
-        if (content.issues_url) {
-            links.push({
-                "icon": '<i class="fa-solid fa-bug"></i>',
-                "title": translate("app.discover.view.issues"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.issues_url);
-                }
-            })
-        }
-        if (content.discord_url) {
-            links.push({
-                "icon": '<i class="fa-brands fa-discord"></i>',
-                "title": translate("app.discover.view.discord"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.discord_url);
-                }
-            })
-        }
-        if (content.donation_urls) {
-            content.donation_urls.forEach(e => {
-                links.push({
-                    "icon": '<i class="fa-solid fa-hand-holding-dollar"></i>',
-                    "title": e.platform == "Other" ? translate("app.discover.donate") : translate("app.discover.donate.platform", "%p", e.platform),
-                    "func": () => {
-                        window.electronAPI.openInBrowser(e.url);
-                    }
-                })
-            });
-        }
-        let buttons = new ContextMenuButtons([
-            {
-                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
-                "title": translate("app.discover.open_in_browser"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(`https://modrinth.com/project/${content.id}`);
-                }
+    }
+    if (content.urls.wiki) {
+        links.push({
+            "icon": '<i class="fa-solid fa-book-atlas"></i>',
+            "title": translate("app.discover.view.wiki"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.wiki);
             }
-        ].concat(links));
-        let moreMenu = new MoreMenu(threeDots, buttons);
-        if (content.project_type != "modpack" || !instance_id) topBar.appendChild(installButton);
-        else threeDots.style.marginLeft = "auto";
-        topBar.appendChild(threeDots);
-        topBar.appendChild(moreMenu.element);
-        contentWrapper.appendChild(topBar);
-
-        let tabsElement = document.createElement("div");
-        contentWrapper.appendChild(tabsElement);
-        let tabContent = document.createElement("div");
-        tabContent.className = "tab-info";
-        tabContent.style.padding = "10px";
-        contentWrapper.appendChild(tabContent);
-        contentInfo.showModal();
-        tabsElement.style.marginInline = "auto";
-        let tabs = new TabContent(tabsElement, [
-            {
-                "name": translate("app.discover.tabs.description"),
-                "value": "description",
+        })
+    }
+    if (content.urls.issues) {
+        links.push({
+            "icon": '<i class="fa-solid fa-bug"></i>',
+            "title": translate("app.discover.view.issues"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.issues);
+            }
+        })
+    }
+    if (content.urls.discord) {
+        links.push({
+            "icon": '<i class="fa-brands fa-discord"></i>',
+            "title": translate("app.discover.view.discord"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.discord);
+            }
+        })
+    }
+    if (content.urls.donations) {
+        content.urls.donations.forEach(e => {
+            links.push({
+                "icon": '<i class="fa-solid fa-hand-holding-dollar"></i>',
+                "title": e.platform == "Other" ? translate("app.discover.donate") : translate("app.discover.donate.platform", "%p", e.platform),
                 "func": () => {
-                    tabContent.style.paddingTop = "10px";
-                    tabContent.innerHTML = "";
-                    let element = document.createElement("div");
-                    element.className = "markdown-body";
-                    element.style.maxWidth = "700px";
-                    element.style.marginInline = "auto";
-                    tabContent.appendChild(element);
-                    element.innerHTML = parseModrinthMarkdown(content.body);
-                    afterMarkdownParse(instance_id, vanilla_version, loader);
+                    window.electronAPI.openInBrowser(e.url);
                 }
-            },
-            {
-                "name": translate("app.discover.tabs.files"),
-                "value": "files",
-                "func": () => {
-                    tabContent.innerHTML = "";
-                    let topFilters = document.createElement("div");
-                    topFilters.className = "version-file-filters";
-                    let mcVersionFilter = document.createElement("div");
-                    let allGameVersions = Array.from(
-                        new Set(
-                            versions.flatMap(v => v.game_versions)
-                        )
-                    );
-                    if (Array.isArray(minecraftVersions) && minecraftVersions.length > 0) {
-                        allGameVersions.sort((a, b) => {
-                            const ia = minecraftVersions.indexOf(a);
-                            const ib = minecraftVersions.indexOf(b);
-                            if (ia === -1 && ib === -1) return 0;
-                            if (ia === -1) return 1;
-                            if (ib === -1) return -1;
-                            return ia - ib;
-                        });
-                        allGameVersions.reverse();
-                    }
+            })
+        });
+    }
+    let buttons = new ContextMenuButtons([
+        {
+            "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+            "title": translate("app.discover.open_in_browser"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.browser);
+            }
+        }
+    ].concat(links));
+    let moreMenu = new MoreMenu(threeDots, buttons);
+    if (content.project_type != "modpack" || !instance_id) topBar.appendChild(installButton);
+    else threeDots.style.marginLeft = "auto";
+    topBar.appendChild(threeDots);
+    topBar.appendChild(moreMenu.element);
+    contentWrapper.appendChild(topBar);
+    let content_ids = instance_content.map(e => e.source_info);
+    if (content.convert_version_ids_to_numbers) content_ids = content_ids.map(Number);
+    if (content_ids.includes(content.id)) {
+        installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+        installButton.classList.add("disabled");
+        installButton.onclick = () => { };
+        installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
+    }
 
-                    let versionDropdown = new DialogDropdown(
-                        translate("app.discover.game_version"),
-                        [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(
-                            allGameVersions.map(e => ({ "name": e, "value": e }))
-                        ),
-                        mcVersionFilter,
-                        vanilla_version ? vanilla_version : "all",
-                        (v) => {
-                            filterVersions(v, loaderDropdown.value, channelDropdown.value);
-                        }
-                    );
-                    let mcLoaderFilter = document.createElement("div");
-                    let allLoaders = Array.from(
-                        new Set(
-                            versions.flatMap(v => v.loaders)
-                        )
-                    );
-                    let loaderDropdown = new SearchDropdown(translate("app.discover.loader"),
-                        [{
-                            "name": translate("app.discover.loader.all"),
-                            "value": "all"
-                        }].concat(allLoaders.map(e => ({ "name": loaders[e] ? loaders[e] : e, "value": e }))),
-                        mcLoaderFilter, loader ? loader : "all", (v) => {
-                            filterVersions(versionDropdown.value, v, channelDropdown.value);
-                        })
-                    let channelFilter = document.createElement("div");
-                    let channelDropdown = new SearchDropdown(translate("app.discover.channel"), [
-                        {
-                            "name": translate("app.discover.channel.all"),
-                            "value": "all"
-                        },
-                        {
-                            "name": translate("app.discover.channel.release"),
-                            "value": "release"
-                        },
-                        {
-                            "name": translate("app.discover.channel.beta"),
-                            "value": "beta"
-                        },
-                        {
-                            "name": translate("app.discover.channel.alpha"),
-                            "value": "alpha"
-                        }
-                    ], channelFilter, "all", (v) => {
-                        filterVersions(versionDropdown.value, loaderDropdown.value, v);
-                    })
-                    topFilters.appendChild(mcVersionFilter);
-                    if (["modpack", "mod"].includes(content.project_type)) topFilters.appendChild(mcLoaderFilter);
-                    topFilters.appendChild(channelFilter);
-                    tabContent.appendChild(topFilters);
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "version-files-wrapper";
-                    let topBar = document.createElement("div");
-                    topBar.className = "version-file-top";
-                    let names = ["", translate("app.discover.files.name"), translate("app.discover.files.versions"), translate("app.discover.files.loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""];
-                    names.forEach(e => {
-                        let element = document.createElement("div");
-                        element.className = "version-file-column-name";
-                        element.innerHTML = e;
-                        topBar.appendChild(element);
+    let tabsElement = document.createElement("div");
+    contentWrapper.appendChild(tabsElement);
+    let tabContent = document.createElement("div");
+    tabContent.className = "tab-info";
+    tabContent.style.padding = "10px";
+    contentWrapper.appendChild(tabContent);
+    contentInfo.showModal();
+    tabsElement.style.marginInline = "auto";
+    let tabs = new TabContent(tabsElement, [
+        {
+            "name": translate("app.discover.tabs.description"),
+            "value": "description",
+            "func": () => {
+                tabContent.style.paddingTop = "10px";
+                tabContent.innerHTML = "";
+                let element = document.createElement("div");
+                element.className = "markdown-body";
+                element.style.maxWidth = "700px";
+                element.style.marginInline = "auto";
+                tabContent.appendChild(element);
+                element.innerHTML = parseModrinthMarkdown(content.description);
+                afterMarkdownParse(instance_id, vanilla_version, loader);
+            }
+        },
+        {
+            "name": translate("app.discover.tabs.files"),
+            "value": "files",
+            "func": () => {
+                let installedVersion = "";
+                if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+                content_ids = instance_content.map(e => e.source_info);
+                if (content.convert_version_ids_to_numbers) content_ids = content_ids.map(Number);
+                if (content_ids.includes(content.id)) {
+                    installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+                    installButton.classList.add("disabled");
+                    installButton.onclick = () => { };
+                    installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
+                }
+                if (content.project_type == "modpack" && instance_id) {
+                    installedVersion = new Instance(instance_id).installed_version;
+                }
+                if (content.convert_version_ids_to_numbers) installedVersion = Number(installedVersion);
+
+                tabContent.innerHTML = "";
+                let topFilters = document.createElement("div");
+                topFilters.className = "version-file-filters";
+                let mcVersionFilter = document.createElement("div");
+                let allGameVersions = Array.from(
+                    new Set(
+                        content.versions.flatMap(v => v.game_versions)
+                    )
+                );
+                if (Array.isArray(minecraftVersions) && minecraftVersions.length > 0) {
+                    allGameVersions.sort((a, b) => {
+                        const ia = minecraftVersions.indexOf(a);
+                        const ib = minecraftVersions.indexOf(b);
+                        if (ia === -1 && ib === -1) return 0;
+                        if (ia === -1) return 1;
+                        if (ib === -1) return -1;
+                        return ia - ib;
                     });
+                    allGameVersions.reverse();
+                }
 
-                    let notfound = new NoResultsFound();
-                    notfound.element.style.gridColumn = "span 8";
-                    notfound.element.style.display = "none";
-                    notfound.element.style.backgroundColor = "var(--color-1)"
+                if (content.combine_versions_and_loaders) {
+                    allGameVersions = allGameVersions.filter(e => minecraftVersions.includes(e));
+                }
 
-                    let versionInfo = [];
-
-                    let filterVersions = (version, loader_, channel) => {
-                        let count = 0;
-                        versionInfo.forEach(e => {
-                            if (!e.game_versions.includes(version) && version && version != "all") {
-                                e.element.style.display = "none";
-                                return;
-                            }
-                            if (loader_ && !e.loaders.includes(loader_) && (content.project_type == "mod" || content.project_type == "modpack") && loader_ != "all") {
-                                e.element.style.display = "none";
-                                return;
-                            }
-                            if (channel && e.channel != channel && channel != "all") {
-                                e.element.style.display = "none";
-                                return;
-                            }
-                            count++;
-                            e.element.style.display = "grid";
-                        });
-                        if (count == 0) {
-                            notfound.element.style.display = "";
-                            topBar.style.display = "none";
-                        } else {
-                            notfound.element.style.display = "none";
-                            topBar.style.display = "grid";
-                        }
+                let versionDropdown = new DialogDropdown(
+                    translate("app.discover.game_version"),
+                    [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(
+                        allGameVersions.map(e => ({ "name": e, "value": e }))
+                    ),
+                    mcVersionFilter,
+                    vanilla_version ? vanilla_version : "all",
+                    (v) => {
+                        filterVersions(v, loaderDropdown.value, channelDropdown.value);
                     }
+                );
+                let mcLoaderFilter = document.createElement("div");
+                let allLoaders = Array.from(
+                    new Set(
+                        content.versions.flatMap(v => v.loaders)
+                    )
+                );
+                if (content.combine_versions_and_loaders) {
+                    allLoaders = Array.from(
+                        new Set(
+                            content.versions.flatMap(v => v.game_versions)
+                        )
+                    );
+                    allLoaders = allLoaders.filter(e => loaders[e.toLowerCase()]);
+                    allLoaders = allLoaders.map(e => e.toLowerCase());
+                }
+                let loaderDropdown = new SearchDropdown(translate("app.discover.loader"),
+                    [{
+                        "name": translate("app.discover.loader.all"),
+                        "value": "all"
+                    }].concat(allLoaders.map(e => ({ "name": loaders[e] ? loaders[e] : e, "value": e }))),
+                    mcLoaderFilter, loader ? loader : "all", (v) => {
+                        filterVersions(versionDropdown.value, v, channelDropdown.value);
+                    })
+                let channelFilter = document.createElement("div");
+                let channelDropdown = new SearchDropdown(translate("app.discover.channel"), [
+                    {
+                        "name": translate("app.discover.channel.all"),
+                        "value": "all"
+                    },
+                    {
+                        "name": translate("app.discover.channel.release"),
+                        "value": "release"
+                    },
+                    {
+                        "name": translate("app.discover.channel.beta"),
+                        "value": "beta"
+                    },
+                    {
+                        "name": translate("app.discover.channel.alpha"),
+                        "value": "alpha"
+                    }
+                ], channelFilter, "all", (v) => {
+                    filterVersions(versionDropdown.value, loaderDropdown.value, v);
+                })
+                topFilters.appendChild(mcVersionFilter);
+                if (["modpack", "mod"].includes(content.project_type)) topFilters.appendChild(mcLoaderFilter);
+                topFilters.appendChild(channelFilter);
+                tabContent.appendChild(topFilters);
+                let wrapper = document.createElement("div");
+                wrapper.className = "version-files-wrapper";
+                let topBar = document.createElement("div");
+                topBar.className = "version-file-top";
+                let names = content.combine_versions_and_loaders ? ["", translate("app.discover.files.name"), translate("app.discover.files.version_loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""] : ["", translate("app.discover.files.name"), translate("app.discover.files.versions"), translate("app.discover.files.loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""];
+                names.forEach((e, i) => {
+                    let element = document.createElement("div");
+                    element.className = "version-file-column-name";
+                    element.innerHTML = e;
+                    if (content.combine_versions_and_loaders && i == 2) {
+                        element.style.gridColumn = "span 2";
+                    }
+                    topBar.appendChild(element);
+                });
 
-                    let installedVersionIndex = versions.findIndex(v => v.id === installedVersion);
+                let notfound = new NoResultsFound();
+                notfound.element.style.gridColumn = "span 8";
+                notfound.element.style.display = "none";
+                notfound.element.style.backgroundColor = "var(--color-1)"
 
-                    let showVersions = () => {
-                        versionInfo = [];
-                        wrapper.innerHTML = "";
-                        wrapper.appendChild(topBar);
-                        wrapper.appendChild(notfound.element);
-                        versions.forEach((e, i) => {
-                            let versionEle = document.createElement("div");
-                            versionEle.className = "version-file";
+                let versionInfo = [];
 
-                            // Channel
-                            let channelEle = document.createElement("div");
-                            channelEle.className = "version-file-channel";
-                            channelEle.innerHTML = e.version_type.toUpperCase()[0];
-                            if (e.version_type.toUpperCase()[0] == "R") {
-                                channelEle.style.setProperty("--channel-color", "var(--go-color)");
-                            } else if (e.version_type.toUpperCase()[0] == "B") {
-                                channelEle.style.setProperty("--channel-color", "yellow");
-                            } else if (e.version_type.toUpperCase()[0] == "A") {
-                                channelEle.style.setProperty("--channel-color", "var(--danger-color)");
-                            }
-                            versionEle.appendChild(channelEle);
+                let filterVersions = (version, loader_, channel) => {
+                    let count = 0;
+                    versionInfo.forEach(e => {
+                        if (!e.game_versions.includes(version) && version && version != "all") {
+                            e.element.style.display = "none";
+                            return;
+                        }
+                        if (loader_ && ((!content.combine_versions_and_loaders && !e.loaders.includes(loader_)) || (content.combine_versions_and_loaders && !e.game_versions.includes(loader_))) && (content.project_type == "mod" || content.project_type == "modpack") && loader_ != "all") {
+                            e.element.style.display = "none";
+                            return;
+                        }
+                        if (channel && e.channel != channel && channel != "all") {
+                            e.element.style.display = "none";
+                            return;
+                        }
+                        count++;
+                        e.element.style.display = "grid";
+                    });
+                    if (count == 0) {
+                        notfound.element.style.display = "";
+                        topBar.style.display = "none";
+                    } else {
+                        notfound.element.style.display = "none";
+                        topBar.style.display = "grid";
+                    }
+                }
 
-                            // Name
-                            let nameInfo = document.createElement("div");
-                            nameInfo.className = "version-file-info";
-                            let nameName = document.createElement("div");
-                            nameName.className = "version-file-title";
-                            let nameDesc = document.createElement("div");
-                            nameDesc.className = "version-file-desc";
-                            nameName.innerHTML = e.version_number;
-                            nameDesc.innerHTML = e.name;
-                            nameInfo.appendChild(nameName);
-                            nameInfo.appendChild(nameDesc);
-                            versionEle.appendChild(nameInfo);
+                let installedVersionIndex = content.versions.findIndex(v => v.id === installedVersion);
 
-                            //Game Version
-                            let tagWrapper = document.createElement("div");
-                            tagWrapper.className = "version-file-chip-wrapper";
-                            e.game_versions.forEach(i => {
-                                let tag = document.createElement("div");
-                                tag.className = "version-file-chip";
-                                tag.innerHTML = i;
-                                tagWrapper.appendChild(tag);
-                            });
-                            versionEle.appendChild(tagWrapper);
+                let showVersions = () => {
+                    versionInfo = [];
+                    wrapper.innerHTML = "";
+                    wrapper.appendChild(topBar);
+                    wrapper.appendChild(notfound.element);
+                    content.versions.forEach((e, i) => {
+                        let versionEle = document.createElement("div");
+                        versionEle.className = "version-file";
 
+                        // Channel
+                        let channelEle = document.createElement("div");
+                        channelEle.className = "version-file-channel";
+                        channelEle.innerHTML = e.version_type.toUpperCase()[0];
+                        if (e.version_type.toUpperCase()[0] == "R") {
+                            channelEle.style.setProperty("--channel-color", "var(--go-color)");
+                        } else if (e.version_type.toUpperCase()[0] == "B") {
+                            channelEle.style.setProperty("--channel-color", "yellow");
+                        } else if (e.version_type.toUpperCase()[0] == "A") {
+                            channelEle.style.setProperty("--channel-color", "var(--danger-color)");
+                        }
+                        versionEle.appendChild(channelEle);
+
+                        // Name
+                        let nameInfo = document.createElement("div");
+                        nameInfo.className = "version-file-info";
+                        let nameName = document.createElement("div");
+                        nameName.className = "version-file-title";
+                        let nameDesc = document.createElement("div");
+                        nameDesc.className = "version-file-desc";
+                        nameName.innerHTML = e.version_number;
+                        nameDesc.innerHTML = e.name;
+                        nameInfo.appendChild(nameName);
+                        nameInfo.appendChild(nameDesc);
+                        versionEle.appendChild(nameInfo);
+
+                        //Game Version
+                        let tagWrapper = document.createElement("div");
+                        tagWrapper.className = "version-file-chip-wrapper";
+                        e.game_versions.forEach(i => {
+                            let tag = document.createElement("div");
+                            tag.className = "version-file-chip";
+                            tag.innerHTML = i;
+                            tagWrapper.appendChild(tag);
+                        });
+                        versionEle.appendChild(tagWrapper);
+                        if (content.combine_versions_and_loaders) {
+                            tagWrapper.style.gridColumn = "span 2";
+                        }
+
+                        if (!content.combine_versions_and_loaders) {
                             //Loaders
                             let tagWrapper2 = document.createElement("div");
                             tagWrapper2.className = "version-file-chip-wrapper";
@@ -10315,702 +10446,95 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 tagWrapper2.appendChild(tag);
                             });
                             versionEle.appendChild(tagWrapper2);
-
-                            //Published
-                            let published = document.createElement("div");
-                            published.className = "version-file-text";
-                            published.innerHTML = formatDate(e.date_published);
-                            versionEle.appendChild(published);
-
-                            //Downloads
-                            let downloads = document.createElement("div");
-                            downloads.className = "version-file-text";
-                            downloads.innerHTML = formatNumber(e.downloads);
-                            versionEle.appendChild(downloads);
-
-                            // Install Button
-                            let installButton = document.createElement("button");
-                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
-                            installButton.setAttribute("title", translate("app.discover.install_specific_version"));
-                            installButton.className = "version-file-install"
-                            let updateToSpecificVersion = async () => {
-                                if (content.project_type == "modpack") {
-                                    contentInfo.close();
-                                    runModpackUpdate(new Instance(instance_id), "modrinth", e);
-                                    return;
-                                }
-                                let instanceInfo = new Instance(instance_id);
-                                let contentList = instanceInfo.getContent();
-                                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-                                installButton.classList.add("disabled");
-                                installButton.onclick = () => { };
-                                let theContent = null;
-                                for (let i = 0; i < contentList.length; i++) {
-                                    if (contentList[i].source_info == content.id) {
-                                        theContent = contentList[i];
-                                    }
-                                }
-                                if (!theContent) return;
-                                await updateContent(instanceInfo, theContent, e.id);
-                                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                                if (content_list_to_update) content_list_to_update.updateSecondaryColumn();
-                                if (instance_id) {
-                                    installedVersion = e.id;
-                                    installedVersionIndex = i;
-                                    showVersions();
-                                }
-                            }
-                            if (installedVersion && installedVersionIndex > i) {
-                                installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
-                                installButton.setAttribute("title", translate("app.discover.update.tooltip"));
-                                installButton.onclick = updateToSpecificVersion;
-                            } else if (installedVersion && installedVersionIndex < i) {
-                                installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.downgrade");
-                                installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
-                                installButton.onclick = updateToSpecificVersion;
-                            } else {
-                                installButton.onclick = () => {
-                                    installButtonClick(content.project_type, "modrinth", e.loaders, content.icon_url, content.title, author, e.game_versions, content_id, instance_id, installButton, contentInfo, e, () => {
-                                        if (instance_id) {
-                                            installedVersion = e.id;
-                                            installedVersionIndex = i;
-                                            showVersions();
-                                        }
-                                    });
-                                }
-                            }
-
-                            if (installedVersion == e.id) {
-                                installButton.classList.add("disabled");
-                                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                                installButton.onclick = () => { }
-                                installButton.setAttribute("title", translate("app.discover.installed.tooltip"));
-                            }
-
-                            versionEle.appendChild(installButton);
-
-                            // Changelog Button
-                            let changeLogButton = document.createElement("button");
-                            changeLogButton.className = "version-file-changelog";
-                            changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>' + translate("app.discover.changelog");
-                            changeLogButton.setAttribute("title", translate("app.discover.changelog.tooltip"));
-                            changeLogButton.onclick = () => {
-                                let dialog = new Dialog();
-                                dialog.showDialog(translate("app.discover.changelog.title", "%v", e.version_number), "notice", `<div class='markdown-body'>${parseModrinthMarkdown(e.changelog)}</div>`, [
-                                    {
-                                        "type": "confirm",
-                                        "content": translate("app.discover.changelog.done")
-                                    }
-                                ], [], () => { });
-                                afterMarkdownParse();
-                            }
-                            if (e.changelog) versionEle.appendChild(changeLogButton);
-
-                            wrapper.appendChild(versionEle);
-
-                            versionInfo.push({ "element": versionEle, "loaders": e.loaders, "game_versions": e.game_versions, "channel": e.version_type })
-                        });
-                        filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value);
-                    }
-
-                    showVersions();
-
-                    filterVersions(vanilla_version, loader, "all");
-
-                    tabContent.appendChild(wrapper);
-                }
-            },
-            team_members.length ? {
-                "name": team_members.length == 1 ? translate("app.discover.tabs.author") : translate("app.discover.tabs.authors"),
-                "value": "authors",
-                "func": () => {
-                    tabContent.style.paddingTop = "0";
-                    tabContent.innerHTML = "";
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "authors-wrapper";
-                    let authors = document.createElement("div");
-                    authors.className = "authors";
-                    team_members.forEach(e => {
-                        let author = document.createElement("div");
-                        author.className = "author";
-                        if (e.user.bio) author.setAttribute("title", e.user.bio);
-                        let authorImg = document.createElement("img");
-                        authorImg.className = "author-image";
-                        authorImg.src = e.user.avatar_url ? e.user.avatar_url : "default.png";
-                        let authorInfo = document.createElement("div");
-                        authorInfo.className = "author-info";
-                        let authorTitle = document.createElement("div");
-                        authorTitle.className = "author-title";
-                        authorTitle.innerHTML = e.user.username;
-                        let authorRole = document.createElement("div");
-                        authorRole.className = "author-role";
-                        authorRole.innerHTML = e.role;
-                        authorInfo.appendChild(authorTitle);
-                        authorInfo.appendChild(authorRole);
-                        author.appendChild(authorImg);
-                        author.appendChild(authorInfo);
-                        let buttons = new ContextMenuButtons([
-                            {
-                                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
-                                "title": translate("app.discover.author.open_in_browser"),
-                                "func": () => {
-                                    window.electronAPI.openInBrowser("https://modrinth.com/user/" + e.user.id);
-                                }
-                            },
-                            {
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "title": translate("app.discover.author.copy_user_id"),
-                                "func": async () => {
-                                    let success = await window.electronAPI.copyToClipboard(e.user.id);
-                                    if (success) {
-                                        displaySuccess(translate("app.discover.author.copy_user_id.success"));
-                                    } else {
-                                        displayError(translate("app.discover.author.copy_user_id.fail"));
-                                    }
-                                }
-                            }
-                        ]);
-                        author.oncontextmenu = (e) => {
-                            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
                         }
-                        authors.appendChild(author);
-                    });
-                    wrapper.appendChild(authors);
-                    tabContent.appendChild(wrapper);
-                }
-            } : null,
-            content.gallery.length ? {
-                "name": translate("app.discover.tabs.gallery"),
-                "value": "gallery",
-                "func": () => {
-                    tabContent.style.paddingTop = "0";
-                    tabContent.innerHTML = "";
-                    let gallery = document.createElement("div");
-                    gallery.className = "gallery";
-                    content.gallery.forEach(e => {
-                        let screenshotElement = document.createElement("button");
-                        screenshotElement.className = "gallery-screenshot";
-                        screenshotElement.setAttribute("data-title", e.title ?? translate("app.discover.gallery.untitled"));
-                        screenshotElement.style.backgroundImage = `url("${e.url}")`;
-                        let screenshotInformation = content.gallery.map(e => ({ "name": e.title ?? translate("app.discover.gallery.untitled"), "file": e.raw_url, "desc": e.description }));
-                        screenshotElement.onclick = () => {
-                            displayScreenshot(e.title ?? translate("app.discover.gallery.untitled"), e.description, e.raw_url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), translate("app.discover.gallery.image"));
-                        }
-                        let buttons = new ContextMenuButtons([
-                            {
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "title": translate("app.discover.gallery.image.copy"),
-                                "func": async () => {
-                                    let success = await window.electronAPI.copyImageToClipboard(e.raw_url);
-                                    if (success) {
-                                        displaySuccess(translate("app.discover.gallery.image.copy.success"));
-                                    } else {
-                                        displayError(translate("app.discover.gallery.image.copy.fail"));
-                                    }
-                                }
-                            },
-                            {
-                                "icon": '<i class="fa-solid fa-share"></i>',
-                                "title": translate("app.discover.gallery.image.share"),
-                                "func": () => {
-                                    openShareDialog(translate("app.discover.gallery.image.share.title"), e.raw_url, translate("app.discover.gallery.image.share.text"))
-                                }
-                            }
-                        ]);
-                        screenshotElement.oncontextmenu = (e) => {
-                            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
-                        }
-                        gallery.appendChild(screenshotElement);
-                    });
-                    tabContent.appendChild(gallery);
-                }
-            } : null
-        ].filter(e => e))
-        tabs.selectOption("description");
-    } else if (content_source == "curseforge") {
-        contentInfo.innerHTML = "";
-        contentInfo.showModal();
-        let dialogContextMenu = new ContextMenu();
-        contentInfo.appendChild(dialogContextMenu.element);
-        let contentWrapper = document.createElement("div");
-        contentWrapper.className = "content-wrapper";
-        let contentNav = document.createElement("div");
-        contentNav.className = "content-nav";
-        contentWrapper.appendChild(contentNav);
-        let buttonBack = document.createElement("button");
-        buttonBack.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
-        buttonBack.className = "content-nav-button";
-        if (contentInfoIndex <= 0) {
-            buttonBack.classList.add("disabled");
-        } else {
-            buttonBack.onclick = () => {
-                contentInfoIndex--;
-                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
-            }
-        }
-        contentNav.appendChild(buttonBack);
-        let buttonForward = document.createElement("button");
-        buttonForward.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
-        buttonForward.className = "content-nav-button";
-        if (contentInfoIndex >= contentInfoHistory.length - 1) {
-            buttonForward.classList.add("disabled");
-        } else {
-            buttonForward.onclick = () => {
-                contentInfoIndex++;
-                displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
-            }
-        }
-        contentNav.appendChild(buttonForward);
-        let contentX = document.createElement("button");
-        contentX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-        contentX.className = "content-x";
-        contentX.onclick = () => {
-            contentInfo.close();
-        }
-        contentNav.appendChild(contentX);
-        contentInfo.appendChild(contentWrapper);
-        let loading = new LoadingContainer();
-        loading.className = "loading-container";
-        loading.element.style.height = "100%";
-        contentWrapper.appendChild(loading.element);
-        let content, description, versions;
-        try {
-            let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}`);
-            content = await content_pre_json.json();
-            let description_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}/description`);
-            description = await description_pre_json.json();
-            versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
-        } catch (e) {
-            loading.errorOut(e, () => {
-                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, true);
-            });
-            return;
-        }
-        loading.element.remove();
-        let topBar = document.createElement("div");
-        topBar.classList.add("content-top");
-        let instImg = document.createElement("img");
-        instImg.classList.add("content-top-image");
-        instImg.src = content.data.logo.url ? content.data.logo.url : "default.png";
-        topBar.appendChild(instImg);
-        let instTopInfo = document.createElement("div");
-        instTopInfo.classList.add("content-top-info");
-        let instTopTitle = document.createElement("h1");
-        instTopTitle.innerHTML = sanitize(content.data.name);
-        instTopTitle.classList.add("content-top-title");
-        instTopInfo.appendChild(instTopTitle);
-        let instTopSubInfo = document.createElement("div");
-        instTopSubInfo.classList.add("content-top-sub-info");
-        let instTopVersions = document.createElement("div");
-        instTopVersions.classList.add("content-top-sub-info-specific");
-        let type = translate("app.content.mod");
-        let project_type = "mod";
-        if (content.data.classId == 6) {
-            type = translate("app.content.mod");
-            project_type = "mod";
-        } else if (content.data.classId == 4471) {
-            type = translate("app.content.modpack");
-            project_type = "modpack"
-        } else if (content.data.classId == 12) {
-            type = translate("app.content.resource_pack");
-            project_type = "resourcepack";
-        } else if (content.data.classId == 6552) {
-            type = translate("app.content.shader");
-            project_type = "shader"
-        } else if (content.data.classId == 17) {
-            type = translate("app.content.world")
-            project_type = "world";
-        } else if (content.data.classId == 6945) {
-            type = translate("app.content.data_pack");
-            project_type = "datapack"
-        }
-        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
-        let instTopPlaytime = document.createElement("div");
-        instTopPlaytime.classList.add("content-top-sub-info-specific");
-        instTopPlaytime.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(content.data.downloadCount))}`;
-        let instTopLastPlayed = document.createElement("div");
-        instTopLastPlayed.classList.add("content-top-sub-info-specific");
-        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.data.dateModified))}`;
-        instTopLastPlayed.setAttribute("title", translate("app.discover.last_updated"));
-        instTopSubInfo.appendChild(instTopVersions);
-        instTopSubInfo.appendChild(instTopPlaytime);
-        instTopSubInfo.appendChild(instTopLastPlayed);
-        instTopInfo.appendChild(instTopSubInfo);
-        topBar.appendChild(instTopInfo);
-        let installButton = document.createElement("button");
-        installButton.className = "content-top-install-button";
-        installButton.innerHTML = '<i class="fa-solid fa-download"></i>Install';
-        installButton.onclick = () => {
-            installButtonClick(project_type, "curseforge", [], content.data.logo.thumbnailUrl, content.data.name, content.data.authors[0].name, [], content.data.id, instance_id, installButton, contentInfo);
-        }
-        let installedVersion = "";
-        if (content_ids.includes(content.data.id + ".0")) {
-            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-            installButton.classList.add("disabled");
-            installButton.onclick = () => { };
-            installedVersion = instance_content[content_ids.indexOf(content.data.id + ".0")].version_id;
-        }
-        if (project_type == "modpack" && instance_id) {
-            installedVersion = new Instance(instance_id).installed_version;
-        }
-        let threeDots = document.createElement("button");
-        threeDots.classList.add("content-top-more");
-        threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-        let links = [];
-        if (content.data.links.sourceUrl) {
-            links.push({
-                "icon": '<i class="fa-solid fa-code"></i>',
-                "title": translate("app.discover.view.source"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.data.links.sourceUrl);
-                }
-            })
-        }
-        if (content.data.links.wikiUrl) {
-            links.push({
-                "icon": '<i class="fa-solid fa-book-atlas"></i>',
-                "title": translate("app.discover.view.wiki"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.data.links.wikiUrl);
-                }
-            })
-        }
-        if (content.data.links.issuesUrl) {
-            links.push({
-                "icon": '<i class="fa-solid fa-bug"></i>',
-                "title": translate("app.discover.view.issues"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.data.links.issuesUrl);
-                }
-            })
-        }
-        // if (content.links.sourceUrl) {
-        //     links.push({
-        //         "icon": '<i class="fa-brands fa-discord"></i>',
-        //         "title": "View Discord",
-        //         "func": (e) => {
-        //             window.electronAPI.openInBrowser(content.discord_url);
-        //         }
-        //     })
-        // }
-        // if (content.donation_urls) {
-        //     content.donation_urls.forEach(e => {
-        //         links.push({
-        //             "icon": '<i class="fa-solid fa-hand-holding-dollar"></i>',
-        //             "title": e.platform == "Other" ? "Donate" : "Donate on " + e.platform,
-        //             "func": () => {
-        //                 window.electronAPI.openInBrowser(e.url);
-        //             }
-        //         })
-        //     });
-        // }
-        let buttons = new ContextMenuButtons([
-            {
-                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
-                "title": translate("app.discover.open_in_browser"),
-                "func": (e) => {
-                    window.electronAPI.openInBrowser(content.data.links.websiteUrl);
-                }
-            }
-        ].concat(links));
-        let moreMenu = new MoreMenu(threeDots, buttons);
-        if (project_type != "modpack" || !instance_id) topBar.appendChild(installButton);
-        else threeDots.style.marginLeft = "auto";
-        topBar.appendChild(threeDots);
-        topBar.appendChild(moreMenu.element);
-        contentWrapper.appendChild(topBar);
 
-        let tabsElement = document.createElement("div");
-        contentWrapper.appendChild(tabsElement);
-        let tabContent = document.createElement("div");
-        tabContent.className = "tab-info";
-        tabContent.style.padding = "10px";
-        contentWrapper.appendChild(tabContent);
-        contentInfo.showModal();
-        tabsElement.style.marginInline = "auto";
-        let tabs = new TabContent(tabsElement, [
-            {
-                "name": translate("app.discover.tabs.description"),
-                "value": "description",
-                "func": () => {
-                    tabContent.style.paddingTop = "10px";
-                    tabContent.innerHTML = "";
-                    let element = document.createElement("div");
-                    element.className = "markdown-body";
-                    element.style.maxWidth = "700px";
-                    element.style.marginInline = "auto";
-                    tabContent.appendChild(element);
-                    element.innerHTML = description.data;
-                    afterMarkdownParse(instance_id, vanilla_version, loader);
-                }
-            },
-            {
-                "name": translate("app.discover.tabs.files"),
-                "value": "files",
-                "func": () => {
-                    if (versions.data) versions = versions.data;
-                    tabContent.innerHTML = "";
-                    let topFilters = document.createElement("div");
-                    topFilters.className = "version-file-filters";
-                    let mcVersionFilter = document.createElement("div");
-                    let allGameVersions = Array.from(
-                        new Set(
-                            versions.flatMap(v => v.gameVersions)
-                        )
-                    );
-                    if (Array.isArray(minecraftVersions) && minecraftVersions.length > 0) {
-                        allGameVersions.sort((a, b) => {
-                            const ia = minecraftVersions.indexOf(a);
-                            const ib = minecraftVersions.indexOf(b);
-                            if (ia === -1 && ib === -1) return 0;
-                            if (ia === -1) return 1;
-                            if (ib === -1) return -1;
-                            return ia - ib;
-                        });
-                        allGameVersions.reverse();
-                    }
+                        //Published
+                        let published = document.createElement("div");
+                        published.className = "version-file-text";
+                        published.innerHTML = formatDate(e.date_published);
+                        versionEle.appendChild(published);
 
-                    allGameVersions = allGameVersions.filter(e => minecraftVersions.includes(e));
+                        //Downloads
+                        let downloads = document.createElement("div");
+                        downloads.className = "version-file-text";
+                        downloads.innerHTML = formatNumber(e.downloads);
+                        versionEle.appendChild(downloads);
 
-                    let versionDropdown = new DialogDropdown(
-                        translate("app.discover.game_version"),
-                        [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(
-                            allGameVersions.map(e => ({ "name": e, "value": e }))
-                        ),
-                        mcVersionFilter,
-                        vanilla_version ? vanilla_version : "all",
-                        (v) => {
-                            filterVersions(v, loaderDropdown.value, channelDropdown.value);
-                        }
-                    );
-                    let mcLoaderFilter = document.createElement("div");
-                    let allLoaders = Array.from(
-                        new Set(
-                            versions.flatMap(v => v.gameVersions)
-                        )
-                    );
-                    allLoaders = allLoaders.filter(e => loaders[e.toLowerCase()]);
-                    allLoaders = allLoaders.map(e => e.toLowerCase());
-                    let loaderDropdown = new SearchDropdown(translate("app.discover.loader"),
-                        [{
-                            "name": translate("app.discover.loader.all"),
-                            "value": "all"
-                        }].concat(allLoaders.map(e => ({ "name": loaders[e] ? loaders[e] : e, "value": e }))),
-                        mcLoaderFilter, loader ? loader : "all", (v) => {
-                            filterVersions(versionDropdown.value, v, channelDropdown.value);
-                        })
-                    let channelFilter = document.createElement("div");
-                    let channelDropdown = new SearchDropdown(translate("app.discover.channel"), [
-                        {
-                            "name": translate("app.discover.channel.all"),
-                            "value": "all"
-                        },
-                        {
-                            "name": translate("app.discover.channel.release"),
-                            "value": "release"
-                        },
-                        {
-                            "name": translate("app.discover.channel.beta"),
-                            "value": "beta"
-                        },
-                        {
-                            "name": translate("app.discover.channel.alpha"),
-                            "value": "alpha"
-                        }
-                    ], channelFilter, "all", (v) => {
-                        filterVersions(versionDropdown.value, loaderDropdown.value, v);
-                    })
-                    topFilters.appendChild(mcVersionFilter);
-                    if (["modpack", "mod"].includes(project_type)) topFilters.appendChild(mcLoaderFilter);
-                    topFilters.appendChild(channelFilter);
-                    tabContent.appendChild(topFilters);
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "version-files-wrapper";
-                    let topBar = document.createElement("div");
-                    topBar.className = "version-file-top";
-                    let names = ["", translate("app.discover.files.name"), translate("app.discover.files.version_loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""];
-                    names.forEach((e, i) => {
-                        let element = document.createElement("div");
-                        element.className = "version-file-column-name";
-                        element.innerHTML = e;
-                        if (i == 2) {
-                            element.style.gridColumn = "span 2";
-                        }
-                        topBar.appendChild(element);
-                    });
-
-                    wrapper.appendChild(topBar);
-
-                    let notfound = new NoResultsFound();
-                    wrapper.appendChild(notfound.element);
-                    notfound.element.style.gridColumn = "span 8";
-                    notfound.element.style.display = "none";
-                    notfound.element.style.backgroundColor = "var(--color-1)"
-
-                    let versionInfo = [];
-
-                    let filterVersions = (version, loader_, channel) => {
-                        let count = 0;
-                        versionInfo.forEach(e => {
-                            if (!e.game_versions.includes(version) && version && version != "all") {
-                                e.element.style.display = "none";
+                        // Install Button
+                        let installButton = document.createElement("button");
+                        installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
+                        installButton.setAttribute("title", translate("app.discover.install_specific_version"));
+                        installButton.className = "version-file-install"
+                        let updateToSpecificVersion = async () => {
+                            if (content.project_type == "modpack") {
+                                contentInfo.close();
+                                runModpackUpdate(new Instance(instance_id), content.source, e.original_version_info);
                                 return;
                             }
-                            if (loader_ && !e.game_versions.includes(loader_) && (project_type == "mod" || project_type == "modpack") && loader_ != "all") {
-                                e.element.style.display = "none";
-                                return;
+                            let instanceInfo = new Instance(instance_id);
+                            let contentList = instanceInfo.getContent();
+                            installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                            installButton.classList.add("disabled");
+                            installButton.onclick = () => { };
+                            let theContent = null;
+                            for (let i = 0; i < contentList.length; i++) {
+                                if (contentList[i].source_info == content.id || (content.convert_version_ids_to_numbers && Number(contentList[i].source_info) == Number(content.id))) {
+                                    theContent = contentList[i];
+                                }
                             }
-                            if (channel && e.channel != channel && channel != "all") {
-                                e.element.style.display = "none";
-                                return;
+                            if (!theContent) return;
+                            await updateContent(instanceInfo, theContent, e.id);
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                            if (content_list_to_update) content_list_to_update.updateSecondaryColumn();
+                            if (instance_id) {
+                                installedVersion = e.id;
+                                if (content.convert_version_ids_to_numbers) installedVersion = Number(installedVersion);
+                                installedVersionIndex = i;
+                                showVersions();
                             }
-                            count++;
-                            e.element.style.display = "grid";
-                        });
-                        if (count == 0) {
-                            notfound.element.style.display = "";
-                            topBar.style.display = "none";
+                        }
+                        if (installedVersion && installedVersionIndex > i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
+                            installButton.setAttribute("title", translate("app.discover.update.tooltip"));
+                            installButton.onclick = updateToSpecificVersion;
+                        } else if (installedVersion && installedVersionIndex < i) {
+                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.downgrade");
+                            installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
+                            installButton.onclick = updateToSpecificVersion;
                         } else {
-                            notfound.element.style.display = "none";
-                            topBar.style.display = "grid";
-                        }
-                    }
-
-                    let installedVersionIndex = versions.findIndex(v => Number(v.id) == Number(installedVersion));
-
-                    let showVersions = () => {
-                        versionInfo = [];
-                        wrapper.innerHTML = "";
-                        wrapper.appendChild(topBar);
-                        wrapper.appendChild(notfound.element);
-                        versions.forEach((e, i) => {
-                            let versionEle = document.createElement("div");
-                            versionEle.className = "version-file";
-
-                            // Channel
-                            let channelEle = document.createElement("div");
-                            channelEle.className = "version-file-channel";
-                            channelEle.innerHTML = ["", "R", "B", "A"][e.releaseType];
-                            if (e.releaseType == 1) {
-                                channelEle.style.setProperty("--channel-color", "var(--go-color)");
-                            } else if (e.releaseType == 2) {
-                                channelEle.style.setProperty("--channel-color", "yellow");
-                            } else if (e.releaseType == 3) {
-                                channelEle.style.setProperty("--channel-color", "var(--danger-color)");
-                            }
-                            versionEle.appendChild(channelEle);
-
-                            // Name
-                            let nameInfo = document.createElement("div");
-                            nameInfo.className = "version-file-info";
-                            let nameName = document.createElement("div");
-                            nameName.className = "version-file-title";
-                            let nameDesc = document.createElement("div");
-                            nameDesc.className = "version-file-desc";
-                            nameName.innerHTML = e.id;
-                            nameDesc.innerHTML = e.displayName;
-                            nameInfo.appendChild(nameName);
-                            nameInfo.appendChild(nameDesc);
-                            versionEle.appendChild(nameInfo);
-
-                            //Game Version
-                            let tagWrapper = document.createElement("div");
-                            tagWrapper.className = "version-file-chip-wrapper";
-                            tagWrapper.style.gridColumn = "span 2";
-                            e.gameVersions.forEach(i => {
-                                let tag = document.createElement("div");
-                                tag.className = "version-file-chip";
-                                tag.innerHTML = i;
-                                tagWrapper.appendChild(tag);
-                            });
-                            versionEle.appendChild(tagWrapper);
-
-                            //Published
-                            let published = document.createElement("div");
-                            published.className = "version-file-text";
-                            published.innerHTML = formatDate(e.dateCreated);
-                            versionEle.appendChild(published);
-
-                            //Downloads
-                            let downloads = document.createElement("div");
-                            downloads.className = "version-file-text";
-                            downloads.innerHTML = formatNumber(e.totalDownloads);
-                            versionEle.appendChild(downloads);
-
-                            // Install Button
-                            let installButton = document.createElement("button");
-                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
-                            installButton.setAttribute("title", translate("app.discover.install_specific_version"));
-                            installButton.className = "version-file-install"
-                            let updateToSpecificVersion = async () => {
-                                if (project_type == "modpack") {
-                                    contentInfo.close();
-                                    runModpackUpdate(new Instance(instance_id), "curseforge", e);
-                                    return;
-                                }
-                                let instanceInfo = new Instance(instance_id);
-                                let contentList = instanceInfo.getContent();
-                                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-                                installButton.classList.add("disabled");
-                                installButton.onclick = () => { };
-                                let theContent = null;
-                                for (let i = 0; i < contentList.length; i++) {
-                                    console.log(contentList[i].source_info, content.data.id);
-                                    if (Number(contentList[i].source_info) == Number(content.data.id)) {
-                                        theContent = contentList[i];
+                            installButton.onclick = () => {
+                                installButtonClick(content.project_type, content.source, e.loaders, content.icon_url, content.title, content.author, e.game_versions, content_id, instance_id, installButton, contentInfo, e.original_version_info, () => {
+                                    if (instance_id) {
+                                        installedVersion = e.id;
+                                        installedVersionIndex = i;
+                                        showVersions();
                                     }
-                                }
-                                if (!theContent) return;
-                                await updateContent(instanceInfo, theContent, e.id);
-                                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                                if (content_list_to_update) content_list_to_update.updateSecondaryColumn();
-                                if (instance_id) {
-                                    installedVersion = e.id;
-                                    installedVersionIndex = i;
-                                    showVersions();
-                                }
+                                });
                             }
-                            if (installedVersion && installedVersionIndex > i) {
-                                installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
-                                installButton.setAttribute("title", translate("app.discover.update.tooltip"));
-                                installButton.onclick = updateToSpecificVersion;
-                            } else if (installedVersion && installedVersionIndex < i) {
-                                installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.downgrade");
-                                installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
-                                installButton.onclick = updateToSpecificVersion;
-                            } else {
-                                installButton.onclick = () => {
-                                    installButtonClick(project_type, "curseforge", [], content.data.logo.thumbnailUrl, content.data.name, content.data.authors[0].name, e.gameVersions, content_id, instance_id, installButton, contentInfo, e, () => {
-                                        if (instance_id) {
-                                            installedVersion = e.id;
-                                            installedVersionIndex = i;
-                                            showVersions();
-                                        }
-                                    });
-                                }
-                            }
+                        }
 
-                            if (Number(installedVersion) == Number(e.id)) {
-                                installButton.classList.add("disabled");
-                                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                                installButton.onclick = () => { }
-                                installButton.setAttribute("title", translate("app.discover.installed.tooltip"));
-                            }
+                        if (installedVersion == e.id) {
+                            installButton.classList.add("disabled");
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                            installButton.onclick = () => { }
+                            installButton.setAttribute("title", translate("app.discover.installed.tooltip"));
+                        }
 
-                            versionEle.appendChild(installButton);
+                        versionEle.appendChild(installButton);
 
-                            // Changelog Button
-                            let changeLogButton = document.createElement("button");
-                            changeLogButton.className = "version-file-changelog";
-                            changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>' + translate("app.discover.changelog");
-                            changeLogButton.setAttribute("title", translate("app.discover.changelog.tooltip"));
-                            changeLogButton.onclick = async () => {
-                                let dialog = new Dialog();
+                        // Changelog Button
+                        let changeLogButton = document.createElement("button");
+                        changeLogButton.className = "version-file-changelog";
+                        changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>' + translate("app.discover.changelog");
+                        changeLogButton.setAttribute("title", translate("app.discover.changelog.tooltip"));
+                        changeLogButton.onclick = () => {
+                            let dialog = new Dialog();
+                            if (e.is_curseforge_changelog) {
                                 let element = document.createElement('div');
                                 element.className = "markdown-body";
                                 let loader = new LoadingContainer();
                                 element.appendChild(loader.element);
-                                dialog.showDialog(translate("app.discover.changelog.title", "%v", e.displayName), "notice", element, [
+                                dialog.showDialog(translate("app.discover.changelog.title", "%v", e.name), "notice", element, [
                                     {
                                         "type": "confirm",
                                         "content": translate("app.discover.changelog.done")
@@ -11025,132 +10549,140 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                         changeLogButton.click();
                                     });
                                 });
+                            } else {
+                                dialog.showDialog(translate("app.discover.changelog.title", "%v", e.version_number), "notice", `<div class='markdown-body'>${parseModrinthMarkdown(e.changelog)}</div>`, [
+                                    {
+                                        "type": "confirm",
+                                        "content": translate("app.discover.changelog.done")
+                                    }
+                                ], [], () => { });
+                                afterMarkdownParse();
                             }
-                            versionEle.appendChild(changeLogButton);
+                        }
+                        if (e.changelog || e.is_curseforge_changelog) versionEle.appendChild(changeLogButton);
 
-                            wrapper.appendChild(versionEle);
+                        wrapper.appendChild(versionEle);
 
-                            versionInfo.push({ "element": versionEle, "loaders": e.gameVersions, "game_versions": e.gameVersions.map(e => e.toLowerCase()), "channel": ["", "release", "beta", "alpha"][e.releaseType] })
-                        });
-                        filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value);
+                        versionInfo.push({ "element": versionEle, "loaders": e.loaders, "game_versions": e.game_versions.map(e => e.toLowerCase()), "channel": e.version_type })
+                    });
+                    filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value);
+                }
+
+                showVersions();
+
+                filterVersions(vanilla_version, loader, "all");
+
+                tabContent.appendChild(wrapper);
+            }
+        },
+        content.authors.length ? {
+            "name": content.authors.length == 1 ? translate("app.discover.tabs.author") : translate("app.discover.tabs.authors"),
+            "value": "authors",
+            "func": () => {
+                tabContent.style.paddingTop = "0";
+                tabContent.innerHTML = "";
+                let wrapper = document.createElement("div");
+                wrapper.className = "authors-wrapper";
+                let authors = document.createElement("div");
+                authors.className = "authors";
+                content.authors.forEach(e => {
+                    let author = document.createElement("div");
+                    author.className = "author";
+                    if (e.user.bio) author.setAttribute("title", e.user.bio);
+                    let authorImg = document.createElement("img");
+                    authorImg.className = "author-image";
+                    authorImg.src = e.user.avatar_url ? e.user.avatar_url : "default.png";
+                    let authorInfo = document.createElement("div");
+                    authorInfo.className = "author-info";
+                    let authorTitle = document.createElement("div");
+                    authorTitle.className = "author-title";
+                    authorTitle.innerHTML = e.user.username;
+                    let authorRole = document.createElement("div");
+                    authorRole.className = "author-role";
+                    authorRole.innerHTML = e.role;
+                    authorInfo.appendChild(authorTitle);
+                    authorInfo.appendChild(authorRole);
+                    author.appendChild(authorImg);
+                    author.appendChild(authorInfo);
+                    let buttons = new ContextMenuButtons([
+                        {
+                            "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                            "title": translate("app.discover.author.open_in_browser"),
+                            "func": () => {
+                                window.electronAPI.openInBrowser(e.browser_url);
+                            }
+                        },
+                        {
+                            "icon": '<i class="fa-solid fa-copy"></i>',
+                            "title": translate("app.discover.author.copy_user_id"),
+                            "func": async () => {
+                                let success = await window.electronAPI.copyToClipboard(e.user.id);
+                                if (success) {
+                                    displaySuccess(translate("app.discover.author.copy_user_id.success"));
+                                } else {
+                                    displayError(translate("app.discover.author.copy_user_id.fail"));
+                                }
+                            }
+                        }
+                    ]);
+                    author.oncontextmenu = (e) => {
+                        dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
                     }
-
-                    showVersions();
-
-
-                    filterVersions(vanilla_version, loader, "all");
-
-                    tabContent.appendChild(wrapper);
-                }
-            },
-            content.data.authors.length ? {
-                "name": content.data.authors.length == 1 ? translate("app.discover.tabs.author") : translate("app.discover.tabs.authors"),
-                "value": "authors",
-                "func": () => {
-                    tabContent.style.paddingTop = "0";
-                    tabContent.innerHTML = "";
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "authors-wrapper";
-                    let authors = document.createElement("div");
-                    authors.className = "authors";
-                    content.data.authors.forEach(e => {
-                        let author = document.createElement("div");
-                        author.className = "author";
-                        // if (e.user.bio) author.setAttribute("title", e.user.bio);
-                        let authorImg = document.createElement("img");
-                        authorImg.className = "author-image";
-                        authorImg.src = e.avatarUrl ? e.avatarUrl : "default.png";
-                        let authorInfo = document.createElement("div");
-                        authorInfo.className = "author-info";
-                        let authorTitle = document.createElement("div");
-                        authorTitle.className = "author-title";
-                        authorTitle.innerHTML = e.name;
-                        // let authorRole = document.createElement("div");
-                        // authorRole.className = "author-role";
-                        // authorRole.innerHTML = e.role;
-                        authorInfo.appendChild(authorTitle);
-                        // authorInfo.appendChild(authorRole);
-                        author.appendChild(authorImg);
-                        author.appendChild(authorInfo);
-                        let buttons = new ContextMenuButtons([
-                            {
-                                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
-                                "title": translate("app.discover.author.open_in_browser"),
-                                "func": () => {
-                                    window.electronAPI.openInBrowser(e.url);
-                                }
-                            },
-                            {
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "title": translate("app.discover.author.copy_user_id"),
-                                "func": async () => {
-                                    let success = await window.electronAPI.copyToClipboard(e.id.toString());
-                                    if (success) {
-                                        displaySuccess(translate("app.discover.author.copy_user_id.success"));
-                                    } else {
-                                        displayError(translate("app.discover.author.copy_user_id.fail"));
-                                    }
+                    authors.appendChild(author);
+                });
+                wrapper.appendChild(authors);
+                tabContent.appendChild(wrapper);
+            }
+        } : null,
+        content.gallery.length ? {
+            "name": translate("app.discover.tabs.gallery"),
+            "value": "gallery",
+            "func": () => {
+                tabContent.style.paddingTop = "0";
+                tabContent.innerHTML = "";
+                let gallery = document.createElement("div");
+                gallery.className = "gallery";
+                content.gallery.forEach(e => {
+                    let screenshotElement = document.createElement("button");
+                    screenshotElement.className = "gallery-screenshot";
+                    screenshotElement.setAttribute("data-title", e.title ?? translate("app.discover.gallery.untitled"));
+                    screenshotElement.style.backgroundImage = `url("${e.url}")`;
+                    let screenshotInformation = content.gallery.map(e => ({ "name": e.title ?? translate("app.discover.gallery.untitled"), "file": e.raw_url, "desc": e.description }));
+                    screenshotElement.onclick = () => {
+                        displayScreenshot(e.title ?? translate("app.discover.gallery.untitled"), e.description, e.raw_url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), translate("app.discover.gallery.image"));
+                    }
+                    let buttons = new ContextMenuButtons([
+                        {
+                            "icon": '<i class="fa-solid fa-copy"></i>',
+                            "title": translate("app.discover.gallery.image.copy"),
+                            "func": async () => {
+                                let success = await window.electronAPI.copyImageToClipboard(e.raw_url);
+                                if (success) {
+                                    displaySuccess(translate("app.discover.gallery.image.copy.success"));
+                                } else {
+                                    displayError(translate("app.discover.gallery.image.copy.fail"));
                                 }
                             }
-                        ]);
-                        author.oncontextmenu = (e) => {
-                            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
-                        }
-                        authors.appendChild(author);
-                    });
-                    wrapper.appendChild(authors);
-                    tabContent.appendChild(wrapper);
-                }
-            } : null,
-            content.data.screenshots.length ? {
-                "name": translate("app.discover.tabs.gallery"),
-                "value": "gallery",
-                "func": () => {
-                    tabContent.style.paddingTop = "0";
-                    tabContent.innerHTML = "";
-                    let gallery = document.createElement("div");
-                    gallery.className = "gallery";
-                    content.data.screenshots.forEach(e => {
-                        let screenshotElement = document.createElement("button");
-                        screenshotElement.className = "gallery-screenshot";
-                        screenshotElement.setAttribute("data-title", e.title ?? translate("app.discover.gallery.untitled"));
-                        screenshotElement.style.backgroundImage = `url("${e.thumbnailUrl}")`;
-                        let screenshotInformation = content.data.screenshots.map(e => ({ "name": e.title ?? translate("app.discover.gallery.untitled"), "file": e.url, "desc": e.description }));
-                        screenshotElement.onclick = () => {
-                            displayScreenshot(e.title ?? translate("app.discover.gallery.untitled"), e.description, e.url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.url), translate("app.discover.gallery.image"));
-                        }
-                        let buttons = new ContextMenuButtons([
-                            {
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "title": translate("app.discover.gallery.image.copy"),
-                                "func": async () => {
-                                    let success = await window.electronAPI.copyImageToClipboard(e.url);
-                                    if (success) {
-                                        displaySuccess(translate("app.discover.gallery.image.copy.success"));
-                                    } else {
-                                        displayError(translate("app.discover.gallery.image.copy.fail"));
-                                    }
-                                }
-                            },
-                            {
-                                "icon": '<i class="fa-solid fa-share"></i>',
-                                "title": translate("app.discover.gallery.image.share"),
-                                "func": () => {
-                                    openShareDialog(translate("app.discover.gallery.image.share.title"), e.url, translate("app.discover.gallery.image.share.text"));
-                                }
+                        },
+                        {
+                            "icon": '<i class="fa-solid fa-share"></i>',
+                            "title": translate("app.discover.gallery.image.share"),
+                            "func": () => {
+                                openShareDialog(translate("app.discover.gallery.image.share.title"), e.raw_url, translate("app.discover.gallery.image.share.text"))
                             }
-                        ]);
-                        screenshotElement.oncontextmenu = (e) => {
-                            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
                         }
-                        gallery.appendChild(screenshotElement);
-                    });
-                    tabContent.appendChild(gallery);
-                }
-            } : null
-        ].filter(e => e))
-        tabs.selectOption("description");
-    }
+                    ]);
+                    screenshotElement.oncontextmenu = (e) => {
+                        dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+                    }
+                    gallery.appendChild(screenshotElement);
+                });
+                tabContent.appendChild(gallery);
+            }
+        } : null
+    ].filter(e => e))
+    tabs.selectOption("description");
+
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
 }

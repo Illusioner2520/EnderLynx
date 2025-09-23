@@ -1383,13 +1383,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let install_path = "";
         if (project_type == "mod") {
             install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`, filename);
-        } else if (project_type == "resourcepack") {
+        } else if (project_type == "resourcepack" || project_type == "resource_pack") {
             install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`, filename);
         } else if (project_type == "shader") {
             install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`, filename);
         } else if (project_type == "world") {
             install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_worlds`, filename);
-        } else if (project_type == "datapack") {
+        } else if (project_type == "datapack" || project_type == "data_pack") {
             install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/saves/${data_pack_world}/datapacks`, filename);
         }
 
