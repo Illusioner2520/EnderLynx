@@ -9281,7 +9281,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         }
                     } else {
                         if (success) {
-                            displaySuccess(translate("app.discover.vt.success", "%i", instance.name));
+                            displaySuccess(translate("app.discover.vt.success", "%i", new Instance(instance).name));
                         } else {
                             displayError(translate("app.discover.vt.fail"));
                         }
