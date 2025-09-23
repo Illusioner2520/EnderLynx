@@ -10010,11 +10010,23 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         content.combine_versions_and_loaders = false;
         content.authors = team_members.map(e => ({ ...e, "browser_url": `https://modrinth.com/user/${e.user.id}` }));
         content.source = "modrinth";
+        content.display_source = "Modrinth";
     } else if (content_source == "curseforge") {
         let cf_content, description, versions;
         try {
-            let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}`);
-            cf_content = await content_pre_json.json();
+            console.log(content_id);
+            if (isNaN(Number(content_id))) {
+                let id_split = content_id.split(":")
+                let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/search?gameId=432&slug=${id_split[0]}&classId=${id_split[1]}`);
+                cf_content = await content_pre_json.json();
+                content_id = cf_content.data[0].id;
+                cf_content = {
+                    "data": cf_content.data[0]
+                }
+            } else {
+                let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}`);
+                cf_content = await content_pre_json.json();
+            }
             let description_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}/description`);
             description = await description_pre_json.json();
             versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
@@ -10087,7 +10099,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 "title": e.title,
                 "description": e.description
             })),
-            "convert_version_ids_to_numbers": true
+            "convert_version_ids_to_numbers": true,
+            "display_source": "CurseForge"
         }
     }
     loading.element.remove();
@@ -10122,9 +10135,14 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     contentTopLastUpdated.classList.add("content-top-sub-info-specific");
     contentTopLastUpdated.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.updated))}`;
     contentTopLastUpdated.setAttribute("title", translate("app.discover.last_updated"));
+    let contentTopSource = document.createElement("div");
+    contentTopSource.classList.add("content-top-sub-info-specific");
+    contentTopSource.innerHTML = `${sanitize(content.display_source)}`;
+    contentTopSource.classList.add(content.source);
     contentTopSubInfo.appendChild(contentTopType);
     contentTopSubInfo.appendChild(contentTopDownloads);
     contentTopSubInfo.appendChild(contentTopLastUpdated);
+    contentTopSubInfo.appendChild(contentTopSource);
     contentTopInfo.appendChild(contentTopSubInfo);
     topBar.appendChild(contentTopInfo);
     let installButton = document.createElement("button");
@@ -10726,6 +10744,34 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
                                     displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader);
+                                }
+                            });
+                            return;
+                        }
+                    }
+                } else if (url_obj.hostname == "curseforge.com" || url_obj.hostname == "www.curseforge.com") {
+                    let pathParts = url_obj.pathname.split('/').filter(Boolean);
+                    if (pathParts.length >= 2 && pathParts[0] == "minecraft") {
+                        let pageType = pathParts[1];
+                        let pageId = pathParts[2];
+                        let map = {
+                            "mc-mods": 6,
+                            "data-packs": 6945,
+                            "texture-packs": 12,
+                            "shaders": 6552,
+                            "modpacks": 4471,
+                            "worlds": 17
+                        }
+                        if (["mc-mods", "data-packs", "texture-packs", "shaders", "modpacks", "worlds"].includes(pageType)) {
+                            el.setAttribute('title', url);
+                            el.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader);
+                            });
+                            el.addEventListener('keydown', (e) => {
+                                if (e.key == "Enter" || e.key == " ") {
+                                    e.preventDefault();
+                                    displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader);
                                 }
                             });
                             return;

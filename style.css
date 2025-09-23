@@ -1340,6 +1340,14 @@ i {
     opacity: .3;
 }
 
+.content-top-sub-info-specific.modrinth {
+    color: #1bd96a;
+}
+
+.content-top-sub-info-specific.curseforge {
+    color: #f16436;
+}
+
 .modrinth {
     --content-accent-color: #1bd96a;
 }
