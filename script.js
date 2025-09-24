@@ -8860,69 +8860,93 @@ class Pagination {
         let element = document.createElement("div");
         element.className = "page-container";
         this.element = element;
+        this.totalPages = totalPages;
+        this.change_page_function = change_page_function;
+        this.d1opt = d1opt;
+        this.d1def = d1def;
+        this.d1func = d1func;
+        this.d2opt = d2opt;
+        this.d2def = d2def;
+        this.d2func = d2func;
+        this.d3opt = d3opt;
+        this.d3def = d3def;
+        this.d3func = d3func;
+        this.d4opt = d4opt;
+        this.d4def = d4def;
+        this.d4func = d4func;
+        this.setPage(currentPage);
+    }
+    setTotalPages(totalPages) {
+        this.totalPages = totalPages;
+        this.setPage(this.currentPage);
+    }
+    setPage(page) {
+        this.currentPage = page;
+        let element = this.element;
+        this.element.innerHTML = "";
         let leftArrow = document.createElement("button");
         leftArrow.className = "page";
         leftArrow.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
-        if (currentPage <= 1) {
+        if (this.currentPage <= 1) {
             leftArrow.classList.add("disabled");
         } else {
             leftArrow.onclick = () => {
-                change_page_function(currentPage - 1);
+                this.change_page_function(this.currentPage - 1);
             }
         }
         let rightArrow = document.createElement("button");
         rightArrow.className = "page";
         rightArrow.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
-        if (currentPage >= totalPages) {
+        if (this.currentPage >= this.totalPages) {
             rightArrow.classList.add("disabled");
         } else {
             rightArrow.onclick = () => {
-                change_page_function(currentPage + 1);
+                this.change_page_function(this.currentPage + 1);
             }
         }
         let currentPageEle = document.createElement("button");
-        currentPageEle.innerHTML = currentPage;
+        currentPageEle.innerHTML = this.currentPage;
         currentPageEle.className = "page";
         currentPageEle.classList.add("selected");
         let gap = 0;
-        if (d1opt) {
+        if (this.d1opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "150px";
-            let dropdown = new SearchDropdown(translate("app.discover.sort_by"), d1opt, dropdownEle, d1def, d1func);
+            new SearchDropdown(translate("app.discover.sort_by"), this.d1opt, dropdownEle, this.d1def, this.d1func);
             element.appendChild(dropdownEle);
-            if (!d2opt && !d3opt && !d4opt) dropdownEle.style.marginRight = "auto";
+            if (!this.d2opt && !this.d3opt && !this.d4opt) dropdownEle.style.marginRight = "auto";
         }
-        if (d2opt) {
+        if (this.d2opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "75px";
-            let dropdown = new SearchDropdown(translate("app.discover.view"), d2opt, dropdownEle, d2def, d2func);
+            new SearchDropdown(translate("app.discover.view"), this.d2opt, dropdownEle, this.d2def, this.d2func);
             element.appendChild(dropdownEle);
-            if (!d3opt && !d4opt) dropdownEle.style.marginRight = "auto";
+            if (!this.d3opt && !this.d4opt) dropdownEle.style.marginRight = "auto";
         }
-        if (d3opt) {
+        if (this.d3opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "180px";
-            let dropdown = new DialogDropdown(translate("app.discover.game_version"), d3opt, dropdownEle, d3def, d3func);
+            new DialogDropdown(translate("app.discover.game_version"), this.d3opt, dropdownEle, this.d3def, this.d3func);
             element.appendChild(dropdownEle);
-            if (!d4opt) dropdownEle.style.marginRight = "auto";
+            if (!this.d4opt) dropdownEle.style.marginRight = "auto";
         }
-        if (d4opt) {
+        if (this.d4opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.marginRight = "auto";
             dropdownEle.style.width = "150px";
-            let dropdown = new SearchDropdown(translate("app.discover.loader"), d4opt, dropdownEle, d4def, d4func);
+            new SearchDropdown(translate("app.discover.loader"), this.d4opt, dropdownEle, this.d4def, this.d4func);
             element.appendChild(dropdownEle);
         }
         element.appendChild(leftArrow);
-        for (let i = 1; i <= totalPages; i++) {
-            if (i == currentPage) {
+        for (let i = 1; i <= this.totalPages; i++) {
+            if (i == this.currentPage) {
                 element.appendChild(currentPageEle);
-            } else if (i == 1 || i == totalPages || i == currentPage + 1 || i == currentPage - 1 || totalPages <= 6) {
+            } else if (i == 1 || i == this.totalPages || i == this.currentPage + 1 || i == this.currentPage - 1 || this.totalPages <= 5) {
                 let pageElement = document.createElement("button");
                 pageElement.innerHTML = i;
                 pageElement.className = "page";
                 pageElement.onclick = () => {
-                    change_page_function(i);
+                    this.change_page_function(i);
                 }
                 element.appendChild(pageElement);
                 gap = 0;
@@ -10014,8 +10038,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else if (content_source == "curseforge") {
         let cf_content, description, versions;
         try {
-            console.log(content_id);
-            if (isNaN(Number(content_id))) {
+            if (content_id.toString().includes(":")) {
                 let id_split = content_id.split(":")
                 let content_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/search?gameId=432&slug=${id_split[0]}&classId=${id_split[1]}`);
                 cf_content = await content_pre_json.json();
@@ -10247,7 +10270,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 element.style.marginInline = "auto";
                 tabContent.appendChild(element);
                 element.innerHTML = parseModrinthMarkdown(content.description);
-                afterMarkdownParse(instance_id, vanilla_version, loader);
+                afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu);
             }
         },
         {
@@ -10302,7 +10325,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     mcVersionFilter,
                     vanilla_version ? vanilla_version : "all",
                     (v) => {
-                        filterVersions(v, loaderDropdown.value, channelDropdown.value);
+                        filterVersions(v, loaderDropdown.value, channelDropdown.value, 1);
                     }
                 );
                 let mcLoaderFilter = document.createElement("div");
@@ -10326,7 +10349,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         "value": "all"
                     }].concat(allLoaders.map(e => ({ "name": loaders[e] ? loaders[e] : e, "value": e }))),
                     mcLoaderFilter, loader ? loader : "all", (v) => {
-                        filterVersions(versionDropdown.value, v, channelDropdown.value);
+                        filterVersions(versionDropdown.value, v, channelDropdown.value, 1);
                     })
                 let channelFilter = document.createElement("div");
                 let channelDropdown = new SearchDropdown(translate("app.discover.channel"), [
@@ -10347,11 +10370,22 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         "value": "alpha"
                     }
                 ], channelFilter, "all", (v) => {
-                    filterVersions(versionDropdown.value, loaderDropdown.value, v);
-                })
+                    filterVersions(versionDropdown.value, loaderDropdown.value, v, 1);
+                });
+
+                let pages = Math.ceil(content.versions.length / 25);
+
+                let pagination = new Pagination(1, pages, (new_page) => {
+                    filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value, new_page);
+                });
+
                 topFilters.appendChild(mcVersionFilter);
                 if (["modpack", "mod"].includes(content.project_type)) topFilters.appendChild(mcLoaderFilter);
                 topFilters.appendChild(channelFilter);
+
+                pagination.element.style.gridColumn = "-1";
+
+                topFilters.appendChild(pagination.element);
                 tabContent.appendChild(topFilters);
                 let wrapper = document.createElement("div");
                 wrapper.className = "version-files-wrapper";
@@ -10375,24 +10409,30 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
 
                 let versionInfo = [];
 
-                let filterVersions = (version, loader_, channel) => {
+                let filterVersions = (version, loader_, channel, new_page) => {
+                    pagination.setPage(new_page);
                     let count = 0;
                     versionInfo.forEach(e => {
                         if (!e.game_versions.includes(version) && version && version != "all") {
-                            e.element.style.display = "none";
+                            e.element.remove();
                             return;
                         }
                         if (loader_ && ((!content.combine_versions_and_loaders && !e.loaders.includes(loader_)) || (content.combine_versions_and_loaders && !e.game_versions.includes(loader_))) && (content.project_type == "mod" || content.project_type == "modpack") && loader_ != "all") {
-                            e.element.style.display = "none";
+                            e.element.remove();
                             return;
                         }
                         if (channel && e.channel != channel && channel != "all") {
-                            e.element.style.display = "none";
+                            e.element.remove();
                             return;
                         }
                         count++;
-                        e.element.style.display = "grid";
+                        if (count <= (new_page * 25 - 25) || count > new_page * 25) {
+                            e.element.remove();
+                            return;
+                        }
+                        wrapper.appendChild(e.element);
                     });
+                    pagination.setTotalPages(Math.ceil(count / 25));
                     if (count == 0) {
                         notfound.element.style.display = "";
                         topBar.style.display = "none";
@@ -10583,12 +10623,10 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
 
                         versionInfo.push({ "element": versionEle, "loaders": e.loaders, "game_versions": e.game_versions.map(e => e.toLowerCase()), "channel": e.version_type })
                     });
-                    filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value);
+                    filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value, 1);
                 }
 
                 showVersions();
-
-                filterVersions(vanilla_version, loader, "all");
 
                 tabContent.appendChild(wrapper);
             }
@@ -10709,7 +10747,7 @@ function parseModrinthMarkdown(md) {
     return window.electronAPI.parseModrinthMarkdown(md);
 }
 
-function afterMarkdownParse(instance_id, vanilla_version, loader) {
+function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu) {
     document.querySelectorAll('.markdown-body a').forEach((el) => {
         let url = el.getAttribute('data-href');
         if (!url) {
@@ -10717,6 +10755,27 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
             el.removeAttribute('href');
             el.setAttribute("tabindex", "0");
         }
+        let buttons = new ContextMenuButtons([
+            {
+                "title": translate("app.discover.open_in_browser"),
+                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                "func": () => {
+                    window.electronAPI.openInBrowser(url);
+                }
+            },
+            {
+                "title": translate("app.discover.copy"),
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "func": async () => {
+                    let success = await window.electronAPI.copyToClipboard(url);
+                    if (success) {
+                        displaySuccess(translate("app.discover.copy.success"));
+                    } else {
+                        displayError(translate("app.discover.copy.fail"));
+                    }
+                }
+            }
+        ])
         if (url) {
             if (url[0] == "/") {
                 url = "https://www.curseforge.com" + url;
@@ -10728,8 +10787,7 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
                     url_obj = new URL(url);
                 }
 
-                console.log(url_obj.hostname);
-                if (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com") {
+                if (dialogContextMenu && (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com")) {
                     let pathParts = url_obj.pathname.split('/').filter(Boolean);
                     if (pathParts.length >= 2) {
                         let pageType = pathParts[0];
@@ -10746,10 +10804,13 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
                                     displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader);
                                 }
                             });
+                            el.oncontextmenu = (e) => {
+                                dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+                            }
                             return;
                         }
                     }
-                } else if (url_obj.hostname == "curseforge.com" || url_obj.hostname == "www.curseforge.com") {
+                } else if (dialogContextMenu && (url_obj.hostname == "curseforge.com" || url_obj.hostname == "www.curseforge.com" || url_obj.hostname == "legacy.curseforge.com")) {
                     let pathParts = url_obj.pathname.split('/').filter(Boolean);
                     if (pathParts.length >= 2 && pathParts[0] == "minecraft") {
                         let pageType = pathParts[1];
@@ -10774,6 +10835,9 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
                                     displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader);
                                 }
                             });
+                            el.oncontextmenu = (e) => {
+                                dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+                            }
                             return;
                         }
                     }
@@ -10791,7 +10855,11 @@ function afterMarkdownParse(instance_id, vanilla_version, loader) {
                     e.preventDefault();
                     window.electronAPI.openInBrowser(url);
                 }
-            })
+            });
+            if (!dialogContextMenu) return;
+            el.oncontextmenu = (e) => {
+                dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+            }
         }
     });
 }
