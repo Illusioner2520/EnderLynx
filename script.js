@@ -10306,8 +10306,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         const ia = minecraftVersions.indexOf(a);
                         const ib = minecraftVersions.indexOf(b);
                         if (ia === -1 && ib === -1) return 0;
-                        if (ia === -1) return 1;
-                        if (ib === -1) return -1;
+                        if (ia === -1) return -1;
+                        if (ib === -1) return 1;
                         return ia - ib;
                     });
                     allGameVersions.reverse();
