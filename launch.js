@@ -752,7 +752,7 @@ class Minecraft {
         child.unref();
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
-    async downloadGame(loader, version, isRepair) {
+    async downloadGame(loader, version, isRepair, whatToRepair) {
         if (!this.libNames) this.libNames = [];
         try {
             ipcRenderer.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
@@ -760,11 +760,13 @@ class Minecraft {
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/logs`), { recursive: true });
             let files = [path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`)]
-            files.forEach((e) => {
-                if (isRepair && fs.existsSync(e)) fs.unlinkSync(e);
-                const fd = fs.openSync(e, 'w');
-                fs.closeSync(fd);
-            });
+            if (!isRepair || whatToRepair.includes("minecraft")) {
+                files.forEach((e) => {
+                    if (isRepair && fs.existsSync(e)) fs.unlinkSync(e);
+                    const fd = fs.openSync(e, 'w');
+                    fs.closeSync(fd);
+                });
+            }
             this.version = version;
             ipcRenderer.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
@@ -782,98 +784,109 @@ class Minecraft {
                 console.error("Invalid version");
                 return;
             }
-            fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`), JSON.stringify(version_json));
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
-            const assetJSON = await fetch(version_json.assetIndex.url);
-            let asset_json = await assetJSON.json();
-            fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/indexes`), { recursive: true });
-            fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/objects`), { recursive: true });
-            fs.writeFileSync(path.resolve(userPath, `minecraft/meta/assets/indexes/${version_json.assets}.json`), JSON.stringify(asset_json));
-            let assetKeys = Object.keys(asset_json.objects);
-            for (let i = 0; i < assetKeys.length; i++) {
-                ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
-                let asset_data = asset_json.objects[assetKeys[i]];
-                if (version_json.assets == "legacy") {
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/legacy/${assetKeys[i]}`)) || isRepair) {
-                        await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/legacy/${assetKeys[i]}`));
-                    }
-                } else if (version_json.assets == "pre-1.6") {
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`)) || isRepair) {
-                        await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`));
-                    }
-                } else {
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`)) || isRepair) {
-                        await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`));
+            if (!isRepair || whatToRepair.includes("minecraft")) {
+                fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`), JSON.stringify(version_json));
+            }
+            if (!isRepair || whatToRepair.includes("assets")) {
+                ipcRenderer.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
+                const assetJSON = await fetch(version_json.assetIndex.url);
+                let asset_json = await assetJSON.json();
+                fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/indexes`), { recursive: true });
+                fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/objects`), { recursive: true });
+                fs.writeFileSync(path.resolve(userPath, `minecraft/meta/assets/indexes/${version_json.assets}.json`), JSON.stringify(asset_json));
+                let assetKeys = Object.keys(asset_json.objects);
+                for (let i = 0; i < assetKeys.length; i++) {
+                    ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
+                    let asset_data = asset_json.objects[assetKeys[i]];
+                    if (version_json.assets == "legacy") {
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/legacy/${assetKeys[i]}`)) || isRepair) {
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/legacy/${assetKeys[i]}`));
+                        }
+                    } else if (version_json.assets == "pre-1.6") {
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`)) || isRepair) {
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`));
+                        }
+                    } else {
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`)) || isRepair) {
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`));
+                        }
                     }
                 }
+                this.asset_dir = version_json.assets == "legacy" ? path.resolve(userPath, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(userPath, "minecraft/meta/assets");
             }
-            this.asset_dir = version_json.assets == "legacy" ? path.resolve(userPath, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(userPath, "minecraft/meta/assets");
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
-            await urlToFile(version_json.downloads.client.url, path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`));
-            this.jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+            if (!isRepair || whatToRepair.includes("minecraft")) {
+                ipcRenderer.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
+                await urlToFile(version_json.downloads.client.url, path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`));
+                this.jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+            }
             let java = new Java();
             let paths = "";
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
-            this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion, isRepair);
-            this.java_version = version_json.javaVersion.majorVersion;
-            const platform = os.platform();
-            const getPlatformString = () => {
-                if (platform === 'win32') return 'windows';
-                if (platform === 'darwin') return 'osx';
-                return 'linux';
-            };
-            const arch = os.arch();
-            if (version_json?.arguments?.game) {
-                this.args = version_json.arguments;
-            } else if (version_json?.minecraftArguments) {
-                this.args = version_json.minecraftArguments.split(" ");
+            if (!isRepair || whatToRepair.includes("java")) {
+                ipcRenderer.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
+                this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion, isRepair);
+                this.java_version = version_json.javaVersion.majorVersion;
             }
-            if (loader == "vanilla") this.main_class = version_json.mainClass;
-            this.version_type = version_json.type;
-            this.assets_index = version_json.assets;
-            let platformString = getPlatformString();
-            let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 60, "Starting library download...");
-            libs: for (let i = 0; i < version_json.libraries.length; i++) {
-                ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`);
-                if (version_json.libraries[i].rules) {
-                    rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
-                        let rule = version_json.libraries[i].rules[j];
-                        if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
-                            continue libs;
+            if (!isRepair || whatToRepair.includes("minecraft")) {
+                const platform = os.platform();
+                const getPlatformString = () => {
+                    if (platform === 'win32') return 'windows';
+                    if (platform === 'darwin') return 'osx';
+                    return 'linux';
+                };
+                const arch = os.arch();
+                if (version_json?.arguments?.game) {
+                    this.args = version_json.arguments;
+                } else if (version_json?.minecraftArguments) {
+                    this.args = version_json.minecraftArguments.split(" ");
+                }
+                if (loader == "vanilla") this.main_class = version_json.mainClass;
+                this.version_type = version_json.type;
+                this.assets_index = version_json.assets;
+                let platformString = getPlatformString();
+                let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
+                ipcRenderer.send('progress-update', "Downloading Minecraft", 60, "Starting library download...");
+                libs: for (let i = 0; i < version_json.libraries.length; i++) {
+                    ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`);
+                    if (version_json.libraries[i].rules) {
+                        rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
+                            let rule = version_json.libraries[i].rules[j];
+                            if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
+                                continue libs;
+                            }
+                            if (rule.action == "disallow" && rule?.os?.name == platformString) {
+                                continue libs;
+                            }
                         }
-                        if (rule.action == "disallow" && rule?.os?.name == platformString) {
-                            continue libs;
+                    }
+                    if (version_json.libraries[i].downloads.artifact) {
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`)) || isRepair) {
+                            await urlToFile(version_json.libraries[i].downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`));
                         }
+                        let libName = version_json.libraries[i].name.split(":");
+                        libName.splice(libName.length - 1, 1);
+                        libName = libName.join(":");
+                        if (!this.libNames?.includes(libName)) {
+                            paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`) + ";";
+                        }
+                        this.libNames.push(libName);
+                    }
+                    if (version_json.libraries[i].natives && version_json.libraries[i].natives[platformString]) {
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`)) || isRepair) {
+                            await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`));
+                        }
+                        let libName = version_json.libraries[i].name.split(":");
+                        libName.splice(libName.length - 1, 1);
+                        libName = libName.join(":");
+                        if (!this.libNames?.includes(libName)) {
+                            paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`) + ";";
+                        }
+                        this.libNames.push(libName);
+                        await extractJar(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`), path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
                     }
                 }
-                if (version_json.libraries[i].downloads.artifact) {
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`)) || isRepair) {
-                        await urlToFile(version_json.libraries[i].downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`));
-                    }
-                    let libName = version_json.libraries[i].name.split(":");
-                    libName.splice(libName.length - 1, 1);
-                    libName = libName.join(":");
-                    if (!this.libNames?.includes(libName)) {
-                        paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`) + ";";
-                    }
-                    this.libNames.push(libName);
-                }
-                if (version_json.libraries[i].natives && version_json.libraries[i].natives[platformString]) {
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`)) || isRepair) {
-                        await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`));
-                    }
-                    let libName = version_json.libraries[i].name.split(":");
-                    libName.splice(libName.length - 1, 1);
-                    libName = libName.join(":");
-                    if (!this.libNames?.includes(libName)) {
-                        paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`) + ";";
-                    }
-                    this.libNames.push(libName);
-                    await extractJar(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`), path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
-                }
+                this.libs += paths;
             }
-            this.libs += paths;
+            ipcRenderer.send('progress-update', "Downloading Minecraft", 100, "Done");
             return { "java_installation": this.java_installation, "java_version": this.java_version };
         } catch (err) {
             console.error('Error in download chain:', err);

@@ -1219,19 +1219,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
     },
-    repairMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
+    repairMinecraft: async (instance_id, loader, vanilla_version, loader_version, whatToRepair) => {
         let mc = new Minecraft(instance_id);
-        let r = await mc.downloadGame(loader, vanilla_version, true);
-        if (loader == "fabric") {
-            await mc.installFabric(vanilla_version, loader_version, true);
-        } else if (loader == "forge") {
-            await mc.installForge(vanilla_version, loader_version, true);
-        } else if (loader == "neoforge") {
-            await mc.installNeoForge(vanilla_version, loader_version, true);
-        } else if (loader == "quilt") {
-            await mc.installQuilt(vanilla_version, loader_version, true);
+        let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
+        if (whatToRepair.includes("mod_loader")) {
+            if (loader == "fabric") {
+                await mc.installFabric(vanilla_version, loader_version, true);
+            } else if (loader == "forge") {
+                await mc.installForge(vanilla_version, loader_version, true);
+            } else if (loader == "neoforge") {
+                await mc.installNeoForge(vanilla_version, loader_version, true);
+            } else if (loader == "quilt") {
+                await mc.installQuilt(vanilla_version, loader_version, true);
+            }
         }
-        return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
+        return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version };
     },
     getForgeVersion: async (mcversion) => {
         let forge = new Forge();

@@ -346,7 +346,8 @@
     "app.instances.settings.update_content.description": "Update all mods, resource packs or shaders to be compatible with the new version. Any content that isn't compatible will be disabled.",
     "app.instances.repair": "Repair Instance",
     "app.instances.repair.title": "Repair Instance",
-    "app.instances.repair.notice": "Are you sure that you want to repair this instance? The launcher will attempt to reinstall Minecraft, the mod loader & java installation. This might take some time. It will not delete your worlds, mod configs or other saved data.",
+    "app.instances.repair.notice": "Are you sure that you want to repair this instance? Select what you want to repair below. This might take some time. It will not delete your worlds, mod configs or other saved data.",
+    "app.instances.repair.notice_modpack": "Are you sure that you want to repair this instance? Select what you want to repair below. This might take some time. It will not delete your worlds, mod configs or other saved data. If you believe the issue is caused by the modpack or a mod in the modpack, please try to update the modpack to the latest version to see if that fixes the issue.",
     "app.instances.repair.cancel": "Cancel",
     "app.instances.repair.confirm": "Confirm Repair",
     "app.instances.settings.width": "Width",
@@ -703,5 +704,13 @@
     "app.settings.def_opts.import.location": "options.txt Location",
     "app.settings.def_opts.import.browse": "Browse",
     "app.settings.def_opts.import.cancel": "Cancel",
-    "app.settings.def_opts.import.confirm": "Import"
+    "app.settings.def_opts.import.confirm": "Import",
+    "app.instances.repair.java": "Java Installation",
+    "app.instances.repair.java.description": "Select this if the game isn't starting at all or there is a crash that wasn't caused by Minecraft or and loaded mods.",
+    "app.instances.repair.minecraft": "Minecraft Itself",
+    "app.instances.repair.minecraft.description": "Select this if the game is crashing and it wasn't caused by a specific mod. This will reinstall Minecraft's code and its libraries.",
+    "app.instances.repair.assets": "Assets",
+    "app.instances.repair.assets.description": "Select this if some of the games assets aren't loading such as the panorama or foreign language files. Make sure that it isn't caused by a resource pack. This is very rarily an issue.",
+    "app.instances.repair.mod_loader": "%l Installation",
+    "app.instances.repair.mod_loader.description": "Select this to reinstall %l and its libraries."
 }

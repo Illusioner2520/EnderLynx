@@ -5653,7 +5653,40 @@ function showInstanceSettings(instanceInfo) {
             "tab": instanceInfo.locked ? "general" : "installation",
             "func": () => {
                 let dialog = new Dialog();
-                dialog.showDialog(translate("app.instances.repair.title"), "notice", translate("app.instances.repair.notice"), [
+                dialog.showDialog(translate("app.instances.repair.title"), "form", [
+                    {
+                        "type": "notice",
+                        "content": instanceInfo.install_source == "custom" ? translate("app.instances.repair.notice") : translate("app.instances.repair.notice_modpack")
+                    },
+                    {
+                        "type": "toggle",
+                        "name": translate("app.instances.repair.minecraft"),
+                        "desc": translate("app.instances.repair.minecraft.description"),
+                        "id": "minecraft",
+                        "default": false
+                    },
+                    {
+                        "type": "toggle",
+                        "name": translate("app.instances.repair.java"),
+                        "desc": translate("app.instances.repair.java.description"),
+                        "id": "java",
+                        "default": false
+                    },
+                    {
+                        "type": "toggle",
+                        "name": translate("app.instances.repair.assets"),
+                        "desc": translate("app.instances.repair.assets.description"),
+                        "id": "assets",
+                        "default": false
+                    },
+                    instanceInfo.loader != "vanilla" ? {
+                        "type": "toggle",
+                        "name": translate("app.instances.repair.mod_loader", "%l", loaders[instanceInfo.loader]),
+                        "desc": translate("app.instances.repair.mod_loader.description", "%l", loaders[instanceInfo.loader]),
+                        "id": "mod_loader",
+                        "default": false
+                    } : null
+                ].filter(e => e), [
                     {
                         "type": "cancel",
                         "content": translate("app.instances.repair.cancel")
@@ -5662,8 +5695,8 @@ function showInstanceSettings(instanceInfo) {
                         "type": "confirm",
                         "content": translate("app.instances.repair.confirm")
                     }
-                ], [], () => {
-                    repairInstance(instanceInfo.refresh());
+                ], [], (v) => {
+                    repairInstance(instanceInfo.refresh(), v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
                 });
             },
             "close_dialog": true
@@ -11339,11 +11372,13 @@ function fixPathForImage(path) {
     return path.replaceAll(" ", "%20").replaceAll("#", "%23");
 }
 
-async function repairInstance(instance) {
+async function repairInstance(instance, whatToRepair) {
     instance.setMcInstalled(false);
-    let r = await window.electronAPI.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version);
-    instance.setJavaPath(r.java_installation);
-    instance.setJavaVersion(r.java_version);
+    let r = await window.electronAPI.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version, whatToRepair);
+    if (whatToRepair.includes("java")) {
+        instance.setJavaPath(r.java_installation);
+        instance.setJavaVersion(r.java_version);
+    }
     instance.setMcInstalled(true);
 }
 
