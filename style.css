@@ -11,6 +11,7 @@
 body {
     --background-color: #0a0a0a;
     --text-color: white;
+    --opposite-text-color: black;
     --subtle-text-color: #aaa;
     --accent-color: #0078d4;
     --danger-color: #d93e5d;
@@ -34,6 +35,7 @@ body.potato {
 body.light {
     --background-color: white;
     --text-color: black;
+    --opposite-text-color: white;
     --subtle-text-color: #444;
     --accent-color: color-mix(in srgb, #0078d4, white);
     --danger-color: color-mix(in srgb, #d93e5d, white);
@@ -1938,7 +1940,7 @@ dialog[open]::backdrop {
     cursor: pointer;
     border-radius: 10px;
     background-color: var(--text-color);
-    color: var(--background-color);
+    color: var(--opposite-text-color);
     transition: background-color .25s, scale .1s;
     font-size: 1rem;
 }
@@ -2423,7 +2425,7 @@ dialog[open]::backdrop {
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    color: var(--background-color);
+    color: var(--opposite-text-color);
     background-color: var(--text-color);
     border-radius: 50%;
     flex-shrink: 0;
@@ -4195,14 +4197,13 @@ dialog {
 
 #tooltip {
     position: fixed;
-    background-color: var(--background-color);
-    color: var(--text-color);
+    background-color: var(--text-color);
+    box-shadow: 0 0 10px -5px black;
+    color: var(--opposite-text-color);
     font-weight: bold;
     padding: 4px;
-    padding-inline: 8px;
-    border-radius: 10px;
+    border-radius: 6px;
     translate: -50% -100%;
-    box-shadow: 0 0 0px 1px var(--text-color), 0 0 10px black;
     pointer-events: none;
     width: max-content;
     transition: .2s opacity .2s, .2s display allow-discrete .2s, .2s overlay allow-discrete .2s, .1s left, .1s top;
@@ -4233,7 +4234,7 @@ dialog {
     width: 0;
     height: 0;
     border-style: solid;
-    border-width: 8px 6px;
+    border-width: 6px 6px;
     border-color: var(--text-color) transparent transparent transparent;
     position: absolute;
 }

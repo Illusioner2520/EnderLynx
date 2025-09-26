@@ -10868,18 +10868,15 @@ document.addEventListener("mouseover", function (e) {
     let tooltip = document.getElementById("tooltip");
     if (!tooltip) return;
     let target = e.target;
-    // Traverse up to find element with title
     while (target && target !== document.body) {
         if (target.hasAttribute && target.hasAttribute("title")) {
             let title = target.getAttribute("title");
             if (title) {
                 tooltip.textContent = title;
                 tooltip.showPopover();
-                // Position tooltip near mouse
-                // Position tooltip at the top center of the element
                 const rect = target.getBoundingClientRect();
                 let x = rect.left + (rect.width / 2);
-                let y = rect.top - 8;
+                let y = rect.top - 7;
                 tooltip.style.setProperty("--left", x + "px");
                 tooltip.style.setProperty("--top", y + "px");
             }
