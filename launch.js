@@ -1039,7 +1039,6 @@ function urlToFile(url, filepath, redirectCount = 0) {
     });
 }
 
-// New function: downloads a file from a URL to a folder, using the filename from the URL
 function urlToFolder(url, folder, redirectCount = 0) {
     return new Promise((resolve, reject) => {
         if (redirectCount > 5) {
@@ -1048,7 +1047,7 @@ function urlToFolder(url, folder, redirectCount = 0) {
 
         const parsedUrl = urlModule.parse(url);
         const protocol = parsedUrl.protocol === 'https:' ? https : http;
-        const fileName = path.basename(parsedUrl.pathname);
+        const fileName = path.basename(decodeURIComponent(parsedUrl.pathname));
         const filepath = path.join(folder, fileName);
 
         fs.mkdirSync(folder, { recursive: true });

@@ -2698,14 +2698,20 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
     manifest_json = JSON.parse(manifest_json);
 
     let content = [];
+    let project_ids = [];
 
     for (let i = 0; i < manifest_json.files.length; i++) {
         ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
 
-        let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${manifest_json.files[i].projectID}/files/${manifest_json.files[i].fileID}/download`, path.resolve(extractToPath, "temp"));
+        let project_id = manifest_json.files[i].projectID;
+        let file_id = manifest_json.files[i].fileID;
+
+        project_ids.push(project_id);
+
+        let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
         const tempFilePath = path.resolve(extractToPath, "temp", file_name);
-        let fileType = "mod";
         let destFolder = "mods";
+        let project_type = "mod";
 
         try {
             if (file_name.endsWith(".jar")) {
@@ -2722,29 +2728,69 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
             } else if (file_name.endsWith(".zip")) {
                 const tempZip = new AdmZip(tempFilePath);
                 if (tempZip.getEntry("pack.mcmeta")) {
+                    project_type = "resource_pack";
                     destFolder = "resourcepacks";
                 } else if (tempZip.getEntry("shaders/")) {
-                    fileType = "shader";
                     destFolder = "shaderpacks";
+                    project_type = "shader";
                 } else {
                     destFolder = "resourcepacks";
+                    project_type = "resource_pack";
                 }
             }
         } catch (e) {
             destFolder = "mods";
         }
 
+        
         const finalPath = path.resolve(extractToPath, destFolder, file_name);
         fs.mkdirSync(path.dirname(finalPath), { recursive: true });
         fs.renameSync(tempFilePath, finalPath);
+
+        content.push({
+            "source": "curseforge",
+            "source_id": project_id,
+            "version_id": file_id,
+            "disabled": false,
+            "type": project_type,
+            "version": "",
+            "file_name": path.basename(finalPath)
+        });
     }
+
+    let cfData = [];
+    try {
+        const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
+        });
+        if (response.ok) {
+            const json = await response.json();
+            cfData = json.data || [];
+        }
+    } catch (e) {
+        cfData = [];
+    }
+
+    console.log(cfData);
+
+    cfData.forEach(e => {
+        const idx = project_ids.indexOf(e.id);
+        if (idx !== -1 && content[idx]) {
+            content[idx].name = e.name;
+            content[idx].image = e.logo.thumbnailUrl;
+            content[idx].author = e.authors[0].name;
+        }
+    });
+
     ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
     return ({
         "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
-        "content": [],
+        "content": cfData.length ? content : [],
         "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
         "vanilla_version": manifest_json.minecraft.version
-    })
+    });
 }
 async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
     ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");

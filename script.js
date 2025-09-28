@@ -6109,12 +6109,14 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
                             "func": () => {
+                                instanceInfo = instanceInfo.refresh();
                                 displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, false, contentList);
                             }
                         } : e.source == "curseforge" ? {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
                             "func": () => {
+                                instanceInfo = instanceInfo.refresh();
                                 displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, false, contentList);
                             }
                         } : null,
