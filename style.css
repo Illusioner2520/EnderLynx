@@ -2260,15 +2260,12 @@ dialog[open]::backdrop {
     display: none;
     font-family: Arial, Helvetica, sans-serif;
     transform: translateX(150%);
-    transition: transform .25s, display .25s allow-discrete;
+    transition: transform .2s, display .2s allow-discrete;
     width: max-content;
     margin-block: 0;
     font-size: 1rem;
-    border-width: 2px;
-    border-color: var(--text-color);
-    border-style: solid;
     margin-left: auto;
-    box-shadow: 0px 0px 10px black;
+    box-shadow: 0px 0px 10px -5px black;
 }
 
 .error.shown {
@@ -2290,15 +2287,12 @@ dialog[open]::backdrop {
     display: none;
     font-family: Arial, Helvetica, sans-serif;
     transform: translateX(150%);
-    transition: transform .25s, display .25s allow-discrete;
+    transition: transform .2s, display .2s allow-discrete;
     width: max-content;
     margin-block: 0;
     font-size: 1rem;
-    border-width: 2px;
-    border-color: var(--text-color);
-    border-style: solid;
     margin-left: auto;
-    box-shadow: 0px 0px 10px black;
+    box-shadow: 0px 0px 10px -5px black;
 }
 
 .success:hover {
