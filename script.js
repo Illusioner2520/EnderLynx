@@ -37,9 +37,10 @@ minecraftVersions = getMCVersions();
 let fetchUpdatedMCVersions = async () => {
     let result_pre_json = await fetch(`https://launchermeta.mojang.com/mc/game/version_manifest.json`);
     let result = await result_pre_json.json();
+    console.log("Setting default to " + result.latest.release);
+    data.setDefault("latest_release", result.latest.release);
     let mc_versions = db.prepare('SELECT * FROM mc_versions_cache').all();
     let mc_version_names = mc_versions.map(e => e.name);
-    console.log(result.versions);
     for (let i = 0; i < result.versions.length; i++) {
         let e = result.versions[i];
         if (!mc_version_names.includes(e.id)) {
@@ -48,7 +49,6 @@ let fetchUpdatedMCVersions = async () => {
             mc_version_names.splice(mc_version_names.indexOf(e.id), 1);
         }
     }
-    console.log(mc_version_names);
     for (let i = 0; i < mc_version_names.length; i++) {
         let id = mc_version_names[i];
         db.prepare("DELETE FROM mc_versions_cache WHERE name = ?").run(id);
@@ -785,7 +785,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version, "latest_version": "hello there" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -4811,8 +4811,9 @@ function showInstanceContent(e) {
                 "options": [],
                 "id": "game_version",
                 "input_source": "loader",
-                "source": (new VersionList).getVersions,
-                "tab": "custom"
+                "source": VersionList.getVersions,
+                "tab": "custom",
+                "default": VersionList.getLatestRelease()
             },
             {
                 "type": "image-upload",
@@ -5599,7 +5600,7 @@ function showInstanceSettings(instanceInfo) {
             "default": instanceInfo.vanilla_version,
             "tab": "installation",
             "input_source": "loader",
-            "source": (new VersionList).getVersions
+            "source": VersionList.getVersions
         },
         instanceInfo.locked ? null : {
             "type": "loader-version-dropdown",
@@ -7923,7 +7924,7 @@ async function getVersions(loader, mcVersion) {
 
 class VersionList {
     constructor() { }
-    async getVersions(loader) {
+    static async getVersions(loader) {
         if (loader == "vanilla") {
             if (version_cache["vanilla"]) return version_cache["vanilla"];
             let v = await window.electronAPI.getVanillaVersions();
@@ -7950,6 +7951,9 @@ class VersionList {
             version_cache["quilt"] = v;
             return v;
         }
+    }
+    static getLatestRelease() {
+        return data.getDefault("latest_release");
     }
 }
 

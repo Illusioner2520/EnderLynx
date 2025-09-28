@@ -24,7 +24,6 @@ const stringArgv = require('string-argv').default;
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
-const { edgeTable } = require('three/examples/jsm/objects/MarchingCubes.js');
 
 const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1]);
