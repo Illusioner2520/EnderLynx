@@ -3825,6 +3825,7 @@ async function showHomeContent(oldEle) {
             article.onclick = () => {
                 window.electronAPI.openInBrowser("https://minecraft.net" + e.article_url);
             }
+            article.title = e.default_tile.sub_header;
             let article_title = document.createElement("div");
             article_title.innerHTML = e.default_tile.title;
             article_title.className = "mc-news-title";
