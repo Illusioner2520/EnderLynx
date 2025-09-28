@@ -24,6 +24,7 @@ const stringArgv = require('string-argv').default;
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
+const { edgeTable } = require('three/examples/jsm/objects/MarchingCubes.js');
 
 const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1]);
@@ -2792,6 +2793,11 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
 
     let content = [];
 
+    let project_ids = [];
+    let version_ids = [];
+    let team_ids = [];
+    let team_to_project_ids = {};
+
     for (let i = 0; i < modrinth_index_json.files.length; i++) {
         ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / modrinth_index_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${modrinth_index_json.files.length}`);
         await urlToFile(modrinth_index_json.files[i].downloads[0], path.resolve(extractToPath, modrinth_index_json.files[i].path));
@@ -2800,40 +2806,59 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             let project_id = split[4];
             let file_id = split[6];
             if (project_id && file_id) {
-                let res_1 = await fetch(`https://api.modrinth.com/v2/project/${project_id}`);
-                let res_1_json = await res_1.json();
-                let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
-                let res_json = await res.json();
-                let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/members`);
-                let get_author_res_json = await get_author_res.json();
-                let author = "";
-                get_author_res_json.forEach(e => {
-                    if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
-                        author = e.user.username;
-                    }
-                });
-
-                let file_name = res_json.files[0].filename;
-                let version = res_json.version_number;
-
-                let project_type = res_1_json.project_type;
-                if (project_type == "resourcepack") project_type = "resource_pack";
-
+                if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
+                    let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
+                    let res_json = await res.json();
+                    file_id = res_json.id;
+                }
+                project_ids.push(project_id);
+                version_ids.push(file_id);
                 content.push({
-                    "author": author,
-                    "disabled": false,
-                    "file_name": file_name,
-                    "image": res_1_json.icon_url,
                     "source": "modrinth",
                     "source_id": project_id,
-                    "type": project_type,
-                    "version": version,
-                    "name": res_1_json.title,
-                    "version_id": res_json.id
-                })
+                    "version_id": file_id,
+                    "disabled": false
+                });
             }
         }
     }
+
+    let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
+    let res_json = await res.json();
+    res_json.forEach(e => {
+        const idx = project_ids.indexOf(e.id);
+        if (idx !== -1 && content[idx]) {
+            content[idx].name = e.title;
+            content[idx].image = e.icon_url;
+            content[idx].type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+            team_ids.push(e.team);
+            if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+            else team_to_project_ids[e.team].push(e.id);
+        }
+    });
+    let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`);
+    let res_json_1 = await res_1.json();
+    res_json_1.forEach(e => {
+        const idx = version_ids.indexOf(e.id);
+        if (idx !== -1 && content[idx]) {
+            content[idx].file_name = e.files[0].filename;
+            content[idx].version = e.version_number;
+        }
+    });
+    console.log(team_to_project_ids);
+    let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
+    let res_json_2 = await res_2.json();
+    res_json_2.forEach(e => {
+        if (Array.isArray(e)) {
+            let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
+            let author = authors.length ? authors[0] : "";
+            if (!team_to_project_ids[e[0].team_id]) return;
+            team_to_project_ids[e[0].team_id].forEach(f => {
+                content[project_ids.indexOf(f)].author = author;
+            });
+        }
+    });
+
     if (!loader) {
         let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
         let keys = Object.keys(modrinth_index_json.dependencies)

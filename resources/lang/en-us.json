@@ -409,7 +409,7 @@
     "app.content.import.cancel": "Cancel",
     "app.content.import.confirm": "Import",
     "app.content.import.complete": "Content import completed!",
-    "app.instances.locked.tooltip": "Instanced is Locked",
+    "app.instances.locked.tooltip": "Instance is Locked",
     "app.content.delete.title": "Are you sure?",
     "app.content.delete.notice": "Are you sure that you want to delete the content '%c'?",
     "app.content.delete.cancel": "Cancel",
