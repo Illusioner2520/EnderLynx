@@ -1504,15 +1504,18 @@ class SearchBar {
         this.oninput = oninput;
         this.onenter = onenter;
         element.classList.add("search-bar");
+        this.element = element;
         let searchIcon = document.createElement("div");
         searchIcon.classList.add("search-icon");
         searchIcon.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
         let searchInput = document.createElement("input");
         searchInput.classList.add("search-input");
         searchInput.setAttribute("placeholder", translate("app.hint.search"));
+        this.input = searchInput;
         let searchClear = document.createElement("button");
         searchClear.classList.add("search-clear");
         searchClear.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        this.clear = searchClear;
         element.appendChild(searchIcon);
         element.appendChild(searchInput);
         element.appendChild(searchClear);
@@ -1541,6 +1544,15 @@ class SearchBar {
     }
     setOnEnter(onenter) {
         this.onenter = onenter;
+    }
+    disable(m) {
+        this.element.style.cursor = "not-allowed";
+        this.element.style.opacity = ".5";
+        this.input.disabled = true;
+        this.clear.disabled = true;
+        this.input.style.cursor = "not-allowed";
+        this.clear.style.cursor = "not-allowed";
+        this.element.title = m;
     }
 }
 
@@ -8711,13 +8723,13 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
                 contentTabSelect("world", tabInfo, loader, vanilla_version, instance_id);
             }
         },
-        // {
-        //     "name": translate("app.discover.servers"),
-        //     "value": "servers",
-        //     "func": () => {
-        //         contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id);
-        //     }
-        // },
+        {
+            "name": translate("app.discover.servers"),
+            "value": "servers",
+            "func": () => {
+                contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id);
+            }
+        },
         {
             "name": translate("app.discover.data_packs"),
             "value": "datapack",
@@ -8743,21 +8755,25 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type, offline) {
         let element = document.createElement("div");
         element.className = "discover-item";
         if (experimental) {
             element.classList.add("experimental");
             element.title = translate("app.discover.experimental");
         }
+        if (offline) {
+            element.classList.add("incompatible");
+            element.title = translate("app.discover.offline");
+        }
         element.onclick = () => {
-            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader);
+            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, null, infoData, project_type);
         }
         element.setAttribute("tabindex", "0");
         element.setAttribute("role", "button");
         element.onkeydown = (e) => {
             if (e.key == "Enter" || e.key == " ") {
-                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader);
+                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, null, infoData, project_type);
             }
         }
         this.element = element;
@@ -8780,10 +8796,12 @@ class ContentSearchEntry {
         titleElement.className = "discover-item-title";
         titleElement.innerHTML = `<div>${sanitize(title)}</div>`;
         top.appendChild(titleElement);
-        let authorElement = document.createElement("div");
-        authorElement.className = "discover-item-author";
-        authorElement.innerHTML = `<div>${sanitize(translate("app.discover.author", "%a", author))}</div>`;
-        top.appendChild(authorElement);
+        if (author) {
+            let authorElement = document.createElement("div");
+            authorElement.className = "discover-item-author";
+            authorElement.innerHTML = `<div>${sanitize(translate("app.discover.author", "%a", author))}</div>`;
+            top.appendChild(authorElement);
+        }
         let descElement = document.createElement("div");
         descElement.className = "discover-item-desc";
         descElement.innerHTML = description;
@@ -8797,7 +8815,13 @@ class ContentSearchEntry {
             tagElement.className = "discover-item-tag";
             tagsElement.appendChild(tagElement);
         });
-        if (downloadCount) {
+        if (downloadCount && downloadCount.toString().includes("/")) {
+            let split = downloadCount.split("/");
+            let downloadCountElement = document.createElement("div");
+            downloadCountElement.innerHTML = translate("app.discover.online_count", "%o", (split[0]), "%t", (split[1]));
+            downloadCountElement.className = "discover-item-downloads";
+            actions.appendChild(downloadCountElement);
+        } else if (downloadCount) {
             let downloadCountElement = document.createElement("div");
             downloadCountElement.innerHTML = translate("app.discover.download_count", "%d", sanitize(formatNumber(downloadCount)));
             downloadCountElement.className = "discover-item-downloads";
@@ -8878,6 +8902,7 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
         searchContents = v;
         getContent(discoverList, instance_id, d.getSelected, v, loader, version, tab);
     });
+    if (tab == "server") s.disable(translate("app.discover.server_search_not_available"));
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
     let d = new SearchDropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
@@ -9023,7 +9048,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
         pages = Math.ceil(apiresult.total_hits / pageSize);
         let paginationTop = new Pagination(page, pages, (new_page) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
-        }, [
+        }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.sort.relevance"),
                 "value": "relevance"
@@ -9042,7 +9067,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }
         ], sortBy, (v) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v);
-        }, [
+        }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.view.5"),
                 "value": "5"
@@ -9069,9 +9094,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }
         ], pageSize.toString(), (v) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
-        }, [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
+        }, ["server"].includes(project_type) ? null : [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
             getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy);
-        }, ["resourcepack", "shader", "world", "datapack"].includes(project_type) ? null : [
+        }, ["resourcepack", "shader", "world", "datapack", "server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.loader.all"),
                 "value": "all"
@@ -9121,10 +9146,10 @@ async function getContent(element, instance_id, source, query, loader, version, 
             loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
             return;
         }
-        pages = Math.ceil(apiresult.pagination.totalCount / pageSize);
+        pages = Math.ceil(project_type == "server" ? (apiresult.meta.total / 50) : (apiresult.pagination.totalCount / pageSize));
         let paginationTop = new Pagination(page, pages, (new_page) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
-        }, [
+        }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.sort.relevance"),
                 "value": "relevance"
@@ -9143,7 +9168,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }
         ], sortBy, (v) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v);
-        }, [
+        }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.view.5"),
                 "value": "5"
@@ -9170,9 +9195,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
             }
         ], pageSize.toString(), (v) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
-        }, [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
+        }, ["server"].includes(project_type) ? null : [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
             getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy);
-        }, ["resourcepack", "shader", "world", "datapack"].includes(project_type) ? null : [
+        }, ["resourcepack", "shader", "world", "datapack", "server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.loader.all"),
                 "value": "all"
@@ -9207,9 +9232,16 @@ async function getContent(element, instance_id, source, query, loader, version, 
         element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.data.length; i++) {
             let e = apiresult.data[i];
-            let entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                installButtonClick(project_type, "curseforge", [], e.thumbnailUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
-            }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type);
+            let entry;
+            if (project_type == "server") {
+                entry = new ContentSearchEntry(e.name, "", e.serverConnection, e.latestPing.online + "/" + e.latestPing.total, e.favicon, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
+                    installButtonClick(project_type, "curseforge", [], e.favicon, e.name, "", [], e.serverConnection, instance_id, button, null);
+                }, e.tags.map(e => e.name), e, null, "curseforge", e.serverConnection, instance_id, version, loader, false, false, project_type, !e.latestPing.successful);
+            } else {
+                entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
+                    installButtonClick(project_type, "curseforge", [], e.thumbnailUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
+                }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type);
+            }
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -9558,6 +9590,10 @@ async function installContent(source, project_id, instance_id, project_type, tit
 }
 
 async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate, data_pack_world) {
+    if (project_type == "server") {
+        let initialContent = await addContent(instance_id, project_type, project_id, title, icon_url);
+        return initialContent;
+    }
     let instance_id = instance.instance_id;
     let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename, data_pack_world);
     if (isUpdate) return initialContent;
@@ -9978,15 +10014,15 @@ async function getModpackVersions(source, content_id) {
 let contentInfoHistory = [];
 let contentInfoIndex = 0;
 
-async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false, content_list_to_update) {
+async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false, content_list_to_update, infoData, pt) {
     if (!content_source) return;
     if (!disableAddToHistory) {
         if (contentInfo.open) {
             contentInfoHistory = contentInfoHistory.slice(0, contentInfoIndex + 1);
-            contentInfoHistory.push({ "content_source": content_source, "content_id": content_id });
+            contentInfoHistory.push({ "content_source": content_source, "content_id": content_id, "info_data": infoData, "project_type": pt });
             contentInfoIndex++;
         } else {
-            contentInfoHistory = [{ "content_source": content_source, "content_id": content_id }];
+            contentInfoHistory = [{ "content_source": content_source, "content_id": content_id, "info_data": infoData, "project_type": pt }];
             contentInfoIndex = 0;
         }
     }
@@ -10010,7 +10046,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonBack.onclick = () => {
             contentInfoIndex--;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
         }
     }
     contentNav.appendChild(buttonBack);
@@ -10022,7 +10058,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonForward.onclick = () => {
             contentInfoIndex++;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
         }
     }
     contentNav.appendChild(buttonForward);
@@ -10075,6 +10111,31 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         content.authors = team_members.map(e => ({ ...e, "browser_url": `https://modrinth.com/user/${e.user.id}` }));
         content.source = "modrinth";
         content.display_source = "Modrinth";
+    } else if (content_source == "curseforge" && pt == "server") {
+        content = {
+            "icon_url": infoData.favicon,
+            "title": infoData.name,
+            "project_type": "server",
+            "downloads": 0,
+            "online_players": infoData.latestPing.online,
+            "total_players": infoData.latestPing.total,
+            "source": "curseforge",
+            "updated": infoData.latestPing.pingedAt,
+            "author": "",
+            "loaders": [],
+            "game_versions": [],
+            "id": infoData.serverConnection,
+            "urls": {
+                "browser": `https://www.curseforge.com/servers/minecraft/game/${infoData.slug}`,
+                "discord": `https://discord.gg/${infoData.discord}`,
+                "twitter": infoData.twitter ? `https://twitter.com/${infoData.twitter}` : null
+            },
+            "description": infoData.description,
+            "authors": [],
+            "gallery": [],
+            "convert_version_ids_to_numbers": true,
+            "display_source": "CurseForge"
+        }
     } else if (content_source == "curseforge") {
         let cf_content, description, versions;
         try {
@@ -10190,10 +10251,17 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     if (content.project_type == "shader") type = translate("app.content.shader");
     if (content.project_type == "datapack") type = translate("app.content.data_pack");
     if (content.project_type == "world") type = translate("app.content.world");
+    if (content.project_type == "server") type = translate("app.content.server");
     contentTopType.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
     let contentTopDownloads = document.createElement("div");
     contentTopDownloads.classList.add("content-top-sub-info-specific");
-    contentTopDownloads.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(content.downloads))}`;
+    if (content.online_players) {
+        contentTopDownloads.innerHTML = `<i class="fa-solid fa-signal"></i>${translate("app.discover.online_count", "%o", content.online_players, "%t", content.total_players)}`;
+    } else if (content.total_players == 0) {
+        contentTopDownloads.innerHTML = `<i class="fa-solid fa-signal"></i>${translate("app.discover.server.offline")}`;
+    } else {
+        contentTopDownloads.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(content.downloads))}`;
+    }
     let contentTopLastUpdated = document.createElement("div");
     contentTopLastUpdated.classList.add("content-top-sub-info-specific");
     contentTopLastUpdated.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatDate(content.updated))}`;
@@ -10251,6 +10319,15 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "title": translate("app.discover.view.discord"),
             "func": (e) => {
                 window.electronAPI.openInBrowser(content.urls.discord);
+            }
+        })
+    }
+    if (content.urls.twitter) {
+        links.push({
+            "icon": '<i class="fa-brands fa-twitter"></i>',
+            "title": translate("app.discover.view.twitter"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.twitter);
             }
         })
     }
@@ -10313,7 +10390,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu);
             }
         },
-        {
+        content.versions?.length ? {
             "name": translate("app.discover.tabs.files"),
             "value": "files",
             "func": () => {
@@ -10670,7 +10747,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
 
                 tabContent.appendChild(wrapper);
             }
-        },
+        } : null,
         content.authors.length ? {
             "name": content.authors.length == 1 ? translate("app.discover.tabs.author") : translate("app.discover.tabs.authors"),
             "value": "authors",
@@ -11591,6 +11668,8 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     "dependencies": dependency_list
                 }, "curseforge", new Instance(instance_id), project_type, title, author, icon, project_id)
             }
+        } else if (project_type == "server") {
+            success = await addContent(instance_id, project_type, project_id, title, icon);
         } else {
             success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
         }
@@ -11640,13 +11719,15 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                         "dependencies": dependency_list
                     }, "curseforge", new Instance(info.instance), project_type, title, author, icon, project_id)
                 }
+            } else if (project_type == "server") {
+                success = await addContent(info.instance, project_type, project_id, title, icon);
             } else {
                 success = await installContent(source, project_id, info.instance, project_type, title, author, icon);
             }
             if (success) {
                 displaySuccess(translate("app.discover.select_instance.success", "%t", title, "%i", (new Instance(info.instance)).name));
             } else {
-                displaySuccess(translate("app.discover.select_instance.fail", "%t", title, "%i", (new Instance(info.instance)).name));
+                displayError(translate("app.discover.select_instance.fail", "%t", title, "%i", (new Instance(info.instance)).name));
             }
         });
     }

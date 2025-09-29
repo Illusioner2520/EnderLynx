@@ -25,6 +25,8 @@ const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
 
+let cfServerInfo = {};
+
 const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1]);
 
@@ -475,10 +477,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getWorlds,
     getSinglePlayerWorlds,
+    addServer,
     deleteServer: async (instance_id, ip, index) => {
-        console.log("instance_id:", instance_id);
-        console.log("ip:", ip);
-        console.log("index:", index);
         let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
         let serversDatPath = path.resolve(patha, 'servers.dat');
 
@@ -1345,6 +1345,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await res.json();
     },
     curseforgeSearch: async (query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") => {
+        if (project_type == "server") {
+            if (cfServerInfo[page] && Date.now() - cfServerInfo[page].time < 3600000) {
+                return cfServerInfo[page].info;
+            }
+            let url = `https://mcservers.forgecdn.net/servers/api/servers?page=${page}`;
+            let res = await fetch(url);
+            let json = await res.json();
+            cfServerInfo[page] = {};
+            cfServerInfo[page].time = Date.now();
+            cfServerInfo[page].info = json;
+            return json;
+        }
         let sort = 1;
         if (sortBy == "downloads") sort = 6;
         if (sortBy == "newest") sort = 5;
@@ -1382,6 +1394,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return false;
     },
     addContent: async (instance_id, project_type, project_url, filename, data_pack_world) => {
+        if (project_type == "server") {
+            let v = await addServer(instance_id, project_url, filename, data_pack_world);
+            return v;
+        }
+
         let install_path = "";
         if (project_type == "mod") {
             install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`, filename);
@@ -2741,7 +2758,7 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
             destFolder = "mods";
         }
 
-        
+
         const finalPath = path.resolve(extractToPath, destFolder, file_name);
         fs.mkdirSync(path.dirname(finalPath), { recursive: true });
         fs.renameSync(tempFilePath, finalPath);
@@ -3213,4 +3230,70 @@ function getOptions(optionsPath) {
         options.push({ key, value });
     }
     return options;
+}
+
+async function addServer(instance_id, ip, title, image) {
+    let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
+    let serversDatPath = path.resolve(patha, 'servers.dat');
+
+    if (!fs.existsSync(serversDatPath)) return false;
+    try {
+        const buffer = fs.readFileSync(serversDatPath);
+        const data = await nbt.parse(buffer);
+        let servers = data.parsed?.value?.servers?.value?.value || [];
+
+        console.log(servers);
+
+        let iconBase64 = "";
+        console.log(image);
+        if (image) {
+            let imageBuffer;
+            if (image.startsWith('data:image/')) {
+                iconBase64 = image.replace(/^data:image\/png;base64,/, '').replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+            } else if (image.startsWith('http://') || image.startsWith('https://')) {
+                console.log(image);
+                const response = await axios.get(image, { responseType: "arraybuffer" });
+                console.log(response.data);
+                imageBuffer = Buffer.from(response.data);
+                iconBase64 = imageBuffer.toString('base64');
+            } else if (fs.existsSync(image)) {
+                imageBuffer = fs.readFileSync(image);
+                iconBase64 = imageBuffer.toString('base64');
+            }
+        }
+
+        console.log(iconBase64);
+
+        servers.push({
+            "icon": {
+                "type": "string",
+                "value": iconBase64
+            },
+            "name": {
+                "type": "string",
+                "value": title
+            },
+            "ip": {
+                "type": "string",
+                "value": ip
+            },
+            "acceptTextures": {
+                "type": "byte",
+                "value": 1
+            },
+            "hidden": {
+                "type": "byte",
+                "value": 0
+            }
+        });
+
+        data.parsed.value.servers.value.value = servers;
+
+        const newBuffer = nbt.writeUncompressed(data.parsed);
+        fs.writeFileSync(serversDatPath, newBuffer);
+        return true;
+    } catch (e) {
+        console.error("Failed to add server to servers.dat:", e);
+        return false;
+    }
 }

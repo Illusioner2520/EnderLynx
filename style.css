@@ -2660,7 +2660,7 @@ dialog[open]::backdrop {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: var(--text-color);
+    color: var(--color-2);
 }
 
 .skin-render-canvas {
