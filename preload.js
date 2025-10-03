@@ -3235,17 +3235,31 @@ function getOptions(optionsPath) {
 async function addServer(instance_id, ip, title, image) {
     let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
     let serversDatPath = path.resolve(patha, 'servers.dat');
-
-    if (!fs.existsSync(serversDatPath)) return false;
+    let data = {};
+    let serversDatExists = fs.existsSync(serversDatPath);
+    if (!serversDatExists) {
+        data.parsed = {
+            "name": "",
+            "type": "compound",
+            "value": {
+                "servers": {
+                    "type": "list",
+                    "value": {
+                        "type": "compound",
+                        "value": []
+                    }
+                }
+            }
+        }
+    }
     try {
-        const buffer = fs.readFileSync(serversDatPath);
-        const data = await nbt.parse(buffer);
+        if (serversDatExists) {
+            const buffer = fs.readFileSync(serversDatPath);
+            data = await nbt.parse(buffer);
+        }
         let servers = data.parsed?.value?.servers?.value?.value || [];
 
-        console.log(servers);
-
         let iconBase64 = "";
-        console.log(image);
         if (image) {
             let imageBuffer;
             if (image.startsWith('data:image/')) {
@@ -3261,8 +3275,6 @@ async function addServer(instance_id, ip, title, image) {
                 iconBase64 = imageBuffer.toString('base64');
             }
         }
-
-        console.log(iconBase64);
 
         servers.push({
             "icon": {
