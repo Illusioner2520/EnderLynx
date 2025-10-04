@@ -2547,6 +2547,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     if (cf_id) dependency_json = await dependency_res.json()
 
     let content = [];
+    let project_ids = [];
 
     for (let i = 0; i < manifest_json.files.length; i++) {
         ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
@@ -2562,19 +2563,63 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
 
         let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${manifest_json.files[i].projectID}/files/${manifest_json.files[i].fileID}/download`, path.resolve(extractToPath, folder));
 
-        if (cf_id) content.push({
-            "author": dependency_item?.authorName ?? "",
-            "disabled": false,
-            "file_name": file_name,
-            "image": dependency_item?.logoUrl ?? "",
-            "source": "curseforge",
-            "source_id": manifest_json.files[i].projectID,
-            "type": type,
-            "version": "",
-            "version_id": manifest_json.files[i].fileID,
-            "name": dependency_item?.name ?? file_name
-        })
+        if (cf_id && dependency_item) {
+            project_ids.push(null);
+            content.push({
+                "author": dependency_item?.authorName ?? "",
+                "disabled": false,
+                "file_name": file_name,
+                "image": dependency_item?.logoUrl ?? "",
+                "source": "curseforge",
+                "source_id": manifest_json.files[i].projectID,
+                "type": type,
+                "version": "",
+                "version_id": manifest_json.files[i].fileID,
+                "name": dependency_item?.name ?? file_name
+            })
+        } else {
+            project_ids.push(manifest_json.files[i].projectID);
+            content.push({
+                "source": "curseforge",
+                "source_id": manifest_json.files[i].projectID,
+                "version_id": manifest_json.files[i].fileID,
+                "disabled": false,
+                "type": type,
+                "version": "",
+                "file_name": file_name
+            });
+        }
     }
+
+    if (project_ids.filter(e => e).length) {
+        let cfData = [];
+        try {
+            const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false })
+            });
+            if (response.ok) {
+                const json = await response.json();
+                cfData = json.data || [];
+            }
+        } catch (e) {
+            cfData = [];
+        }
+
+        console.log(project_ids);
+    
+        cfData.forEach(e => {
+            const idx = project_ids.indexOf(e.id);
+            if (idx !== -1 && content[idx]) {
+                content[idx].name = e.name;
+                content[idx].image = e.logo.thumbnailUrl;
+                content[idx].author = e.authors[0].name;
+            }
+        });
+    }
+
+
     ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
     return ({
         "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
