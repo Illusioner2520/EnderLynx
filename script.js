@@ -6124,14 +6124,14 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
                             "func": () => {
                                 instanceInfo = instanceInfo.refresh();
-                                displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, false, contentList);
+                                displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
                             }
                         } : e.source == "curseforge" ? {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
                             "func": () => {
                                 instanceInfo = instanceInfo.refresh();
-                                displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, false, contentList);
+                                displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
                             }
                         } : null,
                         instanceInfo.locked ? null : e.source == "player_install" ? null : {
@@ -8767,13 +8767,13 @@ class ContentSearchEntry {
             element.title = translate("app.discover.offline");
         }
         element.onclick = () => {
-            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, null, infoData, project_type);
+            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type);
         }
         element.setAttribute("tabindex", "0");
         element.setAttribute("role", "button");
         element.onkeydown = (e) => {
             if (e.key == "Enter" || e.key == " ") {
-                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, null, infoData, project_type);
+                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type);
             }
         }
         this.element = element;
@@ -10014,7 +10014,7 @@ async function getModpackVersions(source, content_id) {
 let contentInfoHistory = [];
 let contentInfoIndex = 0;
 
-async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, disableAddToHistory = false, content_list_to_update, infoData, pt) {
+async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, disableAddToHistory = false, content_list_to_update, infoData, pt) {
     if (!content_source) return;
     if (!disableAddToHistory) {
         if (contentInfo.open) {
@@ -10046,7 +10046,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonBack.onclick = () => {
             contentInfoIndex--;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
         }
     }
     contentNav.appendChild(buttonBack);
@@ -10058,7 +10058,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonForward.onclick = () => {
             contentInfoIndex++;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
         }
     }
     contentNav.appendChild(buttonForward);
@@ -10087,7 +10087,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             versions = await versions_pre_json.json();
         } catch (e) {
             loading.errorOut(e, () => {
-                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, true);
+                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true);
             });
             return;
         }
@@ -10157,7 +10157,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             if (versions.data) versions = versions.data;
         } catch (e) {
             loading.errorOut(e, () => {
-                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, true);
+                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true);
             });
             return;
         }
@@ -10387,7 +10387,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 element.style.marginInline = "auto";
                 tabContent.appendChild(element);
                 element.innerHTML = parseModrinthMarkdown(content.description);
-                afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu);
+                afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked);
             }
         },
         content.versions?.length ? {
@@ -10691,8 +10691,12 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         if (installedVersion == e.id) {
                             installButton.classList.add("disabled");
                             installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                            installButton.onclick = () => { }
+                            installButton.onclick = () => { };
                             installButton.setAttribute("title", translate("app.discover.installed.tooltip"));
+                        } else if (locked) {
+                            installButton.classList.add("disabled");
+                            installButton.onclick = () => { };
+                            installButton.setAttribute("title", translate("app.discover.locked.tooltip"));
                         }
 
                         versionEle.appendChild(installButton);
@@ -10864,7 +10868,7 @@ function parseModrinthMarkdown(md) {
     return window.electronAPI.parseModrinthMarkdown(md);
 }
 
-function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu) {
+function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked) {
     document.querySelectorAll('.markdown-body a').forEach((el) => {
         let url = el.getAttribute('data-href');
         if (!url) {
@@ -10913,12 +10917,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                             el.setAttribute('title', url);
                             el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader);
+                                displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader, locked);
                             });
                             el.addEventListener('keydown', (e) => {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
-                                    displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader);
+                                    displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader, locked);
                                 }
                             });
                             el.oncontextmenu = (e) => {
@@ -10944,12 +10948,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                             el.setAttribute('title', url);
                             el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader);
+                                displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader, locked);
                             });
                             el.addEventListener('keydown', (e) => {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
-                                    displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader);
+                                    displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader, locked);
                                 }
                             });
                             el.oncontextmenu = (e) => {

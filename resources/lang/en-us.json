@@ -619,6 +619,7 @@
     "app.discover.downgrade": "Downgrade",
     "app.discover.downgrade.tooltip": "Downgrade to this Version",
     "app.discover.installed.tooltip": "Version already installed",
+    "app.discover.locked.tooltip": "Instance is locked",
     "app.discover.changelog": "Changelog",
     "app.discover.changelog.tooltip": "View Changelog",
     "app.discover.changelog.title": "%v Changelog",
