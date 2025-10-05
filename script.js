@@ -10869,6 +10869,46 @@ function parseModrinthMarkdown(md) {
 }
 
 function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked) {
+    document.querySelectorAll('.markdown-body img').forEach((el) => {
+        let src = el.getAttribute('src');
+        if (!src) return;
+        let buttons = new ContextMenuButtons([
+            {
+                "title": translate("app.discover.open_in_browser"),
+                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                "func": () => {
+                    window.electronAPI.openInBrowser(src);
+                }
+            },
+            {
+                "title": translate("app.discover.copy_image"),
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "func": async () => {
+                    let success = await window.electronAPI.copyImageToClipboard(src);
+                    if (success) {
+                        displaySuccess(translate("app.discover.copy_image.success"));
+                    } else {
+                        displayError(translate("app.discover.copy_image.fail"));
+                    }
+                }
+            },
+            {
+                "title": translate("app.discover.copy_image_link"),
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "func": async () => {
+                    let success = await window.electronAPI.copyToClipboard(src);
+                    if (success) {
+                        displaySuccess(translate("app.discover.copy_image_link.success"));
+                    } else {
+                        displayError(translate("app.discover.copy_image_link.fail"));
+                    }
+                }
+            }
+        ]);
+        el.oncontextmenu = (e) => {
+            dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
+    });
     document.querySelectorAll('.markdown-body a').forEach((el) => {
         let url = el.getAttribute('data-href');
         if (!url) {

@@ -1544,7 +1544,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             if (/^https?:\/\//.test(file_path)) {
                 // file_path is a URL, download it first
                 const response = await axios.get(file_path, { responseType: "arraybuffer" });
-                image = nativeImage.createFromBuffer(Buffer.from(response.data));
+                let buffer = await sharp(response.data).png().toBuffer();
+                image = nativeImage.createFromBuffer(buffer);
             } else {
                 image = nativeImage.createFromPath(file_path);
             }
@@ -2608,7 +2609,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         }
 
         console.log(project_ids);
-    
+
         cfData.forEach(e => {
             const idx = project_ids.indexOf(e.id);
             if (idx !== -1 && content[idx]) {
