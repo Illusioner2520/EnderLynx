@@ -11072,6 +11072,35 @@ document.addEventListener("mouseout", function (e) {
     tooltip.hidePopover();
 });
 
+document.addEventListener("focusin", function (e) {
+    let tooltip = document.getElementById("tooltip");
+    if (!tooltip) return;
+    let target = e.target;
+    while (target && target !== document.body) {
+        if (target.hasAttribute && target.hasAttribute("title")) {
+            let title = target.getAttribute("title");
+            if (title) {
+                tooltip.textContent = title;
+                tooltip.showPopover();
+                const rect = target.getBoundingClientRect();
+                let x = rect.left + (rect.width / 2);
+                let y = rect.top - 7;
+                tooltip.style.setProperty("--left", x + "px");
+                tooltip.style.setProperty("--top", y + "px");
+            }
+            return;
+        }
+        target = target.parentElement;
+    }
+    tooltip.hidePopover();
+});
+
+document.addEventListener("focusout", function (e) {
+    let tooltip = document.getElementById("tooltip");
+    if (!tooltip) return;
+    tooltip.hidePopover();
+});
+
 document.addEventListener("mouseover", function (e) {
     let target = e.target;
     while (target && target !== document.body) {
