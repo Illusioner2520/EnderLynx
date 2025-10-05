@@ -4045,6 +4045,7 @@ function showMyAccountContent(e) {
                             let info = {};
                             v.forEach(e => { info[e.id] = e.value });
                             e.setName(info.name);
+                            if (!info.name) e.setName(translate("app.wardrobe.unnamed"));
                             e.setModel(info.model);
                             showContent();
                         });
