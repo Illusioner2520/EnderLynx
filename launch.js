@@ -9,6 +9,7 @@ const { spawn, execSync } = require('child_process');
 const { ipcRenderer } = require('electron');
 const { pathToFileURL } = require('url');
 const { version } = require('./package.json');
+const pLimit = require('p-limit').default;
 
 let launchername = "EnderLynx";
 let launcherversion = version;
@@ -795,23 +796,25 @@ class Minecraft {
                 fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/objects`), { recursive: true });
                 fs.writeFileSync(path.resolve(userPath, `minecraft/meta/assets/indexes/${version_json.assets}.json`), JSON.stringify(asset_json));
                 let assetKeys = Object.keys(asset_json.objects);
-                for (let i = 0; i < assetKeys.length; i++) {
+                const limit = pLimit(10);
+                const downloadPromises = assetKeys.map((asset, i) => limit(async () => {
                     ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
-                    let asset_data = asset_json.objects[assetKeys[i]];
+                    let asset_data = asset_json.objects[asset];
                     if (version_json.assets == "legacy") {
-                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/legacy/${assetKeys[i]}`)) || isRepair) {
-                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/legacy/${assetKeys[i]}`));
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/legacy/${asset}`)) || isRepair) {
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/legacy/${asset}`));
                         }
                     } else if (version_json.assets == "pre-1.6") {
-                        if (!fs.existsSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`)) || isRepair) {
-                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${assetKeys[i]}`));
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${asset}`)) || isRepair) {
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${asset}`));
                         }
                     } else {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`)) || isRepair) {
                             await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`));
                         }
                     }
-                }
+                }));
+                await Promise.all(downloadPromises);
                 this.asset_dir = version_json.assets == "legacy" ? path.resolve(userPath, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(userPath, "minecraft/meta/assets");
             }
             if (!isRepair || whatToRepair.includes("minecraft")) {

@@ -24,6 +24,7 @@ const stringArgv = require('string-argv').default;
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
+const pLimit = require('p-limit').default;
 
 let cfServerInfo = {};
 
@@ -83,6 +84,7 @@ function openInBrowser(url) {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
+    getMaxConcurrentDownloads,
     version,
     userPath,
     osplatform: () => os.platform(),
@@ -2550,10 +2552,12 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     let content = [];
     let project_ids = [];
 
-    for (let i = 0; i < manifest_json.files.length; i++) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+    const limit = pLimit(getMaxConcurrentDownloads());
 
-        let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === manifest_json.files[i].projectID) : null;
+    const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
+        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+
+        let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
 
         let folder = "mods";
         if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
@@ -2562,7 +2566,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
         else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shader";
 
-        let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${manifest_json.files[i].projectID}/files/${manifest_json.files[i].fileID}/download`, path.resolve(extractToPath, folder));
+        let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
 
         if (cf_id && dependency_item) {
             project_ids.push(null);
@@ -2572,25 +2576,28 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
                 "file_name": file_name,
                 "image": dependency_item?.logoUrl ?? "",
                 "source": "curseforge",
-                "source_id": manifest_json.files[i].projectID,
+                "source_id": file.projectID,
                 "type": type,
                 "version": "",
-                "version_id": manifest_json.files[i].fileID,
+                "version_id": file.fileID,
                 "name": dependency_item?.name ?? file_name
             })
         } else {
-            project_ids.push(manifest_json.files[i].projectID);
+            project_ids.push(file.projectID);
             content.push({
                 "source": "curseforge",
-                "source_id": manifest_json.files[i].projectID,
-                "version_id": manifest_json.files[i].fileID,
+                "source_id": file.projectID,
+                "version_id": file.fileID,
                 "disabled": false,
                 "type": type,
                 "version": "",
                 "file_name": file_name
             });
         }
-    }
+    }));
+    await Promise.all(downloadPromises);
+
+    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
 
     if (project_ids.filter(e => e).length) {
         let cfData = [];
@@ -2762,11 +2769,13 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
     let content = [];
     let project_ids = [];
 
-    for (let i = 0; i < manifest_json.files.length; i++) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+    const limit = pLimit(getMaxConcurrentDownloads());
 
-        let project_id = manifest_json.files[i].projectID;
-        let file_id = manifest_json.files[i].fileID;
+    const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
+        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+
+        let project_id = file.projectID;
+        let file_id = file.fileID;
 
         project_ids.push(project_id);
 
@@ -2818,7 +2827,10 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
             "version": "",
             "file_name": path.basename(finalPath)
         });
-    }
+    }));
+    await Promise.all(downloadPromises);
+
+    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
 
     let cfData = [];
     try {
@@ -2906,30 +2918,37 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
     let team_ids = [];
     let team_to_project_ids = {};
 
-    for (let i = 0; i < modrinth_index_json.files.length; i++) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / modrinth_index_json.files.length) * 89 + 10, `Downloading file ${i + 1} of ${modrinth_index_json.files.length}`);
-        await urlToFile(modrinth_index_json.files[i].downloads[0], path.resolve(extractToPath, modrinth_index_json.files[i].path));
-        if (modrinth_index_json.files[i].downloads[0].includes("https://cdn.modrinth.com/data")) {
-            let split = modrinth_index_json.files[i].downloads[0].split("/");
-            let project_id = split[4];
-            let file_id = split[6];
-            if (project_id && file_id) {
-                if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
-                    let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
-                    let res_json = await res.json();
-                    file_id = res_json.id;
+    const limit = pLimit(getMaxConcurrentDownloads());
+
+    const downloadPromises = modrinth_index_json.files.map((file, i) =>
+        limit(async () => {
+            ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${modrinth_index_json.files.length}`);
+            await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path));
+            if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
+                let split = file.downloads[0].split("/");
+                let project_id = split[4];
+                let file_id = split[6];
+                if (project_id && file_id) {
+                    if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
+                        let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
+                        let res_json = await res.json();
+                        file_id = res_json.id;
+                    }
+                    project_ids.push(project_id);
+                    version_ids.push(file_id);
+                    content.push({
+                        "source": "modrinth",
+                        "source_id": project_id,
+                        "version_id": file_id,
+                        "disabled": false
+                    });
                 }
-                project_ids.push(project_id);
-                version_ids.push(file_id);
-                content.push({
-                    "source": "modrinth",
-                    "source_id": project_id,
-                    "version_id": file_id,
-                    "disabled": false
-                });
             }
-        }
-    }
+        })
+    );
+
+    await Promise.all(downloadPromises);
+    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
 
     let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
     let res_json = await res.json();
@@ -2953,7 +2972,6 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             content[idx].version = e.version_number;
         }
     });
-    console.log(team_to_project_ids);
     let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
     let res_json_2 = await res_2.json();
     res_json_2.forEach(e => {
@@ -3354,4 +3372,10 @@ async function addServer(instance_id, ip, title, image) {
         console.error("Failed to add server to servers.dat:", e);
         return false;
     }
+}
+
+function getMaxConcurrentDownloads() {
+    let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
+    if (r?.value) return Number(r.value);
+    return 10;
 }

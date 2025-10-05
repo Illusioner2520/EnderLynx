@@ -33,6 +33,7 @@
     "form-data": "^4.0.3",
     "markdown-it": "^14.1.0",
     "msmc": "^5.0.5",
+    "p-limit": "^7.1.1",
     "png-to-ico": "^2.1.8",
     "prismarine-nbt": "^2.7.0",
     "qrcode": "^1.5.4",

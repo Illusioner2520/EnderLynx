@@ -785,7 +785,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version, "latest_version": "hello there" };
+            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version, "latest_release": "hello there", "max_concurrent_downloads": 10 };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -3163,9 +3163,21 @@ settingsButtonEle.onclick = () => {
             "default": data.getDefault("hide_ip") == "true"
         },
         {
+            "type": "slider",
+            "name": translate("app.settings.resources.downloads"),
+            "desc": translate("app.settings.resources.downloads.description"),
+            "tab": "resources",
+            "id": "max_concurrent_downloads",
+            "default": Number(data.getDefault("max_concurrent_downloads")),
+            "min": 1,
+            "max": 20,
+            "increment": 1,
+            "unit": ""
+        },
+        {
             "type": "text",
             "name": translate("app.settings.folder_location"),
-            "tab": "appearance",
+            "tab": "resources",
             "id": "folder_location",
             "desc": translate("app.settings.folder_location.description"),
             "default": window.electronAPI.userPath,
@@ -3295,6 +3307,10 @@ settingsButtonEle.onclick = () => {
             "value": "java"
         },
         {
+            "name": translate("app.settings.tab.resources"),
+            "value": "resources"
+        },
+        {
             "name": translate("app.settings.tab.app_info"),
             "value": "app_info"
         }
@@ -3304,6 +3320,7 @@ settingsButtonEle.onclick = () => {
         data.setDefault("default_width", info.default_width);
         data.setDefault("default_height", info.default_height);
         data.setDefault("default_ram", info.default_ram);
+        data.setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
         data.setDefault("default_page", info.default_page);
         data.setDefault("discord_rpc", (info.discord_rpc).toString());
         data.setDefault("potato_mode", (info.potato_mode).toString());
