@@ -58,6 +58,8 @@ let fetchUpdatedMCVersions = async () => {
 
 fetchUpdatedMCVersions();
 
+let accent_colors = ["red", "orange", "yellow", "lime", "green", "light_blue", "cyan", "blue", "purple", "magenta", "pink", "brown", "light_gray", "gray"];
+
 class DefaultOptions {
     constructor(v) {
         this.version = v;
@@ -785,7 +787,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version, "latest_release": "hello there", "max_concurrent_downloads": 10 };
+            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version, "latest_release": "hello there", "max_concurrent_downloads": 10 };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -3088,6 +3090,36 @@ settingsButtonEle.onclick = () => {
         },
         {
             "type": "dropdown",
+            "name": translate("app.settings.color"),
+            "tab": "appearance",
+            "id": "default_accent_color",
+            "options": [
+                { "name": translate("app.settings.color.red"), "value": "red" },
+                { "name": translate("app.settings.color.orange"), "value": "orange" },
+                { "name": translate("app.settings.color.yellow"), "value": "yellow" },
+                { "name": translate("app.settings.color.lime"), "value": "lime" },
+                { "name": translate("app.settings.color.green"), "value": "green" },
+                { "name": translate("app.settings.color.cyan"), "value": "cyan" },
+                { "name": translate("app.settings.color.light_blue"), "value": "light_blue" },
+                { "name": translate("app.settings.color.blue"), "value": "blue" },
+                { "name": translate("app.settings.color.purple"), "value": "purple" },
+                { "name": translate("app.settings.color.magenta"), "value": "magenta" },
+                { "name": translate("app.settings.color.pink"), "value": "pink" },
+                { "name": translate("app.settings.color.brown"), "value": "brown" },
+                { "name": translate("app.settings.color.gray"), "value": "gray" },
+                { "name": translate("app.settings.color.light_gray"), "value": "light_gray" }
+            ],
+            "default": data.getDefault("default_accent_color"),
+            "onchange": (v) => {
+                data.setDefault("default_accent_color", v);
+                accent_colors.forEach(e => {
+                    document.body.classList.remove(e);
+                });
+                document.body.classList.add(v);
+            }
+        },
+        {
+            "type": "dropdown",
             "name": translate("app.settings.sidebar"),
             "tab": "appearance",
             "id": "default_sidebar",
@@ -3888,6 +3920,8 @@ let mc_news = {};
 if (data.getDefault("default_mode") == "light") {
     document.body.classList.add("light");
 }
+
+document.body.classList.add(data.getDefault("default_accent_color"));
 
 if (data.getDefault("default_sidebar") == "compact") {
     document.body.classList.add("compact");

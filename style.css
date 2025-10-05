@@ -9,11 +9,68 @@
 }
 
 body {
+    --accent: #0078d4;
+}
+
+body.red {
+    --accent: #851f1f;
+}
+
+body.orange {
+    --accent: #d25b01;
+}
+
+body.yellow {
+    --accent: #dfa214;
+}
+
+body.lime {
+    --accent: #589e17;
+}
+
+body.green {
+    --accent: #455622;
+}
+
+body.cyan {
+    --accent: #146e7e;
+}
+
+body.blue {
+    --accent: #2a2c86;
+}
+
+body.purple {
+    --accent: #5e1e92;
+}
+
+body.magenta {
+    --accent: #9e2e95;
+}
+
+body.pink {
+    --accent: #c65d84;
+}
+
+body.brown {
+    --accent: #5a381e;
+}
+
+body.gray {
+    --accent: #323539;
+}
+
+body.light_gray {
+    --accent: #73736a;
+}
+
+body {
     --background-color: #0a0a0a;
     --text-color: white;
     --opposite-text-color: black;
     --subtle-text-color: #aaa;
-    --accent-color: #0078d4;
+    --accent-color: var(--accent);
+    --neutral-color: #0078d4;
     --danger-color: #d93e5d;
     --go-color: #22ff84;
     --success-color: rgb(0, 170, 0);
@@ -37,7 +94,8 @@ body.light {
     --text-color: black;
     --opposite-text-color: white;
     --subtle-text-color: #444;
-    --accent-color: color-mix(in srgb, #0078d4, white);
+    --accent-color: color-mix(in srgb, var(--accent), white);
+    --neutral-color: color-mix(in srgb, #0078d4, white);
     --danger-color: color-mix(in srgb, #d93e5d, white);
     --go-color: #22ff84;
     --success-color: rgb(180, 255, 180);
@@ -1751,7 +1809,7 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
     font-size: 1rem;
     align-items: center;
     align-self: stretch;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: color-mix(in srgb, var(--neutral-color), var(--text-color));
 }
 
 .logs-share:active {
@@ -2565,8 +2623,8 @@ dialog[open]::backdrop {
     height: 60px;
     width: 60px;
     border-radius: 50%;
-    background-color: color-mix(in srgb, 20% var(--accent-color), transparent);
-    color: var(--accent-color);
+    background-color: color-mix(in srgb, 20% var(--neutral-color), transparent);
+    color: var(--neutral-color);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -3812,7 +3870,7 @@ dialog[open]::backdrop {
 
     a {
         cursor: pointer;
-        color: color-mix(in srgb, var(--accent-color), var(--text-color));
+        color: color-mix(in srgb, var(--neutral-color), var(--text-color));
         font-weight: bold;
         text-decoration: none;
 
