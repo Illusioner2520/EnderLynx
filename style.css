@@ -4201,7 +4201,7 @@ dialog {
     translate: -50% -100%;
     pointer-events: none;
     width: max-content;
-    transition: .2s opacity .2s, .2s display allow-discrete .2s, .2s overlay allow-discrete .2s, .1s left, .1s top;
+    transition: opacity .2s .2s, display allow-discrete .2s .2s, overlay allow-discrete .2s  .2s, .1s left, .1s top, transform .2s .2s;
     opacity: 0;
     overflow: visible;
     border: none;
@@ -4215,9 +4215,11 @@ dialog {
 
 #tooltip:popover-open {
     opacity: 1;
+    transform: scaleY(1) scaleX(1) translateY(0);
 
     @starting-style {
         opacity: 0;
+        transform: scale(0.8) translateY(20%);
     }
 }
 
