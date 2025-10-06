@@ -1493,6 +1493,9 @@ class ContextMenu {
         }
         this.element.showPopover();
     }
+    hideContextMenu() {
+        this.element.hidePopover();
+    }
 }
 
 class ContextMenuButtons {
@@ -10084,6 +10087,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     contentInfo.innerHTML = "";
     contentInfo.showModal();
     let dialogContextMenu = new ContextMenu();
+    contentInfo.onscroll = () => {
+        dialogContextMenu.hideContextMenu();
+    }
     contentInfo.appendChild(dialogContextMenu.element);
     let contentWrapper = document.createElement("div");
     contentWrapper.className = "content-wrapper";
@@ -11161,6 +11167,7 @@ document.addEventListener("scroll", function (e) {
     let tooltip = document.getElementById("tooltip");
     if (!tooltip) return;
     tooltip.hidePopover();
+    contextmenu.hideContextMenu();
 }, true);
 
 async function addDesktopShortcut(instanceInfo) {
