@@ -2554,9 +2554,11 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
 
     const limit = pLimit(getMaxConcurrentDownloads());
 
-    const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
 
+    let count = 0;
+
+    const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
         let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
 
         let folder = "mods";
@@ -2565,8 +2567,14 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         let type = "mod";
         if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
         else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shader";
-
-        let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
+        let file_name = "";
+        try {
+            file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
+        } catch (e) {
+            let res = await fetch(`https://api.curse.tools/v1/cf/mods/${file.projectID}/files/${file.fileID}`);
+            let res_json = await res.json();
+            file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, folder));
+        }
 
         if (cf_id && dependency_item) {
             project_ids.push(null);
@@ -2594,10 +2602,14 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
                 "file_name": file_name
             });
         }
+        if (count == manifest_json.files.length - 1) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+        } else {
+            ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`);
+        }
+        count++;
     }));
     await Promise.all(downloadPromises);
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
 
     if (project_ids.filter(e => e).length) {
         let cfData = [];
@@ -2771,6 +2783,10 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
 
     const limit = pLimit(getMaxConcurrentDownloads());
 
+    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+
+    let count = 0;
+
     const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
         ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
 
@@ -2779,7 +2795,14 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
 
         project_ids.push(project_id);
 
-        let file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
+        try {
+            file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
+        } catch (e) {
+            let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
+            let res_json = await res.json();
+            file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, "temp"));
+        }
+
         const tempFilePath = path.resolve(extractToPath, "temp", file_name);
         let destFolder = "mods";
         let project_type = "mod";
@@ -2827,10 +2850,15 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
             "version": "",
             "file_name": path.basename(finalPath)
         });
+
+        if (count == manifest_json.files.length - 1) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+        } else {
+            ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
+        }
+        count++;
     }));
     await Promise.all(downloadPromises);
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
 
     let cfData = [];
     try {
@@ -2920,9 +2948,12 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
 
     const limit = pLimit(getMaxConcurrentDownloads());
 
+    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`);
+
+    let count = 0;
+
     const downloadPromises = modrinth_index_json.files.map((file, i) =>
         limit(async () => {
-            ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${modrinth_index_json.files.length}`);
             await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path));
             if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
                 let split = file.downloads[0].split("/");
@@ -2944,11 +2975,16 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                     });
                 }
             }
+            if (count == modrinth_index_json.files.length - 1) {
+                ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+            } else {
+                ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`);
+            }
+            count++;
         })
     );
 
     await Promise.all(downloadPromises);
-    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
 
     let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
     let res_json = await res.json();

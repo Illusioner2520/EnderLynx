@@ -11746,6 +11746,8 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             if (source == "modrinth") {
                 await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, title);
             } else if (source == "curseforge") {
+                instance.setLoader("");
+                instance.setVanillaVersion("");
                 await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), title);
             }
             let mr_pack_info = {};
