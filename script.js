@@ -733,6 +733,16 @@ let defaultSkins = [{
     "name": translate("app.skins.happy_ghast_pilot"),
     "model": "wide",
     "texture_key": "8409954698b6c7741460fdd85d6ec6a5e0a9ad04ade7e2c72c913f02936a607d"
+},
+{
+    "name": translate("app.skins.copper_chemist"),
+    "model": "wide",
+    "texture_key": "33aef79a4ca986a2971057d35046e71dce326b645353e6f92d56e1c4bb3b0073"
+},
+{
+    "name": translate("app.skins.copper_welder"),
+    "model": "wide",
+    "texture_key": "514b10ff7bc50dd01b5438632815b9e27cfe54064d1a28ef6014f3309d278b38"
 }]
 
 class Data {
