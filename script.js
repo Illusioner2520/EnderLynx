@@ -4103,7 +4103,7 @@ function showMyAccountContent(e) {
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "danger": true,
                     "func": () => {
-                        if (e.skin_id == data.getDefaultProfile().getActiveSkin().skin_id) {
+                        if (e.active_uuid.replaceAll(";","")) {
                             displayError(translate("app.wardrobe.skin.delete.in_use"));
                             return;
                         }
