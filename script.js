@@ -3999,11 +3999,7 @@ function showMyAccountContent(e) {
         pauseButton.onclick = onPause;
     }
     pauseButton.onclick = onPause;
-    let viewerInfo = document.createElement("div");
-    viewerInfo.innerHTML = translate("app.wardrobe.current");
-    viewerInfo.className = 'skin-render-info';
     skinRenderContainer.appendChild(pauseButton);
-    skinRenderContainer.appendChild(viewerInfo);
     let optionsContainer = document.createElement("div");
     optionsContainer.className = "my-account-options";
     ele.appendChild(optionsContainer);
@@ -4050,7 +4046,6 @@ function showMyAccountContent(e) {
                     skinViewer.loadSkin(e.skin_url, {
                         model: e.model == "wide" ? "default" : "slim"
                     });
-                    viewerInfo.innerHTML = translate("app.wardrobe.current");
                     activeSkin = e;
                 }
                 loader.style.display = "none";
@@ -4099,11 +4094,92 @@ function showMyAccountContent(e) {
                     }
                 },
                 {
+                    "title": translate("app.wardrobe.skin.preview"),
+                    "icon": '<i class="fa-solid fa-eye"></i>',
+                    "func": () => {
+                        let skinRenderContainer = document.createElement("div");
+                        skinRenderContainer.className = "skin-render-container";
+                        skinRenderContainer.style.gridColumn = "1";
+                        let skinRenderCanvas = document.createElement("canvas");
+                        skinRenderCanvas.className = "skin-render-canvas";
+                        skinRenderContainer.appendChild(skinRenderCanvas);
+                        ele.appendChild(skinRenderContainer);
+                        const dpr = window.devicePixelRatio || 1;
+                        let skinViewer = new skinview3d.SkinViewer({
+                            canvas: skinRenderCanvas,
+                            width: 398 * dpr,
+                            height: 498 * dpr
+                        });
+                        skinRenderCanvas.style.width = "400px";
+                        skinRenderCanvas.style.height = "500px";
+                        skinViewer.pixelRatio = 2
+                        skinViewer.zoom = 0.7;
+                        skinViewer.controls.enablePan = true;
+                        let walkingAnimation = new skinview3d.WalkingAnimation();
+                        walkingAnimation.headBobbing = false;
+                        skinViewer.animation = walkingAnimation;
+                        skinViewer.animation.speed = 0.5;
+                        let pauseButton = document.createElement("button");
+                        pauseButton.className = 'skin-render-pause';
+                        pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                        let onPause = () => {
+                            skinViewer.animation.paused = true;
+                            pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+                            pauseButton.onclick = onResume;
+                        }
+                        let onResume = () => {
+                            skinViewer.animation.paused = false;
+                            pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                            pauseButton.onclick = onPause;
+                        }
+                        let onClose = () => {
+                            if (skinViewer.animation) skinViewer.animation.paused = true;
+                            if (skinViewer.controls) skinViewer.controls.enabled = false;
+                            if (skinViewer.renderLoopId) {
+                                cancelAnimationFrame(skinViewer.renderLoopId);
+                                skinViewer.renderLoopId = null;
+                            }
+                            skinViewer.draw = () => { };
+                            skinViewer.render = () => { };
+                            if (skinViewer.playerObject?.skin?.texture) skinViewer.playerObject.skin.texture.dispose();
+                            if (skinViewer.playerObject?.cape?.texture) skinViewer.playerObject.cape.texture.dispose();
+                            skinViewer.renderer?.dispose();
+                            const gl = skinViewer.renderer?.getContext();
+                            gl?.getExtension?.('WEBGL_lose_context')?.loseContext();
+                            skinViewer.canvas?.remove();
+                            skinViewer.playerObject = null;
+                            skinViewer.renderer = null;
+                            skinViewer.canvas = null;
+                            skinViewer.controls = null;
+                        }
+                        pauseButton.onclick = onPause;
+                        skinRenderContainer.appendChild(pauseButton);
+                        skinViewer.loadSkin(e.skin_url, {
+                            model: e.model == "wide" ? "default" : "slim"
+                        });
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.wardrobe.skin.preview.title"), "notice", skinRenderContainer, [
+                            {
+                                "type": "confirm",
+                                "content": translate("app.wardrobe.skin.preview.confirm")
+                            }
+                        ], [], () => {
+                            setTimeout(() => {
+                                onClose();
+                            }, 1000);
+                        }, () => {
+                            setTimeout(() => {
+                                onClose();
+                            }, 1000);
+                        })
+                    }
+                },
+                {
                     "title": translate("app.wardrobe.skin.delete"),
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "danger": true,
                     "func": () => {
-                        if (e.active_uuid.replaceAll(";","")) {
+                        if (e.active_uuid.replaceAll(";", "")) {
                             displayError(translate("app.wardrobe.skin.delete.in_use"));
                             return;
                         }
@@ -4140,31 +4216,6 @@ function showMyAccountContent(e) {
             skinName.innerHTML = sanitize(e.name);
             skinName.className = "skin-name";
             skinList.appendChild(skinEle);
-            skinEle.onmouseenter = () => {
-                skinViewer.loadSkin(e.skin_url, {
-                    model: e.model == "wide" ? "default" : "slim",
-                });
-                viewerInfo.innerHTML = translate("app.wardrobe.skin.preview");
-            }
-            skinEle.onfocus = () => {
-                skinViewer.loadSkin(e.skin_url, {
-                    model: e.model == "wide" ? "default" : "slim",
-                });
-                viewerInfo.innerHTML = translate("app.wardrobe.skin.preview");
-            }
-            skinEle.onmouseleave = () => {
-                skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-                    model: activeSkin?.model == "slim" ? "slim" : "default",
-                });
-                viewerInfo.innerHTML = translate("app.wardrobe.current");
-            }
-            skinEle.onblur = (e) => {
-                if (e.relatedTarget?.matches(".my-account-option.skin")) return;
-                skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-                    model: activeSkin?.model == "slim" ? "slim" : "default",
-                });
-                viewerInfo.innerHTML = translate("app.wardrobe.current");
-            }
             if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
                 skinEle.classList.add("selected");
             }
@@ -4225,7 +4276,6 @@ function showMyAccountContent(e) {
                             skinViewer.loadSkin(e.skin_url, {
                                 model: e.model == "wide" ? "default" : "slim"
                             });
-                            viewerInfo.innerHTML = translate("app.wardrobe.current");
                             activeSkin = e;
                         }
                         loader.style.display = "none";
@@ -4247,31 +4297,6 @@ function showMyAccountContent(e) {
                     skinName.innerHTML = sanitize(e.name);
                     skinName.className = "skin-name";
                     defaultSkinList.appendChild(skinEle);
-                    skinEle.onmouseenter = () => {
-                        skinViewer.loadSkin(e.skin_url, {
-                            model: e.model == "wide" ? "default" : "slim",
-                        });
-                        viewerInfo.innerHTML = translate("app.wardrobe.skin.preview");
-                    }
-                    skinEle.onfocus = () => {
-                        skinViewer.loadSkin(e.skin_url, {
-                            model: e.model == "wide" ? "default" : "slim",
-                        });
-                        viewerInfo.innerHTML = translate("app.wardrobe.skin.preview");
-                    }
-                    skinEle.onmouseleave = () => {
-                        skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-                            model: activeSkin?.model == "slim" ? "slim" : "default",
-                        });
-                        viewerInfo.innerHTML = translate("app.wardrobe.current");
-                    }
-                    skinEle.onblur = (e) => {
-                        if (e.relatedTarget?.matches(".my-account-option.skin")) return;
-                        skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-                            model: activeSkin?.model == "slim" ? "slim" : "default",
-                        });
-                        viewerInfo.innerHTML = translate("app.wardrobe.current");
-                    }
                     if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
                         skinEle.classList.add("selected");
                     }
@@ -4311,7 +4336,6 @@ function showMyAccountContent(e) {
                     currentEle.classList.add("selected");
                     e.setActive();
                     skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
-                    viewerInfo.innerHTML = translate("app.wardrobe.current");
                     activeCape = e;
                 }
                 loader.style.display = "none";
@@ -4335,23 +4359,6 @@ function showMyAccountContent(e) {
             capeEle.appendChild(capeName);
             capeName.innerHTML = sanitize(e.cape_name);
             capeList.appendChild(capeEle);
-            capeEle.onmouseenter = () => {
-                skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
-                viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
-            }
-            capeEle.onfocus = () => {
-                skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
-                viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
-            }
-            capeEle.onmouseleave = () => {
-                skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
-                viewerInfo.innerHTML = translate("app.wardrobe.current");
-            }
-            capeEle.onblur = (e) => {
-                if (e.relatedTarget?.matches(".my-account-option.cape")) return;
-                skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
-                viewerInfo.innerHTML = translate("app.wardrobe.current");
-            }
             if (e.active) {
                 capeEle.classList.add("selected");
             }
@@ -4374,23 +4381,6 @@ function showMyAccountContent(e) {
         capeEle.appendChild(capeName);
         capeName.innerHTML = translate("app.wardrobe.no_cape");
         capeList.appendChild(capeEle);
-        capeEle.onmouseenter = () => {
-            skinViewer.loadCape(null);
-            viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
-        }
-        capeEle.onfocus = () => {
-            skinViewer.loadCape(null);
-            viewerInfo.innerHTML = translate("app.wardrobe.cape.preview");
-        }
-        capeEle.onmouseleave = () => {
-            skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
-            viewerInfo.innerHTML = translate("app.wardrobe.current");
-        }
-        capeEle.onblur = (e) => {
-            if (e.relatedTarget?.matches(".my-account-option.cape")) return;
-            skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
-            viewerInfo.innerHTML = translate("app.wardrobe.current");
-        }
         if (!activeCape) {
             capeEle.classList.add("selected");
         }
@@ -4405,7 +4395,6 @@ function showMyAccountContent(e) {
                 currentEle.classList.add("selected");
                 default_profile.removeActiveCape();
                 skinViewer.loadCape(null);
-                viewerInfo.innerHTML = translate("app.wardrobe.current");
                 activeCape = null;
             }
             loader.style.display = "none";
@@ -8221,10 +8210,11 @@ class Dialog {
     closeDialog() {
         this.element.close();
     }
-    showDialog(title, type, info, buttons, tabs, onsubmit) {
+    showDialog(title, type, info, buttons, tabs, onsubmit, onclose) {
         let element = document.createElement("dialog");
         element.className = "dialog";
         element.oncancel = (e) => {
+            onclose();
             setTimeout(() => {
                 this.element.remove();
             }, 1000);
@@ -8240,6 +8230,7 @@ class Dialog {
         dialogX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         dialogX.onclick = (e) => {
             this.element.close();
+            onclose();
             setTimeout(() => {
                 this.element.remove();
             }, 1000);
@@ -8676,6 +8667,7 @@ class Dialog {
                     buttonElement.onclick = () => {
                         if (info[i].close_dialog) {
                             this.element.close();
+                            onclose();
                             setTimeout(() => {
                                 this.element.remove();
                             }, 1000);
@@ -8700,6 +8692,7 @@ class Dialog {
             if (buttons[i].type == "cancel") {
                 buttonElement.onclick = (e) => {
                     this.element.close();
+                    onclose();
                     setTimeout(() => {
                         this.element.remove();
                     }, 1000);
