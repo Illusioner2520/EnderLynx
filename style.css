@@ -488,7 +488,8 @@ body.compact .sidebar {
 
 *:focus-visible,
 .search-bar:has(.search-input:focus-visible),
-.search-dropdown:has(.dropdown-button:focus-visible) {
+.search-dropdown:has(.dropdown-button:focus-visible),
+.details:has(.details-top:focus-visible) {
     outline-style: solid;
     outline-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     outline-width: 3.5px;

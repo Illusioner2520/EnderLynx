@@ -8214,7 +8214,7 @@ class Dialog {
         let element = document.createElement("dialog");
         element.className = "dialog";
         element.oncancel = (e) => {
-            onclose();
+            if (onclose) onclose();
             setTimeout(() => {
                 this.element.remove();
             }, 1000);
@@ -8230,7 +8230,7 @@ class Dialog {
         dialogX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         dialogX.onclick = (e) => {
             this.element.close();
-            onclose();
+            if (onclose) onclose();
             setTimeout(() => {
                 this.element.remove();
             }, 1000);
@@ -8667,7 +8667,7 @@ class Dialog {
                     buttonElement.onclick = () => {
                         if (info[i].close_dialog) {
                             this.element.close();
-                            onclose();
+                            if (onclose) onclose();
                             setTimeout(() => {
                                 this.element.remove();
                             }, 1000);
@@ -8692,7 +8692,7 @@ class Dialog {
             if (buttons[i].type == "cancel") {
                 buttonElement.onclick = (e) => {
                     this.element.close();
-                    onclose();
+                    if (onclose) onclose();
                     setTimeout(() => {
                         this.element.remove();
                     }, 1000);
