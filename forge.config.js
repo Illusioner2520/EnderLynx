@@ -23,8 +23,7 @@ module.exports = {
       /forge\.config\.js$/,
       /package-lock\.json$/,
       /updater\.js$/
-    ],
-    extraResource: ['./resources/lang']
+    ]
   },
   rebuildConfig: {},
   makers: [

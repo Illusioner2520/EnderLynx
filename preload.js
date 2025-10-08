@@ -40,14 +40,36 @@ const instanceArg = args.find(arg => arg.startsWith('--instance='));
 const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
 const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
 
+const enableDevMode = args.includes("--dev");
+
+let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
+if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
+else argsFromUrl = [];
+if (argsFromUrl.includes("debug")) argsFromUrl.splice(argsFromUrl.indexOf("debug"), 1);
+argsFromUrl = argsFromUrl.map(decodeURIComponent);
+
 if (instanceArg) {
     if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
     if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
     if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
 }
 
+if (argsFromUrl[0] == "launch") {
+    if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
+    if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
+    if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
+}
+
+console.log(instance_id_to_launch);
+console.log(world_type_to_launch);
+console.log(world_id_to_launch);
+
 let startingPage = args.find(arg => arg.startsWith('--page='));
 if (startingPage) startingPage = startingPage.split("=")[1];
+
+if (argsFromUrl[0] == "page") {
+    if (argsFromUrl[1]) startingPage = argsFromUrl[1];
+}
 
 if (!fs.existsSync(userPath)) {
     fs.mkdirSync(userPath, { recursive: true });
@@ -105,6 +127,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMaxConcurrentDownloads,
     version,
     userPath,
+    isDev: enableDevMode,
+    resourcePath: process.resourcesPath,
     osplatform: () => os.platform(),
     osrelease: () => os.release(),
     osarch: () => os.arch(),
@@ -406,9 +430,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     databaseRun: (sql, ...params) => {
         return db.prepare(sql).run(...params);
     },
-    readFile: (filePath) => {
+    readFile: (...filePath) => {
         try {
-            const content = fs.readFileSync(filePath, 'utf-8');
+            const content = fs.readFileSync(path.resolve(...filePath), 'utf-8');
             return content;
         } catch (err) {
             return `Error reading file: ${err.message}`;
@@ -2047,9 +2071,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createDesktopShortcut: async (instance_id, instance_name, iconSource, worldType, worldId) => {
         const desktopPath = await ipcRenderer.invoke('get-desktop');
         let safeName = instance_name.replace(/[<>:"/\\|?*]/g, '_');
-        let shortcutPath = path.join(desktopPath, `${safeName} - Minecraft.lnk`);
+        let shortcutPath = path.join(desktopPath, `${safeName} - EnderLynx.lnk`);
 
-        let base_shortcut = safeName + " - Minecraft";
+        let base_shortcut = safeName + " - EnderLynx";
         let count_shortcut = 1;
 
         while (fs.existsSync(shortcutPath)) {
@@ -2059,7 +2083,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         let target, workingDir, args;
 
-        let isDev = await ipcRenderer.invoke('is-dev');
+        let isDev = enableDevMode;
 
         if (isDev) {
             target = path.join(__dirname, 'node_modules', 'electron', 'dist', 'electron.exe');

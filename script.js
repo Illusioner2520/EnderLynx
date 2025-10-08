@@ -7699,7 +7699,12 @@ function formatDateAndTime(dateString) {
 }
 
 function getLangFile(locale) {
-    return JSON.parse(window.electronAPI.readFile(`./resources/lang/${locale}.json`));
+    let isDev = window.electronAPI.isDev;
+    if (!isDev) {
+        return JSON.parse(window.electronAPI.readFile(window.electronAPI.resourcePath, 'app.asar', 'resources', 'lang', `${locale}.json`));
+    } else {
+        return JSON.parse(window.electronAPI.readFile(`./resources/lang/${locale}.json`));
+    }
 }
 
 function checkForProcess(pid) {
@@ -7721,6 +7726,7 @@ function getInstanceContent(instanceInfo) {
 function translate(key, ...params) {
     if (!lang) {
         lang = getLangFile("en-us");
+        console.log(lang);
     }
     let value = lang[key];
     for (let i = 0; i < params.length; i += 2) {
