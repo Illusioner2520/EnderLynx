@@ -31,6 +31,24 @@ let cfServerInfo = {};
 const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1]);
 
+let instance_id_to_launch = "";
+let world_type_to_launch = "";
+let world_id_to_launch = "";
+
+const args = process.argv.slice(1);
+const instanceArg = args.find(arg => arg.startsWith('--instance='));
+const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
+const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
+
+if (instanceArg) {
+    if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
+    if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
+    if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
+}
+
+let startingPage = args.find(arg => arg.startsWith('--page='));
+if (startingPage) startingPage = startingPage.split("=")[1];
+
 if (!fs.existsSync(userPath)) {
     fs.mkdirSync(userPath, { recursive: true });
 }
@@ -1143,9 +1161,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
             callback(message);
         });
     },
+    isOtherStartingPage: () => {
+        if (startingPage) return startingPage;
+        return false;
+    },
     onLaunchInstance: async (callback) => {
-        let v = await ipcRenderer.invoke('get-instance-to-launch');
-        if (v?.instance_id) callback(v);
+        if (instance_id_to_launch) callback({
+            instance_id: instance_id_to_launch,
+            world_type: world_type_to_launch,
+            world_id: world_id_to_launch
+        });
     },
     getVanillaVersions: async () => {
         let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");

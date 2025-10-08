@@ -36,6 +36,8 @@ let win;
 
 const isDev = !app.isPackaged;
 
+let args = process.argv.slice(1);
+
 const createWindow = () => {
     let state = windowStateKeeper({
         defaultWidth: 1000,
@@ -54,7 +56,7 @@ const createWindow = () => {
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
             devTools: isDev,
-            additionalArguments: [`--userDataPath=${user_path}`]
+            additionalArguments: [`--userDataPath=${user_path}`].concat(args)
         },
         backgroundColor: "#0a0a0a",
         icon: path.join(__dirname, 'icon.ico')
@@ -64,21 +66,6 @@ const createWindow = () => {
     if (!isDev) {
         Menu.setApplicationMenu(null);
     }
-}
-
-let instance_id_to_launch = "";
-let world_type_to_launch = "";
-let world_id_to_launch = "";
-
-const args = process.argv.slice(1);
-const instanceArg = args.find(arg => arg.startsWith('--instance='));
-const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
-const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
-
-if (instanceArg) {
-    if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
-    if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
-    if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
 }
 
 app.whenReady().then(() => {
@@ -99,20 +86,6 @@ ipcMain.on('progress-update', (event, title, progress, desc) => {
 
 ipcMain.on('display-error', (event, message) => {
     win.webContents.send('display-error', message);
-});
-
-ipcMain.handle('get-instance-to-launch', (_) => {
-    let temp_ii = instance_id_to_launch;
-    let temp_wt = world_type_to_launch;
-    let temp_wi = world_id_to_launch;
-    instance_id_to_launch = "";
-    world_type_to_launch = "";
-    world_id_to_launch = "";
-    return {
-        instance_id: temp_ii.toString(),
-        world_type: temp_wt.toString(),
-        world_id: temp_wi.toString()
-    };
 });
 
 ipcMain.handle('show-open-dialog', async (event, options) => {

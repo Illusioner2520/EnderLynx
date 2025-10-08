@@ -9789,6 +9789,8 @@ function sanitize(input) {
 }
 
 let defaultpage = data.getDefault("default_page");
+let other_default_page = window.electronAPI.isOtherStartingPage();
+if (other_default_page) defaultpage = other_default_page;
 if (defaultpage == "home") {
     homeButton.setSelected();
     homeContent.displayContent();
@@ -9796,8 +9798,10 @@ if (defaultpage == "home") {
     instanceButton.setSelected();
     instanceContent.displayContent();
 } else if (defaultpage == "discover") {
-    worldButton.setSelected();
-    worldContent.displayContent();
+    setTimeout(() => {
+        worldButton.setSelected();
+        worldContent.displayContent();
+    },0);
 } else if (defaultpage == "my_account") {
     myAccountButton.setSelected();
     myAccountContent.displayContent();
