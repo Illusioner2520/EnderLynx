@@ -146,10 +146,8 @@ class Skin {
         let skin = db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(id);
         if (!skin) throw new Error("Skin not found");
         this.id = skin.id;
-        this.file_name = skin.file_name;
         this.name = skin.name;
         this.model = skin.model;
-        this.last_used = new Date(skin.last_used);
         this.skin_id = skin.skin_id;
         this.active_uuid = skin.active_uuid;
         this.skin_url = skin.skin_url;
@@ -161,10 +159,7 @@ class Skin {
         db.prepare("UPDATE skins SET model = ? WHERE id = ?").run(model, this.id);
         this.model = model;
     }
-    setLastUsed(last_used) {
-        db.prepare("UPDATE skins SET last_used = ? WHERE id = ?").run(last_used.toISOString(), this.id);
-        this.last_used = last_used;
-    }
+
     setName(name) {
         db.prepare("UPDATE skins SET name = ? WHERE id = ?").run(name, this.id);
         this.name = name;
@@ -204,7 +199,6 @@ class Cape {
         this.id = cape.id;
         this.cape_name = cape.cape_name;
         this.uuid = cape.uuid;
-        this.last_used = new Date(cape.last_used);
         this.cape_id = cape.cape_id;
         this.cape_url = cape.cape_url;
         this.active = Boolean(cape.active);
@@ -839,13 +833,13 @@ class Data {
         return skins.map(e => new Skin(e.id));
     }
 
-    addSkin(file_name, name, model, active_uuid, skin_id, skin_url, overrideCheck) {
+    addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck) {
         let skins = this.getSkins();
         let previousSkinIds = skins.map(e => e.skin_id);
         if (previousSkinIds.includes(skin_id) && !overrideCheck) {
             return new Skin(skins[previousSkinIds.indexOf(skin_id)].id);
         }
-        let result = db.prepare("INSERT INTO skins (file_name, name, model, active_uuid, skin_id, skin_url, default_skin) VALUES (?,?,?,?,?,?,?)").run(file_name, name, model, `;${active_uuid};`, skin_id, skin_url, Number(false));
+        let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin) VALUES (?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false));
         return new Skin(result.lastInsertRowid);
     }
 }
@@ -4582,13 +4576,13 @@ function showWardrobeContent(e) {
                     } else {
                         model = "wide";
                     }
-                    data.addSkin("", info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+                    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
                     showContent();
                 };
                 tempImg.src = info.skin;
                 return;
             }
-            data.addSkin("", info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
             showContent();
         });
     }
@@ -7726,7 +7720,6 @@ function getInstanceContent(instanceInfo) {
 function translate(key, ...params) {
     if (!lang) {
         lang = getLangFile("en-us");
-        console.log(lang);
     }
     let value = lang[key];
     for (let i = 0; i < params.length; i += 2) {
@@ -9896,7 +9889,7 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     try {
         for (const e of skin_and_cape_data.skins) {
             let hash = await window.electronAPI.downloadSkin(e.url);
-            let skin = data.addSkin("", translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false);
+            let skin = data.addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false);
             if (e.state == "ACTIVE") skin.setActive(skin_and_cape_data.uuid);
             else skin.removeActive(skin_and_cape_data.uuid);
         }
@@ -12001,5 +11994,19 @@ async function checkForUpdates(isManual) {
 }
 
 checkForUpdates();
+
+switch (data.getDefault("saved_version")) {
+    case "0.0.1":
+    case "0.0.2":
+    case "0.0.3":
+    case "0.0.4":
+    case "0.0.5":
+    case "0.0.6":
+    case "0.0.7":
+        if (data.getDefault("default_page") == "my_account") data.setDefault("default_page", "discover");
+        db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
+        db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
+        db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
+}
 
 data.setDefault("saved_version", window.electronAPI.version);
