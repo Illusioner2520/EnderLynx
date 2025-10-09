@@ -1089,8 +1089,8 @@ class MinecraftAccountSwitcher {
         this.players.push(newPlayerInfo);
         newPlayerInfo.setDefault();
         this.setPlayerInfo();
-        if (currentTab == "my_account") {
-            myAccountContent.displayContent();
+        if (currentTab == "wardrobe") {
+            wardrobeContent.displayContent();
         }
     }
     selectPlayer(newPlayerInfo) {
@@ -1123,8 +1123,8 @@ class MinecraftAccountSwitcher {
                 this.playerElements[i].classList.remove("not-selected");
             }
         }
-        if (currentTab == "my_account") {
-            myAccountContent.displayContent();
+        if (currentTab == "wardrobe") {
+            wardrobeContent.displayContent();
         }
     }
     onPlayerClick(e) {
@@ -1149,8 +1149,8 @@ class MinecraftAccountSwitcher {
             }
         }
         this.setPlayerInfo();
-        if (currentTab == "my_account") {
-            myAccountContent.displayContent();
+        if (currentTab == "wardrobe") {
+            wardrobeContent.displayContent();
         }
     }
 }
@@ -1206,7 +1206,7 @@ function resetDiscordStatus(bypassLock) {
     console.log("current tab", currentTab);
     if (!rpcLocked || bypassLock) {
         window.electronAPI.setActivity({
-            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "my_account" ? translate("app.discord_rpc.my_account") : translate("app.discord_rpc.unknown"),
+            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
             "state": translate("app.discord_rpc.not_playing"),
             startTimestamp: new Date(),
             largeImageKey: 'icon',
@@ -2668,14 +2668,14 @@ let codeToKey = {
 
 let homeContent = new PageContent(showHome, "home");
 let instanceContent = new PageContent(showInstanceContent, "instances");
-let worldContent = new PageContent(null, "discover");
-let myAccountContent = new PageContent(showMyAccountContent, "my_account");
+let discoverContent = new PageContent(null, "discover");
+let wardrobeContent = new PageContent(showWardrobeContent, "wardrobe");
 let contextmenu = new ContextMenu();
 let homeButton = new NavigationButton(homeButtonEle, translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeContent);
 let instanceButton = new NavigationButton(instanceButtonEle, translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instanceContent);
-let worldButton = new NavigationButton(worldButtonEle, translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', worldContent);
+let discoverButton = new NavigationButton(discoverButtonEle, translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', discoverContent);
 let settingsButton = new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa-solid fa-gear"></i>');
-let myAccountButton = new NavigationButton(myAccountButtonEle, translate("app.page.my_account"), '<i class="fa-solid fa-user"></i>', myAccountContent);
+let wardrobeButton = new NavigationButton(wardrobeButtonEle, translate("app.page.wardrobe"), '<i class="fa-solid fa-user"></i>', wardrobeContent);
 
 settingsButtonEle.onclick = () => {
     let selectedKeySelect;
@@ -3179,7 +3179,7 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.page.home"), "value": "home" },
                 { "name": translate("app.settings.page.instances"), "value": "instances" },
                 { "name": translate("app.settings.page.discover"), "value": "discover" },
-                { "name": translate("app.settings.page.my_account"), "value": "my_account" }
+                { "name": translate("app.settings.page.wardrobe"), "value": "wardrobe" }
             ],
             "default": data.getDefault("default_page")
         },
@@ -3396,7 +3396,7 @@ settingsButtonEle.onclick = () => {
     });
 }
 
-let navButtons = [homeButton, instanceButton, worldButton, myAccountButton];
+let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
 
 async function toggleMicrosoftSignIn() {
     try {
@@ -3954,7 +3954,7 @@ if (data.getDefault("hide_ip") == "true") {
 
 let skinViewer;
 
-function showMyAccountContent(e) {
+function showWardrobeContent(e) {
     if (!data.getDefaultProfile()) {
         let ele = document.createElement("div");
         ele.style.padding = "8px";
@@ -8728,7 +8728,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     for (let i = 0; i < navButtons.length; i++) {
         navButtons[i].removeSelected();
     }
-    worldButton.setSelected();
+    discoverButton.setSelected();
     added_vt_dp_packs = [];
     added_vt_rp_packs = [];
     content.innerHTML = "";
@@ -9805,12 +9805,12 @@ if (defaultpage == "home") {
     instanceContent.displayContent();
 } else if (defaultpage == "discover") {
     setTimeout(() => {
-        worldButton.setSelected();
+        discoverButton.setSelected();
         worldContent.displayContent();
     },0);
-} else if (defaultpage == "my_account") {
-    myAccountButton.setSelected();
-    myAccountContent.displayContent();
+} else if (defaultpage == "wardrobe") {
+    wardrobeButton.setSelected();
+    wardrobeContent.displayContent();
 }
 
 async function applyCape(profile, cape) {
