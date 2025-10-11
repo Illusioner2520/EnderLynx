@@ -4107,7 +4107,7 @@ function showWardrobeContent(e) {
                         skinRenderCanvas.style.width = "400px";
                         skinRenderCanvas.style.height = "500px";
                         skinViewer.pixelRatio = 2
-                        skinViewer.zoom = 0.7;
+                        skinViewer.zoom = 0.8;
                         skinViewer.controls.enablePan = true;
                         let walkingAnimation = new skinview3d.WalkingAnimation();
                         walkingAnimation.headBobbing = false;
