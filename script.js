@@ -1195,6 +1195,8 @@ class NavigationButton {
 }
 
 let currentTab = "";
+let currentSubTab = "";
+let currentInstanceId = "";
 
 function resetDiscordStatus(bypassLock) {
     console.log("current tab", currentTab);
@@ -5290,6 +5292,8 @@ function showInstanceContent(e) {
     return ele;
 }
 function showSpecificInstanceContent(instanceInfo, default_tab) {
+    currentTab = "instance";
+    currentInstanceId = instanceInfo.instance_id;
     instanceInfo = instanceInfo.refresh();
     for (let i = 0; i < navButtons.length; i++) {
         navButtons[i].removeSelected();
@@ -5494,7 +5498,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
             "func": (e) => {
-                showInstanceSettings(new Instance(instanceInfo.instance_id));
+                showInstanceSettings(new Instance(instanceInfo.instance_id), tabsInfo);
             }
         },
         {
@@ -5613,7 +5617,7 @@ function getServerLastPlayed(instance_id, ip) {
     return result ? new Date(result.date) : new Date(null);
 }
 
-function showInstanceSettings(instanceInfo) {
+function showInstanceSettings(instanceInfo, tabsInfo) {
     let dialog = new Dialog();
     dialog.showDialog(translate("app.instances.settings.title"), "form", [
         {
@@ -5959,12 +5963,16 @@ function showInstanceSettings(instanceInfo) {
                 }
             }
             displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
+            if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
+                setInstanceTabContentContent(instanceInfo, tabsInfo);
+            }
         }
         instanceInfo.setMcInstalled(true);
     });
 }
 
 function setInstanceTabContentContent(instanceInfo, element) {
+    currentSubTab = "content";
     element.innerHTML = "";
     instanceInfo = instanceInfo.refresh();
     let instanceLockedBanner = document.createElement("div");
@@ -6350,6 +6358,7 @@ function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
 }
 async function setInstanceTabContentWorlds(instanceInfo, element) {
+    currentSubTab = "worlds";
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let importWorlds = document.createElement("button");
@@ -6811,6 +6820,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     clearMoreMenus();
 }
 function setInstanceTabContentLogs(instanceInfo, element) {
+    currentSubTab = "logs";
     let deleteButton = document.createElement("button");
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
@@ -7041,6 +7051,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     logDisplay.className = "logs-display";
 }
 function setInstanceTabContentOptions(instanceInfo, element) {
+    currentSubTab = "options";
     let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
@@ -7354,6 +7365,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
     }
 }
 function setInstanceTabContentScreenshots(instanceInfo, element) {
+    currentSubTab = "screenshots";
     element.innerHTML = "";
     let galleryElement = document.createElement("div");
     galleryElement.className = "gallery";
