@@ -73,11 +73,20 @@ const createWindow = () => {
         icon: path.join(__dirname, 'icon.ico')
     });
     win.loadFile('index.html');
+
+    win.webContents.on('did-finish-load', () => {
+        if (openedFile) {
+            win.webContents.send('open-file', openedFile);
+        }
+    });
+
     state.manage(win);
     if (!enableDev) {
         Menu.setApplicationMenu(null);
     }
 }
+
+let openedFile = null;
 
 app.whenReady().then(() => {
     app.setAppUserModelId('me.illusioner.enderlynx');
@@ -85,6 +94,18 @@ app.whenReady().then(() => {
     rpc.login({ clientId }).catch(console.error);
     if (!app.isDefaultProtocolClient('enderlynx') && !isDev) {
         app.setAsDefaultProtocolClient('enderlynx', process.execPath, []);
+    }
+    const fileArg = process.argv.find(arg => arg.endsWith('.elpack'));
+    if (fileArg) {
+        openedFile = fileArg;
+    }
+});
+
+app.on('open-file', (event, path) => {
+    event.preventDefault();
+    openedFile = path;
+    if (win) {
+        win.webContents.send('open-file', openedFile);
     }
 });
 

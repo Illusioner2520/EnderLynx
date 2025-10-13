@@ -1472,7 +1472,7 @@ class ContextMenu {
         this.element.style.right = "";
         let xTranslate = "0px";
         let yTranslate = "0px";
-        if (window.innerWidth - x < 200) {
+        if (window.innerWidth - x < 250) {
             xTranslate = "-100%";
         }
         if (window.innerHeight - y < 350) {
@@ -3720,11 +3720,13 @@ async function showHomeContent(oldEle) {
                     window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}`));
                 }
             },
-            // {
-            //     "icon": '<i class="fa-solid fa-share"></i>',
-            //     "title": translate("app.button.instances.share"),
-            //     "func": (e) => { }
-            // },
+            {
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "title": translate("app.button.instances.share"),
+                "func": (e) => {
+                    openInstanceShareDialog(instanceInfo);
+                }
+            },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
@@ -5038,6 +5040,8 @@ function showInstanceContent(e) {
                 instance.setLoader(packInfo.loader);
                 instance.setVanillaVersion(packInfo.vanilla_version);
                 instance.setLoaderVersion(packInfo.loader_version);
+                if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
+                if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
                 packInfo.content.forEach(e => {
                     instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
                 });
@@ -5071,6 +5075,7 @@ function showInstanceContent(e) {
                 instance.setLoader(packInfo.loader);
                 instance.setVanillaVersion(packInfo.vanilla_version);
                 instance.setLoaderVersion(packInfo.loader_version);
+                if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
                 packInfo.content.forEach(e => {
                     instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
                 });
@@ -5219,11 +5224,13 @@ function showInstanceContent(e) {
                     window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instances[i].instance_id}`));
                 }
             },
-            // {
-            //     "icon": '<i class="fa-solid fa-share"></i>',
-            //     "title": translate("app.button.instances.share"),
-            //     "func": (e) => { }
-            // },
+            {
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "title": translate("app.button.instances.share"),
+                "func": (e) => {
+                    openInstanceShareDialog(instances[i]);
+                }
+            },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
@@ -5489,11 +5496,13 @@ function showSpecificInstanceContent(instanceInfo, default_tab) {
                 window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}`));
             }
         },
-        // {
-        //     "icon": '<i class="fa-solid fa-share"></i>',
-        //     "title": translate("app.button.instances.share"),
-        //     "func": (e) => { }
-        // },
+        {
+            "icon": '<i class="fa-solid fa-share"></i>',
+            "title": translate("app.button.instances.share"),
+            "func": (e) => {
+                openInstanceShareDialog(instanceInfo);
+            }
+        },
         {
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
@@ -8099,6 +8108,224 @@ class ImageUpload {
     }
 }
 
+class MultipleFileSelect {
+    constructor(element, options) {
+        element.className = "multiple-file-select-wrapper";
+        this.selected = new Set();
+        this.expanded = new Set();
+        this.value = [];
+
+        const itemList = document.createElement("div");
+        itemList.className = "multiple-file-select";
+        this.itemList = itemList;
+        element.appendChild(itemList);
+
+        this.tree = this.buildTree(options);
+        this.renderTree(this.tree, this.itemList);
+    }
+
+    getValue() {
+        return Array.from(this.selected);
+    }
+
+    setSelected(selected) {
+        this.selected = new Set();
+        selected.forEach(e => {
+            let node = this.getNode(e);
+            if (!node) return;
+            this.selectAll(e, node);
+        });
+        this.updateCheckboxStates();
+    }
+
+    /** Build a hierarchical tree object */
+    buildTree(paths) {
+        const root = {};
+        for (const path of paths) {
+            const parts = path.split("//");
+            let node = root;
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (!node[part]) {
+                    node[part] = { children: {}, isFile: i === parts.length - 1 };
+                }
+                node = node[part].children;
+            }
+        }
+        return root;
+    }
+
+    /** Recursive render — only called once */
+    renderTree(node, container, parentPath = "") {
+        for (const key of Object.keys(node)) {
+            const fullPath = parentPath ? parentPath + "//" + key : key;
+            const isFile = node[key].isFile;
+            const children = node[key].children;
+
+            const item = document.createElement("div");
+            item.className = "multiple-file-select-item";
+            item.dataset.path = fullPath;
+
+            // Chevron
+            let chevron = null;
+            if (Object.keys(children).length) {
+                chevron = document.createElement("button");
+                chevron.className = "multiple-file-select-chevron";
+                chevron.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+                chevron.style.cursor = "pointer";
+                chevron.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleExpand(fullPath, childContainer, chevron);
+                };
+                chevron.onkeydown = (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        chevron.click();
+                    }
+                };
+                item.appendChild(chevron);
+            } else {
+                const spacer = document.createElement("span");
+                spacer.style.display = "inline-block";
+                spacer.style.width = "20px";
+                item.appendChild(spacer);
+            }
+
+            // Checkbox
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "multiple-file-select-checkbox";
+            checkbox.dataset.path = fullPath;
+            checkbox.onchange = (e) => {
+                e.stopPropagation();
+                if (checkbox.checked) this.selectAll(fullPath, node[key]);
+                else this.deselectAll(fullPath, node[key]);
+                this.updateCheckboxStates();
+            };
+            checkbox.onkeydown = (e) => {
+                if (e.key === " " || e.key === "Enter") {
+                    e.preventDefault();
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event("change"));
+                }
+            };
+            item.appendChild(checkbox);
+
+            // Label
+            const label = document.createElement("span");
+            label.className = isFile
+                ? "multiple-file-select-title file"
+                : "multiple-file-select-title folder";
+            label.innerHTML = key;
+            item.appendChild(label);
+
+            container.appendChild(item);
+
+            // Child container
+            const childContainer = document.createElement("div");
+            if (this.expanded.has(fullPath)) {
+                childContainer.classList.add("shown");
+            } else {
+                childContainer.classList.remove("shown");
+            }
+            childContainer.style.paddingLeft = "20px";
+            childContainer.className = "multiple-file-select-child-container";
+            container.appendChild(childContainer);
+
+            if (Object.keys(children).length) {
+                this.renderTree(children, childContainer, fullPath);
+            }
+        }
+    }
+
+    toggleExpand(path, childContainer, chevron) {
+        if (this.expanded.has(path)) {
+            this.expanded.delete(path);
+            childContainer.classList.remove("shown");
+            chevron.style.rotate = "0deg";
+        } else {
+            this.expanded.add(path);
+            childContainer.classList.add("shown");
+            chevron.style.rotate = "90deg";
+        }
+    }
+
+    selectAll(path, node) {
+        this.selected.add(path);
+        for (const key of Object.keys(node.children)) {
+            this.selectAll(path + "//" + key, node.children[key]);
+        }
+    }
+
+    deselectAll(path, node) {
+        this.selected.delete(path);
+        for (const key of Object.keys(node.children)) {
+            this.deselectAll(path + "//" + key, node.children[key]);
+        }
+    }
+
+    /** Efficiently update checkboxes and indeterminate states */
+    updateCheckboxStates() {
+        const allCheckboxes = this.itemList.querySelectorAll(".multiple-file-select-checkbox");
+        for (const checkbox of allCheckboxes) {
+            const path = checkbox.dataset.path;
+            const node = this.getNode(path);
+            const { checked, indeterminate } = this.getNodeSelectionState(path, node);
+            checkbox.checked = checked;
+            checkbox.indeterminate = indeterminate;
+        }
+        // Only include files in this.value
+        this.value = Array.from(this.selected).filter(path => {
+            const node = this.getNode(path);
+            return node && node.isFile;
+        });
+    }
+
+    /** Find a node by path */
+    getNode(path) {
+        const parts = path.split("//");
+        let node = { children: this.tree };
+        for (const part of parts) {
+            if (!node.children) return null;
+            if (!node.children[part]) return null;
+            node = node.children[part];
+        }
+        return node;
+    }
+
+    /** Compute selection state recursively */
+    getNodeSelectionState(path, node) {
+        if (!node || !Object.keys(node.children).length) {
+            return {
+                checked: this.selected.has(path),
+                indeterminate: false
+            };
+        }
+
+        let checkedCount = 0;
+        let indeterminateCount = 0;
+        let childCount = 0;
+        for (const key of Object.keys(node.children)) {
+            const childPath = path + "//" + key;
+            const childNode = node.children[key];
+            const { checked, indeterminate } = this.getNodeSelectionState(childPath, childNode);
+            if (checked) checkedCount++;
+            if (indeterminate) indeterminateCount++;
+            childCount++;
+        }
+
+        const fullyChecked = checkedCount === childCount;
+        const noneChecked = checkedCount === 0 && indeterminateCount === 0;
+        const partiallyChecked = !fullyChecked && !noneChecked;
+
+        return {
+            checked: fullyChecked,
+            indeterminate: partiallyChecked,
+        };
+    }
+}
+
+
 class MultipleSelect {
     constructor(element, options) {
         element.className = "multiple-select-wrapper";
@@ -8491,6 +8718,19 @@ class Dialog {
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);
                     let multiSelect = new MultipleSelect(element, info[i].options);
+                    if (info[i].default) multiSelect.setSelected(info[i].default);
+                    this.values.push({ "id": info[i].id, "element": multiSelect });
+                } else if (info[i].type == "files") {
+                    let wrapper = document.createElement("div");
+                    wrapper.className = "dialog-text-label-wrapper";
+                    let label = document.createElement("div");
+                    label.innerHTML = sanitize(info[i].name);
+                    label.className = "dialog-label";
+                    wrapper.appendChild(label);
+                    let element = document.createElement("div");
+                    wrapper.appendChild(element);
+                    contents[tab].appendChild(wrapper);
+                    let multiSelect = new MultipleFileSelect(element, info[i].options);
                     if (info[i].default) multiSelect.setSelected(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "dropdown") {
@@ -9812,7 +10052,7 @@ if (defaultpage == "home") {
     setTimeout(() => {
         discoverButton.setSelected();
         worldContent.displayContent();
-    },0);
+    }, 0);
 } else if (defaultpage == "wardrobe") {
     wardrobeButton.setSelected();
     wardrobeContent.displayContent();
@@ -11776,6 +12016,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
 
                 instance.setLoader(mr_pack_info.loader);
                 instance.setVanillaVersion(mr_pack_info.vanilla_version);
+                if (mr_pack_info.allocated_ram) instance.setAllocatedRam(mr_pack_info.allocated_ram);
                 info.loader = mr_pack_info.loader;
                 info.game_version = mr_pack_info.vanilla_version;
             }
@@ -11906,6 +12147,7 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
 
         instanceInfo.setLoader(mr_pack_info.loader);
         instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
+        if (mr_pack_info.allocated_ram) instance.setAllocatedRam(mr_pack_info.allocated_ram);
     }
     if (!mr_pack_info.loader_version) {
         displayError(mr_pack_info);
@@ -12006,6 +12248,121 @@ async function checkForUpdates(isManual) {
 }
 
 checkForUpdates();
+
+async function createElPack(instance, content_list, overrides) {
+    instance = instance.refresh();
+    let manifest = {
+        "name": instance.name,
+        "icon": instance.image,
+        "loader": instance.loader,
+        "loader_version": instance.loader_version,
+        "game_version": instance.vanilla_version,
+        "allocated_ram": instance.allocated_ram,
+        "files": content_list.map(e => ({
+            "type": e.type,
+            "source": e.source,
+            "version_id": e.version_id,
+            "source_info": e.source_info,
+            "file_name": e.file_name,
+            "disabled": e.disabled
+        }))
+    }
+    let file_path = await window.electronAPI.createElPack(instance.instance_id, instance.name, manifest, overrides);
+    openShareDialogForFile(file_path);
+}
+
+window.electronAPI.onOpenFile((info, file_path) => {
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.import.elpack.title"), "notice", translate("app.import.elpack.description", "%t", info.name), [
+        {
+            "type": "cancel",
+            "content": translate("app.import.elpack.cancel")
+        },
+        {
+            "type": "confirm",
+            "content": translate("app.import.elpack.confirm")
+        }
+    ], [], async () => {
+        let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+        let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
+        showSpecificInstanceContent(instance);
+        let packInfo = await window.electronAPI.processPackFile(file_path, instance_id, info.name);
+        console.log(packInfo);
+        if (!packInfo.loader_version) {
+            displayError(packInfo);
+            return;
+        }
+        instance.setLoader(packInfo.loader);
+        instance.setVanillaVersion(packInfo.vanilla_version);
+        instance.setLoaderVersion(packInfo.loader_version);
+        if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
+        if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
+        packInfo.content.forEach(e => {
+            instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+        });
+        instance.setInstalling(false);
+        let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+        instance.setJavaPath(r.java_installation);
+        instance.setJavaVersion(r.java_version);
+        instance.setMcInstalled(true);
+    });
+});
+
+function openInstanceShareDialog(instanceInfo) {
+    let options = window.electronAPI.getInstanceFiles(instanceInfo.instance_id);
+    let content = instanceInfo.getContent();
+    let contentSpecific = [];
+    let contentMap = {};
+    content.forEach(e => {
+        let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+        let content_file = content_folder + "//" + e.file_name;
+        let replace = content_folder + "//" + parseMinecraftFormatting(e.name);
+        contentSpecific.push(replace);
+        contentMap[replace] = e;
+        let index = options.indexOf(content_file);
+        if (index < 0) return;
+        options[index] = replace;
+    });
+
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.instances.share.title"), "form", [
+        {
+            "type": "text",
+            "name": translate("app.instances.share.name"),
+            "id": "name",
+            "default": instanceInfo.name
+        },
+        {
+            "type": "files",
+            "name": translate("app.instances.share.files"),
+            "id": "files",
+            "options": options,
+            "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts", "shader"]
+        }
+    ], [
+        {
+            "type": "cancel",
+            "content": translate("app.instances.share.cancel")
+        },
+        {
+            "type": "confirm",
+            "content": translate("app.instances.share.confirm")
+        }
+    ], [], (v) => {
+        let info = {};
+        v.forEach(e => info[e.id] = e.value);
+        let nonContentSpecific = info.files.filter(e => !contentSpecific.includes(e));
+        let yesContentSpecific = info.files.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]);
+        yesContentSpecific = yesContentSpecific.filter(e => {
+            if (e.source != "player_install") return true;
+            let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+            let content_file = content_folder + "//" + e.file_name;
+            nonContentSpecific.push(content_file);
+            return false;
+        });
+        createElPack(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")));
+    });
+}
 
 switch (data.getDefault("saved_version")) {
     case "0.0.1":

@@ -3212,6 +3212,11 @@ dialog[open]::backdrop {
     grid-template-columns: auto 1fr;
 }
 
+.multiple-file-select-wrapper {
+    display: grid;
+    min-width: 500px;
+}
+
 .multiple-select {
     border-radius: 8px;
     background-color: var(--color-1);
@@ -3219,6 +3224,21 @@ dialog[open]::backdrop {
     grid-column: span 2;
     margin-right: 10px;
     display: grid;
+}
+
+.multiple-file-select {
+    border-radius: 8px;
+    background-color: var(--color-1);
+    display: grid;
+}
+
+.multiple-file-select-chevron {
+    transition: rotate .1s;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .multiple-select-top {
@@ -3249,7 +3269,18 @@ dialog[open]::backdrop {
     align-items: center;
 }
 
+.multiple-file-select-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    gap: 10px;
+}
+
 .multiple-select-item:last-child {
+    border-radius: 0px 0px 8px 8px;
+}
+
+.multiple-file-select-item:last-child {
     border-radius: 0px 0px 8px 8px;
 }
 
@@ -3258,11 +3289,28 @@ dialog[open]::backdrop {
     font-size: 1rem;
 }
 
+.multiple-file-select-title {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
 .multiple-select-item:nth-child(2n) {
     background-color: var(--color-1t);
 }
 
+.multiple-file-select-item:nth-child(2n) {
+    background-color: var(--color-1t);
+}
+
 .multiple-select-checkbox {
+    height: 20px;
+    width: 20px;
+    cursor: pointer;
+    margin: 0;
+    accent-color: var(--accent-color);
+}
+
+.multiple-file-select-checkbox {
     height: 20px;
     width: 20px;
     cursor: pointer;
@@ -4708,4 +4756,24 @@ body.offline #offline-notice {
 .def_opts_actions {
     display: flex;
     gap: 8px;
+}
+
+.multiple-file-select-child-container {
+    display: none;
+    transition: display allow-discrete .1s, opacity .1s, height .1s;
+    height: 0px;
+    opacity: .4;
+    overflow: hidden;
+    interpolate-size: allow-keywords;
+}
+
+.multiple-file-select-child-container.shown {
+    display: block;
+    height: auto;
+    opacity: 1;
+
+    @starting-style {
+        opacity: .4;
+        height: 0px;
+    }
 }

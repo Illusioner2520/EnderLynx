@@ -337,7 +337,7 @@
     "app.wardrobe.unnamed": "<unnamed>",
     "app.loader.unknown": "Unknown",
     "app.instances.file": "File",
-    "app.instances.file.description": "Select a Modrinth .mrpack file or a CurseForge .zip file",
+    "app.instances.file.description": "Select a .mrpack file, .elpack file, or a CurseForge .zip file",
     "app.instances.file.browse": "Browse Files",
     "app.instances.launcher": "Launcher",
     "app.launcher.modrinth": "Modrinth App",
@@ -744,5 +744,14 @@
     "app.instances.repair.assets": "Assets",
     "app.instances.repair.assets.description": "Select this if some of the games assets aren't loading such as the panorama or foreign language files. Make sure that it isn't caused by a resource pack. This is very rarily an issue.",
     "app.instances.repair.mod_loader": "%l Installation",
-    "app.instances.repair.mod_loader.description": "Select this to reinstall %l and its libraries."
+    "app.instances.repair.mod_loader.description": "Select this to reinstall %l and its libraries.",
+    "app.import.elpack.title": "Import Pack File",
+    "app.import.elpack.description": "Are you sure that you want to import %t?",
+    "app.import.elpack.cancel": "Cancel",
+    "app.import.elpack.confirm": "Import",
+    "app.instances.share.title": "Share Instance",
+    "app.instances.share.cancel": "Cancel",
+    "app.instances.share.confirm": "Export",
+    "app.instances.share.name": "Name",
+    "app.instances.share.files": "Files to Include"
 }
