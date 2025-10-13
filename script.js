@@ -5024,10 +5024,7 @@ function showInstanceContent(e) {
                 instance.setJavaVersion(r.java_version);
                 instance.setMcInstalled(true);
             } else if (info.selected_tab == "file") {
-                if (!info.name_f) {
-                    displayError(translate("app.instances.no_name"));
-                    return;
-                }
+                if (!info.name_if) info.name_if = "";
                 let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
                 let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
                 showSpecificInstanceContent(instance);
@@ -5041,6 +5038,7 @@ function showInstanceContent(e) {
                 instance.setVanillaVersion(packInfo.vanilla_version);
                 instance.setLoaderVersion(packInfo.loader_version);
                 if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
+                if (!instance.name && packInfo.name) instance.setName(packInfo.name);
                 if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
                 packInfo.content.forEach(e => {
                     instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);

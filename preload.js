@@ -2700,7 +2700,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         "content": content,
         "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
         "vanilla_version": manifest_json.minecraft.version,
-        "allocated_ram": allocated_ram
+        "allocated_ram": allocated_ram,
+        "name": manifest_json.name
     })
 }
 async function importContent(file_path, content_type, instance_id) {
@@ -2949,7 +2950,8 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
         "content": cfData.length ? content : [],
         "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
         "vanilla_version": manifest_json.minecraft.version,
-        "allocated_ram": allocated_ram
+        "allocated_ram": allocated_ram,
+        "name": manifest_json.name
     });
 }
 async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
@@ -3101,7 +3103,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         "loader_version": modrinth_index_json.dependencies[loader],
         "content": content,
         "loader": loader.replace("-loader", ""),
-        "vanilla_version": modrinth_index_json.dependencies["minecraft"]
+        "vanilla_version": modrinth_index_json.dependencies["minecraft"],
+        "name": manifest_json.name
     })
 }
 async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
@@ -3173,7 +3176,7 @@ async function processElPack(instance_id, elpack_path, loader, title = ".elpack 
             install_path += file.file_name;
             let url = "";
             if (file.source === "modrinth") {
-                url = `https://cdn.modrinth.com/data/${file.source_info}/versions/${file.version_id}/${file.file_name}`;
+                url = `https://cdn.modrinth.com/data/${file.source_info}/versions/${file.version_id}/${file.file_name.replace(".disabled", "")}`;
             } else if (file.source === "curseforge") {
                 url = `https://www.curseforge.com/api/v1/mods/${Number(file.source_info)}/files/${Number(file.version_id)}/download`;
             } else if (file.source === "vanilla_tweaks") {
@@ -3248,7 +3251,6 @@ async function processElPack(instance_id, elpack_path, loader, title = ".elpack 
             res_json.forEach(e => {
                 content.forEach(item => {
                     if (item.source === "modrinth" && item.version_id === e.id) {
-                        item.file_name = e.files[0].filename;
                         item.version = e.version_number;
                     }
                 });
@@ -3307,7 +3309,8 @@ async function processElPack(instance_id, elpack_path, loader, title = ".elpack 
         "loader": manifest_json.loader,
         "vanilla_version": manifest_json.game_version,
         "allocated_ram": manifest_json.allocated_ram,
-        "image": manifest_json.icon
+        "image": manifest_json.icon,
+        "name": manifest_json.name
     })
 }
 
