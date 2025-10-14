@@ -78,9 +78,7 @@ Section "MainSection" SecMain
     ${EndIf}
 
     ${If} $DoStartMenu == ${BST_CHECKED}
-        CreateDirectory "$SMPROGRAMS\EnderLynx"
-        CreateShortcut "$SMPROGRAMS\EnderLynx\EnderLynx.lnk" "$INSTDIR\EnderLynx.exe"
-        CreateShortcut "$SMPROGRAMS\EnderLynx\Uninstall EnderLynx.lnk" "$INSTDIR\Uninstall.exe"
+        CreateShortcut "$SMPROGRAMS\EnderLynx.lnk" "$INSTDIR\EnderLynx.exe"
     ${EndIf}
 SectionEnd
 
