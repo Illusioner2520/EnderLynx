@@ -65,11 +65,11 @@ Section "MainSection" SecMain
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "NoModify" 1
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx" "NoRepair" 1
 
-    WriteRegStr HKCR ".elpack" "" "EnderLynx.elpack"
-    WriteRegStr HKCR "EnderLynx.elpack" "" "EnderLynx Pack File"
-    WriteRegStr HKCR "EnderLynx.elpack\DefaultIcon" "" "$INSTDIR\EnderLynx.exe,0"
-    WriteRegStr HKCR "EnderLynx.elpack\shell" "" "open"
-    WriteRegStr HKCR "EnderLynx.elpack\shell\open\command" "" '"$INSTDIR\EnderLynx.exe" "%1"'
+    WriteRegStr HKCU "Software\Classes\.elpack" "" "EnderLynx.elpack"
+    WriteRegStr HKCU "Software\Classes\EnderLynx.elpack" "" "EnderLynx Pack File"
+    WriteRegStr HKCU "Software\Classes\EnderLynx.elpack\DefaultIcon" "" "$INSTDIR\EnderLynx.exe,0"
+    WriteRegStr HKCU "Software\Classes\EnderLynx.elpack\shell" "" "open"
+    WriteRegStr HKCU "Software\Classes\EnderLynx.elpack\shell\open\command" "" '"$INSTDIR\EnderLynx.exe" "%1"'
 
     System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 

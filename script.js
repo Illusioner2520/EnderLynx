@@ -1202,7 +1202,7 @@ function resetDiscordStatus(bypassLock) {
     console.log("current tab", currentTab);
     if (!rpcLocked || bypassLock) {
         window.electronAPI.setActivity({
-            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
+            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" || currentTab == "instance" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
             "state": translate("app.discord_rpc.not_playing"),
             startTimestamp: new Date(),
             largeImageKey: 'icon',
