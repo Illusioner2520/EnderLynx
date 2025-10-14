@@ -88,18 +88,39 @@ const createWindow = () => {
 
 let openedFile = null;
 
-app.whenReady().then(() => {
-    app.setAppUserModelId('me.illusioner.enderlynx');
-    createWindow();
-    rpc.login({ clientId }).catch(console.error);
-    if (!app.isDefaultProtocolClient('enderlynx') && !isDev) {
-        app.setAsDefaultProtocolClient('enderlynx', process.execPath, []);
-    }
-    const fileArg = process.argv.find(arg => arg.endsWith('.elpack'));
-    if (fileArg) {
-        openedFile = fileArg;
-    }
-});
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        if (win) {
+            if (win.isMinimized()) win.restore();
+            win.focus();
+        }
+
+        const fileArg = commandLine.find(arg => arg.endsWith('.elpack'));
+        if (fileArg) {
+            openedFile = fileArg;
+            if (win) {
+                win.webContents.send('open-file', openedFile);
+            }
+        }
+    });
+
+    app.whenReady().then(() => {
+        app.setAppUserModelId('me.illusioner.enderlynx');
+        createWindow();
+        rpc.login({ clientId }).catch(console.error);
+        if (!app.isDefaultProtocolClient('enderlynx') && !isDev) {
+            app.setAsDefaultProtocolClient('enderlynx', process.execPath, []);
+        }
+        const fileArg = process.argv.find(arg => arg.endsWith('.elpack'));
+        if (fileArg) {
+            openedFile = fileArg;
+        }
+    });
+}
 
 app.on('open-file', (event, path) => {
     event.preventDefault();

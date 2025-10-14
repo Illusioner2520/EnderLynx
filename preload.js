@@ -3104,7 +3104,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         "content": content,
         "loader": loader.replace("-loader", ""),
         "vanilla_version": modrinth_index_json.dependencies["minecraft"],
-        "name": manifest_json.name
+        "name": modrinth_index_json.name
     })
 }
 async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
