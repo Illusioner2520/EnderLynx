@@ -31,41 +31,56 @@ let cfServerInfo = {};
 const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1]);
 
+let enableDevMode = false;
+let launchInstanceCallback = () => {};
 let instance_id_to_launch = "";
 let world_type_to_launch = "";
 let world_id_to_launch = "";
+let startingPage = null;
 
-const args = process.argv.slice(1);
-const instanceArg = args.find(arg => arg.startsWith('--instance='));
-const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
-const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
+function processArgs(args) {
+    
+    const instanceArg = args.find(arg => arg.startsWith('--instance='));
+    const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
+    const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
+    
+    enableDevMode = args.includes("--dev");
+    
+    let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
+    if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
+    else argsFromUrl = [];
+    if (argsFromUrl.includes("debug")) argsFromUrl.splice(argsFromUrl.indexOf("debug"), 1);
+    argsFromUrl = argsFromUrl.map(decodeURIComponent);
+    
+    if (instanceArg) {
+        if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
+        if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
+        if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
+    }
+    
+    if (argsFromUrl[0] == "launch") {
+        if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
+        if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
+        if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
+    }
+    
+    startingPage = args.find(arg => arg.startsWith('--page='));
+    if (startingPage) startingPage = startingPage.split("=")[1];
+    
+    if (argsFromUrl[0] == "page") {
+        if (argsFromUrl[1]) startingPage = argsFromUrl[1];
+    }
 
-const enableDevMode = args.includes("--dev");
-
-let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
-if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
-else argsFromUrl = [];
-if (argsFromUrl.includes("debug")) argsFromUrl.splice(argsFromUrl.indexOf("debug"), 1);
-argsFromUrl = argsFromUrl.map(decodeURIComponent);
-
-if (instanceArg) {
-    if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
-    if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
-    if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
+    if (launchInstanceCallback) {
+        launchInstanceCallback({
+            instance_id: instance_id_to_launch,
+            world_type: world_type_to_launch,
+            world_id: world_id_to_launch
+        });
+    }
 }
 
-if (argsFromUrl[0] == "launch") {
-    if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
-    if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
-    if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
-}
-
-let startingPage = args.find(arg => arg.startsWith('--page='));
-if (startingPage) startingPage = startingPage.split("=")[1];
-
-if (argsFromUrl[0] == "page") {
-    if (argsFromUrl[1]) startingPage = argsFromUrl[1];
-}
+processArgs(process.argv.slice(1));
 
 if (!fs.existsSync(userPath)) {
     fs.mkdirSync(userPath, { recursive: true });
@@ -131,6 +146,10 @@ function readELPack(file_path) {
     }
 }
 
+ipcRenderer.on('new-args', (event, newargs) => {
+    processArgs(newargs.slice(1));
+});
+
 contextBridge.exposeInMainWorld('electronAPI', {
     onOpenFile: (callback) => {
         ipcRenderer.on('open-file', (event, filePath) => {
@@ -138,7 +157,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         });
     },
     getMaxConcurrentDownloads,
-    version,
+    version: enableDevMode ? version + "-dev" : version,
     userPath,
     isDev: enableDevMode,
     resourcePath: process.resourcesPath,
@@ -303,11 +322,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     setOptionsTXT: (instance_id, content, dont_complete_if_already_exists) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
-        if (dont_complete_if_already_exists && fs.existsSync(optionsPath)) {
+        let alreadyExists = fs.existsSync(optionsPath);
+        if (dont_complete_if_already_exists && alreadyExists) {
             return content.version;
         }
-        fs.writeFileSync(optionsPath, content.content, "utf-8");
-        return content.version;
+        if (!alreadyExists) {
+            fs.writeFileSync(optionsPath, content.content, "utf-8");
+            return content.version;
+        } else {
+            let lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
+            for (let j = 0; j < content.keys.length; j++) {
+                let key = content.keys[j];
+                let value = content.values[j];
+                let found = false;
+                inner: for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim().startsWith(key + ":")) {
+                        lines[i] = `${key}:${value}`;
+                        found = true;
+                        break inner;
+                    }
+                }
+                if (!found) {
+                    lines.push(`${key}:${value}`);
+                }
+            }
+            fs.writeFileSync(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+        }
     },
     deleteWorld: (instance_id, world_id) => {
         const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
@@ -408,34 +448,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return true;
     },
-    deleteContent: (instance_id, project_type, file_name) => {
-        let folder;
-        if (project_type === "mod") {
-            folder = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`);
-        } else if (project_type === "resource_pack") {
-            folder = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`);
-        } else if (project_type === "shader") {
-            folder = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`);
-        } else {
-            return false;
-        }
-
-        const filePath = path.join(folder, file_name);
-        try {
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                return true;
-            }
-            // Try with .disabled extension if not found
-            if (fs.existsSync(filePath + ".disabled")) {
-                fs.unlinkSync(filePath + ".disabled");
-                return true;
-            }
-            return false;
-        } catch (err) {
-            return false;
-        }
-    },
     updateOptionsTXT: (instance_id, key, value) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
         let lines = [];
@@ -451,7 +463,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             }
         }
         if (!found) {
-            lines.push(`${key}: ${value}`);
+            lines.push(`${key}:${value}`);
         }
         fs.writeFileSync(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
     },
@@ -1152,6 +1164,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return false;
     },
     onLaunchInstance: async (callback) => {
+        launchInstanceCallback = callback;
         if (instance_id_to_launch) callback({
             instance_id: instance_id_to_launch,
             world_type: world_type_to_launch,

@@ -137,7 +137,7 @@ class DefaultOptions {
         r.forEach(e => {
             content += e.key + ":" + e.value + "\n"
         });
-        return { "content": content, "version": Number((dataVersion ? dataVersion : (v?.value ? v?.value : "100"))) };
+        return { "content": content, "version": Number((dataVersion ? dataVersion : (v?.value ? v?.value : "100"))), "keys": r.map(e => e.key), "values": r.map(e => e.value) };
     }
 }
 
@@ -791,7 +791,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version, "latest_release": "hello there", "max_concurrent_downloads": 10 };
+            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10 };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -12376,4 +12376,4 @@ switch (data.getDefault("saved_version")) {
         db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
 }
 
-data.setDefault("saved_version", window.electronAPI.version);
+data.setDefault("saved_version", window.electronAPI.version.replace("-dev", ""));

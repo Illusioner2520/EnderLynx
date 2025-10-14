@@ -106,6 +106,7 @@ if (!gotTheLock) {
                 win.webContents.send('open-file', openedFile);
             }
         }
+        win.webContents.send('new-args', commandLine);
     });
 
     app.whenReady().then(() => {
