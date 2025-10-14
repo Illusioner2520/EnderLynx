@@ -1,6 +1,6 @@
 # EnderLynx
 
-EnderLynx is a Minecraft launcher that is currently a work in progress. All versions are in alpha currently, therefore expect plenty of bugs and missing features. If you encounter a bug when using the app, please report it in the issues tab.
+EnderLynx is a Minecraft launcher that is currently a work in progress. We are currently in beta, therefore expect plenty of bugs. If you encounter a bug when using the app, please report it in the issues tab. If you want something added to the app, please request it in the issues tab.
 
 ## Requirements
 
