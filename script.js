@@ -11993,6 +11993,9 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             let mr_pack_info = {};
             if (source == "modrinth") {
                 mr_pack_info = await window.electronAPI.processMrPack(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.mrpack`), info.loader, title);
+                let default_options = new DefaultOptions();
+                let v = window.electronAPI.setOptionsTXT(instance.instance_id, default_options.getOptionsTXT(), false);
+                instance.setAttemptedOptionsTxtVersion(v);
             } else if (source == "curseforge") {
                 mr_pack_info = await window.electronAPI.processCfZip(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.zip`), project_id, title);
 
