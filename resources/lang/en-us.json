@@ -268,8 +268,6 @@
     "app.home.tooltip.instance": "Play Instance",
     "app.home.loading": "Loading",
     "app.instance.view": "View Instance",
-    "app.worlds.open_seed_map": "Open Seed Map",
-    "app.worlds.seed_map.notice": "Make sure to select the correct version.",
     "app.worlds.unpin": "Unpin World",
     "app.worlds.pin": "Pin World",
     "app.worlds.desktop_shortcut": "Add Desktop Shortcut",

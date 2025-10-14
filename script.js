@@ -3538,14 +3538,6 @@ async function showHomeContent(oldEle) {
                     window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`))
                 }
             } : null,
-            e.type == "singleplayer" ? (e.seed ? {
-                "title": translate("app.worlds.open_seed_map"),
-                "icon": '<i class="fa-solid fa-map"></i>',
-                "func": () => {
-                    displaySuccess(translate("app.worlds.seed_map.notice"));
-                    window.electronAPI.openInBrowser("https://www.chunkbase.com/apps/seed-map#seed=" + e.seed);
-                }
-            } : null) : null,
             {
                 "title": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
                 "icon": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
@@ -6591,14 +6583,6 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                 window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`))
                             }
                         },
-                        worlds[i].seed ? {
-                            "title": translate("app.worlds.open_seed_map"),
-                            "icon": '<i class="fa-solid fa-map"></i>',
-                            "func": () => {
-                                displaySuccess(translate("app.worlds.seed_map.notice"));
-                                window.electronAPI.openInBrowser("https://www.chunkbase.com/apps/seed-map#seed=" + worlds[i].seed);
-                            }
-                        } : null,
                         {
                             "title": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
                             "icon": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
