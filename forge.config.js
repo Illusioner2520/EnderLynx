@@ -22,7 +22,8 @@ module.exports = {
       /credits\.txt$/,
       /forge\.config\.js$/,
       /package-lock\.json$/,
-      /updater\.js$/
+      /updater\.js$/,
+      /README\.md$/
     ]
   },
   rebuildConfig: {},
