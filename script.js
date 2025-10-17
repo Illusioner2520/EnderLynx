@@ -60,6 +60,27 @@ fetchUpdatedMCVersions();
 
 let accent_colors = ["red", "orange", "yellow", "lime", "green", "light_blue", "cyan", "blue", "purple", "magenta", "pink", "brown", "light_gray", "gray"];
 
+let page_log = [];
+let page_index = -1;
+
+function pageForward() {
+    if (!page_log[page_index + 1]) return;
+    page_index++;
+    page_log[page_index]();
+}
+
+function pageBackward() {
+    if (!page_log[page_index - 1]) return;
+    page_index--;
+    page_log[page_index]();
+}
+
+document.body.onmousedown = (e) => {
+    if (document.querySelector("dialog[open]")) return;
+    if (e.button == 3) pageBackward();
+    else if (e.button == 4) pageForward();
+}
+
 class DefaultOptions {
     constructor(v) {
         this.version = v;
@@ -1217,7 +1238,25 @@ class PageContent {
         this.func = func;
         this.title = title;
     }
-    displayContent() {
+    displayContent(dont_add_to_log) {
+        if (!dont_add_to_log) {
+            page_log = page_log.slice(0, page_index + 1).concat([() => {
+                for (let i = 0; i < navButtons.length; i++) {
+                    navButtons[i].removeSelected();
+                }
+                if (this.title == "home") {
+                    homeButton.setSelected();
+                } else if (this.title == "instances") {
+                    instanceButton.setSelected();
+                } else if (this.title == "discover") {
+                    discoverButton.setSelected();
+                } else if (this.title == "wardrobe") {
+                    wardrobeButton.setSelected();
+                }
+                this.displayContent(true);
+            }]);
+            page_index++;
+        }
         if (this.title == "discover") {
             showAddContent();
             currentTab = "discover";
@@ -5288,7 +5327,13 @@ function showInstanceContent(e) {
     }
     return ele;
 }
-function showSpecificInstanceContent(instanceInfo, default_tab) {
+function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log) {
+    if (!dont_add_to_log) {
+        page_log = page_log.slice(0, page_index + 1).concat([() => {
+            showSpecificInstanceContent(instanceInfo, default_tab, true);
+        }]);
+        page_index++;
+    }
     currentTab = "instance";
     currentInstanceId = instanceInfo.instance_id;
     instanceInfo = instanceInfo.refresh();
@@ -10033,7 +10078,7 @@ if (defaultpage == "home") {
 } else if (defaultpage == "discover") {
     setTimeout(() => {
         discoverButton.setSelected();
-        worldContent.displayContent();
+        discoverContent.displayContent();
     }, 0);
 } else if (defaultpage == "wardrobe") {
     wardrobeButton.setSelected();
