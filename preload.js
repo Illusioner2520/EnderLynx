@@ -2216,12 +2216,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     crlfDelay: Infinity
                 });
                 let startFound = false;
+                let previousHour = 0;
                 for await (const line of rl) {
                     let searchForStart = () => {
                         const tsEnd = line.indexOf("]");
                         if (tsEnd === -1) return;
                         const timestamp = line.slice(1, tsEnd);
-                        if (isNaN(new Date(timestamp).getTime())) return;
+                        if (isNaN(new Date(timestamp).getTime())) {
+                            const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
+                            if (hh && mm && ss) {
+                                const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
+                                startTimestamp = combined.toISOString();
+                                startFound = true;
+                            } else {
+                                return;
+                            }
+                            return;
+                        }
                         startTimestamp = timestamp;
                         startFound = true;
                     }
@@ -2229,7 +2240,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
                         const tsEnd = line.indexOf("]");
                         if (tsEnd === -1) return;
                         const timestamp = line.slice(1, tsEnd);
-                        if (isNaN(new Date(timestamp).getTime())) return;
+                        if (isNaN(new Date(timestamp).getTime())) {
+                            const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
+                            if (hh && mm && ss) {
+                                if (hh < previousHour) {
+                                    parsedDate.setDate(parsedDate.getDate() + 1);
+                                }
+                                previousHour = hh;
+                                const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
+                                endTimestamp = combined.toISOString();
+                            } else {
+                                return;
+                            }
+                            return;
+                        }
                         endTimestamp = timestamp;
                     }
                     if (!startFound) searchForStart();
@@ -2241,7 +2265,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
                         // Timestamp
                         const tsEnd = line.indexOf("]");
                         if (tsEnd === -1) return;
-                        const timestamp = line.slice(1, tsEnd); // remove leading "["
+                        let timestamp = line.slice(1, tsEnd); // remove leading "["
+                        if (isNaN(new Date(timestamp).getTime())) {
+                            const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
+                            if (hh && mm && ss) {
+                                const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
+                                timestamp = combined.toISOString();
+                            } else {
+                                return;
+                            }
+                        }
 
                         // Extract host/port part
                         const marker = "Connecting to ";
