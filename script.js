@@ -5233,15 +5233,10 @@ function showInstanceContent(e) {
             } else if (info.selected_tab == "launcher") {
                 // Import from launcher here
             } else if (info.selected_tab == "code") {
-                if (!info.name_c) {
-                    displayError(translate("app.instances.no_name"));
-                    return;
-                }
                 let instance_id = window.electronAPI.getInstanceFolderName(info.name_c);
                 let instance = data.addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
-                console.log(packInfo);
                 if (!packInfo) {
                     displayError(translate("app.cf.code.error"));
                     instance.delete();
@@ -5255,6 +5250,7 @@ function showInstanceContent(e) {
                 instance.setLoader(packInfo.loader);
                 instance.setVanillaVersion(packInfo.vanilla_version);
                 instance.setLoaderVersion(packInfo.loader_version);
+                if (!instance.name && packInfo.name) instance.setName(packInfo.name);
                 if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
                 packInfo.content.forEach(e => {
                     instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
