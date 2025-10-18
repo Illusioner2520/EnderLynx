@@ -9722,7 +9722,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 }, e.tags.map(e => e.name), e, null, "curseforge", e.serverConnection, instance_id, version, loader, false, false, project_type, !e.latestPing.successful);
             } else {
                 entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                    installButtonClick(project_type, "curseforge", [], e.thumbnailUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
+                    installButtonClick(project_type, "curseforge", [], e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
                 }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type);
             }
             element.appendChild(entry.element);
@@ -10666,7 +10666,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             project_type = "datapack"
         }
         content = {
-            "icon_url": cf_content.data.logo.thumbnailUrl,
+            "icon_url": cf_content.data.logo.thumbnailUrl ? cf_content.data.logo.thumbnailUrl : cf_content.data.logo.url,
             "title": cf_content.data.name,
             "project_type": project_type,
             "downloads": cf_content.data.downloadCount,

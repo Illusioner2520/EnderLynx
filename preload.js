@@ -32,41 +32,41 @@ const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDat
     .split('=')[1]);
 
 let enableDevMode = false;
-let launchInstanceCallback = () => {};
+let launchInstanceCallback = () => { };
 let instance_id_to_launch = "";
 let world_type_to_launch = "";
 let world_id_to_launch = "";
 let startingPage = null;
 
 function processArgs(args) {
-    
+
     const instanceArg = args.find(arg => arg.startsWith('--instance='));
     const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
     const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
-    
+
     enableDevMode = args.includes("--dev");
-    
+
     let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
     if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
     else argsFromUrl = [];
     if (argsFromUrl.includes("debug")) argsFromUrl.splice(argsFromUrl.indexOf("debug"), 1);
     argsFromUrl = argsFromUrl.map(decodeURIComponent);
-    
+
     if (instanceArg) {
         if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
         if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
         if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
     }
-    
+
     if (argsFromUrl[0] == "launch") {
         if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
         if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
         if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
     }
-    
+
     startingPage = args.find(arg => arg.startsWith('--page='));
     if (startingPage) startingPage = startingPage.split("=")[1];
-    
+
     if (argsFromUrl[0] == "page") {
         if (argsFromUrl[1]) startingPage = argsFromUrl[1];
     }
@@ -2727,15 +2727,14 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
             cfData = [];
         }
 
-        console.log(project_ids);
-
         cfData.forEach(e => {
-            const idx = project_ids.indexOf(e.id);
-            if (idx !== -1 && content[idx]) {
-                content[idx].name = e.name;
-                content[idx].image = e.logo.thumbnailUrl;
-                content[idx].author = e.authors[0].name;
-            }
+            content.forEach(item => {
+                if (Number(item.source_id) == Number(e.id)) {
+                    item.name = e.name;
+                    item.image = e.logo.thumbnailUrl;
+                    item.author = e.authors[0].name;
+                }
+            });
         });
     }
 
@@ -2982,12 +2981,13 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
     console.log(cfData);
 
     cfData.forEach(e => {
-        const idx = project_ids.indexOf(e.id);
-        if (idx !== -1 && content[idx]) {
-            content[idx].name = e.name;
-            content[idx].image = e.logo.thumbnailUrl;
-            content[idx].author = e.authors[0].name;
-        }
+        content.forEach(item => {
+            if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
+                item.name = e.name;
+                item.image = e.logo.thumbnailUrl;
+                item.author = e.authors[0].name;
+            }
+        });
     });
 
     ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
@@ -3100,23 +3100,25 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
     let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
     let res_json = await res.json();
     res_json.forEach(e => {
-        const idx = project_ids.indexOf(e.id);
-        if (idx !== -1 && content[idx]) {
-            content[idx].name = e.title;
-            content[idx].image = e.icon_url;
-            content[idx].type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-            team_ids.push(e.team);
-            if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
-            else team_to_project_ids[e.team].push(e.id);
-        }
+        content.forEach(item => {
+            if (item.source_id == e.id) {
+                item.name = e.title;
+                item.image = e.icon_url;
+                item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                team_ids.push(e.team);
+                if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+                else team_to_project_ids[e.team].push(e.id);
+            }
+        });
     });
     let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`);
     let res_json_1 = await res_1.json();
     res_json_1.forEach(e => {
-        const idx = version_ids.indexOf(e.id);
-        if (idx !== -1 && content[idx]) {
-            content[idx].version = e.version_number;
-        }
+        content.forEach(item => {
+            if (item.source_id == e.id) {
+                item.version = e.version_number;
+            }
+        });
     });
     let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
     let res_json_2 = await res_2.json();
@@ -3126,7 +3128,11 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             let author = authors.length ? authors[0] : "";
             if (!team_to_project_ids[e[0].team_id]) return;
             team_to_project_ids[e[0].team_id].forEach(f => {
-                content[project_ids.indexOf(f)].author = author;
+                content.forEach(item => {
+                    if (item.source_id == f) {
+                        item.author = author;
+                    }
+                });
             });
         }
     });
