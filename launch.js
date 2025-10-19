@@ -30,16 +30,12 @@ class Minecraft {
         ipcRenderer.send('progress-update', "Downloading Fabric", 20, "Downloading fabric libraries...");
         for (let i = 0; i < data.libraries.length; i++) {
             ipcRenderer.send('progress-update', "Downloading Fabric", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
-            let fileName = data.libraries[i].name.split(":");
-            fileName.splice(0, 1);
-            fileName = fileName.join("-") + ".jar";
-            let patha = data.libraries[i].name.split(":");
-            patha[0] = patha[0].replaceAll(".", "/");
-            patha = patha.join("/") + "/" + fileName;
-            if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${patha}`)) || isRepair) {
-                await urlToFile(`https://maven.fabricmc.net/${patha}`, path.resolve(userPath, `minecraft/meta/libraries/${patha}`));
+            let lib_path = mavenPathToFilePath(data.libraries[i].name);
+            let lib_path_rel = mavenPathToRelPath(data.libraries[i].name);
+            if (!fs.existsSync(lib_path) || isRepair) {
+                await urlToFile(`https://maven.fabricmc.net/${lib_path_rel}`, lib_path);
             }
-            this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+            this.libs += lib_path + ";";
             let libName = data.libraries[i].name.split(":");
             libName.splice(libName.length - 1, 1);
             this.libNames.push(libName.join(":"));
@@ -57,16 +53,11 @@ class Minecraft {
         ipcRenderer.send('progress-update', "Downloading Quilt", 20, "Downloading quilt libraries...");
         for (let i = 0; i < data.libraries.length; i++) {
             ipcRenderer.send('progress-update', "Downloading Quilt", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
-            let fileName = data.libraries[i].name.split(":");
-            fileName.splice(0, 1);
-            fileName = fileName.join("-") + ".jar";
-            let patha = data.libraries[i].name.split(":");
-            patha[0] = patha[0].replaceAll(".", "/");
-            patha = patha.join("/") + "/" + fileName;
-            if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${patha}`)) || isRepair) {
-                await urlToFile(data.libraries[i].url + `${patha}`, path.resolve(userPath, `minecraft/meta/libraries/${patha}`));
+            let lib_path = mavenPathToFilePath(data.libraries[i].name);
+            if (!fs.existsSync(lib_path) || isRepair) {
+                await urlToFile(data.libraries[i].url + mavenPathToRelPath(data.libraries[i].name), lib_path);
             }
-            this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+            this.libs += lib_path + ";";
             let libName = data.libraries[i].name.split(":");
             libName.splice(libName.length - 1, 1);
             this.libNames.push(libName.join(":"));
@@ -106,7 +97,7 @@ class Minecraft {
 
         this.modded_args_game = version_json?.arguments?.game ? version_json.arguments.game : [];
         this.modded_args_jvm = version_json?.arguments?.jvm ? version_json.arguments.jvm.map(e => {
-            e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`));
+            e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
             e = e.replaceAll("${classpath_separator}", ";");
             e = e.replaceAll("${version_name}", `${mcversion}-forge-${forgeversion}`);
             return e;
@@ -116,13 +107,6 @@ class Minecraft {
         let installation = await java.getJavaInstallation(21);
 
         fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}`), { recursive: true });
-
-        fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/launcher_profiles.json`), "{}");
-        fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/launcher_profiles_microsoft_store.json`), "{}");
-
-        ipcRenderer.send('progress-update', "Downloading Forge", 20, "Running Forge Installer");
-
-        let args = ["-jar", installerPath];
 
         let compareVersions = (v1, v2) => {
             const a = v1.split('-')[0].split('.').map(Number);
@@ -141,6 +125,15 @@ class Minecraft {
         const upperBound = "14.23.5.2851";
 
         if (compareVersions(forgeversion, lowerBound) >= 0 && compareVersions(forgeversion, upperBound) <= 0) {
+            console.log("running old installation...");
+            const platform = os.platform();
+            const getPlatformString = () => {
+                if (platform === 'win32') return 'windows';
+                if (platform === 'darwin') return 'osx';
+                return 'linux';
+            };
+            const arch = os.arch();
+            let platformString = getPlatformString();
             let forge_library_path = install_profile_json.install.filePath;
             let name_items = install_profile_json.install.path.split(":");
             let package_ = name_items[0];
@@ -150,40 +143,121 @@ class Minecraft {
             installation_path = path.resolve(userPath, "minecraft/meta/libraries", installation_path);
             let installation_path_w_file = path.resolve(installation_path, forge_library_path);
             if (!fs.existsSync(installation_path_w_file) || isRepair) {
-                zip.extractEntryTo(forge_library_path, installation_path);
+                zip.extractEntryTo(forge_library_path, installation_path, true, true);
             }
 
             this.libs += installation_path_w_file + ";";
 
             for (let i = 0; i < install_profile_json.versionInfo.libraries.length; i++) {
+                console.log("downloading lib ", i+1);
                 let entry = install_profile_json.versionInfo.libraries[i];
+                // handle natives and native extraction
+                try {
+                    // skip based on rules similar to other checks
+                    if (entry.natives) {
+                        let skip = false;
+                        if (entry.rules) {
+                            for (let r = 0; r < entry.rules.length; r++) {
+                                let rule = entry.rules[r];
+                                if (rule.action === "allow" && rule?.os?.name && rule.os.name !== platformString) {
+                                    skip = true;
+                                    break;
+                                }
+                                if (rule.action === "disallow" && rule?.os?.name && rule.os.name === platformString) {
+                                    skip = true;
+                                    break;
+                                }
+                                if (rule.action === "allow" && rule?.os?.arch && rule.os.arch !== arch) {
+                                    skip = true;
+                                    break;
+                                }
+                                if (rule.action === "disallow" && rule?.os?.arch && rule.os.arch === arch) {
+                                    skip = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (skip) {
+                            continue;
+                        }
+
+                        // determine classifier for current platform and arch
+                        let simpleArch = (arch === "arm" || arch === "ia32" || arch === "mips" || arch === "ppc") ? "32" : "64";
+                        let nativeClassifier = entry.natives[platformString];
+                        if (!nativeClassifier) {
+                            continue;
+                        }
+                        nativeClassifier = nativeClassifier.replace("${arch}", simpleArch);
+
+                        let mavenWithClassifier = entry.name + ":" + nativeClassifier;
+                        let lib_rel = mavenPathToRelPath(mavenWithClassifier);
+                        let lib_path = mavenPathToFilePath(mavenWithClassifier);
+
+                        if (!fs.existsSync(lib_path) || isRepair) {
+                            if (entry.url && !entry.url.includes("https://libraries.minecraft.net/")) {
+                                await urlToFile(entry.url + lib_rel, lib_path);
+                            } else {
+                                await urlToFile(`https://maven.creeperhost.net/${lib_rel}`, lib_path);
+                            }
+                        }
+
+                        this.libs += lib_path + ";";
+                        let libName = entry.name.split(":");
+                        libName.splice(libName.length - 1, 1);
+                        this.libNames.push(libName.join(":"));
+
+                        const excludes = (entry.extract && Array.isArray(entry.extract.exclude)) ? entry.extract.exclude : [];
+
+                        try {
+                            const zip = new AdmZip(lib_path);
+                            const zipEntries = zip.getEntries();
+                            const nativesOut = path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${mcversion}`);
+                            for (const ze of zipEntries) {
+                                const entryName = ze.entryName.replace(/\\/g, "/");
+                                if (ze.isDirectory) continue;
+                                let excluded = false;
+                                for (const pattern of excludes) {
+                                    if (pattern.endsWith("/")) {
+                                        if (entryName.startsWith(pattern)) { excluded = true; break; }
+                                    } else {
+                                        if (entryName === pattern) { excluded = true; break; }
+                                    }
+                                }
+                                if (excluded) continue;
+
+                                const outPath = path.resolve(nativesOut, entryName);
+                                if (!fs.existsSync(outPath) || isRepair) {
+                                    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+                                    fs.writeFileSync(outPath, ze.getData());
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Failed extracting native:", e);
+                        }
+                        continue;
+                    }
+                } catch (e) {
+                    console.error("Error processing library native:", e);
+                }
                 if (entry.name == install_profile_json.install.path) {
                     // hi
                 } else if (entry.url && !entry.url.includes("https://libraries.minecraft.net/")) {
-                    let fileName = entry.name.split(":");
-                    fileName.splice(0, 1);
-                    fileName = fileName.join("-") + ".jar";
-                    let patha = entry.name.split(":");
-                    patha[0] = patha[0].replaceAll(".", "/");
-                    patha = patha.join("/") + "/" + fileName;
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${patha}`)) || isRepair) {
-                        await urlToFile(`${entry.url}${patha}`, path.resolve(userPath, `minecraft/meta/libraries/${patha}`));
+                    let lib_path_rel = mavenPathToRelPath(entry.name);
+                    let lib_path = mavenPathToFilePath(entry.name);
+                    if (!fs.existsSync(lib_path) || isRepair) {
+                        await urlToFile(`${entry.url}${lib_path_rel}`, lib_path);
                     }
-                    this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+                    this.libs += lib_path + ";";
                     let libName = entry.name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
                 } else if (!entry.url) {
-                    let fileName = entry.name.split(":");
-                    fileName.splice(0, 1);
-                    fileName = fileName.join("-") + ".jar";
-                    let patha = entry.name.split(":");
-                    patha[0] = patha[0].replaceAll(".", "/");
-                    patha = patha.join("/") + "/" + fileName;
-                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${patha}`)) || isRepair) {
-                        await urlToFile(`https://maven.creeperhost.net/${patha}`, path.resolve(userPath, `minecraft/meta/libraries/${patha}`));
+                    let lib_path_rel = mavenPathToRelPath(entry.name);
+                    let lib_path = mavenPathToFilePath(entry.name);
+                    if (!fs.existsSync(lib_path) || isRepair) {
+                        await urlToFile(`https://maven.creeperhost.net/${lib_path_rel}`, lib_path);
                     }
-                    this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+                    this.libs += lib_path + ";";
                     let libName = entry.name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
@@ -191,40 +265,144 @@ class Minecraft {
             }
             this.main_class = install_profile_json.versionInfo.mainClass;
             this.legacy_modded_arguments = install_profile_json.versionInfo.minecraftArguments;
-            this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${mcversion}/${mcversion}.jar`);
+            this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}/${mcversion}.jar`);
         } else if (compareVersions(forgeversion, upperBound) > 0) {
-            args = args.concat("--installClient", path.resolve(userPath, `minecraft/instances/${this.instance_id}`));
-            await new Promise((resolve, reject) => {
-                const installer = spawn(installation, args, {
-                    "cwd": path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
-                });
+            let no_need_to_process = false;
+            if (!install_profile_json.libraries || !version_json.libraries) return;
+            let processors = install_profile_json.processors;
+            let libraries = version_json.libraries.map(e => ({ ...e, include_in_classpath: true })).concat(install_profile_json.libraries.map(e => ({ ...e, include_in_classpath: false })));
+            let paths = [];
+            for (let i = 0; i < libraries.length; i++) {
+                ipcRenderer.send('progress-update', "Downloading Forge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
+                let e = libraries[i];
+                if (e.downloads.artifact) {
+                    if (!e.downloads.artifact.url) {
+                        if (fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`))) {
+                            no_need_to_process = true;
+                        }
+                        continue;
+                    }
+                    if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`)) || isRepair) {
+                        await urlToFile(e.downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`));
+                    }
+                    console.log("downloading ", e.name);
+                    let libName = e.name.split(":");
+                    libName.splice(libName.length - 1, 1);
+                    libName = libName.join(":");
+                    if (!this.libNames?.includes(libName) && e.include_in_classpath) {
+                        paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
+                    }
+                    this.libNames.push(libName);
+                }
+            }
+            if (!no_need_to_process || isRepair) {
+                let new_data = {};
+                for (let i = 0; i < Object.keys(install_profile_json.data).length; i++) {
+                    let key = Object.keys(install_profile_json.data)[i];
+                    let entry = Object.entries(install_profile_json.data)[i][1];
+                    async function extract_data(file_path) {
+                        console.log("extracting data for ", file_path);
+                        let extract_file = zip.getEntry(file_path.slice(1));
+                        let parsed_path = path.parse(file_path);
+                        let file_name = parsed_path.name;
+                        let ext = parsed_path.ext;
+                        let out_path = path.resolve(userPath, `minecraft/meta/libraries/me/illusioner/enderlynx/forge-installer-extracts/${mcversion}-${forgeversion}/forge-installer-extracts-${mcversion}-${forgeversion}-${file_name}.${ext}`);
+                        if (!extract_file) {
+                            throw new Error(`Missing entry in installer zip: ${file_path}`);
+                        }
+                        if (!fs.existsSync(out_path) || isRepair) {
+                            fs.mkdirSync(path.dirname(out_path), { recursive: true });
+                            const buf = extract_file.getData();
+                            fs.writeFileSync(out_path, buf);
+                        }
+                        let maven_path = `me.illusioner.enderlynx:forge-installer-extracts:${mcversion}-${forgeversion}:${file_name}@${ext}`;
+                        return `[${maven_path}]`;
+                    }
+                    console.log(entry);
+                    let client = entry.client.startsWith("/") ? await extract_data(entry.client) : entry.client;
+                    let server = entry.server.startsWith("/") ? await extract_data(entry.server) : entry.server;
+                    new_data[key] = {
+                        client,
+                        server
+                    }
+                }
+                console.log(new_data);
 
-                installer.stdout.on('data', data => {
-                    console.log(`${data}`);
-                });
-                installer.stderr.on('data', data => console.error(`Installer Error: ${data}`));
+                new_data.SIDE = {
+                    client: "client"
+                };
+                new_data.MINECRAFT_JAR = {
+                    client: path.resolve(userPath, `minecraft/meta/versions/${mcversion}/${mcversion}.jar`)
+                }
+                new_data.ROOT = {
+                    client: path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
+                }
+                new_data.MINECRAFT_VERSION = {
+                    client: mcversion
+                }
+                new_data.LIBRARY_DIR = {
+                    client: forgeLibDir
+                }
 
-                installer.on('close', code => {
-                    if (code === 0) resolve();
-                    else reject(new Error(`Forge installer exited with code ${code}`));
-                });
-            });
-            let forge_version_info = fs.readFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${mcversion}-forge-${forgeversion}/${mcversion}-forge-${forgeversion}.json`))
-            forge_version_info = JSON.parse(forge_version_info);
-            let libraries = forge_version_info.libraries;
-            let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+                for (let i = 0; i < processors.length; i++) {
+                    ipcRenderer.send('progress-update', "Downloading Forge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
+                    let processor = processors[i];
+                    if (processor.sides && !processor.sides.includes("client")) continue;
+                    let cp = [...processor.classpath, processor.jar];
+                    let cp_w_libs = "";
+                    cp.forEach(c => {
+                        let lib_path = mavenPathToFilePath(c);
+                        cp_w_libs += lib_path + ";";
+                    });
+                    let main_class = getMainClass(mavenPathToFilePath(processor.jar));
+                    let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
+                        console.log(e);
+                        if (e.startsWith("{")) {
+                            return new_data[e.slice(1, e.length - 1)].client
+                        } else {
+                            return e;
+                        }
+                    }).map(e => {
+                        console.log(e);
+                        if (e.startsWith("[")) {
+                            return mavenPathToFilePath(e.slice(1, e.length - 1));
+                        } else {
+                            return e;
+                        }
+                    }));
+                    await new Promise((resolve, reject) => {
+                        console.log(args);
+                        const processor = spawn(installation, args, {
+                            "cwd": path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
+                        });
+
+                        processor.stdout.on('data', data => {
+                            console.log(`${data}`);
+                        });
+                        processor.stderr.on('data', data => console.error(`Processor Error: ${data}`));
+
+                        processor.on('close', code => {
+                            if (code === 0) resolve();
+                            else reject(new Error(`Processor exited with code ${code}`));
+                        });
+                    });
+                }
+            }
+
+            let libs = version_json.libraries;
+            let lib_paths = libs.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
             this.libs = [...(new Set(this.libs))];
             this.libs = lib_paths.join(";") + ";";
-            this.libNames = libraries.map(e => {
+            this.libNames = libs.map(e => {
                 let libName = e.name.split(":");
                 libName.splice(libName.length - 1, 1);
                 return libName.join(":");
             });
             this.main_class = version_json.mainClass;
-            this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${mcversion}-forge-${forgeversion}/${mcversion}-forge-${forgeversion}.jar`);
-            if (forge_version_info.minecraftArguments) {
-                this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${mcversion}/${mcversion}.jar`);
-                this.legacy_modded_arguments = forge_version_info.minecraftArguments;
+            this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}-forge-${forgeversion}/${mcversion}-forge-${forgeversion}.jar`);
+            if (version_json.minecraftArguments) {
+                this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}/${mcversion}.jar`);
+                this.legacy_modded_arguments = version_json.minecraftArguments;
             }
         }
 
@@ -261,7 +439,7 @@ class Minecraft {
 
         this.modded_args_game = version_json?.arguments?.game ? version_json.arguments.game : [];
         this.modded_args_jvm = version_json?.arguments?.jvm ? version_json.arguments.jvm.map(e => {
-            e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`));
+            e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
             e = e.replaceAll("${classpath_separator}", ";");
             e = e.replaceAll("${version_name}", `${mcversion}-neoforge-${neoforgeversion}`);
             return e;
@@ -272,42 +450,139 @@ class Minecraft {
 
         fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}`), { recursive: true });
 
-        fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/launcher_profiles.json`), "{}");
-        fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/launcher_profiles_microsoft_store.json`), "{}");
+        let no_need_to_process = false;
 
-        ipcRenderer.send('progress-update', "Downloading NeoForge", 20, "Running NeoForge Installer");
+        if (!install_profile_json.libraries || !version_json.libraries) return;
+        let processors = install_profile_json.processors;
+        let libraries = version_json.libraries.map(e => ({ ...e, include_in_classpath: true })).concat(install_profile_json.libraries.map(e => ({ ...e, include_in_classpath: false })));
+        let paths = [];
+        for (let i = 0; i < libraries.length; i++) {
+            ipcRenderer.send('progress-update', "Downloading NeoForge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
+            let e = libraries[i];
+            if (e.downloads.artifact) {
+                if (!e.downloads.artifact.url) {
+                    if (fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`))) {
+                        no_need_to_process = true;
+                    }
+                    continue;
+                }
+                if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`)) || isRepair) {
+                    await urlToFile(e.downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`));
+                }
+                console.log("downloading ", e.name);
+                let libName = e.name.split(":");
+                libName.splice(libName.length - 1, 1);
+                libName = libName.join(":");
+                if (!this.libNames?.includes(libName) && e.include_in_classpath) {
+                    paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
+                }
+                this.libNames.push(libName);
+            }
+        }
+        if (!no_need_to_process || isRepair) {
+            let new_data = {};
+            for (let i = 0; i < Object.keys(install_profile_json.data).length; i++) {
+                let key = Object.keys(install_profile_json.data)[i];
+                let entry = Object.entries(install_profile_json.data)[i][1];
+                async function extract_data(file_path) {
+                    console.log("extracting data for ", file_path);
+                    let extract_file = zip.getEntry(file_path.slice(1));
+                    let parsed_path = path.parse(file_path);
+                    let file_name = parsed_path.name;
+                    let ext = parsed_path.ext;
+                    let out_path = path.resolve(userPath, `minecraft/meta/libraries/me/illusioner/enderlynx/neoforge-installer-extracts/${mcversion}-${neoforgeversion}/neoforge-installer-extracts-${mcversion}-${neoforgeversion}-${file_name}.${ext}`);
+                    if (!extract_file) {
+                        throw new Error(`Missing entry in installer zip: ${file_path}`);
+                    }
+                    if (!fs.existsSync(out_path) || isRepair) {
+                        fs.mkdirSync(path.dirname(out_path), { recursive: true });
+                        const buf = extract_file.getData();
+                        fs.writeFileSync(out_path, buf);
+                    }
+                    let maven_path = `me.illusioner.enderlynx:neoforge-installer-extracts:${mcversion}-${neoforgeversion}:${file_name}@${ext}`;
+                    return `[${maven_path}]`;
+                }
+                console.log(entry);
+                let client = entry.client.startsWith("/") ? await extract_data(entry.client) : entry.client;
+                let server = entry.server.startsWith("/") ? await extract_data(entry.server) : entry.server;
+                new_data[key] = {
+                    client,
+                    server
+                }
+            }
+            console.log(new_data);
 
-        let args = ["-jar", installerPath];
+            new_data.SIDE = {
+                client: "client"
+            };
+            new_data.MINECRAFT_JAR = {
+                client: path.resolve(userPath, `minecraft/meta/versions/${mcversion}/${mcversion}.jar`)
+            }
+            new_data.ROOT = {
+                client: path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
+            }
+            new_data.MINECRAFT_VERSION = {
+                client: mcversion
+            }
+            new_data.LIBRARY_DIR = {
+                client: neoForgeLibDir
+            }
 
-        args = args.concat("--installClient", path.resolve(userPath, `minecraft/instances/${this.instance_id}`));
-        await new Promise((resolve, reject) => {
-            const installer = spawn(installation, args, {
-                "cwd": path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
-            });
+            for (let i = 0; i < processors.length; i++) {
+                ipcRenderer.send('progress-update', "Downloading NeoForge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
+                let processor = processors[i];
+                if (processor.sides && !processor.sides.includes("client")) continue;
+                let cp = [...processor.classpath, processor.jar];
+                let cp_w_libs = "";
+                cp.forEach(c => {
+                    let lib_path = mavenPathToFilePath(c);
+                    cp_w_libs += lib_path + ";";
+                });
+                let main_class = getMainClass(mavenPathToFilePath(processor.jar));
+                let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
+                    console.log(e);
+                    if (e.startsWith("{")) {
+                        return new_data[e.slice(1, e.length - 1)].client
+                    } else {
+                        return e;
+                    }
+                }).map(e => {
+                    console.log(e);
+                    if (e.startsWith("[")) {
+                        return mavenPathToFilePath(e.slice(1, e.length - 1));
+                    } else {
+                        return e;
+                    }
+                }));
+                await new Promise((resolve, reject) => {
+                    console.log(args);
+                    const processor = spawn(installation, args, {
+                        "cwd": path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
+                    });
 
-            installer.stdout.on('data', data => {
-                console.log(`${data}`);
-            });
-            installer.stderr.on('data', data => console.error(`Installer Error: ${data}`));
+                    processor.stdout.on('data', data => {
+                        console.log(`${data}`);
+                    });
+                    processor.stderr.on('data', data => console.error(`Processor Error: ${data}`));
 
-            installer.on('close', code => {
-                if (code === 0) resolve();
-                else reject(new Error(`NeoForge installer exited with code ${code}`));
-            });
-        });
-        let forge_version_info = fs.readFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/neoforge-${neoforgeversion}/neoforge-${neoforgeversion}.json`))
-        forge_version_info = JSON.parse(forge_version_info);
-        let libraries = forge_version_info.libraries;
-        let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+                    processor.on('close', code => {
+                        if (code === 0) resolve();
+                        else reject(new Error(`Processor exited with code ${code}`));
+                    });
+                });
+            }
+        }
+        let libs = version_json.libraries;
+        let lib_paths = libs.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
         this.libs = [...(new Set(this.libs))];
         this.libs = lib_paths.join(";") + ";";
-        this.libNames = libraries.map(e => {
+        this.libNames = libs.map(e => {
             let libName = e.name.split(":");
             libName.splice(libName.length - 1, 1);
             return libName.join(":");
         });
         this.main_class = version_json.mainClass;
-        this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/neoforge-${neoforgeversion}/neoforge-${neoforgeversion}.jar`)
+        this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}-neoforge-${neoforgeversion}/${mcversion}-neoforge-${neoforgeversion}.jar`);
 
         ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
     }
@@ -334,13 +609,7 @@ class Minecraft {
                 this.modded_args_game = fabric_json.arguments.game;
                 this.modded_args_jvm = fabric_json.arguments.jvm;
                 for (let i = 0; i < fabric_json.libraries.length; i++) {
-                    let fileName = fabric_json.libraries[i].name.split(":");
-                    fileName.splice(0, 1);
-                    fileName = fileName.join("-") + ".jar";
-                    let patha = fabric_json.libraries[i].name.split(":");
-                    patha[0] = patha[0].replaceAll(".", "/");
-                    patha = patha.join("/") + "/" + fileName;
-                    this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+                    this.libs += mavenPathToFilePath(fabric_json.libraries[i].name) + ";";
                     let libName = fabric_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
@@ -356,13 +625,7 @@ class Minecraft {
                 if (quilt_json.arguments?.game) this.modded_args_game = quilt_json.arguments.game;
                 if (quilt_json.arguments?.jvm) this.modded_args_jvm = quilt_json.arguments.jvm;
                 for (let i = 0; i < quilt_json.libraries.length; i++) {
-                    let fileName = quilt_json.libraries[i].name.split(":");
-                    fileName.splice(0, 1);
-                    fileName = fileName.join("-") + ".jar";
-                    let patha = quilt_json.libraries[i].name.split(":");
-                    patha[0] = patha[0].replaceAll(".", "/");
-                    patha = patha.join("/") + "/" + fileName;
-                    this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+                    this.libs += mavenPathToFilePath(quilt_json.libraries[i].name) + ";";
                     let libName = quilt_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
@@ -406,24 +669,12 @@ class Minecraft {
                         if (entry.name == install_profile_json.install.path) {
                             // hi
                         } else if (entry.url && !entry.url.includes("https://libraries.minecraft.net/")) {
-                            let fileName = entry.name.split(":");
-                            fileName.splice(0, 1);
-                            fileName = fileName.join("-") + ".jar";
-                            let patha = entry.name.split(":");
-                            patha[0] = patha[0].replaceAll(".", "/");
-                            patha = patha.join("/") + "/" + fileName;
-                            this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+                            this.libs += mavenPathToFilePath(entry.name) + ";";
                             let libName = entry.name.split(":");
                             libName.splice(libName.length - 1, 1);
                             this.libNames.push(libName.join(":"));
                         } else if (!entry.url) {
-                            let fileName = entry.name.split(":");
-                            fileName.splice(0, 1);
-                            fileName = fileName.join("-") + ".jar";
-                            let patha = entry.name.split(":");
-                            patha[0] = patha[0].replaceAll(".", "/");
-                            patha = patha.join("/") + "/" + fileName;
-                            this.libs += path.resolve(userPath, `minecraft/meta/libraries/${patha}`) + ";";
+                            this.libs += mavenPathToFilePath(entry.name) + ";";
                             let libName = entry.name.split(":");
                             libName.splice(libName.length - 1, 1);
                             this.libNames.push(libName.join(":"));
@@ -431,14 +682,14 @@ class Minecraft {
                     }
                     this.main_class = install_profile_json.versionInfo.mainClass;
                     this.legacy_modded_arguments = install_profile_json.versionInfo.minecraftArguments;
-                    this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                    this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.jar`);
                     this.modded_args_game = [];
                     this.modded_args_jvm = [];
                 } else if (compareVersions(loaderVersion, upperBound) > 0) {
-                    let forge_version_info = fs.readFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}-forge-${loaderVersion}/${version}-forge-${loaderVersion}.json`))
+                    let forge_version_info = fs.readFileSync(path.resolve(userPath, `minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`))
                     forge_version_info = JSON.parse(forge_version_info);
                     let libraries = forge_version_info.libraries;
-                    let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+                    let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
                     this.libs = [...(new Set(this.libs))];
                     this.libs = lib_paths.join(";") + ";";
                     this.libNames = libraries.map(e => {
@@ -447,16 +698,16 @@ class Minecraft {
                         return libName.join(":");
                     });
                     this.main_class = forge_version_info.mainClass;
-                    this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}-forge-${loaderVersion}/${version}-forge-${loaderVersion}.jar`);
+                    this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${version}-forge-${loaderVersion}/${version}-forge-${loaderVersion}.jar`);
                     this.modded_args_game = forge_version_info?.arguments?.game ? forge_version_info.arguments.game : [];
                     this.modded_args_jvm = forge_version_info?.arguments?.jvm ? forge_version_info.arguments.jvm.map(e => {
-                        e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`));
+                        e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
                         e = e.replaceAll("${classpath_separator}", ";");
                         e = e.replaceAll("${version_name}", `${version}-forge-${loaderVersion}`);
                         return e;
                     }) : [];
                     if (forge_version_info.minecraftArguments) {
-                        this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                        this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.jar`);
                         this.legacy_modded_arguments = forge_version_info.minecraftArguments;
                     }
                 }
@@ -465,10 +716,10 @@ class Minecraft {
             if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/neoforge/${version}/${loaderVersion}/neoforge-${version}-${loaderVersion}.json`))) {
                 await this.installNeoForge(version, loaderVersion);
             } else {
-                let neo_forge_version_info = fs.readFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/neoforge-${loaderVersion}/neoforge-${loaderVersion}.json`))
+                let neo_forge_version_info = fs.readFileSync(path.resolve(userPath, `minecraft/meta/neoforge/${version}/${loaderVersion}/neoforge-${version}-${loaderVersion}.json`))
                 neo_forge_version_info = JSON.parse(neo_forge_version_info);
                 let libraries = neo_forge_version_info.libraries;
-                let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`, e.downloads.artifact.path));
+                let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
                 this.libs = [...(new Set(this.libs))];
                 this.libs = lib_paths.join(";") + ";";
                 this.libNames = libraries.map(e => {
@@ -477,17 +728,17 @@ class Minecraft {
                     return libName.join(":");
                 });
                 this.main_class = neo_forge_version_info.mainClass;
-                this.modded_jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/neoforge-${loaderVersion}/neoforge-${loaderVersion}.jar`);
+                this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/neoforge-${loaderVersion}/neoforge-${loaderVersion}.jar`);
                 this.modded_args_game = neo_forge_version_info?.arguments?.game ? neo_forge_version_info.arguments.game : [];
                 this.modded_args_jvm = neo_forge_version_info?.arguments?.jvm ? neo_forge_version_info.arguments.jvm.map(e => {
-                    e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/instances/${this.instance_id}/libraries`));
+                    e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
                     e = e.replaceAll("${classpath_separator}", ";");
                     e = e.replaceAll("${version_name}", `${version}-neoforge-${loaderVersion}`);
                     return e;
                 }) : [];
             }
         }
-        let version_json = fs.readFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`));
+        let version_json = fs.readFileSync(path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`));
         version_json = JSON.parse(version_json);
         let paths = "";
         libs: for (let i = 0; i < version_json.libraries.length; i++) {
@@ -516,10 +767,10 @@ class Minecraft {
             }
         };
         this.libs += paths;
-        this.jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+        this.jarfile = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.jar`);
         let java = new Java();
-        this.java_installation = javaPath ? javaPath : await java.getJavaInstallation(version_json.javaVersion.majorVersion);
-        this.java_version = version_json.javaVersion.majorVersion;
+        this.java_installation = javaPath ? javaPath : await java.getJavaInstallation(version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8);
+        this.java_version = version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8;
         if (version_json?.arguments?.game) {
             this.args = version_json.arguments;
         } else if (version_json?.minecraftArguments) {
@@ -757,17 +1008,9 @@ class Minecraft {
         if (!this.libNames) this.libNames = [];
         try {
             ipcRenderer.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
-            fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}`), { recursive: true });
+            fs.mkdirSync(path.resolve(userPath, `minecraft/meta/versions/${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/logs`), { recursive: true });
-            let files = [path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`)]
-            if (!isRepair || whatToRepair.includes("minecraft")) {
-                files.forEach((e) => {
-                    if (isRepair && fs.existsSync(e)) fs.unlinkSync(e);
-                    const fd = fs.openSync(e, 'w');
-                    fs.closeSync(fd);
-                });
-            }
             this.version = version;
             ipcRenderer.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
@@ -786,7 +1029,7 @@ class Minecraft {
                 return;
             }
             if (!isRepair || whatToRepair.includes("minecraft")) {
-                fs.writeFileSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`), JSON.stringify(version_json));
+                fs.writeFileSync(path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`), JSON.stringify(version_json));
             }
             if (!isRepair || whatToRepair.includes("assets")) {
                 ipcRenderer.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
@@ -817,19 +1060,20 @@ class Minecraft {
                 await Promise.all(downloadPromises);
                 this.asset_dir = version_json.assets == "legacy" ? path.resolve(userPath, "minecraft/meta/assets/legacy") : version_json.assets == "pre-1.6" ? path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources`) : path.resolve(userPath, "minecraft/meta/assets");
             }
-            if (!isRepair || whatToRepair.includes("minecraft")) {
+            const jarFilePath = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.jar`);
+            if ((!isRepair && !fs.existsSync(jarFilePath)) || whatToRepair?.includes("minecraft")) {
                 ipcRenderer.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
-                await urlToFile(version_json.downloads.client.url, path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`));
-                this.jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
+                await urlToFile(version_json.downloads.client.url, jarFilePath);
+                this.jarfile = jarFilePath;
             }
             let java = new Java();
             let paths = "";
-            if (!isRepair || whatToRepair.includes("java")) {
+            if (!isRepair || whatToRepair?.includes("java")) {
                 ipcRenderer.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
-                this.java_installation = await java.getJavaInstallation(version_json.javaVersion.majorVersion, isRepair);
-                this.java_version = version_json.javaVersion.majorVersion;
+                this.java_installation = await java.getJavaInstallation(version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8, isRepair);
+                this.java_version = version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8;
             }
-            if (!isRepair || whatToRepair.includes("minecraft")) {
+            if (!isRepair || whatToRepair?.includes("minecraft")) {
                 const platform = os.platform();
                 const getPlatformString = () => {
                     if (platform === 'win32') return 'windows';
@@ -1130,7 +1374,7 @@ class Forge {
         // Only include versions that look like vanilla Minecraft versions (e.g., "1.20.1")
         let versions = Object.keys(data)
             .filter(v => /^\d+\.\d+(\.\d+)?$/.test(v));
-        versions = versions.filter(e => !["1.5.1", "1.5", "1.4.7", "1.4.6", "1.4.5", "1.4.4", "1.4.3", "1.4.2", "1.4.1", "1.4.0", "1.3.2", "1.2.5", "1.2.4", "1.2.3", "1.1"].includes(e));
+        versions = versions.filter(e => !["1.5.2", "1.5.1", "1.5", "1.4.7", "1.4.6", "1.4.5", "1.4.4", "1.4.3", "1.4.2", "1.4.1", "1.4.0", "1.3.2", "1.2.5", "1.2.4", "1.2.3", "1.1"].includes(e));
         return versions.reverse();
     }
 
@@ -1210,6 +1454,64 @@ class NeoForge {
             }
         }
         return versions.reverse();
+    }
+}
+
+function mavenPathToFilePath(maven_path) {
+    return path.resolve(userPath, "minecraft/meta/libraries/", mavenPathToRelPath(maven_path));
+}
+function mavenPathToRelPath(maven_path) {
+    let extension;
+    if (maven_path.includes('@')) {
+        [maven_path, extension] = maven_path.split('@');
+    }
+
+    const parts = maven_path.split(':');
+    if (parts.length < 3) {
+        throw new Error('Invalid Maven artifact format');
+    }
+
+    const [groupId, artifactId, version, classifier] = parts;
+    const groupPath = groupId.replace(/\./g, '/');
+    const fileExtension = extension || 'jar';
+    const classifierPart = classifier ? `-${classifier}` : '';
+
+    const fileName = `${artifactId}-${version}${classifierPart}.${fileExtension}`;
+    return `${groupPath}/${artifactId}/${version}/${fileName}`;
+}
+function getMainClass(jar_path) {
+    if (!fs.existsSync(jar_path)) return null;
+    try {
+        const zip = new AdmZip(jar_path);
+        const entries = zip.getEntries();
+        const manifestEntry = entries.find(e => e.entryName && e.entryName.toUpperCase() === 'META-INF/MANIFEST.MF');
+        if (!manifestEntry) return null;
+        const content = manifestEntry.getData().toString('utf8');
+        const lines = content.split(/\r?\n/);
+        const headers = {};
+        let currentKey = null;
+        for (const line of lines) {
+            if (line === '') {
+                currentKey = null;
+                continue;
+            }
+            if (/^\s/.test(line) && currentKey) {
+                // Continuation line: append without the leading space
+                headers[currentKey] += line.slice(1);
+            } else {
+                const idx = line.indexOf(':');
+                if (idx === -1) {
+                    currentKey = null;
+                    continue;
+                }
+                currentKey = line.slice(0, idx).trim().toLowerCase();
+                headers[currentKey] = (line.slice(idx + 1) || '').trim();
+            }
+        }
+        return headers['main-class'] || null;
+    } catch (err) {
+        console.error('Failed to read manifest:', err);
+        return null;
     }
 }
 
