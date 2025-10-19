@@ -1194,7 +1194,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getInstanceFolderName: (instance_id) => {
         instance_id = instance_id.trim();
-        instance_id = instance_id.replace(/[^\p{L}\p{N} _\-.]/gu, "_");
+        instance_id = instance_id.replace(/[^0-9a-zA-Z\-._]/g, "_");
         instance_id = instance_id.replace(/[. ]+$/, "_");
         const reserved_names = new Set([
             "con", "prn", "aux", "nul",
