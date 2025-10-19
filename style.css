@@ -3566,6 +3566,7 @@ dialog[open]::backdrop {
     animation-name: homecontainer;
     timeline-scope: --home-container;
     animation-timeline: --home-container;
+    animation-fill-mode: both;
 }
 
 .home-discover-container {
