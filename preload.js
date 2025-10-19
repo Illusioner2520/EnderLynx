@@ -1193,16 +1193,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await quilt.getSupportedVanillaVersions();
     },
     getInstanceFolderName: (instance_id) => {
-        let reserved_names = ["con", "prn", "aux", "nul", "com0", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt0", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9", ""]
-        for (let i = 0; i < instance_id.length; i++) {
-            if (!/^[0-9a-zA-Z_\-\s]$/.test(instance_id[i])) {
-                instance_id = instance_id.substring(0, i) + "_" + instance_id.substring(i + 1);
-            }
-        }
-        if (reserved_names.includes(instance_id.toLowerCase())) {
+        instance_id = instance_id.trim();
+        instance_id = instance_id.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+        instance_id = instance_id.replace(/[. ]+$/, "_");
+        const reserved_names = new Set([
+            "con", "prn", "aux", "nul",
+            "com0", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+            "lpt0", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+        ]);
+        if (reserved_names.has(instance_id.toLowerCase())) {
             instance_id += "_";
         }
-        let baseInstanceId = instance_id.trim();
+        if (!instance_id) {
+            instance_id = "unnamed";
+        }
+        if (instance_id.length > 100) {
+            instance_id = instance_id.substring(0, 100);
+        }
+        const baseInstanceId = instance_id;
         let counter = 1;
         while (folderExists(path.resolve(userPath, `minecraft/instances/${instance_id}`))) {
             instance_id = `${baseInstanceId}_${counter}`;
