@@ -751,5 +751,6 @@
     "app.instances.share.cancel": "Cancel",
     "app.instances.share.confirm": "Export",
     "app.instances.share.name": "Name",
-    "app.instances.share.files": "Files to Include"
+    "app.instances.share.files": "Files to Include",
+    "app.list.total": "%c Total"
 }

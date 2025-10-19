@@ -2172,6 +2172,11 @@ class ContentList {
             contentListTop.appendChild(updateAllButton);
         }
 
+        let totalText = document.createElement("div");
+        totalText.className = "content-list-total";
+        totalText.innerHTML = translate("app.list.total", "%c", content.length);
+        contentListTop.appendChild(totalText);
+
         let applyFilters = (search, dropdown) => {
             let numShown = 0;
             for (let i = 0; i < this.items.length; i++) {
@@ -2184,6 +2189,7 @@ class ContentList {
                     this.items[i].element.classList.add("hidden");
                 }
             }
+            totalText.innerHTML = translate("app.list.total", "%c", numShown);
             notFoundElement.style.display = numShown ? "none" : "";
             this.figureOutMainCheckedState();
         }

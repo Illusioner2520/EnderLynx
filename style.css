@@ -1218,7 +1218,7 @@ i {
     font-size: 1rem;
     align-items: center;
     align-self: stretch;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: color-mix(in srgb, var(--neutral-color), var(--text-color));
 }
 
 .content-list-update-all:active {
@@ -1227,6 +1227,20 @@ i {
 
 .content-list-update-all:hover {
     background-color: var(--color-1t);
+}
+
+.content-list-total {
+    padding: 8px;
+    width: max-content;
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    font-weight: bold;
+}
+
+.content-list-top:not(:has(.content-list-refresh)):not(:has(.content-list-update-all)) .content-list-total {
+    margin-left: auto;
 }
 
 .content-list-item {
