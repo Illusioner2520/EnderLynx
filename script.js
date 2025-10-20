@@ -6175,7 +6175,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
     let instanceLockedBanner = document.createElement("div");
     instanceLockedBanner.className = "instance-locked-banner";
     let instanceLockedText = document.createElement("span");
-    instanceLockedText.innerHTML = translate("app.instance.locked");
+    instanceLockedText.innerHTML = translate("app.instance.locked", "%c", translate("app.discover." + instanceInfo.install_source));
     let instanceLockedButton = document.createElement("button");
     instanceLockedButton.className = "instance-locked-button";
     instanceLockedButton.innerHTML = '<i class="fa-solid fa-unlock"></i>' + translate("app.instance.unlock");
@@ -7926,6 +7926,7 @@ function translate(key, ...params) {
     for (let i = 0; i < params.length; i += 2) {
         value = value.replace(params[i], params[i + 1]);
     }
+    if (!value) return key;
     return value;
 }
 

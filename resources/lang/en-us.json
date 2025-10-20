@@ -408,7 +408,7 @@
     "app.instances.settings.modpack.installed_via": "Modpack installed via %c",
     "app.instances.settings.modpack.view": "View Modpack",
     "app.instances.updated_all": "Successfully updated all content for instance %i",
-    "app.instance.locked": "Instance is locked. Unlock it to edit its content and unlink it from Modrinth / CurseForge.",
+    "app.instance.locked": "Instance is locked. Unlock it to edit its content and unlink it from %c.",
     "app.instance.unlock": "Unlock",
     "app.content.import": "Import Content",
     "app.content.import.title": "Select Content to Import",
