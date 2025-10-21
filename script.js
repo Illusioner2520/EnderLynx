@@ -12571,32 +12571,6 @@ window.electronAPI.onOpenFile((info, file_path) => {
     });
 });
 
-function onError(message, reportable, reportInfo) {
-    let wrapper = document.createElement("div");
-    wrapper.style.display = "flex";
-    wrapper.style.flexDirection = "column";
-    wrapper.style.gap = "8px";
-    let description = document.createElement("span");
-    description.innerHTML = translate("app.error.description", "%m", message);
-    wrapper.appendChild(description);
-    let bugButton = document.createElement("button");
-    bugButton.innerHTML = '<i class="fa-solid fa-bug"></i> ' + translate("app.error.report");
-    bugButton.onclick = () => {
-        window.electronAPI.openInBrowser(`https://github.com/Illusioner2520/EnderLynx/issues/new?template=1-bug_report.yml&version=${window.electronAPI.version}&title=Error&description=${reportInfo}`);
-    }
-    bugButton.className = "bug-button";
-    if (reportable) wrapper.appendChild(bugButton);
-    let dialog = new Dialog();
-    dialog.showDialog(translate("app.error.title"), "notice", wrapper, [
-        {
-            "type": "confirm",
-            "content": translate("app.error.confirm")
-        }
-    ], [], () => { })
-}
-
-window.electronAPI.onError(onError);
-
 function openInstanceShareDialog(instanceInfo) {
     let options = window.electronAPI.getInstanceFiles(instanceInfo.instance_id);
     let content = instanceInfo.getContent();

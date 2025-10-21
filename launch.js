@@ -1537,17 +1537,6 @@ function getMainClass(jar_path) {
     }
 }
 
-class InstallationError extends Error {
-    constructor(code, reportBody) {
-        super(reportBody);
-        this.name = "InstallationError";
-        this.code = code;
-        if (Error.captureStackTrace) {
-            Error.captureStackTrace(this, InstallationError);
-        }
-    }
-}
-
 module.exports = {
     Minecraft,
     Java,
@@ -1556,6 +1545,5 @@ module.exports = {
     Quilt,
     NeoForge,
     urlToFile,
-    urlToFolder,
-    InstallationError
+    urlToFolder
 }

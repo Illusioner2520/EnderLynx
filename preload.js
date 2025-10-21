@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer, clipboard, nativeImage, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt, InstallationError } = require('./launch.js');
+const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
 const { JavaSearch } = require('./java_scan.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
@@ -150,16 +150,11 @@ ipcRenderer.on('new-args', (event, newargs) => {
     processArgs(newargs.slice(1));
 });
 
-let errorCallback = () => { };
-
 contextBridge.exposeInMainWorld('electronAPI', {
     onOpenFile: (callback) => {
         ipcRenderer.on('open-file', (event, filePath) => {
             callback(readELPack(filePath), filePath);
         });
-    },
-    onError: (callback) => {
-        errorCallback = callback;
     },
     getMaxConcurrentDownloads,
     version: enableDevMode ? version + "-dev" : version,
@@ -1259,7 +1254,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             }
             return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
         } catch (err) {
-            errorCallback(err.message, true, err.stack + "\nLine: " + err.lineNumber + "\nFile: " + err.fileName);
             return { "error": true };
         }
     },
@@ -1280,7 +1274,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             }
             return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version };
         } catch (err) {
-            errorCallback(err.message, true, err.stack + "\nLine: " + err.lineNumber + "\nFile: " + err.fileName);
             return { "error": true }
         }
     },
