@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer, clipboard, nativeImage, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
+const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt, InstallationError } = require('./launch.js');
 const { JavaSearch } = require('./java_scan.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
@@ -107,7 +107,7 @@ try {
 
 const db = new Database(path.resolve(userPath, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -150,11 +150,16 @@ ipcRenderer.on('new-args', (event, newargs) => {
     processArgs(newargs.slice(1));
 });
 
+let errorCallback = () => { };
+
 contextBridge.exposeInMainWorld('electronAPI', {
     onOpenFile: (callback) => {
         ipcRenderer.on('open-file', (event, filePath) => {
             callback(readELPack(filePath), filePath);
         });
+    },
+    onError: (callback) => {
+        errorCallback = callback;
     },
     getMaxConcurrentDownloads,
     version: enableDevMode ? version + "-dev" : version,
@@ -1194,7 +1199,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getInstanceFolderName: (instance_id) => {
         instance_id = instance_id.trim();
-        instance_id = instance_id.replace(/[^0-9a-zA-Z\-._]/g, "_");
+        instance_id = instance_id.replace(/[^0-9a-zA-Z\-._ \(\)]/g, "_");
         instance_id = instance_id.replace(/[. ]+$/, "_");
         const reserved_names = new Set([
             "con", "prn", "aux", "nul",
@@ -1240,34 +1245,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ];
     },
     downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
-        let mc = new Minecraft(instance_id);
-        let r = await mc.downloadGame(loader, vanilla_version);
-        if (loader == "fabric") {
-            await mc.installFabric(vanilla_version, loader_version);
-        } else if (loader == "forge") {
-            await mc.installForge(vanilla_version, loader_version);
-        } else if (loader == "neoforge") {
-            await mc.installNeoForge(vanilla_version, loader_version);
-        } else if (loader == "quilt") {
-            await mc.installQuilt(vanilla_version, loader_version);
+        try {
+            let mc = new Minecraft(instance_id);
+            let r = await mc.downloadGame(loader, vanilla_version);
+            if (loader == "fabric") {
+                await mc.installFabric(vanilla_version, loader_version);
+            } else if (loader == "forge") {
+                await mc.installForge(vanilla_version, loader_version);
+            } else if (loader == "neoforge") {
+                await mc.installNeoForge(vanilla_version, loader_version);
+            } else if (loader == "quilt") {
+                await mc.installQuilt(vanilla_version, loader_version);
+            }
+            return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
+        } catch (err) {
+            errorCallback(err.message, true, err.stack + "\nLine: " + err.lineNumber + "\nFile: " + err.fileName);
+            return { "error": true };
         }
-        return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
     },
     repairMinecraft: async (instance_id, loader, vanilla_version, loader_version, whatToRepair) => {
-        let mc = new Minecraft(instance_id);
-        let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
-        if (whatToRepair.includes("mod_loader")) {
-            if (loader == "fabric") {
-                await mc.installFabric(vanilla_version, loader_version, true);
-            } else if (loader == "forge") {
-                await mc.installForge(vanilla_version, loader_version, true);
-            } else if (loader == "neoforge") {
-                await mc.installNeoForge(vanilla_version, loader_version, true);
-            } else if (loader == "quilt") {
-                await mc.installQuilt(vanilla_version, loader_version, true);
+        try {
+            let mc = new Minecraft(instance_id);
+            let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
+            if (whatToRepair.includes("mod_loader")) {
+                if (loader == "fabric") {
+                    await mc.installFabric(vanilla_version, loader_version, true);
+                } else if (loader == "forge") {
+                    await mc.installForge(vanilla_version, loader_version, true);
+                } else if (loader == "neoforge") {
+                    await mc.installNeoForge(vanilla_version, loader_version, true);
+                } else if (loader == "quilt") {
+                    await mc.installQuilt(vanilla_version, loader_version, true);
+                }
             }
+            return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version };
+        } catch (err) {
+            errorCallback(err.message, true, err.stack + "\nLine: " + err.lineNumber + "\nFile: " + err.fileName);
+            return { "error": true }
         }
-        return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version };
     },
     getForgeVersion: async (mcversion) => {
         let forge = new Forge();
@@ -2607,155 +2622,160 @@ async function getNewAccessToken(refresh_token) {
 
 
 async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
-    ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-    const zip = new AdmZip(zip_path);
+    try {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        const zip = new AdmZip(zip_path);
 
-    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
+        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
-    if (!fs.existsSync(extractToPath)) {
-        fs.mkdirSync(extractToPath, { recursive: true });
-    }
-
-    zip.extractAllTo(extractToPath, true);
-
-    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    fs.mkdirSync(srcDir, { recursive: true });
-    fs.mkdirSync(destDir, { recursive: true });
-
-    const files = fs.readdirSync(srcDir);
-
-    for (const file of files) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-        const srcPath = path.join(srcDir, file);
-        const destPath = path.join(destDir, file);
-
-        if (fs.existsSync(destPath)) {
-            const stats = fs.lstatSync(destPath);
-            if (stats.isDirectory()) {
-                fs.rmSync(destPath, { recursive: true, force: true });
-            } else {
-                fs.unlinkSync(destPath);
-            }
-        }
-        try {
-            fs.cpSync(srcPath, destPath, { recursive: true });
-            fs.rmSync(srcPath, { recursive: true, force: true });
-        } catch (err) {
-            return "Unable to enable overrides for folder " + file;
-        }
-    }
-
-    let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
-    manifest_json = JSON.parse(manifest_json);
-
-    let dependency_res;
-    if (cf_id) dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`)
-    let dependency_json;
-    if (cf_id) dependency_json = await dependency_res.json()
-
-    let content = [];
-    let project_ids = [];
-
-    const limit = pLimit(getMaxConcurrentDownloads());
-
-    let allocated_ram = manifest_json.minecraft?.recommendedRam;
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
-
-    let count = 0;
-
-    const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-        let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
-
-        let folder = "mods";
-        if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
-        else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shaderpacks";
-        let type = "mod";
-        if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
-        else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shader";
-        let file_name = "";
-        try {
-            file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
-        } catch (e) {
-            let res = await fetch(`https://api.curse.tools/v1/cf/mods/${file.projectID}/files/${file.fileID}`);
-            let res_json = await res.json();
-            file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, folder));
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
         }
 
-        if (cf_id && dependency_item) {
-            project_ids.push(null);
-            content.push({
-                "author": dependency_item?.authorName ?? "",
-                "disabled": false,
-                "file_name": file_name,
-                "image": dependency_item?.logoUrl ?? "",
-                "source": "curseforge",
-                "source_id": file.projectID,
-                "type": type,
-                "version": "",
-                "version_id": file.fileID,
-                "name": dependency_item?.name ?? file_name
-            })
-        } else {
-            project_ids.push(file.projectID);
-            content.push({
-                "source": "curseforge",
-                "source_id": file.projectID,
-                "version_id": file.fileID,
-                "disabled": false,
-                "type": type,
-                "version": "",
-                "file_name": file_name
-            });
-        }
-        if (count == manifest_json.files.length - 1) {
-            ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-        } else {
-            ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`);
-        }
-        count++;
-    }));
-    await Promise.all(downloadPromises);
+        zip.extractAllTo(extractToPath, true);
 
-    if (project_ids.filter(e => e).length) {
-        let cfData = [];
-        try {
-            const response = await fetch("https://api.curse.tools/v1/cf/mods", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false })
-            });
-            if (response.ok) {
-                const json = await response.json();
-                cfData = json.data || [];
-            }
-        } catch (e) {
-            cfData = [];
-        }
+        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
-        cfData.forEach(e => {
-            content.forEach(item => {
-                if (Number(item.source_id) == Number(e.id)) {
-                    item.name = e.name;
-                    item.image = e.logo.thumbnailUrl;
-                    item.author = e.authors[0].name;
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const files = fs.readdirSync(srcDir);
+
+        for (const file of files) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                const stats = fs.lstatSync(destPath);
+                if (stats.isDirectory()) {
+                    fs.rmSync(destPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(destPath);
                 }
+            }
+            try {
+                fs.cpSync(srcPath, destPath, { recursive: true });
+                fs.rmSync(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                return "Unable to enable overrides for folder " + file;
+            }
+        }
+
+        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        manifest_json = JSON.parse(manifest_json);
+
+        let dependency_res;
+        if (cf_id) dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`)
+        let dependency_json;
+        if (cf_id) dependency_json = await dependency_res.json()
+
+        let content = [];
+        let project_ids = [];
+
+        const limit = pLimit(getMaxConcurrentDownloads());
+
+        let allocated_ram = manifest_json.minecraft?.recommendedRam;
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+
+        let count = 0;
+
+        const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
+            let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
+
+            let folder = "mods";
+            if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
+            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shaderpacks";
+            let type = "mod";
+            if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
+            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shader";
+            let file_name = "";
+            try {
+                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
+            } catch (e) {
+                let res = await fetch(`https://api.curse.tools/v1/cf/mods/${file.projectID}/files/${file.fileID}`);
+                let res_json = await res.json();
+                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, folder));
+            }
+
+            if (cf_id && dependency_item) {
+                project_ids.push(null);
+                content.push({
+                    "author": dependency_item?.authorName ?? "",
+                    "disabled": false,
+                    "file_name": file_name,
+                    "image": dependency_item?.logoUrl ?? "",
+                    "source": "curseforge",
+                    "source_id": file.projectID,
+                    "type": type,
+                    "version": "",
+                    "version_id": file.fileID,
+                    "name": dependency_item?.name ?? file_name
+                })
+            } else {
+                project_ids.push(file.projectID);
+                content.push({
+                    "source": "curseforge",
+                    "source_id": file.projectID,
+                    "version_id": file.fileID,
+                    "disabled": false,
+                    "type": type,
+                    "version": "",
+                    "file_name": file_name
+                });
+            }
+            if (count == manifest_json.files.length - 1) {
+                ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+            } else {
+                ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`);
+            }
+            count++;
+        }));
+        await Promise.all(downloadPromises);
+
+        if (project_ids.filter(e => e).length) {
+            let cfData = [];
+            try {
+                const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false })
+                });
+                if (response.ok) {
+                    const json = await response.json();
+                    cfData = json.data || [];
+                }
+            } catch (e) {
+                cfData = [];
+            }
+
+            cfData.forEach(e => {
+                content.forEach(item => {
+                    if (Number(item.source_id) == Number(e.id)) {
+                        item.name = e.name;
+                        item.image = e.logo.thumbnailUrl;
+                        item.author = e.authors[0].name;
+                    }
+                });
             });
-        });
+        }
+
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
+        return ({
+            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
+            "content": content,
+            "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
+            "vanilla_version": manifest_json.minecraft.version,
+            "allocated_ram": allocated_ram,
+            "name": manifest_json.name
+        })
+    } catch (err) {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
+        return { "error": true };
     }
-
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-    return ({
-        "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
-        "content": content,
-        "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
-        "vanilla_version": manifest_json.minecraft.version,
-        "allocated_ram": allocated_ram,
-        "name": manifest_json.name
-    })
 }
 async function importContent(file_path, content_type, instance_id) {
     // Determine destination folder and file type
@@ -2844,534 +2864,549 @@ async function importContent(file_path, content_type, instance_id) {
     };
 }
 async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
-    ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-    const zip = new AdmZip(zip_path);
-
-    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    if (!fs.existsSync(extractToPath)) {
-        fs.mkdirSync(extractToPath, { recursive: true });
-    }
-
-    zip.extractAllTo(extractToPath, true);
-
-    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    fs.mkdirSync(srcDir, { recursive: true });
-    fs.mkdirSync(destDir, { recursive: true });
-
-    const files = fs.readdirSync(srcDir);
-
-    for (const file of files) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-        const srcPath = path.join(srcDir, file);
-        const destPath = path.join(destDir, file);
-
-        if (fs.existsSync(destPath)) {
-            const stats = fs.lstatSync(destPath);
-            if (stats.isDirectory()) {
-                fs.rmSync(destPath, { recursive: true, force: true });
-            } else {
-                fs.unlinkSync(destPath);
-            }
-        }
-        try {
-            fs.cpSync(srcPath, destPath, { recursive: true });
-            fs.rmSync(srcPath, { recursive: true, force: true });
-        } catch (err) {
-            return "Unable to enable overrides for folder " + file;
-        }
-    }
-
-    let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
-    manifest_json = JSON.parse(manifest_json);
-
-    let content = [];
-    let project_ids = [];
-
-    const limit = pLimit(getMaxConcurrentDownloads());
-
-    let allocated_ram = manifest_json.minecraft?.recommendedRam;
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
-
-    let count = 0;
-
-    const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-        ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
-
-        let project_id = file.projectID;
-        let file_id = file.fileID;
-
-        project_ids.push(project_id);
-
-        try {
-            file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
-        } catch (e) {
-            let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
-            let res_json = await res.json();
-            file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, "temp"));
-        }
-
-        const tempFilePath = path.resolve(extractToPath, "temp", file_name);
-        let destFolder = "mods";
-        let project_type = "mod";
-
-        try {
-            if (file_name.endsWith(".jar")) {
-                const tempZip = new AdmZip(tempFilePath);
-                if (tempZip.getEntry("fabric.mod.json")) {
-                    destFolder = "mods";
-                } else if (tempZip.getEntry("META-INF/mods.toml")) {
-                    destFolder = "mods";
-                } else if (tempZip.getEntry("quilt.mod.json")) {
-                    destFolder = "mods";
-                } else {
-                    destFolder = "mods";
-                }
-            } else if (file_name.endsWith(".zip")) {
-                const tempZip = new AdmZip(tempFilePath);
-                if (tempZip.getEntry("pack.mcmeta")) {
-                    project_type = "resource_pack";
-                    destFolder = "resourcepacks";
-                } else if (tempZip.getEntry("shaders/")) {
-                    destFolder = "shaderpacks";
-                    project_type = "shader";
-                } else {
-                    destFolder = "resourcepacks";
-                    project_type = "resource_pack";
-                }
-            }
-        } catch (e) {
-            destFolder = "mods";
-        }
-
-
-        const finalPath = path.resolve(extractToPath, destFolder, file_name);
-        fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-        fs.renameSync(tempFilePath, finalPath);
-
-        content.push({
-            "source": "curseforge",
-            "source_id": project_id,
-            "version_id": file_id,
-            "disabled": false,
-            "type": project_type,
-            "version": "",
-            "file_name": path.basename(finalPath)
-        });
-
-        if (count == manifest_json.files.length - 1) {
-            ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-        } else {
-            ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
-        }
-        count++;
-    }));
-    await Promise.all(downloadPromises);
-
-    let cfData = [];
     try {
-        const response = await fetch("https://api.curse.tools/v1/cf/mods", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
-        });
-        if (response.ok) {
-            const json = await response.json();
-            cfData = json.data || [];
-        }
-    } catch (e) {
-        cfData = [];
-    }
+        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        const zip = new AdmZip(zip_path);
 
-    console.log(cfData);
+        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
-    cfData.forEach(e => {
-        content.forEach(item => {
-            if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
-                item.name = e.name;
-                item.image = e.logo.thumbnailUrl;
-                item.author = e.authors[0].name;
-            }
-        });
-    });
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-    return ({
-        "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
-        "content": cfData.length ? content : [],
-        "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
-        "vanilla_version": manifest_json.minecraft.version,
-        "allocated_ram": allocated_ram,
-        "name": manifest_json.name
-    });
-}
-async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
-    ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-    const zip = new AdmZip(mrpack_path);
-
-    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    if (!fs.existsSync(extractToPath)) {
-        fs.mkdirSync(extractToPath, { recursive: true });
-    }
-
-    zip.extractAllTo(extractToPath, true);
-
-    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    fs.mkdirSync(srcDir, { recursive: true });
-    fs.mkdirSync(destDir, { recursive: true });
-
-    const files = fs.readdirSync(srcDir);
-
-    for (const file of files) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-        const srcPath = path.join(srcDir, file);
-        const destPath = path.join(destDir, file);
-
-        if (fs.existsSync(destPath)) {
-            const stats = fs.lstatSync(destPath);
-            if (stats.isDirectory()) {
-                fs.rmSync(destPath, { recursive: true, force: true });
-            } else {
-                fs.unlinkSync(destPath);
-            }
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
         }
 
-        try {
-            fs.cpSync(srcPath, destPath, { recursive: true });
-            fs.rmSync(srcPath, { recursive: true, force: true });
-        } catch (err) {
-            return "Unable to enable overrides for folder " + file;
-        }
-    }
+        zip.extractAllTo(extractToPath, true);
 
-    let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
-    modrinth_index_json = JSON.parse(modrinth_index_json);
+        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
 
-    let content = [];
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
 
-    let project_ids = [];
-    let version_ids = [];
-    let team_ids = [];
-    let team_to_project_ids = {};
+        const files = fs.readdirSync(srcDir);
 
-    const limit = pLimit(getMaxConcurrentDownloads());
+        for (const file of files) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
 
-    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`);
-
-    let count = 0;
-
-    const downloadPromises = modrinth_index_json.files.map((file, i) =>
-        limit(async () => {
-            await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path));
-            if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
-                let split = file.downloads[0].split("/");
-                let project_id = split[4];
-                let file_id = split[6];
-                if (project_id && file_id) {
-                    if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
-                        let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
-                        let res_json = await res.json();
-                        file_id = res_json.id;
-                    }
-                    project_ids.push(project_id);
-                    version_ids.push(file_id);
-                    content.push({
-                        "source": "modrinth",
-                        "source_id": project_id,
-                        "version_id": file_id,
-                        "disabled": false,
-                        "file_name": path.basename(file.path),
-                        "version": "",
-                        "name": path.basename(file.path),
-                        "image": "",
-                        "type": path.dirname(file.path) == "mods" ? "mod" : path.dirname(file.path) == "resourcepacks" ? "resource_pack" : "shader"
-                    });
+            if (fs.existsSync(destPath)) {
+                const stats = fs.lstatSync(destPath);
+                if (stats.isDirectory()) {
+                    fs.rmSync(destPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(destPath);
                 }
-            }
-            if (count == modrinth_index_json.files.length - 1) {
-                ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-            } else {
-                ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`);
-            }
-            count++;
-        })
-    );
-
-    await Promise.all(downloadPromises);
-
-    let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
-    let res_json = await res.json();
-    res_json.forEach(e => {
-        content.forEach(item => {
-            if (item.source_id == e.id) {
-                item.name = e.title;
-                item.image = e.icon_url;
-                item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                team_ids.push(e.team);
-                if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
-                else team_to_project_ids[e.team].push(e.id);
-            }
-        });
-    });
-    let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`);
-    let res_json_1 = await res_1.json();
-    res_json_1.forEach(e => {
-        content.forEach(item => {
-            if (item.source_id == e.id) {
-                item.version = e.version_number;
-            }
-        });
-    });
-    let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
-    let res_json_2 = await res_2.json();
-    res_json_2.forEach(e => {
-        if (Array.isArray(e)) {
-            let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-            let author = authors.length ? authors[0] : "";
-            if (!team_to_project_ids[e[0].team_id]) return;
-            team_to_project_ids[e[0].team_id].forEach(f => {
-                content.forEach(item => {
-                    if (item.source_id == f) {
-                        item.author = author;
-                    }
-                });
-            });
-        }
-    });
-
-    if (!loader) {
-        let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
-        let keys = Object.keys(modrinth_index_json.dependencies)
-        for (const key of keys) {
-            if (loaders.includes(key)) {
-                loader = key;
-                break;
-            }
-        }
-    } else {
-        if (loader == "fabric") loader = "fabric-loader";
-        if (loader == "quilt") loader = "quilt-loader";
-    }
-    ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-    return ({
-        "loader_version": modrinth_index_json.dependencies[loader],
-        "content": content,
-        "loader": loader.replace("-loader", ""),
-        "vanilla_version": modrinth_index_json.dependencies["minecraft"],
-        "name": modrinth_index_json.name
-    })
-}
-async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
-    ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-    const zip = new AdmZip(elpack_path);
-
-    let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    if (!fs.existsSync(extractToPath)) {
-        fs.mkdirSync(extractToPath, { recursive: true });
-    }
-
-    zip.extractAllTo(extractToPath, true);
-
-    let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-    let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-    fs.mkdirSync(srcDir, { recursive: true });
-    fs.mkdirSync(destDir, { recursive: true });
-
-    const files = fs.readdirSync(srcDir);
-
-    for (const file of files) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-        const srcPath = path.join(srcDir, file);
-        const destPath = path.join(destDir, file);
-
-        if (fs.existsSync(destPath)) {
-            const stats = fs.lstatSync(destPath);
-            if (stats.isDirectory()) {
-                fs.rmSync(destPath, { recursive: true, force: true });
-            } else {
-                fs.unlinkSync(destPath);
-            }
-        }
-
-        try {
-            fs.cpSync(srcPath, destPath, { recursive: true });
-            fs.rmSync(srcPath, { recursive: true, force: true });
-        } catch (err) {
-            return "Unable to enable overrides for folder " + file;
-        }
-    }
-
-    let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
-    manifest_json = JSON.parse(manifest_json);
-
-    let content = [];
-
-    let mr_project_ids = [];
-    let cf_project_ids = [];
-    let mr_version_ids = [];
-    let cf_version_ids = [];
-    let mr_team_ids = [];
-    let mr_team_to_project_ids = {};
-
-    const limit = pLimit(getMaxConcurrentDownloads());
-
-    ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
-
-    let count = 0;
-
-    const downloadPromises = manifest_json.files.map((file, i) =>
-        limit(async () => {
-            let install_path = "";
-            if (file.type == "mod") install_path = "mods/";
-            if (file.type == "resource_pack") install_path = "resourcepacks/";
-            if (file.type == "shader") install_path = "shaderpacks/";
-            install_path += file.file_name;
-            let url = "";
-            if (file.source === "modrinth") {
-                url = `https://cdn.modrinth.com/data/${file.source_info}/versions/${file.version_id}/${file.file_name.replace(".disabled", "")}`;
-            } else if (file.source === "curseforge") {
-                url = `https://www.curseforge.com/api/v1/mods/${Number(file.source_info)}/files/${Number(file.version_id)}/download`;
-            } else if (file.source === "vanilla_tweaks") {
-                url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
             }
             try {
-                await urlToFile(url, path.resolve(extractToPath, install_path));
+                fs.cpSync(srcPath, destPath, { recursive: true });
+                fs.rmSync(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                return "Unable to enable overrides for folder " + file;
+            }
+        }
+
+        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        manifest_json = JSON.parse(manifest_json);
+
+        let content = [];
+        let project_ids = [];
+
+        const limit = pLimit(getMaxConcurrentDownloads());
+
+        let allocated_ram = manifest_json.minecraft?.recommendedRam;
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+
+        let count = 0;
+
+        const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
+            ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+
+            let project_id = file.projectID;
+            let file_id = file.fileID;
+
+            project_ids.push(project_id);
+
+            try {
+                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
             } catch (e) {
-                if (file.source === "modrinth") {
-                    let url = `https://api.modrinth.com/v2/project/${file.source_info}/version/${file.version_id}`;
-                    let res_pre_json = await fetch(url);
-                    let res = await res_pre_json.json();
-                    await urlToFile(res.files[0].url, path.resolve(extractToPath, install_path));
-                } else {
-                    throw e;
+                let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
+                let res_json = await res.json();
+                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, "temp"));
+            }
+
+            const tempFilePath = path.resolve(extractToPath, "temp", file_name);
+            let destFolder = "mods";
+            let project_type = "mod";
+
+            try {
+                if (file_name.endsWith(".jar")) {
+                    const tempZip = new AdmZip(tempFilePath);
+                    if (tempZip.getEntry("fabric.mod.json")) {
+                        destFolder = "mods";
+                    } else if (tempZip.getEntry("META-INF/mods.toml")) {
+                        destFolder = "mods";
+                    } else if (tempZip.getEntry("quilt.mod.json")) {
+                        destFolder = "mods";
+                    } else {
+                        destFolder = "mods";
+                    }
+                } else if (file_name.endsWith(".zip")) {
+                    const tempZip = new AdmZip(tempFilePath);
+                    if (tempZip.getEntry("pack.mcmeta")) {
+                        project_type = "resource_pack";
+                        destFolder = "resourcepacks";
+                    } else if (tempZip.getEntry("shaders/")) {
+                        destFolder = "shaderpacks";
+                        project_type = "shader";
+                    } else {
+                        destFolder = "resourcepacks";
+                        project_type = "resource_pack";
+                    }
                 }
+            } catch (e) {
+                destFolder = "mods";
             }
+
+
+            const finalPath = path.resolve(extractToPath, destFolder, file_name);
+            fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+            fs.renameSync(tempFilePath, finalPath);
+
             content.push({
-                "author": file.source == "vanilla_tweaks" ? "Vanilla Tweaks" : "",
-                "disabled": file.disabled,
-                "file_name": file.file_name,
-                "image": file.source == "vanilla_tweaks" ? "https://vanillatweaks.net/assets/images/logo.png" : "",
-                "source": file.source,
-                "source_id": file.source_info,
-                "type": file.type,
+                "source": "curseforge",
+                "source_id": project_id,
+                "version_id": file_id,
+                "disabled": false,
+                "type": project_type,
                 "version": "",
-                "version_id": file.version_id,
-                "name": file.source == "vanilla_tweaks" ? "Vanilla Tweaks Resource Pack" : ""
+                "file_name": path.basename(finalPath)
             });
-            if (file.source == "modrinth") {
-                mr_project_ids.push(file.source_info);
-                mr_version_ids.push(file.version_id);
-            } else if (file.source == "curseforge") {
-                cf_project_ids.push(Number(file.source_info));
-                cf_version_ids.push(Number(file.version_id));
-            }
+
             if (count == manifest_json.files.length - 1) {
                 ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
             } else {
                 ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
             }
             count++;
-        })
-    );
+        }));
+        await Promise.all(downloadPromises);
 
-    await Promise.all(downloadPromises);
-
-    if (mr_project_ids.length) {
-        try {
-            const res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${mr_project_ids.join('","')}"]`);
-            const res_json = await res.json();
-            res_json.forEach(e => {
-                // Find all content items with matching source and source_info
-                content.forEach((item, idx) => {
-                    if (item.source === "modrinth" && item.source_id === e.id) {
-                        item.name = e.title;
-                        item.image = e.icon_url;
-                        item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                        if (!mr_team_to_project_ids[e.team]) mr_team_to_project_ids[e.team] = [];
-                        mr_team_to_project_ids[e.team].push(e.id);
-                        if (!mr_team_ids.includes(e.team)) mr_team_ids.push(e.team);
-                    }
-                });
-            });
-        } catch (e) { }
-    }
-
-    if (mr_version_ids.length) {
-        try {
-            const res = await fetch(`https://api.modrinth.com/v2/versions?ids=["${mr_version_ids.join('","')}"]`);
-            const res_json = await res.json();
-            res_json.forEach(e => {
-                content.forEach(item => {
-                    if (item.source === "modrinth" && item.version_id === e.id) {
-                        item.version = e.version_number;
-                    }
-                });
-            });
-        } catch (e) { }
-    }
-
-    if (mr_team_ids.length) {
-        try {
-            const res = await fetch(`https://api.modrinth.com/v2/teams?ids=["${mr_team_ids.join('","')}"]`);
-            const res_json = await res.json();
-            res_json.forEach(e => {
-                if (Array.isArray(e)) {
-                    let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                    let author = authors.length ? authors[0] : "";
-                    if (!mr_team_to_project_ids[e[0].team_id]) return;
-                    mr_team_to_project_ids[e[0].team_id].forEach(projectId => {
-                        content.forEach(item => {
-                            if (item.source === "modrinth" && item.source_id === projectId) {
-                                item.author = author;
-                            }
-                        });
-                    });
-                }
-            });
-        } catch (e) { }
-    }
-
-    if (cf_project_ids.length) {
+        let cfData = [];
         try {
             const response = await fetch("https://api.curse.tools/v1/cf/mods", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
+                body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
             });
             if (response.ok) {
                 const json = await response.json();
-                const cfData = json.data || [];
-                cfData.forEach(e => {
+                cfData = json.data || [];
+            }
+        } catch (e) {
+            cfData = [];
+        }
+
+        console.log(cfData);
+
+        cfData.forEach(e => {
+            content.forEach(item => {
+                if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
+                    item.name = e.name;
+                    item.image = e.logo.thumbnailUrl;
+                    item.author = e.authors[0].name;
+                }
+            });
+        });
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
+        return ({
+            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
+            "content": cfData.length ? content : [],
+            "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
+            "vanilla_version": manifest_json.minecraft.version,
+            "allocated_ram": allocated_ram,
+            "name": manifest_json.name
+        });
+    } catch (err) {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
+        return { "error": true };
+    }
+}
+async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
+    try {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        const zip = new AdmZip(mrpack_path);
+
+        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
+
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
+        }
+
+        zip.extractAllTo(extractToPath, true);
+
+        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
+
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const files = fs.readdirSync(srcDir);
+
+        for (const file of files) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                const stats = fs.lstatSync(destPath);
+                if (stats.isDirectory()) {
+                    fs.rmSync(destPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(destPath);
+                }
+            }
+
+            try {
+                fs.cpSync(srcPath, destPath, { recursive: true });
+                fs.rmSync(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                return "Unable to enable overrides for folder " + file;
+            }
+        }
+
+        let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
+        modrinth_index_json = JSON.parse(modrinth_index_json);
+
+        let content = [];
+
+        let project_ids = [];
+        let version_ids = [];
+        let team_ids = [];
+        let team_to_project_ids = {};
+
+        const limit = pLimit(getMaxConcurrentDownloads());
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`);
+
+        let count = 0;
+
+        const downloadPromises = modrinth_index_json.files.map((file, i) =>
+            limit(async () => {
+                await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path));
+                if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
+                    let split = file.downloads[0].split("/");
+                    let project_id = split[4];
+                    let file_id = split[6];
+                    if (project_id && file_id) {
+                        if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
+                            let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
+                            let res_json = await res.json();
+                            file_id = res_json.id;
+                        }
+                        project_ids.push(project_id);
+                        version_ids.push(file_id);
+                        content.push({
+                            "source": "modrinth",
+                            "source_id": project_id,
+                            "version_id": file_id,
+                            "disabled": false,
+                            "file_name": path.basename(file.path),
+                            "version": "",
+                            "name": path.basename(file.path),
+                            "image": "",
+                            "type": path.dirname(file.path) == "mods" ? "mod" : path.dirname(file.path) == "resourcepacks" ? "resource_pack" : "shader"
+                        });
+                    }
+                }
+                if (count == modrinth_index_json.files.length - 1) {
+                    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+                } else {
+                    ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`);
+                }
+                count++;
+            })
+        );
+
+        await Promise.all(downloadPromises);
+
+        let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
+        let res_json = await res.json();
+        res_json.forEach(e => {
+            content.forEach(item => {
+                if (item.source_id == e.id) {
+                    item.name = e.title;
+                    item.image = e.icon_url;
+                    item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                    team_ids.push(e.team);
+                    if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+                    else team_to_project_ids[e.team].push(e.id);
+                }
+            });
+        });
+        let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`);
+        let res_json_1 = await res_1.json();
+        res_json_1.forEach(e => {
+            content.forEach(item => {
+                if (item.source_id == e.id) {
+                    item.version = e.version_number;
+                }
+            });
+        });
+        let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
+        let res_json_2 = await res_2.json();
+        res_json_2.forEach(e => {
+            if (Array.isArray(e)) {
+                let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
+                let author = authors.length ? authors[0] : "";
+                if (!team_to_project_ids[e[0].team_id]) return;
+                team_to_project_ids[e[0].team_id].forEach(f => {
                     content.forEach(item => {
-                        if (item.source === "curseforge" && item.source_id == e.id + ".0") {
-                            item.name = e.name;
-                            item.image = e.logo.thumbnailUrl;
-                            item.author = e.authors[0].name;
+                        if (item.source_id == f) {
+                            item.author = author;
                         }
                     });
                 });
             }
-        } catch (e) { }
-    }
+        });
 
-    ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-    return ({
-        "loader_version": manifest_json.loader_version,
-        "content": content,
-        "loader": manifest_json.loader,
-        "vanilla_version": manifest_json.game_version,
-        "allocated_ram": manifest_json.allocated_ram,
-        "image": manifest_json.icon,
-        "name": manifest_json.name
-    })
+        if (!loader) {
+            let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
+            let keys = Object.keys(modrinth_index_json.dependencies)
+            for (const key of keys) {
+                if (loaders.includes(key)) {
+                    loader = key;
+                    break;
+                }
+            }
+        } else {
+            if (loader == "fabric") loader = "fabric-loader";
+            if (loader == "quilt") loader = "quilt-loader";
+        }
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
+        return ({
+            "loader_version": modrinth_index_json.dependencies[loader],
+            "content": content,
+            "loader": loader.replace("-loader", ""),
+            "vanilla_version": modrinth_index_json.dependencies["minecraft"],
+            "name": modrinth_index_json.name
+        })
+    } catch (err) {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
+        return { "error": true };
+    }
+}
+async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
+    try {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        const zip = new AdmZip(elpack_path);
+
+        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
+
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
+        }
+
+        zip.extractAllTo(extractToPath, true);
+
+        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
+        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
+
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const files = fs.readdirSync(srcDir);
+
+        for (const file of files) {
+            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                const stats = fs.lstatSync(destPath);
+                if (stats.isDirectory()) {
+                    fs.rmSync(destPath, { recursive: true, force: true });
+                } else {
+                    fs.unlinkSync(destPath);
+                }
+            }
+
+            try {
+                fs.cpSync(srcPath, destPath, { recursive: true });
+                fs.rmSync(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                return "Unable to enable overrides for folder " + file;
+            }
+        }
+
+        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        manifest_json = JSON.parse(manifest_json);
+
+        let content = [];
+
+        let mr_project_ids = [];
+        let cf_project_ids = [];
+        let mr_version_ids = [];
+        let cf_version_ids = [];
+        let mr_team_ids = [];
+        let mr_team_to_project_ids = {};
+
+        const limit = pLimit(getMaxConcurrentDownloads());
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+
+        let count = 0;
+
+        const downloadPromises = manifest_json.files.map((file, i) =>
+            limit(async () => {
+                let install_path = "";
+                if (file.type == "mod") install_path = "mods/";
+                if (file.type == "resource_pack") install_path = "resourcepacks/";
+                if (file.type == "shader") install_path = "shaderpacks/";
+                install_path += file.file_name;
+                let url = "";
+                if (file.source === "modrinth") {
+                    url = `https://cdn.modrinth.com/data/${file.source_info}/versions/${file.version_id}/${file.file_name.replace(".disabled", "")}`;
+                } else if (file.source === "curseforge") {
+                    url = `https://www.curseforge.com/api/v1/mods/${Number(file.source_info)}/files/${Number(file.version_id)}/download`;
+                } else if (file.source === "vanilla_tweaks") {
+                    url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
+                }
+                try {
+                    await urlToFile(url, path.resolve(extractToPath, install_path));
+                } catch (e) {
+                    if (file.source === "modrinth") {
+                        let url = `https://api.modrinth.com/v2/project/${file.source_info}/version/${file.version_id}`;
+                        let res_pre_json = await fetch(url);
+                        let res = await res_pre_json.json();
+                        await urlToFile(res.files[0].url, path.resolve(extractToPath, install_path));
+                    } else {
+                        throw e;
+                    }
+                }
+                content.push({
+                    "author": file.source == "vanilla_tweaks" ? "Vanilla Tweaks" : "",
+                    "disabled": file.disabled,
+                    "file_name": file.file_name,
+                    "image": file.source == "vanilla_tweaks" ? "https://vanillatweaks.net/assets/images/logo.png" : "",
+                    "source": file.source,
+                    "source_id": file.source_info,
+                    "type": file.type,
+                    "version": "",
+                    "version_id": file.version_id,
+                    "name": file.source == "vanilla_tweaks" ? "Vanilla Tweaks Resource Pack" : ""
+                });
+                if (file.source == "modrinth") {
+                    mr_project_ids.push(file.source_info);
+                    mr_version_ids.push(file.version_id);
+                } else if (file.source == "curseforge") {
+                    cf_project_ids.push(Number(file.source_info));
+                    cf_version_ids.push(Number(file.version_id));
+                }
+                if (count == manifest_json.files.length - 1) {
+                    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+                } else {
+                    ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
+                }
+                count++;
+            })
+        );
+
+        await Promise.all(downloadPromises);
+
+        if (mr_project_ids.length) {
+            try {
+                const res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${mr_project_ids.join('","')}"]`);
+                const res_json = await res.json();
+                res_json.forEach(e => {
+                    // Find all content items with matching source and source_info
+                    content.forEach((item, idx) => {
+                        if (item.source === "modrinth" && item.source_id === e.id) {
+                            item.name = e.title;
+                            item.image = e.icon_url;
+                            item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                            if (!mr_team_to_project_ids[e.team]) mr_team_to_project_ids[e.team] = [];
+                            mr_team_to_project_ids[e.team].push(e.id);
+                            if (!mr_team_ids.includes(e.team)) mr_team_ids.push(e.team);
+                        }
+                    });
+                });
+            } catch (e) { }
+        }
+
+        if (mr_version_ids.length) {
+            try {
+                const res = await fetch(`https://api.modrinth.com/v2/versions?ids=["${mr_version_ids.join('","')}"]`);
+                const res_json = await res.json();
+                res_json.forEach(e => {
+                    content.forEach(item => {
+                        if (item.source === "modrinth" && item.version_id === e.id) {
+                            item.version = e.version_number;
+                        }
+                    });
+                });
+            } catch (e) { }
+        }
+
+        if (mr_team_ids.length) {
+            try {
+                const res = await fetch(`https://api.modrinth.com/v2/teams?ids=["${mr_team_ids.join('","')}"]`);
+                const res_json = await res.json();
+                res_json.forEach(e => {
+                    if (Array.isArray(e)) {
+                        let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
+                        let author = authors.length ? authors[0] : "";
+                        if (!mr_team_to_project_ids[e[0].team_id]) return;
+                        mr_team_to_project_ids[e[0].team_id].forEach(projectId => {
+                            content.forEach(item => {
+                                if (item.source === "modrinth" && item.source_id === projectId) {
+                                    item.author = author;
+                                }
+                            });
+                        });
+                    }
+                });
+            } catch (e) { }
+        }
+
+        if (cf_project_ids.length) {
+            try {
+                const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
+                });
+                if (response.ok) {
+                    const json = await response.json();
+                    const cfData = json.data || [];
+                    cfData.forEach(e => {
+                        content.forEach(item => {
+                            if (item.source === "curseforge" && item.source_id == e.id + ".0") {
+                                item.name = e.name;
+                                item.image = e.logo.thumbnailUrl;
+                                item.author = e.authors[0].name;
+                            }
+                        });
+                    });
+                }
+            } catch (e) { }
+        }
+
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
+        return ({
+            "loader_version": manifest_json.loader_version,
+            "content": content,
+            "loader": manifest_json.loader,
+            "vanilla_version": manifest_json.game_version,
+            "allocated_ram": manifest_json.allocated_ram,
+            "image": manifest_json.icon,
+            "name": manifest_json.name
+        })
+    } catch (err) {
+        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
+        return { "error": true };
+    }
 }
 
 async function getSkinFromURL(url) {

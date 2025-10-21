@@ -371,6 +371,7 @@ class Instance {
         this.post_exit_hook = content.post_exit_hook;
         this.installed_version = content.installed_version;
         this.last_analyzed_log = content.last_analyzed_log;
+        this.failed = Boolean(content.failed);
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
     get pinned() {
@@ -548,6 +549,12 @@ class Instance {
         db.prepare("UPDATE instances SET mc_installed = ? WHERE id = ?").run(Number(mc_installed), this.id);
         this.mc_installed = mc_installed;
         if (instance_watches[this.instance_id].onchangemc_installed) instance_watches[this.instance_id].onchangemc_installed(mc_installed);
+    }
+    setFailed(failed) {
+        console.log(failed);
+        db.prepare("UPDATE instances SET failed = ? WHERE id = ?").run(Number(failed), this.id);
+        this.failed = failed;
+        if (instance_watches[this.instance_id].onchangefailed) instance_watches[this.instance_id].onchangefailed(failed);
     }
 
     watchForChange(name, func) {
@@ -5196,21 +5203,30 @@ function showInstanceContent(e) {
                 }
                 let instance_id = window.electronAPI.getInstanceFolderName(info.name);
                 let loader_version = "";
-                if (info.loader == "fabric") {
-                    loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
-                } else if (info.loader == "forge") {
-                    loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
-                } else if (info.loader == "neoforge") {
-                    loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
-                } else if (info.loader == "quilt") {
-                    loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                try {
+                    if (info.loader == "fabric") {
+                        loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                    } else if (info.loader == "forge") {
+                        loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                    } else if (info.loader == "neoforge") {
+                        loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                    } else if (info.loader == "quilt") {
+                        loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                    }
+                } catch (e) {
+                    displayError(translate("app.instances.failed_to_create"));
+                    return;
                 }
                 let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                 showSpecificInstanceContent(instance);
                 let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setMcInstalled(true);
+                if (r.error) {
+                    instance.setFailed(true);
+                } else {
+                    instance.setJavaPath(r.java_installation);
+                    instance.setJavaVersion(r.java_version);
+                    instance.setMcInstalled(true);
+                }
             } else if (info.selected_tab == "file") {
                 if (!info.name_if) info.name_if = "";
                 let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
@@ -5233,9 +5249,13 @@ function showInstanceContent(e) {
                 });
                 instance.setInstalling(false);
                 let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setMcInstalled(true);
+                if (r.error) {
+                    instance.setFailed(true);
+                } else {
+                    instance.setJavaPath(r.java_installation);
+                    instance.setJavaVersion(r.java_version);
+                    instance.setMcInstalled(true);
+                }
             } else if (info.selected_tab == "launcher") {
                 // Import from launcher here
             } else if (info.selected_tab == "code") {
@@ -5263,9 +5283,13 @@ function showInstanceContent(e) {
                 });
                 instance.setInstalling(false);
                 let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setMcInstalled(true);
+                if (r.error) {
+                    instance.setFailed(true);
+                } else {
+                    instance.setJavaPath(r.java_installation);
+                    instance.setJavaVersion(r.java_version);
+                    instance.setMcInstalled(true);
+                }
             }
         })
     }
@@ -5622,42 +5646,52 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log)
             });
         }
     }
-    if (!instanceInfo.mc_installed) {
-        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-        playButton.classList.remove("instance-top-play-button");
-        playButton.classList.add("instance-top-loading-button");
-        playButton.onclick = () => { };
-    } else if (!running) {
-        playButton.classList.add("instance-top-play-button");
-        playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-        playButton.onclick = playButtonClick
-    } else {
-        playButton.classList.add("instance-top-stop-button");
-        playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-        playButton.onclick = stopButtonClick
-        window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.classList.remove("instance-top-stop-button");
-            playButton.classList.add("instance-top-play-button");
-            playButton.onclick = playButtonClick;
-            live.findLive();
-            running = false;
-            analyzeLogs();
-        });
-    }
-    instanceInfo.watchForChange("mc_installed", (v) => {
-        if (v) {
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.classList.remove("instance-top-loading-button");
-            playButton.classList.add("instance-top-play-button");
-            playButton.onclick = playButtonClick;
-        } else {
-            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+    let calculatePlayButtonState = (mc_installed, failed) => {
+        if (failed) {
+            playButton.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
+            playButton.title = translate("app.instances.failed.tooltip");
             playButton.classList.remove("instance-top-play-button");
             playButton.classList.remove("instance-top-stop-button");
             playButton.classList.add("instance-top-loading-button");
             playButton.onclick = () => { };
+        } else if (!mc_installed) {
+            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+            playButton.classList.remove("instance-top-play-button");
+            playButton.classList.remove("instance-top-stop-button");
+            playButton.classList.add("instance-top-loading-button");
+            playButton.title = "";
+            playButton.onclick = () => { };
+        } else if (!running) {
+            playButton.classList.remove("instance-top-stop-button");
+            playButton.classList.remove("instance-top-loading-button");
+            playButton.classList.add("instance-top-play-button");
+            playButton.title = "";
+            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.onclick = playButtonClick
+        } else {
+            playButton.classList.remove("instance-top-play-button");
+            playButton.classList.remove("instance-top-loading-button");
+            playButton.classList.add("instance-top-stop-button");
+            playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
+            playButton.onclick = stopButtonClick
+            playButton.title = "";
+            window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+                playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+                playButton.classList.remove("instance-top-stop-button");
+                playButton.classList.add("instance-top-play-button");
+                playButton.onclick = playButtonClick;
+                live.findLive();
+                running = false;
+                analyzeLogs();
+            });
         }
+    }
+    calculatePlayButtonState(instanceInfo.mc_installed, instanceInfo.failed, running);
+    instanceInfo.watchForChange("mc_installed", (v) => {
+        calculatePlayButtonState(v, instanceInfo.refresh().failed);
+    });
+    instanceInfo.watchForChange("failed", (v) => {
+        calculatePlayButtonState(instanceInfo.refresh().mc_installed, v);
     });
     let threeDots = document.createElement("button");
     threeDots.classList.add("instance-top-more");
@@ -6148,23 +6182,27 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         instanceInfo.setVanillaVersion(info.game_version, true);
         instanceInfo.setLoaderVersion(info.loader_version);
         instanceInfo.setMcInstalled(false);
-        await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
-        if (info.update_content) {
-            let content = instanceInfo.getContent();
-            for (let i = 0; i < content.length; i++) {
-                let c = content[i];
-                try {
-                    await updateContent(instanceInfo, c);
-                } catch (e) {
-                    displayError(translate("app.content.update_failed").replace("%c", c.name));
+        let r = await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
+        if (r.error) {
+            instanceInfo.setFailed(true);
+        } else {
+            if (info.update_content) {
+                let content = instanceInfo.getContent();
+                for (let i = 0; i < content.length; i++) {
+                    let c = content[i];
+                    try {
+                        await updateContent(instanceInfo, c);
+                    } catch (e) {
+                        displayError(translate("app.content.update_failed").replace("%c", c.name));
+                    }
+                }
+                displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
+                if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
+                    setInstanceTabContentContent(instanceInfo, tabsInfo);
                 }
             }
-            displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
-            if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                setInstanceTabContentContent(instanceInfo, tabsInfo);
-            }
+            instanceInfo.setMcInstalled(true);
         }
-        instanceInfo.setMcInstalled(true);
     });
 }
 
@@ -12029,12 +12067,17 @@ function fixPathForImage(path) {
 
 async function repairInstance(instance, whatToRepair) {
     instance.setMcInstalled(false);
+    instance.setFailed(false);
     let r = await window.electronAPI.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version, whatToRepair);
-    if (whatToRepair.includes("java")) {
-        instance.setJavaPath(r.java_installation);
-        instance.setJavaVersion(r.java_version);
+    if (r.error) {
+        instance.setFailed(true);
+    } else {
+        if (whatToRepair.includes("java")) {
+            instance.setJavaPath(r.java_installation);
+            instance.setJavaVersion(r.java_version);
+        }
+        instance.setMcInstalled(true);
     }
-    instance.setMcInstalled(true);
 }
 
 async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version, oncomplete) {
@@ -12197,12 +12240,21 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 instance.setAttemptedOptionsTxtVersion(v);
             } else if (source == "curseforge") {
                 mr_pack_info = await window.electronAPI.processCfZip(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.zip`), project_id, title);
-
+                if (mr_pack_info.error) {
+                    instance.setFailed(true);
+                    instance.setInstalling(false);
+                    return;
+                }
                 instance.setLoader(mr_pack_info.loader);
                 instance.setVanillaVersion(mr_pack_info.vanilla_version);
                 if (mr_pack_info.allocated_ram) instance.setAllocatedRam(mr_pack_info.allocated_ram);
                 info.loader = mr_pack_info.loader;
                 info.game_version = mr_pack_info.vanilla_version;
+            }
+            if (mr_pack_info.error) {
+                instance.setFailed(true);
+                instance.setInstalling(false);
+                return;
             }
             if (!mr_pack_info.loader_version) {
                 displayError(mr_pack_info);
@@ -12214,9 +12266,13 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             });
             instance.setInstalling(false);
             let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-            instance.setJavaPath(r.java_installation);
-            instance.setJavaVersion(r.java_version);
-            instance.setMcInstalled(true);
+            if (r.error) {
+                instance.setFailed(true);
+            } else {
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
+            }
         })
     } else if (instance_id) {
         button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
@@ -12326,8 +12382,18 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     let mr_pack_info = {};
     if (source == "modrinth") {
         mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/pack.mrpack`), instanceInfo.loader, instanceInfo.name);
+        if (mr_pack_info.error) {
+            instanceInfo.setFailed(true);
+            instanceInfo.setInstalling(false);
+            return;
+        }
     } else if (source == "curseforge") {
         mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/pack.zip`), instanceInfo.install_id, instanceInfo.name);
+        if (mr_pack_info.error) {
+            instanceInfo.setFailed(true);
+            instanceInfo.setInstalling(false);
+            return;
+        }
 
         instanceInfo.setLoader(mr_pack_info.loader);
         instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
@@ -12344,9 +12410,13 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     });
     instanceInfo.setInstalling(false);
     let r = await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, instanceInfo.loader, instanceInfo.vanilla_version, mr_pack_info.loader_version);
-    instanceInfo.setJavaPath(r.java_installation);
-    instanceInfo.setJavaVersion(r.java_version);
-    instanceInfo.setMcInstalled(true);
+    if (r.error) {
+        instanceInfo.setFailed(true);
+    } else {
+        instanceInfo.setJavaPath(r.java_installation);
+        instanceInfo.setJavaVersion(r.java_version);
+        instanceInfo.setMcInstalled(true);
+    }
 }
 
 function closeAllDialogs() {
@@ -12472,6 +12542,11 @@ window.electronAPI.onOpenFile((info, file_path) => {
         showSpecificInstanceContent(instance);
         let packInfo = await window.electronAPI.processPackFile(file_path, instance_id, info.name);
         console.log(packInfo);
+        if (packInfo.error) {
+            instance.setFailed(true);
+            instance.setInstalling(false);
+            return;
+        }
         if (!packInfo.loader_version) {
             displayError(packInfo);
             return;
@@ -12486,11 +12561,41 @@ window.electronAPI.onOpenFile((info, file_path) => {
         });
         instance.setInstalling(false);
         let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-        instance.setJavaPath(r.java_installation);
-        instance.setJavaVersion(r.java_version);
-        instance.setMcInstalled(true);
+        if (r.error) {
+            instance.setFailed(true);
+        } else {
+            instance.setJavaPath(r.java_installation);
+            instance.setJavaVersion(r.java_version);
+            instance.setMcInstalled(true);
+        }
     });
 });
+
+function onError(message, reportable, reportInfo) {
+    let wrapper = document.createElement("div");
+    wrapper.style.display = "flex";
+    wrapper.style.flexDirection = "column";
+    wrapper.style.gap = "8px";
+    let description = document.createElement("span");
+    description.innerHTML = translate("app.error.description", "%m", message);
+    wrapper.appendChild(description);
+    let bugButton = document.createElement("button");
+    bugButton.innerHTML = '<i class="fa-solid fa-bug"></i> ' + translate("app.error.report");
+    bugButton.onclick = () => {
+        window.electronAPI.openInBrowser(`https://github.com/Illusioner2520/EnderLynx/issues/new?template=1-bug_report.yml&version=${window.electronAPI.version}&title=Error&description=${reportInfo}`);
+    }
+    bugButton.className = "bug-button";
+    if (reportable) wrapper.appendChild(bugButton);
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.error.title"), "notice", wrapper, [
+        {
+            "type": "confirm",
+            "content": translate("app.error.confirm")
+        }
+    ], [], () => { })
+}
+
+window.electronAPI.onError(onError);
 
 function openInstanceShareDialog(instanceInfo) {
     let options = window.electronAPI.getInstanceFiles(instanceInfo.instance_id);
@@ -12560,6 +12665,11 @@ switch (data.getDefault("saved_version")) {
         db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
         db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
         db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
+    case "0.0.8":
+    case "0.0.9":
+    case "0.1.0":
+    case "0.1.1":
+        db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
 }
 
 data.setDefault("saved_version", window.electronAPI.version.replace("-dev", ""));

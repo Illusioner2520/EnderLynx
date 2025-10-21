@@ -752,5 +752,12 @@
     "app.instances.share.confirm": "Export",
     "app.instances.share.name": "Name",
     "app.instances.share.files": "Files to Include",
-    "app.list.total": "%c Total"
+    "app.list.total": "%c Total",
+    "app.error.title": "An Error has occured!",
+    "app.error.description": "An error has occured! %m",
+    "app.error.report": "Report this Error",
+    "app.error.confirm": "Close",
+    "app.instances.failed": "Failed",
+    "app.instances.failed.tooltip": "Failed to Install. Repair Necessary",
+    "app.instances.failed_to_create": "Failed to create instance"
 }
