@@ -3228,7 +3228,7 @@ dialog[open]::backdrop {
 
 .multiple-file-select-wrapper {
     display: grid;
-    min-width: 500px;
+    min-width: 650px;
 }
 
 .multiple-select {
@@ -4783,6 +4783,26 @@ body.offline #offline-notice {
 }
 
 .multiple-file-select-child-container.shown {
+    display: block;
+    height: auto;
+    opacity: 1;
+
+    @starting-style {
+        opacity: .4;
+        height: 0px;
+    }
+}
+
+div:has(> .dialog-wrapper-hidden) {
+    display: none;
+    transition: display allow-discrete .1s, opacity .1s, height .1s;
+    height: 0px;
+    opacity: .4;
+    overflow: hidden;
+    interpolate-size: allow-keywords;
+}
+
+div:has(> .dialog-wrapper-hidden.shown) {
     display: block;
     height: auto;
     opacity: 1;

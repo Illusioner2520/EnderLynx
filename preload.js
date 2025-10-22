@@ -2413,7 +2413,82 @@ contextBridge.exposeInMainWorld('electronAPI', {
             if (fs.existsSync(srcPath)) {
                 const stat = fs.statSync(srcPath);
                 if (stat.isDirectory()) {
-                    // Recursively add directory
+                    function addDirToZip(dir, zipPath) {
+                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        for (const entry of entries) {
+                            const entrySrc = path.join(dir, entry.name);
+                            const entryDest = path.join(zipPath, entry.name);
+                            if (entry.isDirectory()) {
+                                addDirToZip(entrySrc, entryDest);
+                            } else {
+                                zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+                            }
+                        }
+                    }
+                    addDirToZip(srcPath, destPath);
+                } else {
+                    zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
+                }
+            }
+        }
+
+        zip.writeZip(zipPath);
+
+        return zipPath;
+    },
+    createMrPack: async (instance_id, name, manifest, overrides) => {
+        const tempDir = path.resolve(userPath, "temp");
+        fs.mkdirSync(tempDir, { recursive: true });
+        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.mrpack`);
+
+        const zip = new AdmZip();
+
+        zip.addFile("modrinth.index.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+
+        for (let override of overrides) {
+            const srcPath = path.resolve(userPath, "minecraft", "instances", instance_id, override);
+            const destPath = "overrides/" + override;
+            if (fs.existsSync(srcPath)) {
+                const stat = fs.statSync(srcPath);
+                if (stat.isDirectory()) {
+                    function addDirToZip(dir, zipPath) {
+                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        for (const entry of entries) {
+                            const entrySrc = path.join(dir, entry.name);
+                            const entryDest = path.join(zipPath, entry.name);
+                            if (entry.isDirectory()) {
+                                addDirToZip(entrySrc, entryDest);
+                            } else {
+                                zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+                            }
+                        }
+                    }
+                    addDirToZip(srcPath, destPath);
+                } else {
+                    zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
+                }
+            }
+        }
+
+        zip.writeZip(zipPath);
+
+        return zipPath;
+    },
+    createCfZip: async (instance_id, name, manifest, overrides) => {
+        const tempDir = path.resolve(userPath, "temp");
+        fs.mkdirSync(tempDir, { recursive: true });
+        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.zip`);
+
+        const zip = new AdmZip();
+
+        zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+
+        for (let override of overrides) {
+            const srcPath = path.resolve(userPath, "minecraft", "instances", instance_id, override);
+            const destPath = "overrides/" + override;
+            if (fs.existsSync(srcPath)) {
+                const stat = fs.statSync(srcPath);
+                if (stat.isDirectory()) {
                     function addDirToZip(dir, zipPath) {
                         const entries = fs.readdirSync(dir, { withFileTypes: true });
                         for (const entry of entries) {

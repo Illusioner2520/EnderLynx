@@ -5234,7 +5234,7 @@ function showInstanceContent(e) {
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
                 console.log(packInfo);
-                if (!packInfo.loader_version) {
+                if (!("loader_version" in packInfo)) {
                     displayError(packInfo);
                     return;
                 }
@@ -8925,6 +8925,9 @@ class Dialog {
                     contents[tab].appendChild(wrapper);
                     let multiSelect = new MultiSelect(element, info[i].options);
                     if (info[i].default) multiSelect.selectOption(info[i].default);
+                    if (info[i].onchange) multiSelect.addOnChange(() => {
+                        info[i].onchange(multiSelect.value);
+                    });
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "checkboxes") {
                     let wrapper = document.createElement("div");
@@ -12503,7 +12506,7 @@ async function checkForUpdates(isManual) {
 
 checkForUpdates();
 
-async function createElPack(instance, content_list, overrides) {
+async function createElPack(instance, content_list, overrides, pack_version) {
     instance = instance.refresh();
     let manifest = {
         "name": instance.name,
@@ -12511,6 +12514,7 @@ async function createElPack(instance, content_list, overrides) {
         "loader": instance.loader,
         "loader_version": instance.loader_version,
         "game_version": instance.vanilla_version,
+        "pack_version": pack_version,
         "allocated_ram": instance.allocated_ram,
         "files": content_list.map(e => ({
             "type": e.type,
@@ -12522,6 +12526,91 @@ async function createElPack(instance, content_list, overrides) {
         }))
     }
     let file_path = await window.electronAPI.createElPack(instance.instance_id, instance.name, manifest, overrides);
+    openShareDialogForFile(file_path);
+}
+async function createMrPack(instance, content_list, overrides, pack_version) {
+    instance = instance.refresh();
+    let url = `https://api.modrinth.com/v2/versions?ids=["${content_list.map(e => e.version_id).join('","')}"]`;
+    let info = [];
+    try {
+        const response = await fetch(url);
+        info = await (response.json());
+    } catch (e) {
+        displayError(translate("app.mrpack.error"));
+        return;
+    }
+    let files_list = content_list.map(e => {
+        let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+        let content_file = content_folder + "/" + e.file_name;
+        return {
+            "path": content_file,
+            "hashes": {
+                "sha1": "",
+                "sha512": ""
+            },
+            "downloads": [],
+            "fileSize": 0,
+            "version_id": e.version_id
+        }
+    });
+    info: for (let i = 0; i < info.length; i++) {
+        for (let j = 0; j < files_list.length; j++) {
+            if (files_list[j].version_id == info[i].id) {
+                files_list[j].hashes.sha1 = info[i].files[0].hashes.sha1;
+                files_list[j].hashes.sha512 = info[i].files[0].hashes.sha512;
+                files_list[j].fileSize = info[i].files[0].size;
+                files_list[j].downloads = [info[i].files[0].url];
+                continue info;
+            }
+        }
+    }
+    files_list = files_list.map(({version_id, ...rest}) => rest);
+    let manifest = {
+        "formatVersion": 1,
+        "game": "minecraft",
+        "versionId": pack_version,
+        "name": instance.name,
+        "files": files_list,
+        "dependencies": {
+            "minecraft": instance.vanilla_version
+        }
+    }
+    let convert = {
+        "forge": "forge",
+        "neoforge": "neoforge",
+        "fabric": "fabric-loader",
+        "quilt": "quilt-loader"
+    }
+    if (convert[instance.loader]) manifest.dependencies[convert[instance.loader]] = instance.loader_version;
+    let file_path = await window.electronAPI.createMrPack(instance.instance_id, instance.name, manifest, overrides);
+    openShareDialogForFile(file_path);
+}
+async function createCfZip(instance, content_list, overrides, pack_version) {
+    instance = instance.refresh();
+    let manifest = {
+        "minecraft": {
+            "version": instance.vanilla_version,
+            "modLoaders": [
+                {
+                    "id": instance.loader + "-" + instance.loader_version,
+                    "primary": true
+                }
+            ],
+            "recommendedRam": instance.allocated_ram
+        },
+        "manifestType": "minecraftModpack",
+        "manifestVersion": 1,
+        "name": instance.name,
+        "version": pack_version,
+        "author": "",
+        "files": content_list.map(e => ({
+            "projectID": Number(e.source_info),
+            "fileID": Number(e.version_id),
+            "required": true
+        })),
+        "overrides": "overrides"
+    }
+    let file_path = await window.electronAPI.createCfZip(instance.instance_id, instance.name, manifest, overrides);
     openShareDialogForFile(file_path);
 }
 
@@ -12587,6 +12676,36 @@ function openInstanceShareDialog(instanceInfo) {
         options[index] = replace;
     });
 
+    let distributionToggleWrapper = document.createElement("div");
+    let labelWrapper = document.createElement("div");
+    labelWrapper.className = "label-wrapper";
+    let label = document.createElement("label");
+    label.className = "dialog-label";
+    let labelDesc = document.createElement("label");
+    labelDesc.className = "dialog-label-desc";
+    let toggleEle = document.createElement("button");
+    new Toggle(toggleEle, () => { }, false);
+    distributionToggleWrapper.className = "dialog-text-label-wrapper-horizontal";
+    distributionToggleWrapper.classList.add("dialog-wrapper-hidden");
+    distributionToggleWrapper.appendChild(toggleEle);
+    distributionToggleWrapper.appendChild(labelWrapper);
+    labelWrapper.appendChild(label);
+    labelWrapper.appendChild(labelDesc);
+
+    let updateToggle = (v) => {
+        if (v == "elpack") distributionToggleWrapper.classList.remove("shown");
+        if (v == "mrpack") {
+            distributionToggleWrapper.classList.add("shown");
+            label.innerHTML = translate("app.instances.share.distribution", "%p", "Modrinth");
+            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", "Modrinth");
+        }
+        if (v == "cf_zip") {
+            distributionToggleWrapper.classList.add("shown");
+            label.innerHTML = translate("app.instances.share.distribution", "%p", "CurseForge");
+            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", "CurseForge");
+        }
+    }
+
     let dialog = new Dialog();
     dialog.showDialog(translate("app.instances.share.title"), "form", [
         {
@@ -12594,6 +12713,39 @@ function openInstanceShareDialog(instanceInfo) {
             "name": translate("app.instances.share.name"),
             "id": "name",
             "default": instanceInfo.name
+        },
+        {
+            "type": "text",
+            "name": translate("app.instances.share.version"),
+            "id": "version",
+            "default": ""
+        },
+        {
+            "type": "multi-select",
+            "name": translate("app.instances.share.out"),
+            "id": "out",
+            "default": "elpack",
+            "options": [
+                {
+                    "name": translate("app.instances.share.elpack"),
+                    "value": "elpack"
+                },
+                {
+                    "name": translate("app.instances.share.mrpack"),
+                    "value": "mrpack"
+                },
+                {
+                    "name": translate("app.instances.share.cf_zip"),
+                    "value": "cf_zip"
+                }
+            ],
+            "onchange": (v) => {
+                updateToggle(v);
+            }
+        },
+        {
+            "type": "notice",
+            "content": distributionToggleWrapper
         },
         {
             "type": "files",
@@ -12623,7 +12775,27 @@ function openInstanceShareDialog(instanceInfo) {
             nonContentSpecific.push(content_file);
             return false;
         });
-        createElPack(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")));
+        if (info.out == "elpack") {
+            createElPack(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")), info.version);
+        } else if (info.out == "mrpack") {
+            yesContentSpecific = yesContentSpecific.filter(e => {
+                if (e.source == "modrinth") return true;
+                let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                let content_file = content_folder + "//" + e.file_name;
+                nonContentSpecific.push(content_file);
+                return false;
+            });
+            createMrPack(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")), info.version);
+        } else if (info.out == "cf_zip") {
+            yesContentSpecific = yesContentSpecific.filter(e => {
+                if (e.source == "curseforge") return true;
+                let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                let content_file = content_folder + "//" + e.file_name;
+                nonContentSpecific.push(content_file);
+                return false;
+            });
+            createCfZip(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")), info.version);
+        }
     });
 }
 
