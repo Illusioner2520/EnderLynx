@@ -768,8 +768,8 @@
     "app.instances.failed.tooltip": "Failed to Install. Repair Necessary",
     "app.instances.failed_to_create": "Failed to create instance",
     "app.mrpack.error": "Failed to create Modrinth .mrpack",
-    "app.distribution.curseforge.eco": "There is currently content selected that is not within the CurseForge ecosystem. If there exists an alternate within the CurseForge ecosystem, please use that. Otherwise, check that you have properly credited the author(s) and that you have permission to include it.",
-    "app.distribution.modrinth.eco": "There is currently content selected that is not within the Modrinth ecosystem. If there exists an alternate within the Modrinth ecosystem, please use that. Otherwise, check that you have properly credited the author(s) and that you have permission to include it.",
+    "app.distribution.curseforge.eco": "There is currently content selected that is not within the CurseForge ecosystem. If there exists an alternate within the CurseForge ecosystem, please use that. Otherwise, check that you have properly credited the author(s) and that you have permission to include it. Here is the list: %l",
+    "app.distribution.modrinth.eco": "There is currently content selected that is not within the Modrinth ecosystem. If there exists an alternate within the Modrinth ecosystem, please use that. Otherwise, check that you have properly credited the author(s) and that you have permission to include it. Here is the list: %l",
     "app.distribution.modrinth.version": "Please enter a pack version for distribution",
     "app.distribution.warnings": "Distribution Warnings:",
     "app.distribution.name": "Please enter a name for distribution"

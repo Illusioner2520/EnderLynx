@@ -12717,11 +12717,11 @@ function openInstanceShareDialog(instanceInfo) {
         let distributionWarnings = [];
         if (out == "mrpack") {
             let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "modrinth");
-            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.modrinth.eco"));
+            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.modrinth.eco", "%l", content_specific.map(e => e.name).join(", ")));
             if (!packVersion) distributionWarnings.push(translate("app.distribution.modrinth.version"));
         } else if (out == "cf_zip") {
             let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "curseforge");
-            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.curseforge.eco"));
+            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.curseforge.eco", "%l", content_specific.map(e => e.name).join(", ")));
         }
         if (out != "elpack") {
             if (!name) distributionWarnings.push(translate("app.distribution.name"));
