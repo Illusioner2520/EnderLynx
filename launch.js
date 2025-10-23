@@ -751,7 +751,11 @@ class Minecraft {
                 }) : [];
             }
         }
-        let version_json = fs.readFileSync(path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`));
+        let version_path = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`);
+        if (!fs.existsSync(version_path)) {
+            version_path = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.json`)
+        }
+        let version_json = fs.readFileSync(version_path);
         version_json = JSON.parse(version_json);
         let paths = "";
         libs: for (let i = 0; i < version_json.libraries.length; i++) {
