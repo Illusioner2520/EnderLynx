@@ -8343,6 +8343,10 @@ class MultipleFileSelect {
         this.renderTree(this.tree, this.itemList);
     }
 
+    addOnChange(onchange) {
+        this.onchange = onchange;
+    }
+
     getValue() {
         return Array.from(this.selected);
     }
@@ -8355,6 +8359,7 @@ class MultipleFileSelect {
             this.selectAll(e, node);
         });
         this.updateCheckboxStates();
+        if (this.onchange) this.onchange(this.getValue());
     }
 
     /** Build a hierarchical tree object */
@@ -8420,6 +8425,7 @@ class MultipleFileSelect {
                 if (checkbox.checked) this.selectAll(fullPath, node[key]);
                 else this.deselectAll(fullPath, node[key]);
                 this.updateCheckboxStates();
+                if (this.onchange) this.onchange(this.getValue());
             };
             checkbox.onkeydown = (e) => {
                 if (e.key === " " || e.key === "Enter") {
@@ -8776,6 +8782,9 @@ class Dialog {
                     if (info[i].onchange) textInput.onchange = () => {
                         info[i].onchange(textInput.value);
                     }
+                    if (info[i].oninput) textInput.oninput = () => {
+                        info[i].oninput(textInput.value);
+                    }
                     if (info[i].maxlength) textInput.maxLength = info[i].maxlength;
                     if (info[i].default) textInput.value = info[i].maxlength ? info[i].default.substring(0, info[i].maxlength) : info[i].default;
                     let wrapper = document.createElement("div");
@@ -8953,6 +8962,7 @@ class Dialog {
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);
                     let multiSelect = new MultipleFileSelect(element, info[i].options);
+                    if (info[i].onchange) multiSelect.addOnChange(info[i].onchange);
                     if (info[i].default) multiSelect.setSelected(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "dropdown") {
@@ -12684,13 +12694,46 @@ function openInstanceShareDialog(instanceInfo) {
     let labelDesc = document.createElement("label");
     labelDesc.className = "dialog-label-desc";
     let toggleEle = document.createElement("button");
-    new Toggle(toggleEle, () => { }, false);
+    let distributionToggle = new Toggle(toggleEle, () => {
+        updateDistributionInfo(out, overrides, packVersion, name);
+    }, false);
     distributionToggleWrapper.className = "dialog-text-label-wrapper-horizontal";
     distributionToggleWrapper.classList.add("dialog-wrapper-hidden");
     distributionToggleWrapper.appendChild(toggleEle);
     distributionToggleWrapper.appendChild(labelWrapper);
     labelWrapper.appendChild(label);
     labelWrapper.appendChild(labelDesc);
+
+    let distributionInfo = document.createElement("div");
+    distributionInfo.className = "info";
+    distributionInfo.classList.add("dialog-wrapper-hidden");
+
+    let overrides = [];
+    let out = "elpack";
+    let packVersion = "";
+    let name = instanceInfo.name;
+
+    let updateDistributionInfo = (out, overrides, packVersion, name) => {
+        let distributionWarnings = [];
+        if (out == "mrpack") {
+            let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "modrinth");
+            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.modrinth.eco"));
+            if (!packVersion) distributionWarnings.push(translate("app.distribution.modrinth.version"));
+        } else if (out == "cf_zip") {
+            let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "curseforge");
+            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.curseforge.eco"));
+        }
+        if (out != "elpack") {
+            if (!name) distributionWarnings.push(translate("app.distribution.name"));
+        }
+        if (!distributionToggle.toggled) distributionWarnings = [];
+        if (distributionWarnings.length) {
+            distributionInfo.classList.add("shown");
+            distributionInfo.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span style="display: flex;flex-direction: column;gap: 4px;"><b>' + translate("app.distribution.warnings") + "</b>" + distributionWarnings.map(e => `<span>${e}</span>`).join("") + "</span>";
+        } else { 
+            distributionInfo.classList.remove("shown");
+        }
+    }
 
     let updateToggle = (v) => {
         if (v == "elpack") distributionToggleWrapper.classList.remove("shown");
@@ -12704,21 +12747,34 @@ function openInstanceShareDialog(instanceInfo) {
             label.innerHTML = translate("app.instances.share.distribution", "%p", "CurseForge");
             labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", "CurseForge");
         }
+        updateDistributionInfo(v, overrides, packVersion, name);
     }
 
     let dialog = new Dialog();
     dialog.showDialog(translate("app.instances.share.title"), "form", [
         {
+            "type": "notice",
+            "content": distributionInfo
+        },
+        {
             "type": "text",
             "name": translate("app.instances.share.name"),
             "id": "name",
-            "default": instanceInfo.name
+            "default": instanceInfo.name,
+            "oninput": (v) => {
+                name = v;
+                updateDistributionInfo(out, overrides, packVersion, v);
+            }
         },
         {
             "type": "text",
             "name": translate("app.instances.share.version"),
             "id": "version",
-            "default": ""
+            "default": "",
+            "oninput": (v) => {
+                packVersion = v;
+                updateDistributionInfo(out, overrides, v, name);
+            }
         },
         {
             "type": "multi-select",
@@ -12740,6 +12796,7 @@ function openInstanceShareDialog(instanceInfo) {
                 }
             ],
             "onchange": (v) => {
+                out = v;
                 updateToggle(v);
             }
         },
@@ -12752,7 +12809,11 @@ function openInstanceShareDialog(instanceInfo) {
             "name": translate("app.instances.share.files"),
             "id": "files",
             "options": options,
-            "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts", "shader"]
+            "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts", "shader"],
+            "onchange": (v) => {
+                overrides = v;
+                updateDistributionInfo(out, v, packVersion, name);
+            }
         }
     ], [
         {
