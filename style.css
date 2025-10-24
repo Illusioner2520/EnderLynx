@@ -2442,12 +2442,12 @@ dialog[open]::backdrop {
     transition: scale .1s;
 }
 
-.gallery-screenshot:active {
-    scale: .9;
-}
-
 .gallery-screenshot:hover {
     scale: .95;
+}
+
+.gallery-screenshot:active {
+    scale: .9;
 }
 
 .gallery-screenshot::after {
