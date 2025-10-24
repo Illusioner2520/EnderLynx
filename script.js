@@ -2182,31 +2182,18 @@ class ContentList {
         let totalText = document.createElement("div");
         totalText.className = "content-list-total";
         totalText.innerHTML = translate("app.list.total", "%c", content.length);
+        this.totalText = totalText;
+        this.notFoundElement = notFoundElement;
         contentListTop.appendChild(totalText);
 
-        let applyFilters = (search, dropdown) => {
-            let numShown = 0;
-            for (let i = 0; i < this.items.length; i++) {
-                if (this.items[i].name.toLowerCase().includes(search.toLowerCase().trim()) && (this.items[i].type == dropdown || dropdown == "all")) {
-                    this.items[i].element.style.display = "flex";
-                    this.items[i].element.classList.remove("hidden");
-                    numShown++;
-                } else {
-                    this.items[i].element.style.display = "none";
-                    this.items[i].element.classList.add("hidden");
-                }
-            }
-            totalText.innerHTML = translate("app.list.total", "%c", numShown);
-            notFoundElement.style.display = numShown ? "none" : "";
-            this.figureOutMainCheckedState();
-        }
-
         searchBar.setOnInput((v) => {
-            applyFilters(v, filter.value);
+            this.applyFilters(v, filter.value);
         });
+        this.searchBar = searchBar;
+        this.filter = filter;
 
         filter.setOnChange((v) => {
-            applyFilters(searchBar.value, v);
+            this.applyFilters(searchBar.value, v);
         });
 
         let contentMainElement = document.createElement("div");
@@ -2344,6 +2331,28 @@ class ContentList {
             contentMainElement.appendChild(contentEle);
         }
         element.appendChild(contentMainElement);
+    }
+
+    reApplyFilters() {
+        this.applyFilters(this.searchBar.value, this.filter.value);
+    }
+
+    applyFilters(search, dropdown) {
+        let numShown = 0;
+        for (let i = 0; i < this.items.length; i++) {
+            if (this.items[i].name.toLowerCase().includes(search.toLowerCase().trim()) && (this.items[i].type == dropdown || dropdown == "all")) {
+                this.items[i].element.style.display = "flex";
+                this.items[i].element.classList.remove("hidden");
+                if (document.body.contains(this.items[i].element)) numShown++;
+            } else {
+                this.items[i].element.style.display = "none";
+                this.items[i].element.classList.add("hidden");
+            }
+        }
+        console.log("numShown", numShown);
+        this.totalText.innerHTML = translate("app.list.total", "%c", numShown);
+        this.notFoundElement.style.display = numShown ? "none" : "";
+        this.figureOutMainCheckedState();
     }
 
     updateSecondaryColumn() {
@@ -6396,6 +6405,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             ele.remove();
                             displaySuccess(translate("app.content.delete.success").replace("%c", e.name));
                             e.delete();
+                            contentList.reApplyFilters();
                         } else {
                             displayError(translate("app.content.delete.fail").replace("%c", e.name));
                         }
@@ -6467,6 +6477,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                         ele.remove();
                                         displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                         e.delete();
+                                        contentList.reApplyFilters();
                                     } else {
                                         displayError(translate("app.content.delete.fail", "%c", e.name));
                                     }
@@ -6520,6 +6531,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                                 ele.remove();
                                 displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                 e.delete();
+                                contentList.reApplyFilters();
                             } else {
                                 displayError(translate("app.content.delete.fail", "%c", e.name));
                             }
@@ -12574,7 +12586,7 @@ async function createMrPack(instance, content_list, overrides, pack_version) {
             }
         }
     }
-    files_list = files_list.map(({version_id, ...rest}) => rest);
+    files_list = files_list.map(({ version_id, ...rest }) => rest);
     let manifest = {
         "formatVersion": 1,
         "game": "minecraft",
@@ -12730,7 +12742,7 @@ function openInstanceShareDialog(instanceInfo) {
         if (distributionWarnings.length) {
             distributionInfo.classList.add("shown");
             distributionInfo.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span style="display: flex;flex-direction: column;gap: 4px;"><b>' + translate("app.distribution.warnings") + "</b>" + distributionWarnings.map(e => `<span>${e}</span>`).join("") + "</span>";
-        } else { 
+        } else {
             distributionInfo.classList.remove("shown");
         }
     }
