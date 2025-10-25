@@ -3,6 +3,7 @@ const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
 const fs = require('fs');
+const AdmZip = require('adm-zip');
 
 let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
 
@@ -180,4 +181,131 @@ rpc.on('ready', () => {
     ipcMain.on('remove-discord-activity', (_) => {
         rpc.clearActivity().catch(console.error);
     })
+});
+
+ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overrides) => {
+    win.webContents.send('progress-update', `Creating .elpack`, 0, `Creating manifest...`);
+    const tempDir = path.resolve(user_path, "temp");
+    fs.mkdirSync(tempDir, { recursive: true });
+    const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.elpack`);
+
+    const zip = new AdmZip();
+
+    zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+
+    for (let i = 0; i < overrides.length; i++) {
+        win.webContents.send('progress-update', `Creating .elpack`, (i + 1) / overrides.length * 95, `Moving Override ${i + 1} of ${overrides.length}`);
+        let override = overrides[i];
+        const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
+        const destPath = "overrides/" + override;
+        if (fs.existsSync(srcPath)) {
+            const stat = fs.statSync(srcPath);
+            if (stat.isDirectory()) {
+                function addDirToZip(dir, zipPath) {
+                    const entries = fs.readdirSync(dir, { withFileTypes: true });
+                    for (const entry of entries) {
+                        const entrySrc = path.join(dir, entry.name);
+                        const entryDest = path.join(zipPath, entry.name);
+                        if (entry.isDirectory()) {
+                            addDirToZip(entrySrc, entryDest);
+                        } else {
+                            zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+                        }
+                    }
+                }
+                addDirToZip(srcPath, destPath);
+            } else {
+                zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
+            }
+        }
+    }
+
+    zip.writeZip(zipPath);
+
+    win.webContents.send('progress-update', `Creating .elpack`, 100, `Done`);
+    win.webContents.send('open-file-share', zipPath);
+});
+ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overrides) => {
+    win.webContents.send('progress-update', `Creating .mrpack`, 0, `Creating manifest...`);
+    const tempDir = path.resolve(user_path, "temp");
+    fs.mkdirSync(tempDir, { recursive: true });
+    const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.mrpack`);
+
+    const zip = new AdmZip();
+
+    zip.addFile("modrinth.index.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+
+    for (let i = 0; i < overrides.length; i++) {
+        win.webContents.send('progress-update', `Creating .mrpack`, (i + 1) / overrides.length * 95, `Moving Override ${i + 1} of ${overrides.length}`);
+        let override = overrides[i];
+        const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
+        const destPath = "overrides/" + override;
+        if (fs.existsSync(srcPath)) {
+            const stat = fs.statSync(srcPath);
+            if (stat.isDirectory()) {
+                function addDirToZip(dir, zipPath) {
+                    const entries = fs.readdirSync(dir, { withFileTypes: true });
+                    for (const entry of entries) {
+                        const entrySrc = path.join(dir, entry.name);
+                        const entryDest = path.join(zipPath, entry.name);
+                        if (entry.isDirectory()) {
+                            addDirToZip(entrySrc, entryDest);
+                        } else {
+                            zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+                        }
+                    }
+                }
+                addDirToZip(srcPath, destPath);
+            } else {
+                zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
+            }
+        }
+    }
+
+    zip.writeZip(zipPath);
+
+    win.webContents.send('progress-update', `Creating .mrpack`, 100, `Done`);
+    win.webContents.send('open-file-share', zipPath);
+});
+ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overrides) => {
+    win.webContents.send('progress-update', `Creating .zip`, 0, `Creating manifest...`);
+    const tempDir = path.resolve(user_path, "temp");
+    fs.mkdirSync(tempDir, { recursive: true });
+    const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.zip`);
+
+    const zip = new AdmZip();
+
+    zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+
+    for (let i = 0; i < overrides.length; i++) {
+        win.webContents.send('progress-update', `Creating .zip`, (i + 1) / overrides.length * 95, `Moving Override ${i + 1} of ${overrides.length}`);
+        let override = overrides[i];
+        const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
+        const destPath = "overrides/" + override;
+        if (fs.existsSync(srcPath)) {
+            const stat = fs.statSync(srcPath);
+            if (stat.isDirectory()) {
+                function addDirToZip(dir, zipPath) {
+                    const entries = fs.readdirSync(dir, { withFileTypes: true });
+                    for (const entry of entries) {
+                        const entrySrc = path.join(dir, entry.name);
+                        const entryDest = path.join(zipPath, entry.name);
+                        if (entry.isDirectory()) {
+                            addDirToZip(entrySrc, entryDest);
+                        } else {
+                            zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+                        }
+                    }
+                }
+                addDirToZip(srcPath, destPath);
+            } else {
+                zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
+            }
+        }
+    }
+
+    zip.writeZip(zipPath);
+
+    win.webContents.send('progress-update', `Creating .zip`, 100, `Done`);
+    win.webContents.send('open-file-share', zipPath);
 });

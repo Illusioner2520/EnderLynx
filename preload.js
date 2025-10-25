@@ -1154,6 +1154,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             callback(title, progress, desc);
         });
     },
+    onOpenFileShare: (callback) => {
+        ipcRenderer.on('open-file-share', (_event, file_path) => {
+            callback(file_path);
+        });
+    },
     onErrorMessage: (callback) => {
         ipcRenderer.on('display-error', (_event, message) => {
             callback(message);
@@ -2398,120 +2403,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
         return filePath;
     },
-    createElPack: async (instance_id, name, manifest, overrides) => {
-        const tempDir = path.resolve(userPath, "temp");
-        fs.mkdirSync(tempDir, { recursive: true });
-        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.elpack`);
-
-        const zip = new AdmZip();
-
-        zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
-
-        for (let override of overrides) {
-            const srcPath = path.resolve(userPath, "minecraft", "instances", instance_id, override);
-            const destPath = "overrides/" + override;
-            if (fs.existsSync(srcPath)) {
-                const stat = fs.statSync(srcPath);
-                if (stat.isDirectory()) {
-                    function addDirToZip(dir, zipPath) {
-                        const entries = fs.readdirSync(dir, { withFileTypes: true });
-                        for (const entry of entries) {
-                            const entrySrc = path.join(dir, entry.name);
-                            const entryDest = path.join(zipPath, entry.name);
-                            if (entry.isDirectory()) {
-                                addDirToZip(entrySrc, entryDest);
-                            } else {
-                                zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
-                            }
-                        }
-                    }
-                    addDirToZip(srcPath, destPath);
-                } else {
-                    zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
-                }
-            }
-        }
-
-        zip.writeZip(zipPath);
-
-        return zipPath;
-    },
-    createMrPack: async (instance_id, name, manifest, overrides) => {
-        const tempDir = path.resolve(userPath, "temp");
-        fs.mkdirSync(tempDir, { recursive: true });
-        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.mrpack`);
-
-        const zip = new AdmZip();
-
-        zip.addFile("modrinth.index.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
-
-        for (let override of overrides) {
-            const srcPath = path.resolve(userPath, "minecraft", "instances", instance_id, override);
-            const destPath = "overrides/" + override;
-            if (fs.existsSync(srcPath)) {
-                const stat = fs.statSync(srcPath);
-                if (stat.isDirectory()) {
-                    function addDirToZip(dir, zipPath) {
-                        const entries = fs.readdirSync(dir, { withFileTypes: true });
-                        for (const entry of entries) {
-                            const entrySrc = path.join(dir, entry.name);
-                            const entryDest = path.join(zipPath, entry.name);
-                            if (entry.isDirectory()) {
-                                addDirToZip(entrySrc, entryDest);
-                            } else {
-                                zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
-                            }
-                        }
-                    }
-                    addDirToZip(srcPath, destPath);
-                } else {
-                    zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
-                }
-            }
-        }
-
-        zip.writeZip(zipPath);
-
-        return zipPath;
-    },
-    createCfZip: async (instance_id, name, manifest, overrides) => {
-        const tempDir = path.resolve(userPath, "temp");
-        fs.mkdirSync(tempDir, { recursive: true });
-        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.zip`);
-
-        const zip = new AdmZip();
-
-        zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
-
-        for (let override of overrides) {
-            const srcPath = path.resolve(userPath, "minecraft", "instances", instance_id, override);
-            const destPath = "overrides/" + override;
-            if (fs.existsSync(srcPath)) {
-                const stat = fs.statSync(srcPath);
-                if (stat.isDirectory()) {
-                    function addDirToZip(dir, zipPath) {
-                        const entries = fs.readdirSync(dir, { withFileTypes: true });
-                        for (const entry of entries) {
-                            const entrySrc = path.join(dir, entry.name);
-                            const entryDest = path.join(zipPath, entry.name);
-                            if (entry.isDirectory()) {
-                                addDirToZip(entrySrc, entryDest);
-                            } else {
-                                zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
-                            }
-                        }
-                    }
-                    addDirToZip(srcPath, destPath);
-                } else {
-                    zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
-                }
-            }
-        }
-
-        zip.writeZip(zipPath);
-
-        return zipPath;
-    }
+    createElPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-elpack', id, name, manifest, overrides),
+    createMrPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-mrpack', id, name, manifest, overrides),
+    createCfZip: (id, name, manifest, overrides) => ipcRenderer.invoke('create-cfzip', id, name, manifest, overrides)
 });
 
 async function convertToIco(input, outputPath) {

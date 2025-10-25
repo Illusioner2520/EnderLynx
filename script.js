@@ -8172,6 +8172,10 @@ window.electronAPI.onProgressUpdate((a, b, c) => {
     ]);
 });
 
+window.electronAPI.onOpenFileShare((p) => {
+    openShareDialogForFile(p);
+});
+
 window.electronAPI.onErrorMessage((message) => {
     displayError(message);
 });
@@ -12547,8 +12551,7 @@ async function createElPack(instance, content_list, overrides, pack_version) {
             "disabled": e.disabled
         }))
     }
-    let file_path = await window.electronAPI.createElPack(instance.instance_id, instance.name, manifest, overrides);
-    openShareDialogForFile(file_path);
+    window.electronAPI.createElPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createMrPack(instance, content_list, overrides, pack_version) {
     instance = instance.refresh();
@@ -12604,8 +12607,7 @@ async function createMrPack(instance, content_list, overrides, pack_version) {
         "quilt": "quilt-loader"
     }
     if (convert[instance.loader]) manifest.dependencies[convert[instance.loader]] = instance.loader_version;
-    let file_path = await window.electronAPI.createMrPack(instance.instance_id, instance.name, manifest, overrides);
-    openShareDialogForFile(file_path);
+    window.electronAPI.createMrPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createCfZip(instance, content_list, overrides, pack_version) {
     instance = instance.refresh();
@@ -12632,8 +12634,7 @@ async function createCfZip(instance, content_list, overrides, pack_version) {
         })),
         "overrides": "overrides"
     }
-    let file_path = await window.electronAPI.createCfZip(instance.instance_id, instance.name, manifest, overrides);
-    openShareDialogForFile(file_path);
+    window.electronAPI.createCfZip(instance.instance_id, instance.name, manifest, overrides);
 }
 
 window.electronAPI.onOpenFile((info, file_path) => {
