@@ -12873,23 +12873,25 @@ function openInstanceShareDialog(instanceInfo) {
     });
 }
 
-switch (data.getDefault("saved_version")) {
-    case "0.0.1":
-    case "0.0.2":
-    case "0.0.3":
-    case "0.0.4":
-    case "0.0.5":
-    case "0.0.6":
-    case "0.0.7":
-        if (data.getDefault("default_page") == "my_account") data.setDefault("default_page", "discover");
-        db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
-        db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
-        db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
-    case "0.0.8":
-    case "0.0.9":
-    case "0.1.0":
-    case "0.1.1":
-        db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
-}
+try {
+    switch (data.getDefault("saved_version")) {
+        case "0.0.1":
+        case "0.0.2":
+        case "0.0.3":
+        case "0.0.4":
+        case "0.0.5":
+        case "0.0.6":
+        case "0.0.7":
+            if (data.getDefault("default_page") == "my_account") data.setDefault("default_page", "discover");
+            db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
+            db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
+            db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
+        case "0.0.8":
+        case "0.0.9":
+        case "0.1.0":
+        case "0.1.1":
+            db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
+    }
+} catch (e) { }
 
 data.setDefault("saved_version", window.electronAPI.version.replace("-dev", ""));
