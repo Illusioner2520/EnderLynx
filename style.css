@@ -3906,7 +3906,7 @@ dialog[open]::backdrop {
     }
 
     h1 {
-        margin-block: .67em;
+        margin-block: 6px;
     }
 
     h2 {
@@ -3926,9 +3926,9 @@ dialog[open]::backdrop {
     }
 
     blockquote {
-        padding: 0 1em;
+        padding: 0 10px;
         color: var(--color-base);
-        border-left: 0.25em solid var(--color-1);
+        border-left: 3px solid var(--color-1);
         margin-inline: 0;
     }
 
@@ -3938,20 +3938,10 @@ dialog[open]::backdrop {
         font-weight: bold;
         text-decoration: none;
 
-        &:focus-visible,
         &:hover {
             filter: brightness(1.2);
-            text-decoration: none;
+            text-decoration: underline;
         }
-
-        &:active {
-            filter: brightness(1.1);
-            text-decoration: none;
-        }
-    }
-
-    a:active>img {
-        scale: 0.98;
     }
 
     img {
@@ -3960,18 +3950,10 @@ dialog[open]::backdrop {
         display: inline-block;
     }
 
-    html:not(.dark-mode, .oled-mode) & img[src$='#gh-dark-mode-only'] {
-        display: none;
-    }
-
-    html:is(.dark-mode, .oled-mode) & img[src$='#gh-light-mode-only'] {
-        display: none;
-    }
-
     pre {
-        margin-top: 1rem;
+        margin-top: 4px;
         padding: 14px;
-        border-radius: 10px;
+        border-radius: 5px;
         background-color: var(--color-1);
         overflow-x: auto;
 
@@ -3983,16 +3965,16 @@ dialog[open]::backdrop {
     }
 
     code {
-        padding: 0.2em 0.4em;
+        padding: 2px 4px;
         font-size: 100%;
-        border-radius: 10px;
+        border-radius: 5px;
         background-color: var(--color-1);
         color: var(--text-color);
     }
 
     hr {
         margin: 20px 0;
-        color: var(--color-1);
+        border-color: var(--color-1);
     }
 
     table {
@@ -4003,7 +3985,7 @@ dialog[open]::backdrop {
         border-collapse: separate;
         border-spacing: 0;
         line-height: 1.5;
-        border: 0.1rem solid var(--color-1);
+        border: 4px solid var(--color-1);
         border-radius: 2px;
 
         th {
@@ -4012,10 +3994,10 @@ dialog[open]::backdrop {
 
         td,
         th {
-            padding: 0.4rem 0.85rem;
+            padding: 8px 12px;
         }
 
-        tr:nth-child(2n) {
+        tr {
             background-color: var(--color-2);
         }
 
@@ -4031,16 +4013,17 @@ dialog[open]::backdrop {
     }
 
     details {
-        border: 0.15rem solid var(--color-1);
+        border: 2px solid var(--color-1);
         border-radius: 10px;
-        padding: 0.5rem 0.5rem 0;
+        padding: 8px 8px 0;
 
         summary {
             font-weight: bold;
-            margin: -0.5rem -0.5rem 0;
-            padding: 0.5rem 0.8rem;
+            margin: -8px -8px 0;
+            padding: 8px 10px;
             cursor: pointer;
             background-color: var(--color-1);
+            border-radius: 8px;
 
             &:hover {
                 filter: brightness(0.85);
@@ -4048,10 +4031,11 @@ dialog[open]::backdrop {
         }
 
         &[open] {
-            padding: 0.5rem;
+            padding: 8px;
 
-            summary {
-                margin-bottom: 0.5rem;
+            > summary {
+                margin-bottom: 8px;
+                border-radius: 8px 8px 0px 0px;
             }
 
             > :last-child:not(summary) {
@@ -4070,14 +4054,6 @@ dialog[open]::backdrop {
         width: 850px;
         max-width: 100%;
         height: auto;
-    }
-
-    @media screen and (max-width: 1280px) {
-
-        iframe,
-        video {
-            width: 100%;
-        }
     }
 }
 
