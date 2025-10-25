@@ -3111,7 +3111,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         let res_json_1 = await res_1.json();
         res_json_1.forEach(e => {
             content.forEach(item => {
-                if (item.source_id == e.id) {
+                if (item.source_id == e.project_id) {
                     item.version = e.version_number;
                 }
             });
