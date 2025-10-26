@@ -5157,6 +5157,11 @@ function showInstanceContent(e) {
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
                 console.log(packInfo);
+                if (packInfo.error) {
+                    instance.setFailed(true);
+                    instance.setInstalling(false);
+                    return;
+                }
                 if (!("loader_version" in packInfo)) {
                     displayError(packInfo);
                     return;
