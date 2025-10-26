@@ -485,7 +485,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return `Error reading file: ${err.message}`;
         }
     },
-    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) => {
+    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit, offline) => {
         if (!player_info) throw new LoginError("Please sign in to your Microsoft account to play Minecraft.");
 
         let date = new Date();
@@ -494,7 +494,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             try {
                 player_info = await getNewAccessToken(player_info.refresh_token);
             } catch (err) {
-                throw new Error("Unable to update access token.");
+                if (!offline) throw new Error("Unable to update access token.");
             }
         }
         let mc = new Minecraft(instance_id);
