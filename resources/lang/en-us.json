@@ -714,7 +714,7 @@
     "app.settings.updates.complete.cancel": "Later",
     "app.settings.updates.complete.confirm": "Restart EnderLynx",
     "app.settings.updates.download_failed": "Failed to download update",
-    "app.offline": "You are currently offline. You can still play Singleplayer as long as you previously signed in.",
+    "app.offline": "You are currently offline. You can still play singleplayer as long as you previously signed in.",
     "app.discover.vt.fail": "Unable to download Vanilla Tweaks Packs.",
     "app.discover.vt.success": "Vanilla Tweaks Packs installed to %i",
     "app.discover.experimental": "Experimental Pack. May produce errors when trying to download.",

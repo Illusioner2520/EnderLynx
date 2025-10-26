@@ -159,7 +159,7 @@ class DefaultOptions {
         content = "version:" + (dataVersion ? dataVersion : (v?.value ? v?.value : "100")) + "\n";
         dataVersion = Number(dataVersion);
         r.forEach(e => {
-            if (dataVersion < 1444 && keyToNum[e.value]) {
+            if (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && keyToNum[e.value]) {
                 content += e.key + ":" + keyToNum[e.value] + "\n"
             } else {
                 content += e.key + ":" + e.value + "\n"
@@ -3031,7 +3031,6 @@ settingsButtonEle.onclick = () => {
             let options = window.electronAPI.getOptions(info.options_txt_location);
             db.prepare("DELETE FROM options_defaults WHERE key != ?").run("version");
             let defaultOptions = new DefaultOptions();
-            console.log(options);
             options.forEach(e => {
                 if (e.key == "version") return;
                 defaultOptions.setDefault(e.key, e.value);
@@ -12379,6 +12378,7 @@ document.getElementById("offline-notice").innerHTML = translate("app.offline");
 
 window.ononline = () => {
     document.body.classList.remove("offline");
+    fetchUpdatedMCVersions();
 }
 
 if (!navigator.onLine) {
