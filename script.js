@@ -1629,14 +1629,15 @@ function createId() {
     return id;
 }
 
-class SearchDropdown {
+class Dropdown {
     constructor(title, options, element, initial, onchange) {
         this.title = title;
         this.element = element;
-        this.onchange = onchange;
+        if (onchange) this.onchange = onchange;
         this.id = createId();
         let dropdownButton = document.createElement('button');
         dropdownButton.setAttribute("popovertarget", this.id);
+        this.dropdownButton = dropdownButton;
         element.style.anchorName = "--" + this.id;
         dropdownButton.classList.add('dropdown-button');
         element.appendChild(dropdownButton);
@@ -1661,134 +1662,7 @@ class SearchDropdown {
         dropdownList.classList.add("dropdown-list");
         dropdownList.setAttribute("popover", "");
         dropdownList.style.positionAnchor = "--" + this.id;
-        this.popover = dropdownList;
-        this.setOptions(options, initial);
-        element.appendChild(dropdownList);
-    }
-    getPass() {
-        return this.options.filter(e => e.value == this.selected)[0].pass;
-    }
-    setOptions(options, initial) {
-        this.options = options;
-        this.selected = initial;
-        this.value = initial;
-        this.optEles = [];
-        let name = "";
-        for (let i = 0; i < this.options.length; i++) {
-            if (this.options[i].value == initial) {
-                name = this.options[i].name;
-                break;
-            }
-        }
-        this.selectedElement.innerHTML = sanitize(name);
-        this.popover.innerHTML = "";
-        for (let i = 0; i < options.length; i++) {
-            let optEle = document.createElement("button");
-            optEle.classList.add("dropdown-item");
-            optEle.innerHTML = sanitize(options[i].name);
-            optEle.onclick = (e) => {
-                this.selectOption(options[i].value);
-                this.onchange(options[i].value);
-            }
-            optEle.dataset.value = options[i].value;
-            if (options[i].value == initial) {
-                optEle.classList.add("selected");
-            }
-            this.popover.appendChild(optEle);
-            this.optEles.push(optEle);
-        }
-    }
-    selectOption(option) {
-        let name = "";
-        for (let i = 0; i < this.options.length; i++) {
-            if (this.options[i].value == option) {
-                name = this.options[i].name;
-                break;
-            }
-        }
-        this.selectedElement.innerHTML = sanitize(name);
-        for (let i = 0; i < this.optEles.length; i++) {
-            if (this.optEles[i].dataset.value == option) {
-                this.optEles[i].classList.add("selected");
-            } else {
-                this.optEles[i].classList.remove("selected");
-            }
-        }
-        this.selected = option;
-        this.value = option;
-        this.popover.hidePopover();
-    }
-    get getSelected() {
-        return this.selected;
-    }
-    setOnChange(onchange) {
-        this.onchange = onchange;
-    }
-    addOnChange(onchange) {
-        this.onchange = onchange;
-    }
-}
-
-class DialogDropdown {
-    constructor(title, options, element, initial, onchange) {
-        if (onchange) this.onchange = onchange;
-        this.title = title;
-        this.element = element;
-        this.id = createId();
-        let dropdownButton = document.createElement('button');
-        dropdownButton.onclick = () => {
-            dropdownList.showPopover();
-        }
-        element.style.anchorName = "--" + this.id;
-        dropdownButton.classList.add('dropdown-button');
-        element.appendChild(dropdownButton);
-        element.classList.add('search-dropdown');
-        let dropdownSearchInput = document.createElement("input");
-        dropdownSearchInput.className = "dropdown-search-input";
-        dropdownSearchInput.placeholder = "Search...";
-        dropdownSearchInput.oninput = () => {
-            this.filter();
-        }
-        element.appendChild(dropdownSearchInput);
-        this.dropdownSearchInput = dropdownSearchInput;
-        let dropdownInfo = document.createElement("div");
-        dropdownInfo.classList.add("dropdown-info");
-        let dropdownTitle = document.createElement("div");
-        dropdownTitle.classList.add("dropdown-title");
-        dropdownTitle.innerHTML = sanitize(title);
-        let dropdownSelected = document.createElement("div");
-        dropdownSelected.classList.add("dropdown-selected");
-        dropdownInfo.appendChild(dropdownTitle);
-        dropdownInfo.appendChild(dropdownSelected);
-        dropdownButton.appendChild(dropdownInfo);
-        this.selectedElement = dropdownSelected;
-        let dropdownChevron = document.createElement("div");
-        dropdownChevron.classList.add("dropdown-chevron");
-        dropdownChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-        dropdownButton.appendChild(dropdownChevron);
-        let dropdownList = document.createElement("div");
-        dropdownList.id = this.id;
-        dropdownList.classList.add("dropdown-list-dialog");
-        dropdownList.setAttribute("popover", "");
-        dropdownList.style.positionAnchor = "--" + this.id;
-        dropdownList.ontoggle = () => {
-            this.dropdownSearchInput.value = "";
-            this.filter();
-            this.dropdownSearchInput.focus();
-        }
-        dropdownList.popover = "manual";
-        document.addEventListener('pointerdown', (e) => {
-            if (!dropdownList.matches(':popover-open')) return;
-            const t = e.target;
-            if (dropdownList.contains(t)) return;
-            if (t === dropdownSearchInput || dropdownSearchInput.contains(t)) return;
-            dropdownList.hidePopover();
-        }, true);
-        document.addEventListener('keydown', (e) => {
-            if (e.key == "Escape") {
-                dropdownList.hidePopover();
-            }
-        }, true);
+        this.dropdownList = dropdownList;
         this.popover = dropdownList;
         this.setOptions(options, initial);
         element.appendChild(dropdownList);
@@ -1796,16 +1670,6 @@ class DialogDropdown {
     getPass() {
         return this.options.filter(e => e.value == this.selected)[0] ? this.options.filter(e => e.value == this.selected)[0].pass : null;
     }
-    filter() {
-        let value = this.dropdownSearchInput.value.toLowerCase().trim();
-        this.optEles.forEach(e => {
-            if (!e.innerHTML.toLowerCase().includes(value)) {
-                e.style.display = "none";
-            } else {
-                e.style.display = "";
-            }
-        });
-    }
     setOptions(options, initial) {
         this.options = options;
         this.selected = initial;
@@ -1818,7 +1682,7 @@ class DialogDropdown {
                 break;
             }
         }
-        this.selectedElement.innerHTML = sanitize(name);
+        this.selectedElement.innerHTML = sanitize(name ? name : initial);
         this.popover.innerHTML = "";
         for (let i = 0; i < options.length; i++) {
             let optEle = document.createElement("button");
@@ -1843,7 +1707,7 @@ class DialogDropdown {
                 break;
             }
         }
-        this.selectedElement.innerHTML = sanitize(name);
+        this.selectedElement.innerHTML = sanitize(name ? name : initial);
         for (let i = 0; i < this.optEles.length; i++) {
             if (this.optEles[i].dataset.value == option) {
                 this.optEles[i].classList.add("selected");
@@ -1859,8 +1723,59 @@ class DialogDropdown {
     get getSelected() {
         return this.selected;
     }
+    setOnChange(onchange) {
+        this.onchange = onchange;
+    }
     addOnChange(onchange) {
         this.onchange = onchange;
+    }
+}
+
+class SearchDropdown extends Dropdown {
+    constructor(title, options, element, initial, onchange) {
+        super(title, options, element, initial, onchange);
+        let dropdownSearchInput = document.createElement("input");
+        dropdownSearchInput.className = "dropdown-search-input";
+        dropdownSearchInput.placeholder = "Search...";
+        dropdownSearchInput.oninput = () => {
+            this.filter();
+        }
+        this.dropdownSearchInput = dropdownSearchInput;
+        element.insertBefore(dropdownSearchInput, this.dropdownList);
+        this.dropdownList.ontoggle = () => {
+            this.dropdownSearchInput.value = "";
+            this.filter();
+            this.dropdownSearchInput.focus();
+        }
+        this.dropdownButton.onclick = () => {
+            this.dropdownList.showPopover();
+        }
+        this.dropdownButton.removeAttribute("popovertarget");
+        this.dropdownList.classList.remove("dropdown-list");
+        this.dropdownList.classList.add('dropdown-list-dialog');
+        this.dropdownList.popover = "manual";
+        document.addEventListener('pointerdown', (e) => {
+            if (!this.dropdownList.matches(':popover-open')) return;
+            const t = e.target;
+            if (this.dropdownList.contains(t)) return;
+            if (t === dropdownSearchInput || dropdownSearchInput.contains(t)) return;
+            this.dropdownList.hidePopover();
+        }, true);
+        document.addEventListener('keydown', (e) => {
+            if (e.key == "Escape") {
+                this.dropdownList.hidePopover();
+            }
+        }, true);
+    }
+    filter() {
+        let value = this.dropdownSearchInput.value.toLowerCase().trim();
+        this.optEles.forEach(e => {
+            if (!e.innerHTML.toLowerCase().includes(value)) {
+                e.style.display = "none";
+            } else {
+                e.style.display = "";
+            }
+        });
     }
 }
 
@@ -3003,7 +2918,7 @@ settingsButtonEle.onclick = () => {
             } else if (type == "boolean") {
                 let inputElement1 = document.createElement("div");
                 inputElement1.className = "option-input";
-                inputElement = new SearchDropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
+                inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
                     defaultOptions.setDefault(e.key, v);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = v;
@@ -5310,14 +5225,14 @@ function showInstanceContent(e) {
     let search = document.createElement("div");
     let searchbar = new SearchBar(search, searchInstances, null);
     let sort = document.createElement('div');
-    sortBy = new SearchDropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
+    sortBy = new Dropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
     { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
     { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
     { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
     { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
     { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.getDefault("default_sort"), sortInstances);
     let group = document.createElement('div');
-    let groupBy = new SearchDropdown(translate("app.instances.group.by"), [{ "name": translate("app.instances.group.none"), "value": "none" }, { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" }, { "name": translate("app.instances.group.loader"), "value": "loader" }, { "name": translate("app.instances.group.game_version"), "value": "game_version" }], group, data.getDefault("default_group"), groupInstances);
+    let groupBy = new Dropdown(translate("app.instances.group.by"), [{ "name": translate("app.instances.group.none"), "value": "none" }, { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" }, { "name": translate("app.instances.group.loader"), "value": "loader" }, { "name": translate("app.instances.group.game_version"), "value": "game_version" }], group, data.getDefault("default_group"), groupInstances);
     searchAndFilter.appendChild(search);
     searchAndFilter.appendChild(sort);
     searchAndFilter.appendChild(group);
@@ -6325,7 +6240,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
     contentSearch.style.flexGrow = 2;
     let searchBar = new SearchBar(contentSearch, () => { }, null);
     let typeDropdown = document.createElement("div");
-    let dropdownInfo = new SearchDropdown(translate("app.button.content.type"), [
+    let dropdownInfo = new Dropdown(translate("app.button.content.type"), [
         {
             "name": translate("app.content.all"),
             "value": "all"
@@ -6751,7 +6666,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     contentSearch.style.flexGrow = 2;
     let searchBar = new SearchBar(contentSearch, () => { }, null);
     let typeDropdown = document.createElement("div");
-    let dropdownInfo = new SearchDropdown(translate("app.worlds.type"), [
+    let dropdownInfo = new Dropdown(translate("app.worlds.type"), [
         {
             "name": translate("app.worlds.all"),
             "value": "all"
@@ -7190,9 +7105,9 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         render();
     }
     if (log_info.length > 9) {
-        let dropdownInfo = new DialogDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
-    } else {
         let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+    } else {
+        let dropdownInfo = new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
     }
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
@@ -7306,7 +7221,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         }
     }, null);
     let typeDropdown = document.createElement("div");
-    let dropdownInfo = new SearchDropdown(translate("app.options.type"), [
+    let dropdownInfo = new Dropdown(translate("app.options.type"), [
         {
             "name": translate("app.options.all"),
             "value": "all"
@@ -7504,7 +7419,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         } else if (type == "boolean") {
             let inputElement1 = document.createElement("div");
             inputElement1.className = "option-input";
-            inputElement = new SearchDropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
+            inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
                 try {
                     window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, v);
                     displaySuccess(translate("app.options.updated"));
@@ -8999,9 +8914,9 @@ class Dialog {
                     contents[tab].appendChild(wrapper);
                     let multiSelect;
                     if (info[i].options.length >= 10 || info[i].source) {
-                        multiSelect = new DialogDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
+                        multiSelect = new SearchDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
                     } else {
-                        multiSelect = new SearchDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value, () => { });
+                        multiSelect = new Dropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value, () => { });
                     }
                     if (info[i].onchange) multiSelect.addOnChange(() => {
                         info[i].onchange(multiSelect.value, this.values, wrapper);
@@ -9103,7 +9018,7 @@ class Dialog {
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);
                     let loaderElement;
-                    let multiSelect = new DialogDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
+                    let multiSelect = new SearchDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
                     for (let j = 0; j < this.values.length; j++) {
                         if (this.values[j].id == info[i].loader_source) {
                             loaderElement = this.values[j].element;
@@ -9462,7 +9377,7 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
     if (tab == "server") s.disable(translate("app.discover.server_search_not_available"));
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
-    let d = new SearchDropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
+    let d = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
         getContent(discoverList, instance_id, d.getSelected, searchContents, loader, version, tab);
     });
     getContent(discoverList, instance_id, sources[0].value, "", loader, version, tab);
@@ -9534,21 +9449,21 @@ class Pagination {
         if (this.d1opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "150px";
-            new SearchDropdown(translate("app.discover.sort_by"), this.d1opt, dropdownEle, this.d1def, this.d1func);
+            new Dropdown(translate("app.discover.sort_by"), this.d1opt, dropdownEle, this.d1def, this.d1func);
             element.appendChild(dropdownEle);
             if (!this.d2opt && !this.d3opt && !this.d4opt) dropdownEle.style.marginRight = "auto";
         }
         if (this.d2opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "75px";
-            new SearchDropdown(translate("app.discover.view"), this.d2opt, dropdownEle, this.d2def, this.d2func);
+            new Dropdown(translate("app.discover.view"), this.d2opt, dropdownEle, this.d2def, this.d2func);
             element.appendChild(dropdownEle);
             if (!this.d3opt && !this.d4opt) dropdownEle.style.marginRight = "auto";
         }
         if (this.d3opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "180px";
-            new DialogDropdown(translate("app.discover.game_version"), this.d3opt, dropdownEle, this.d3def, this.d3func);
+            new SearchDropdown(translate("app.discover.game_version"), this.d3opt, dropdownEle, this.d3def, this.d3func);
             element.appendChild(dropdownEle);
             if (!this.d4opt) dropdownEle.style.marginRight = "auto";
         }
@@ -9556,7 +9471,7 @@ class Pagination {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.marginRight = "auto";
             dropdownEle.style.width = "150px";
-            new SearchDropdown(translate("app.discover.loader"), this.d4opt, dropdownEle, this.d4def, this.d4func);
+            new Dropdown(translate("app.discover.loader"), this.d4opt, dropdownEle, this.d4def, this.d4func);
             element.appendChild(dropdownEle);
         }
         element.appendChild(leftArrow);
@@ -9836,7 +9751,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
         buttonWrapper.className = "vt-button-wrapper";
         if (!version) {
             let dropdownElement = document.createElement("div");
-            let drodpown = new SearchDropdown("Version", [
+            let drodpown = new Dropdown("Version", [
                 {
                     "name": "1.21",
                     "value": "1.21"
@@ -10998,7 +10913,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     allGameVersions = allGameVersions.filter(e => minecraftVersions.includes(e));
                 }
 
-                let versionDropdown = new DialogDropdown(
+                let versionDropdown = new SearchDropdown(
                     translate("app.discover.game_version"),
                     [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(
                         allGameVersions.map(e => ({ "name": e, "value": e }))
@@ -11024,7 +10939,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     allLoaders = allLoaders.filter(e => loaders[e.toLowerCase()]);
                     allLoaders = allLoaders.map(e => e.toLowerCase());
                 }
-                let loaderDropdown = new SearchDropdown(translate("app.discover.loader"),
+                let loaderDropdown = new Dropdown(translate("app.discover.loader"),
                     [{
                         "name": translate("app.discover.loader.all"),
                         "value": "all"
@@ -11033,7 +10948,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         filterVersions(versionDropdown.value, v, channelDropdown.value, 1);
                     })
                 let channelFilter = document.createElement("div");
-                let channelDropdown = new SearchDropdown(translate("app.discover.channel"), [
+                let channelDropdown = new Dropdown(translate("app.discover.channel"), [
                     {
                         "name": translate("app.discover.channel.all"),
                         "value": "all"
