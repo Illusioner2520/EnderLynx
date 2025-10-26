@@ -8987,7 +8987,6 @@ class Dialog {
                                 multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
                                 try {
                                     let list = await info[i].source();
-                                    console.log(list);
                                     if (label.innerHTML != translate("app.dialog.loading")) return;
                                     if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
                                         multiSelect.setOptions(list, list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
@@ -8996,7 +8995,6 @@ class Dialog {
                                     }
                                     label.innerHTML = sanitize(info[i].name);
                                 } catch (err) {
-                                    if (currentToken !== updateToken) return;
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
                                     if (multiSelect.onchange) multiSelect.onchange();
                                     label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
@@ -9049,7 +9047,6 @@ class Dialog {
                                 }
                             });
                             let setInitialValues = async () => {
-                                const currentToken = ++updateToken;
                                 wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
                                 if (loaderElement.value == "vanilla") return;
                                 let oldValue = multiSelect.value;
@@ -9059,12 +9056,10 @@ class Dialog {
                                 multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
                                 try {
                                     let list = await getVersions(loaderElement.value, value);
-                                    if (currentToken !== updateToken) return;
                                     if (label.innerHTML != translate("app.dialog.loading")) return;
                                     multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
                                     label.innerHTML = loaders[loaderElement.value] + " Version";
                                 } catch (err) {
-                                    if (currentToken !== updateToken) return;
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
                                     label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
                                     multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
