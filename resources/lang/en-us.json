@@ -772,5 +772,7 @@
     "app.distribution.modrinth.eco": "There is currently content selected that is not within the Modrinth ecosystem. If there exists an alternate within the Modrinth ecosystem, please use that. Otherwise, check that you have properly credited the author(s) and that you have permission to include it. Here is the list: %l",
     "app.distribution.modrinth.version": "Please enter a pack version for distribution",
     "app.distribution.warnings": "Distribution Warnings:",
-    "app.distribution.name": "Please enter a name for distribution"
+    "app.distribution.name": "Please enter a name for distribution",
+    "app.import.drop": "Drop here to import instance",
+    "app.import.content.drop": "Drop here to import content"
 }

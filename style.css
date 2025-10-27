@@ -1143,6 +1143,7 @@ h1 {
 
 .tab-info {
     display: grid;
+    position: relative;
 }
 
 i {
@@ -4788,4 +4789,52 @@ div:has(> .dialog-wrapper-hidden.shown) {
         opacity: .4;
         height: 0px;
     }
+}
+
+.drop-overlay {
+    display: none;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    background-color: var(--dialog-backdrop);
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    z-index: 1000;
+    transition: opacity .2s, display .2s allow-discrete;
+    pointer-events: none;
+}
+
+.small-drop-overlay {
+    padding: 8px;
+    top: -5px;
+    left: -5px;
+    width: calc(100% + 10px);
+    height: calc(100% + 10px);
+}
+
+.drop-overlay.shown {
+    display: flex;
+    opacity: 1;
+    @starting-style {
+        opacity: 0;
+    }
+}
+
+.drop-overlay-inner {
+    border-style: dotted;
+    border-color: var(--text-color);
+    border-width: 3px;
+    border-radius: 16px;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    padding: 20px;
 }

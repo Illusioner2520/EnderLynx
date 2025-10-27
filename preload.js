@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, clipboard, nativeImage, shell } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
@@ -134,13 +134,61 @@ function openInBrowser(url) {
     shell.openExternal(url);
 }
 
-function readELPack(file_path) {
+function readElPack(file_path) {
     try {
         const zip = new AdmZip(file_path);
         const manifestEntry = zip.getEntry('manifest.json');
         if (!manifestEntry) return null;
         const manifestData = manifestEntry.getData().toString('utf-8');
         return JSON.parse(manifestData);
+    } catch (e) {
+        return null;
+    }
+}
+function readMrPack(file_path) {
+    try {
+        const zip = new AdmZip(file_path);
+        const manifestEntry = zip.getEntry('modrinth.index.json');
+        if (!manifestEntry) return null;
+        const manifestData = manifestEntry.getData().toString('utf-8');
+        let jsonData = JSON.parse(manifestData);
+        console.log(jsonData);
+        let loader = "vanilla";
+        let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
+        let keys = Object.keys(jsonData.dependencies)
+        for (const key of keys) {
+            if (loaders.includes(key)) {
+                loader = key;
+                break;
+            }
+        }
+        return {
+            name: jsonData.name,
+            game_version: jsonData.dependencies.minecraft,
+            loader: loader.replace("-loader", ""),
+            loader_version: jsonData.dependencies[loader],
+            image: ""
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+function readCfZip(file_path) {
+    try {
+        const zip = new AdmZip(file_path);
+        const manifestEntry = zip.getEntry('manifest.json');
+        if (!manifestEntry) return null;
+        const manifestData = manifestEntry.getData().toString('utf-8');
+        let jsonData = JSON.parse(manifestData);
+        let loaderSplit = jsonData.minecraft.modLoaders[0].id.split("-");
+        return {
+            name: jsonData.name,
+            game_version: jsonData.minecraft.version,
+            loader: loaderSplit[0],
+            loader_version: loaderSplit[1],
+            image: ""
+        };
     } catch (e) {
         return null;
     }
@@ -153,7 +201,7 @@ ipcRenderer.on('new-args', (event, newargs) => {
 contextBridge.exposeInMainWorld('electronAPI', {
     onOpenFile: (callback) => {
         ipcRenderer.on('open-file', (event, filePath) => {
-            callback(readELPack(filePath), filePath);
+            callback(readElPack(filePath), filePath);
         });
     },
     getMaxConcurrentDownloads,
@@ -174,6 +222,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAppMetrics: async () => {
         let appMetrics = await ipcRenderer.invoke('get-app-metrics');
         return appMetrics;
+    },
+    readPackFile: (file_path) => {
+        let ext = path.extname(file_path);
+        if (ext == ".elpack") {
+            return readElPack(file_path);
+        } else if (ext == ".mrpack") {
+            return readMrPack(file_path);
+        } else if (ext == ".zip") {
+            return readCfZip(file_path);
+        }
     },
     getInstanceFiles: (instance_id) => {
         const dirPath = path.resolve(userPath, "minecraft", "instances", instance_id);
@@ -2405,7 +2463,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     createElPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-elpack', id, name, manifest, overrides),
     createMrPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-mrpack', id, name, manifest, overrides),
-    createCfZip: (id, name, manifest, overrides) => ipcRenderer.invoke('create-cfzip', id, name, manifest, overrides)
+    createCfZip: (id, name, manifest, overrides) => ipcRenderer.invoke('create-cfzip', id, name, manifest, overrides),
+    readPathsFromDrop: (fileList) => {
+        return Array.from(fileList).map(f => webUtils.getPathForFile(f));
+    }
 });
 
 async function convertToIco(input, outputPath) {
@@ -2739,14 +2800,14 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         return { "error": true };
     }
 }
-async function importContent(file_path, content_type, instance_id) {
+function importContent(file_path, content_type, instance_id) {
     // Determine destination folder and file type
     let destFolder = "";
     let fileType = content_type;
 
     // If content_type is "auto", try to detect type by inspecting the file
     if (content_type === "auto") {
-        if (file_path.endsWith(".jar")) {
+        if (file_path.endsWith(".jar") || file_path.endsWith(".jar.disabled")) {
             try {
                 const tempZip = new AdmZip(file_path);
                 if (tempZip.getEntry("fabric.mod.json")) {
@@ -2766,7 +2827,7 @@ async function importContent(file_path, content_type, instance_id) {
                 destFolder = "mods";
                 fileType = "mod";
             }
-        } else if (file_path.endsWith(".zip")) {
+        } else if (file_path.endsWith(".zip") || file_path.endsWith(".zip.disabled")) {
             try {
                 const tempZip = new AdmZip(file_path);
                 if (tempZip.getEntry("pack.mcmeta")) {
@@ -2784,9 +2845,7 @@ async function importContent(file_path, content_type, instance_id) {
                 fileType = "resource_pack";
             }
         } else {
-            // fallback
-            destFolder = "mods";
-            fileType = "mod";
+            return;
         }
     } else {
         // Map content_type to folder
@@ -3134,6 +3193,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         });
 
         if (!loader) {
+            loader = "vanilla";
             let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
             let keys = Object.keys(modrinth_index_json.dependencies)
             for (const key of keys) {

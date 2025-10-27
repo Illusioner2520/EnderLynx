@@ -5197,7 +5197,7 @@ function showInstanceContent(e) {
                     instanceContent.displayContent();
                     return;
                 }
-                if (!packInfo.loader_version) {
+                if (!("loader_version" in packInfo)) {
                     displayError(packInfo);
                     return;
                 }
@@ -6137,6 +6137,15 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
 function setInstanceTabContentContent(instanceInfo, element) {
     currentSubTab = "content";
     element.innerHTML = "";
+    let fileDrop = document.createElement("div");
+    fileDrop.dataset.action = "content-import";
+    fileDrop.dataset.instanceId = instanceInfo.instance_id;
+    fileDrop.className = "small-drop-overlay drop-overlay";
+    let fileDropInner = document.createElement("div");
+    fileDropInner.className = "drop-overlay-inner";
+    fileDropInner.innerHTML = translate("app.import.content.drop");
+    fileDrop.appendChild(fileDropInner);
+    element.appendChild(fileDrop);
     instanceInfo = instanceInfo.refresh();
     let instanceLockedBanner = document.createElement("div");
     instanceLockedBanner.className = "instance-locked-banner";
@@ -6217,7 +6226,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
         ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            await window.electronAPI.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
+            window.electronAPI.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
             displaySuccess(translate("app.content.import.complete"));
             setInstanceTabContentContent(instanceInfo, element);
         })
@@ -12553,7 +12562,7 @@ async function createCfZip(instance, content_list, overrides, pack_version) {
     window.electronAPI.createCfZip(instance.instance_id, instance.name, manifest, overrides);
 }
 
-window.electronAPI.onOpenFile((info, file_path) => {
+let importInstance = (info, file_path) => {
     let dialog = new Dialog();
     dialog.showDialog(translate("app.import.elpack.title"), "notice", translate("app.import.elpack.description", "%t", info.name), [
         {
@@ -12575,7 +12584,7 @@ window.electronAPI.onOpenFile((info, file_path) => {
             instance.setInstalling(false);
             return;
         }
-        if (!packInfo.loader_version) {
+        if (!("loader_version" in packInfo)) {
             displayError(packInfo);
             return;
         }
@@ -12597,7 +12606,9 @@ window.electronAPI.onOpenFile((info, file_path) => {
             instance.setMcInstalled(true);
         }
     });
-});
+}
+
+window.electronAPI.onOpenFile(importInstance);
 
 function openInstanceShareDialog(instanceInfo) {
     let options = window.electronAPI.getInstanceFiles(instanceInfo.instance_id);
@@ -12788,6 +12799,70 @@ function openInstanceShareDialog(instanceInfo) {
         }
     });
 }
+
+const overlay = document.getElementById('drop-overlay');
+document.getElementById('drop-overlay-inner').innerHTML = translate("app.import.drop");
+let dragCounter = 0;
+
+function isFileDrag(event) {
+    return Array.from(event.dataTransfer?.types || []).includes('Files');
+}
+
+function findClosestDropOverlay(el) {
+  let current = el;
+  while (current && current !== document) {
+    const overlay = current.querySelector(':scope > .drop-overlay');
+    if (overlay) return overlay;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+document.body.ondragenter = (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    console.log(e);
+    dragCounter++;
+    overlay.classList.add('shown');
+    [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
+    findClosestDropOverlay(e.target)?.classList?.add("shown");
+};
+
+document.body.ondragleave = (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter === 0) overlay.classList.remove('shown');
+};
+
+document.body.ondragover = (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+};
+
+document.body.ondrop = (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter = 0;
+    [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
+    let overlay = findClosestDropOverlay(e.target);
+    const files = window.electronAPI.readPathsFromDrop(Object.entries(e.dataTransfer.files).map(e => e[1]));
+    if (overlay.dataset.action == "instance-import") {
+        files.forEach(file => {
+            let info = window.electronAPI.readPackFile(file);
+            console.log(info);
+            if (!info) return;
+            importInstance(info, file);
+        });
+    } else if (overlay.dataset.action == "content-import") {
+        let instance = new Instance(overlay.dataset.instanceId);
+        if (instance.locked) return;
+        files.forEach(file => {
+            window.electronAPI.importContent(file, "auto", overlay.dataset.instanceId);
+        });
+        setInstanceTabContentContent(instance, overlay.parentElement);
+    }
+};
 
 try {
     switch (data.getDefault("saved_version")) {
