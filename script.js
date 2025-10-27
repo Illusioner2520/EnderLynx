@@ -8100,6 +8100,7 @@ window.electronAPI.onErrorMessage((message) => {
 });
 
 window.electronAPI.onLaunchInstance(async (launch_info) => {
+    if (!launch_info.instance_id) return;
     try {
         let instance = new Instance(launch_info.instance_id);
         showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
