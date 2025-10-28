@@ -4805,7 +4805,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     background-color: var(--dialog-backdrop);
     backdrop-filter: blur(5px);
     opacity: 0;
-    z-index: 1000;
+    z-index: 1000000;
     transition: opacity .2s, display .2s allow-discrete;
     pointer-events: none;
 }
