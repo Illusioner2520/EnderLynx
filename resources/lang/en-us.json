@@ -780,5 +780,7 @@
     "app.import.instance.fail": "Unable to import instance file %f",
     "app.import.content.fail": "Unable to import content file %f",
     "app.import.content.locked": "Unable to import content because instance is locked",
-    "app.import.worlds.fail": "Unable to import world file %f"
+    "app.import.worlds.fail": "Unable to import world file %f",
+    "app.home.discover.refresh": "Refresh",
+    "app.home.discover.refresh.failed": "Failed to fetch new modpacks"
 }

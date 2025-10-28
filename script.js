@@ -3949,12 +3949,31 @@ async function showHomeContent(oldEle) {
     discoverModsTitle.onclick = () => {
         showAddContent();
     }
-    discoverModsWrapper.appendChild(discoverModsTitle);
+    let discoverModsRefresh = document.createElement("button");
+    discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.home.discover.refresh");
+    discoverModsRefresh.className = "home-discover-refresh";
+    discoverModsRefresh.onclick = async () => {
+        discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i>' + translate("app.home.discover.refresh");
+        try {
+            home_modpacks = await window.electronAPI.getRandomModpacks();
+            if (!home_modpacks) throw new Error();
+            updateHomeModpacksList(home_modpacks);
+        } catch (e) {
+            displayError(translate("app.home.discover.refresh.failed"));
+        }
+        discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.home.discover.refresh");
+    }
+    let discoverModsTop = document.createElement("div");
+    discoverModsTop.className = "home-discover-top";
+    discoverModsTop.appendChild(discoverModsTitle);
+    discoverModsTop.appendChild(discoverModsRefresh);
+    discoverModsWrapper.appendChild(discoverModsTop);
     let discoverModsContainer = document.createElement("div");
     discoverModsContainer.className = "home-discover-container";
     discoverModsWrapper.appendChild(discoverModsContainer);
 
     let updateHomeModpacksList = (e) => {
+        discoverModsContainer.innerHTML = '';
         discoverModsWrapper.style.display = "grid";
         e.hits.forEach(e => {
             let item = document.createElement("button");

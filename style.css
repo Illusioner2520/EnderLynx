@@ -4850,3 +4850,46 @@ div:has(> .dialog-wrapper-hidden.shown) {
     position: sticky;
     top: 8px;
 }
+
+.home-discover-refresh {
+    border-radius: 10px;
+    padding-inline: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    margin-left: auto;
+    gap: 8px;
+    font-size: 1rem;
+    z-index: 2;
+    align-items: center;
+    position: relative;
+    --color: var(--background-color);
+    background-color: var(--color);
+}
+
+.home-discover-refresh::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    bottom: -6px;
+    left: 0;
+    right: 0;
+    background: var(--color);
+    z-index: -1;
+    border-radius: 10px;
+}
+
+.home-discover-refresh:hover {
+    --color: var(--color-1);
+}
+
+.home-discover-refresh:active {
+    scale: .9;
+}
+
+.home-discover-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}

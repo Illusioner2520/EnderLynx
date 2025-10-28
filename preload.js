@@ -289,19 +289,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return mkd.render(md);
     },
     openInBrowser,
-    getRandomModpacks: () => {
-        return new Promise((resolve) => {
-            let indexes = ["relevance", "downloads", "follows", "newest", "updated"];
-            let index = indexes[Math.floor(Math.random() * indexes.length)];
-            let offset = Math.floor(Math.random() * 10000);
-            try {
-                fetch(`https://api.modrinth.com/v2/search?facets=[["project_type:modpack"]]&index=${index}&offset=${offset}&limit=10`).then(response => {
-                    response.json().then(data => resolve(data));
-                });
-            } catch (e) {
-                resolve([]);
-            }
-        });
+    getRandomModpacks: async () => {
+        let indexes = ["relevance", "downloads", "follows", "newest", "updated"];
+        let index = indexes[Math.floor(Math.random() * indexes.length)];
+        let offset = Math.floor(Math.random() * 10000);
+        try {
+            let res = await fetch(`https://api.modrinth.com/v2/search?facets=[["project_type:modpack"]]&index=${index}&offset=${offset}&limit=10`);
+            let json = await res.json();
+            return json;
+        } catch (e) {
+            return null;
+        }
     },
     getPinnedWorlds: async () => {
         let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");
@@ -2902,7 +2900,7 @@ async function importWorld(file_path, instance_id, worldName) {
                     if (entry.isDirectory) {
                         fs.mkdirSync(dest, { recursive: true });
                     } else {
-                        ipcRenderer.send('progress-update', `Importing ${worldName}`, count/entries.length * 95, `Moving file ${count} of ${entries.length}...`);
+                        ipcRenderer.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`);
                         fs.mkdirSync(path.dirname(dest), { recursive: true });
                         await new Promise((resolve) => {
                             fs.writeFile(dest, entry.getData(), () => resolve());
@@ -2943,7 +2941,7 @@ async function importWorld(file_path, instance_id, worldName) {
                             if (entry.isDirectory) {
                                 fs.mkdirSync(dest, { recursive: true });
                             } else {
-                                ipcRenderer.send('progress-update', `Importing ${worldName}`, outerCount/candidateTopFolders.size * 95 * count/entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`);
+                                ipcRenderer.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`);
                                 fs.mkdirSync(path.dirname(dest), { recursive: true });
                                 await new Promise((resolve) => {
                                     fs.writeFile(dest, entry.getData(), () => resolve());
