@@ -4355,6 +4355,7 @@ dialog {
     transition: background-color .25s;
     display: flex;
     font-size: 1rem;
+    align-items: center;
 }
 
 .details-top:hover {
@@ -4795,7 +4796,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     display: none;
     justify-content: center;
     align-items: center;
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
@@ -4815,6 +4816,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     left: -5px;
     width: calc(100% + 10px);
     height: calc(100% + 10px);
+    position: absolute;
 }
 
 .drop-overlay.shown {
@@ -4823,6 +4825,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
     @starting-style {
         opacity: 0;
     }
+}
+
+.small-drop-overlay.shown {
+    display: block;
 }
 
 .drop-overlay-inner {
@@ -4837,4 +4843,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
     align-items: center;
     font-size: 2rem;
     padding: 20px;
+}
+
+.small-drop-overlay > .drop-overlay-inner {
+    max-height: calc(100vh - 16px);
+    position: sticky;
+    top: 8px;
 }

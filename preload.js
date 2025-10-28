@@ -2099,6 +2099,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getOptions,
     importContent,
+    importWorld,
     getAllCurseforgeFiles: async (project_id) => {
         let first_pre_json = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=50&sort=dateCreated&sortDescending=true&removeAlphas=false`);
         let first = await first_pre_json.json();
@@ -2465,7 +2466,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createMrPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-mrpack', id, name, manifest, overrides),
     createCfZip: (id, name, manifest, overrides) => ipcRenderer.invoke('create-cfzip', id, name, manifest, overrides),
     readPathsFromDrop: (fileList) => {
-        return Array.from(fileList).map(f => webUtils.getPathForFile(f));
+        return Array.from(fileList).map(f => ({
+            path: webUtils.getPathForFile(f),
+            name: f.name
+        }));
+    },
+    isInstanceFile: (file_path) => {
+        let ext = path.extname(file_path);
+        if (ext == ".mrpack" || ext == ".elpack") return true;
+        if (ext == ".zip") {
+            const zip = new AdmZip(file_path);
+            if (zip.getEntry('pack.mcmeta')) return false;
+            if (zip.getEntry('manifest.json')) return true;
+        }
+        return false;
     }
 });
 
@@ -2800,12 +2814,162 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         return { "error": true };
     }
 }
-function importContent(file_path, content_type, instance_id) {
-    // Determine destination folder and file type
+async function importWorld(file_path, instance_id, worldName) {
+    ipcRenderer.send('progress-update', `Importing ${worldName}`, 0, "Beginning...");
+    try {
+        const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
+        fs.mkdirSync(savesPath, { recursive: true });
+
+        if (fs.existsSync(file_path) && fs.statSync(file_path).isDirectory()) {
+            const baseName = path.basename(file_path);
+            let targetName = baseName;
+            let counter = 1;
+            while (fs.existsSync(path.join(savesPath, targetName))) {
+                targetName = `${baseName} (${counter})`;
+                counter++;
+            }
+            const destPath = path.join(savesPath, targetName);
+            async function collectFiles(dir, base) {
+                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+                let files = [];
+                for (const entry of entries) {
+                    const full = path.join(dir, entry.name);
+                    const rel = path.relative(base, full).replace(/\\/g, '/');
+                    if (entry.isDirectory()) {
+                        files.push({ full, rel, isDirectory: true });
+                        const sub = await collectFiles(full, base);
+                        files = files.concat(sub);
+                    } else if (entry.isFile()) {
+                        files.push({ full, rel, isDirectory: false });
+                    }
+                }
+                return files;
+            }
+
+            await fs.promises.mkdir(destPath, { recursive: true });
+            const allEntries = await collectFiles(file_path, file_path);
+
+            const dirs = allEntries.filter(e => e.isDirectory);
+            for (const d of dirs) {
+                const targetDir = path.join(destPath, d.rel);
+                await fs.promises.mkdir(targetDir, { recursive: true });
+            }
+
+            const files = allEntries.filter(e => !e.isDirectory);
+            const total = files.length || 1;
+            let done = 0;
+
+            for (const fileEntry of files) {
+                const srcFile = fileEntry.full;
+                const destFile = path.join(destPath, fileEntry.rel);
+                await fs.promises.mkdir(path.dirname(destFile), { recursive: true });
+
+                await fs.promises.copyFile(srcFile, destFile);
+
+                done++;
+                const percent = Math.round((done / total) * 95);
+                ipcRenderer.send('progress-update', `Importing ${worldName}`, percent, `Copying ${done} of ${total}...`);
+            }
+
+            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done");
+            return { new_world_path: destPath };
+        }
+
+        const ext = path.extname(file_path).toLowerCase();
+        if (ext === ".zip" && fs.existsSync(file_path)) {
+            const zip = new AdmZip(file_path);
+            const entries = zip.getEntries().map(e => ({
+                entry: e,
+                name: e.entryName.replace(/^\/+/, '')
+            }));
+
+            const rootLevel = entries.find(e => e.name === "level.dat");
+            if (rootLevel) {
+                let baseName = path.basename(file_path, ext);
+                let targetName = baseName;
+                let counter = 1;
+                while (fs.existsSync(path.join(savesPath, targetName))) {
+                    targetName = `${baseName} (${counter})`;
+                    counter++;
+                }
+                const destPath = path.join(savesPath, targetName);
+                fs.mkdirSync(destPath, { recursive: true });
+
+                let count = 0;
+                for (const { entry, name } of entries) {
+                    count++;
+                    const dest = path.join(destPath, name);
+                    if (entry.isDirectory) {
+                        fs.mkdirSync(dest, { recursive: true });
+                    } else {
+                        ipcRenderer.send('progress-update', `Importing ${worldName}`, count/entries.length * 95, `Moving file ${count} of ${entries.length}...`);
+                        fs.mkdirSync(path.dirname(dest), { recursive: true });
+                        await new Promise((resolve) => {
+                            fs.writeFile(dest, entry.getData(), () => resolve());
+                        });
+                    }
+                }
+                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done");
+                return { new_world_path: destPath };
+            }
+
+            const candidateTopFolders = new Set();
+            for (const { name } of entries) {
+                if (name.endsWith("/level.dat")) {
+                    const parts = name.split("/");
+                    if (parts[0]) candidateTopFolders.add(parts[0]);
+                }
+            }
+
+            if (candidateTopFolders.size > 0) {
+                const imported = [];
+                let outerCount = 0;
+                for (const top of candidateTopFolders) {
+                    outerCount++;
+                    let targetName = top;
+                    let counter = 1;
+                    while (fs.existsSync(path.join(savesPath, targetName))) {
+                        targetName = `${top} (${counter})`;
+                        counter++;
+                    }
+                    const destPath = path.join(savesPath, targetName);
+                    fs.mkdirSync(destPath, { recursive: true });
+                    let count = 0;
+                    for (const { entry, name } of entries) {
+                        count++;
+                        if (name === top || name.startsWith(top + "/")) {
+                            const rel = name === top ? "" : name.slice(top.length + 1);
+                            const dest = rel ? path.join(destPath, rel) : destPath;
+                            if (entry.isDirectory) {
+                                fs.mkdirSync(dest, { recursive: true });
+                            } else {
+                                ipcRenderer.send('progress-update', `Importing ${worldName}`, outerCount/candidateTopFolders.size * 95 * count/entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`);
+                                fs.mkdirSync(path.dirname(dest), { recursive: true });
+                                await new Promise((resolve) => {
+                                    fs.writeFile(dest, entry.getData(), () => resolve());
+                                });
+                            }
+                        }
+                    }
+                    imported.push(destPath);
+                }
+                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done");
+                return { imported };
+            }
+            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error");
+            return null;
+        }
+        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error");
+        return null;
+    } catch (e) {
+        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error");
+        return null;
+    }
+}
+async function importContent(file_path, content_type, instance_id) {
     let destFolder = "";
     let fileType = content_type;
 
-    // If content_type is "auto", try to detect type by inspecting the file
     if (content_type === "auto") {
         if (file_path.endsWith(".jar") || file_path.endsWith(".jar.disabled")) {
             try {
@@ -2845,24 +3009,21 @@ function importContent(file_path, content_type, instance_id) {
                 fileType = "resource_pack";
             }
         } else {
-            return;
+            return null;
         }
     } else {
-        // Map content_type to folder
         if (content_type === "mod") destFolder = "mods";
         else if (content_type === "resource_pack") destFolder = "resourcepacks";
         else if (content_type === "shader") destFolder = "shaderpacks";
         else destFolder = "mods";
     }
 
-    // Ensure destination folder exists
     const destPath = path.resolve(userPath, `minecraft/instances/${instance_id}/${destFolder}`);
     fs.mkdirSync(destPath, { recursive: true });
 
-    // Copy file
     let fileName = path.basename(file_path);
     let finalPath = path.join(destPath, fileName);
-    // If the file already exists, change the name to something unique
+
     let uniqueFinalPath = finalPath;
     let uniqueFileName = fileName;
     let count = 1;
@@ -2873,8 +3034,9 @@ function importContent(file_path, content_type, instance_id) {
         uniqueFinalPath = path.join(destPath, uniqueFileName);
         count++;
     }
-    fs.copyFileSync(file_path, uniqueFinalPath);
-    // Update fileName and finalPath to the unique ones for return value
+    await new Promise((resolve) => {
+        fs.copyFile(file_path, uniqueFinalPath, () => resolve());
+    });
     fileName = uniqueFileName;
     finalPath = uniqueFinalPath;
 

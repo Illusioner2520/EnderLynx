@@ -6226,9 +6226,15 @@ function setInstanceTabContentContent(instanceInfo, element) {
         ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            window.electronAPI.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
-            displaySuccess(translate("app.content.import.complete"));
-            setInstanceTabContentContent(instanceInfo, element);
+            document.body.style.cursor = "progress";
+            let success = await window.electronAPI.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
+            document.body.style.cursor = "";
+            if (success) {
+                displaySuccess(translate("app.content.import.complete"));
+            } else {
+                displayError(translate("app.content.import.failed"));
+            }
+            if (document.body.contains(importContent)) setInstanceTabContentContent(instanceInfo, element);
         })
     }
     if (instanceInfo.locked) {
@@ -6703,6 +6709,15 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     searchAndFilter.appendChild(importWorlds);
     searchAndFilter.appendChild(addContent);
     element.innerHTML = "";
+    let fileDrop = document.createElement("div");
+    fileDrop.dataset.action = "world-import";
+    fileDrop.dataset.instanceId = instanceInfo.instance_id;
+    fileDrop.className = "small-drop-overlay drop-overlay";
+    let fileDropInner = document.createElement("div");
+    fileDropInner.className = "drop-overlay-inner";
+    fileDropInner.innerHTML = translate("app.import.worlds.drop");
+    fileDrop.appendChild(fileDropInner);
+    element.appendChild(fileDrop);
     element.appendChild(searchAndFilter);
     let worldList = [];
 
@@ -12802,65 +12817,126 @@ function openInstanceShareDialog(instanceInfo) {
 
 const overlay = document.getElementById('drop-overlay');
 document.getElementById('drop-overlay-inner').innerHTML = translate("app.import.drop");
-let dragCounter = 0;
 
 function isFileDrag(event) {
     return Array.from(event.dataTransfer?.types || []).includes('Files');
 }
 
+let activeOverlay = null;
+
 function findClosestDropOverlay(el) {
-  let current = el;
-  while (current && current !== document) {
-    const overlay = current.querySelector(':scope > .drop-overlay');
-    if (overlay) return overlay;
-    current = current.parentElement;
-  }
-  return null;
+    let current = el;
+    while (current && current !== document) {
+        const overlay = current.querySelector(':scope > .drop-overlay');
+        if (overlay) return overlay;
+        current = current.parentElement;
+    }
+    return null;
+}
+
+function showOverlay(overlay) {
+    if (activeOverlay === overlay) return;
+    if (activeOverlay) activeOverlay.classList.remove('shown');
+    activeOverlay = overlay;
+    if (overlay) overlay.classList.add('shown');
 }
 
 document.body.ondragenter = (e) => {
     if (!isFileDrag(e)) return;
     e.preventDefault();
-    console.log(e);
-    dragCounter++;
-    overlay.classList.add('shown');
-    [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
-    findClosestDropOverlay(e.target)?.classList?.add("shown");
+    let overlay = findClosestDropOverlay(e.target);
+    showOverlay(overlay);
 };
 
 document.body.ondragleave = (e) => {
     if (!isFileDrag(e)) return;
     e.preventDefault();
-    dragCounter--;
-    if (dragCounter === 0) overlay.classList.remove('shown');
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    if (!under || e.clientX == 0 || e.clientY == 0) {
+        showOverlay(null);
+        return;
+    }
+    const overlay = findClosestDropOverlay(under);
+    showOverlay(overlay);
+    if (!overlay && under === document.body) {
+        showOverlay(null);
+    }
 };
 
 document.body.ondragover = (e) => {
     if (!isFileDrag(e)) return;
     e.preventDefault();
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    if (e.clientX == 0 || e.clientY == 0 || !under) {
+        showOverlay(null);
+        return;
+    }
+    const overlay = findClosestDropOverlay(under);
+    showOverlay(overlay);
 };
 
 document.body.ondrop = (e) => {
     if (!isFileDrag(e)) return;
     e.preventDefault();
-    dragCounter = 0;
     [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
-    let overlay = findClosestDropOverlay(e.target);
+    let overlay = activeOverlay;
     const files = window.electronAPI.readPathsFromDrop(Object.entries(e.dataTransfer.files).map(e => e[1]));
     if (overlay.dataset.action == "instance-import") {
         files.forEach(file => {
-            let info = window.electronAPI.readPackFile(file);
-            console.log(info);
-            if (!info) return;
-            importInstance(info, file);
+            let info = window.electronAPI.readPackFile(file.path);
+            if (!info) {
+                displayError(translate("app.import.instance.fail", "%f", file.name));
+                return;
+            }
+            importInstance(info, file.path);
         });
     } else if (overlay.dataset.action == "content-import") {
-        let instance = new Instance(overlay.dataset.instanceId);
-        if (instance.locked) return;
-        files.forEach(file => {
-            window.electronAPI.importContent(file, "auto", overlay.dataset.instanceId);
+        new Promise(async (resolve) => {
+            document.body.style.cursor = "progress";
+            let instance = new Instance(overlay.dataset.instanceId);
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                if (window.electronAPI.isInstanceFile(file.path)) {
+                    let info = window.electronAPI.readPackFile(file.path);
+                    if (!info) {
+                        displayError(translate("app.import.instance.fail", "%f", file.name));
+                        return;
+                    }
+                    importInstance(info, file.path);
+                }
+                if (instance.locked) {
+                    displayError(translate("app.import.content.locked"));
+                    document.body.style.cursor = "";
+                    return;
+                }
+                let success = await window.electronAPI.importContent(file.path, "auto", overlay.dataset.instanceId);
+                if (!success) {
+                    displayError(translate("app.import.content.fail", "%f", file.name));
+                    document.body.style.cursor = "";
+                    return;
+                }
+            };
+            if (document.body.contains(overlay)) setInstanceTabContentContent(instance, overlay.parentElement);
+            document.body.style.cursor = "";
         });
-        setInstanceTabContentContent(instance, overlay.parentElement);
+    } else if (overlay.dataset.action == "world-import") {
+        new Promise(async (resolve) => {
+            let instance = new Instance(overlay.dataset.instanceId);
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                if (window.electronAPI.isInstanceFile(file.path)) {
+                    let info = window.electronAPI.readPackFile(file.path);
+                    if (!info) return;
+                    importInstance(info, file.path);
+                }
+                let success = await window.electronAPI.importWorld(file.path, overlay.dataset.instanceId, file.name);
+                if (!success) {
+                    displayError(translate("app.import.worlds.fail", "%f", file.name));
+                    return;
+                }
+            };
+            if (document.body.contains(overlay)) setInstanceTabContentWorlds(instance, overlay.parentElement);
+        });
     }
 };
 

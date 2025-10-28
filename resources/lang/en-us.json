@@ -427,6 +427,7 @@
     "app.content.import.cancel": "Cancel",
     "app.content.import.confirm": "Import",
     "app.content.import.complete": "Content import completed!",
+    "app.content.import.failed": "Content import failed",
     "app.instances.locked.tooltip": "Instance is Locked",
     "app.content.delete.title": "Are you sure?",
     "app.content.delete.notice": "Are you sure that you want to delete the content '%c'?",
@@ -774,5 +775,10 @@
     "app.distribution.warnings": "Distribution Warnings:",
     "app.distribution.name": "Please enter a name for distribution",
     "app.import.drop": "Drop here to import instance",
-    "app.import.content.drop": "Drop here to import content"
+    "app.import.content.drop": "Drop here to import content",
+    "app.import.worlds.drop": "Drop here to import world",
+    "app.import.instance.fail": "Unable to import instance file %f",
+    "app.import.content.fail": "Unable to import content file %f",
+    "app.import.content.locked": "Unable to import content because instance is locked",
+    "app.import.worlds.fail": "Unable to import world file %f"
 }
