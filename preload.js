@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
@@ -131,6 +131,7 @@ class LoginError extends Error {
 }
 
 function openInBrowser(url) {
+    if (!url) return;
     shell.openExternal(url);
 }
 
@@ -655,6 +656,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getMultiplayerWorlds,
     openFolder,
+    showFileInFolder,
     openFolderFromFile: (file_path) => {
         const folder = path.dirname(file_path);
         openFolder(folder);
@@ -3722,6 +3724,30 @@ async function getMultiplayerWorlds(instance_id) {
     console.log(worlds);
 
     return worlds;
+}
+
+function showFileInFolder(filePath) {
+    let command;
+    switch (process.platform) {
+        case 'win32':
+            command = `explorer /select, "${path.resolve(filePath)}"`;
+            break;
+        case 'darwin':
+            command = `open -R "${path.resolve(filePath)}"`;
+            break;
+        case 'linux':
+            command = `xdg-open "${path.resolve(filePath)}"`;
+            break;
+        default:
+            console.error('Unsupported operating system.');
+            return;
+    }
+
+    exec(command, (error) => {
+        if (error && error.code !== 1) {
+            console.error(`Error showing file: ${error}`);
+        }
+    });
 }
 
 function openFolder(folderPath) {

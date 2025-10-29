@@ -6370,7 +6370,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
                             "title": translate("app.content.open"),
                             "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                             "func": () => {
-                                window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}`))
+                                window.electronAPI.showFileInFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/${e.file_name}`))
                             }
                         },
                         e.source == "modrinth" ? {
