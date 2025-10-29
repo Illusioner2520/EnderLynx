@@ -101,6 +101,8 @@ if (!gotTheLock) {
         }
 
         const fileArg = commandLine.find(arg => arg.endsWith('.elpack'));
+        if (!fileArg) fileArg = commandLine.find(arg => arg.endsWith('.mrpack'));
+        if (!fileArg) fileArg = commandLine.find(arg => arg.endsWith('.zip'));
         if (fileArg) {
             openedFile = fileArg;
             if (win) {
@@ -117,7 +119,9 @@ if (!gotTheLock) {
         if (!app.isDefaultProtocolClient('enderlynx') && !isDev) {
             app.setAsDefaultProtocolClient('enderlynx', process.execPath, []);
         }
-        const fileArg = process.argv.find(arg => arg.endsWith('.elpack'));
+        let fileArg = process.argv.find(arg => arg.endsWith('.elpack'));
+        if (!fileArg) fileArg = process.argv.find(arg => arg.endsWith('.mrpack'));
+        if (!fileArg) fileArg = process.argv.find(arg => arg.endsWith('.zip'));
         if (fileArg) {
             openedFile = fileArg;
         }

@@ -202,7 +202,16 @@ ipcRenderer.on('new-args', (event, newargs) => {
 contextBridge.exposeInMainWorld('electronAPI', {
     onOpenFile: (callback) => {
         ipcRenderer.on('open-file', (event, filePath) => {
-            callback(readElPack(filePath), filePath);
+            let ext = path.extname(filePath);
+            let info = {};
+            if (ext == ".elpack") {
+                info = readElPack(filePath);
+            } else if (ext == ".mrpack") {
+                info = readMrPack(filePath);
+            } else if (ext == ".zip") {
+                info = readCfZip(filePath);
+            }
+            if (info) callback(info, filePath);
         });
     },
     getMaxConcurrentDownloads,
