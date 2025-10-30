@@ -2750,7 +2750,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
             else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shaderpacks";
             let type = "mod";
             if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
-            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shader";
+            else if (dependency_item?.categoryClass?.slug == "shaders") type = "shader";
             let file_name = "";
             try {
                 file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));

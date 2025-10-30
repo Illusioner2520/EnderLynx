@@ -12776,7 +12776,7 @@ function openInstanceShareDialog(instanceInfo) {
             "name": translate("app.instances.share.files"),
             "id": "files",
             "options": options,
-            "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts", "shader"],
+            "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts"],
             "onchange": (v) => {
                 overrides = v;
                 updateDistributionInfo(out, v, packVersion, name);
