@@ -3147,16 +3147,7 @@ async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip
 
             try {
                 if (file_name.endsWith(".jar")) {
-                    const tempZip = new AdmZip(tempFilePath);
-                    if (tempZip.getEntry("fabric.mod.json")) {
-                        destFolder = "mods";
-                    } else if (tempZip.getEntry("META-INF/mods.toml")) {
-                        destFolder = "mods";
-                    } else if (tempZip.getEntry("quilt.mod.json")) {
-                        destFolder = "mods";
-                    } else {
-                        destFolder = "mods";
-                    }
+                    destFolder = "mods";
                 } else if (file_name.endsWith(".zip")) {
                     const tempZip = new AdmZip(tempFilePath);
                     if (tempZip.getEntry("pack.mcmeta")) {
