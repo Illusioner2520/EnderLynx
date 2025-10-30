@@ -3818,20 +3818,6 @@ async function showHomeContent(oldEle) {
                 }
             },
             {
-                "icon": '<i class="fa-solid fa-eye"></i>',
-                "title": translate("app.button.instances.view"),
-                "func": (e) => {
-                    showSpecificInstanceContent(instanceInfo.refresh());
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-copy"></i>',
-                "title": translate("app.button.instances.duplicate"),
-                "func": (e) => {
-                    duplicateInstance(instanceInfo);
-                }
-            },
-            {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
@@ -5354,20 +5340,6 @@ function showInstanceContent(e) {
                 "title": translate("app.button.content.add"),
                 "func": (e) => {
                     showAddContent(instances[i].instance_id, instances[i].vanilla_version, instances[i].loader);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-eye"></i>',
-                "title": translate("app.button.instances.view"),
-                "func": (e) => {
-                    showSpecificInstanceContent(new Instance(instances[i].instance_id));
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-copy"></i>',
-                "title": translate("app.button.instances.duplicate"),
-                "func": (e) => {
-                    duplicateInstance(instances[i]);
                 }
             },
             {

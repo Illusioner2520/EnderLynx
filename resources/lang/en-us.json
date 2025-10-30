@@ -32,7 +32,6 @@
     "app.button.instances.stop": "Stop Instance",
     "app.button.instances.play": "Play Instance",
     "app.button.content.add": "Add Content",
-    "app.button.instances.view": "View Instance",
     "app.button.instances.duplicate": "Duplicate Instance",
     "app.button.instances.open_folder": "Open Folder",
     "app.button.instances.share": "Export Instance",
