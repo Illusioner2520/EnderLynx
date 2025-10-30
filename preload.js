@@ -124,6 +124,8 @@ let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
 let processWatches = {};
 
+let serverIndexList = [];
+
 class LoginError extends Error {
     constructor(message) {
         super(message);
@@ -645,13 +647,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
             const data = await nbt.parse(buffer);
             let servers = data.parsed.value.servers.value.value || [];
             const originalLength = servers.length;
+            let completed = false;
             for (let i = 0; i < ip.length; i++) {
-                if (servers[index[i]].ip?.value == ip[i]) {
-                    servers[index[i]] = null;
+                if (servers[serverIndexList[index[i]]].ip?.value == ip[i]) {
+                    servers[serverIndexList[index[i]]] = null;
+                    serverIndexList[index[i]] = null;
+                    completed = true;
                 }
             }
+            if (!completed) return false;
             servers = servers.filter(e => e);
-            if (servers.length === originalLength) return false;
+            let currentNum = 0;
+            for (let i = 0; i < serverIndexList.length; i++) {
+                if (serverIndexList[i] === null) continue;
+                serverIndexList[i] = currentNum;
+                currentNum++;
+            }
+
+            console.log(serverIndexList);
 
             data.parsed.value.servers.value.value = servers;
 
@@ -3731,6 +3744,11 @@ async function getMultiplayerWorlds(instance_id) {
     }
 
     console.log(worlds);
+
+    serverIndexList = [];
+    worlds.forEach((e,i) => {
+        serverIndexList[i] = i;
+    });
 
     return worlds;
 }

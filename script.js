@@ -6770,6 +6770,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                         let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                         if (success) {
                             ele.remove();
+                            contentList.reApplyFilters();
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
                         } else {
                             displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
@@ -6835,6 +6836,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                     let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                                     if (success) {
                                         ele.remove();
+                                        contentList.reApplyFilters();
                                         displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
                                     } else {
                                         displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
@@ -6877,6 +6879,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                         let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
                         if (success) {
                             ele.remove();
+                            contentList.reApplyFilters();
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
                         } else {
                             displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
@@ -6919,6 +6922,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                             "title": translate("app.worlds.delete"),
                             "icon": '<i class="fa-solid fa-trash-can"></i>',
                             "danger": true,
+                            "func_id": "delete",
                             "func": (ele) => {
                                 let dialog = new Dialog();
                                 dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
@@ -6934,6 +6938,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                                     let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
                                     if (success) {
                                         ele.remove();
+                                        contentList.reApplyFilters();
                                         displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
                                     } else {
                                         displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
@@ -6987,6 +6992,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                         } else {
                             displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(names.join(", "))));
                         }
+                        contentList.reApplyFilters();
                     },
                     "show_confirmation_dialog": true,
                     "dialog_title": translate("app.worlds.delete.confirm.title"),
