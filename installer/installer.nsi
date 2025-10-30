@@ -71,6 +71,13 @@ Section "MainSection" SecMain
     WriteRegStr HKCU "Software\Classes\EnderLynx.elpack\shell" "" "open"
     WriteRegStr HKCU "Software\Classes\EnderLynx.elpack\shell\open\command" "" '"$INSTDIR\EnderLynx.exe" "%1"'
 
+    WriteRegStr HKCU "Software\Classes\Applications\EnderLynx.exe\shell\open\command" "" '"$INSTDIR\EnderLynx.exe" "%1"'
+    WriteRegStr HKCU "Software\Classes\Applications\EnderLynx.exe" "FriendlyAppName" "EnderLynx"
+    WriteRegStr HKCU "Software\Classes\Applications\EnderLynx.exe\DefaultIcon" "" "$INSTDIR\EnderLynx.exe,0"
+
+    WriteRegStr HKCU "Software\Classes\.mrpack\OpenWithProgids" "EnderLynx.mrpack" ""
+    WriteRegStr HKCU "Software\Classes\.zip\OpenWithProgids" "EnderLynx.zip" ""
+
     System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
     ${If} $DoDesktop == ${BST_CHECKED}
@@ -87,6 +94,18 @@ Section "Uninstall"
 
     DeleteRegKey HKCU "Software\EnderLynx"
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\EnderLynx"
+
+    DeleteRegKey HKCU "Software\Classes\EnderLynx.elpack"
+    DeleteRegValue HKCU "Software\Classes\.elpack" ""
+
+    DeleteRegValue HKCU "Software\Classes\.mrpack\OpenWithProgids" "EnderLynx.mrpack"
+    DeleteRegValue HKCU "Software\Classes\.zip\OpenWithProgids" "EnderLynx.zip"
+    DeleteRegKey HKCU "Software\Classes\EnderLynx.mrpack"
+    DeleteRegKey HKCU "Software\Classes\EnderLynx.zip"
+
+    DeleteRegKey HKCU "Software\Classes\Applications\EnderLynx.exe"
+
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
     Delete "$DESKTOP\EnderLynx.lnk"
     RMDir /r "$SMPROGRAMS\EnderLynx"

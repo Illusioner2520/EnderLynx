@@ -100,7 +100,7 @@ if (!gotTheLock) {
             win.focus();
         }
 
-        const fileArg = commandLine.find(arg => arg.endsWith('.elpack'));
+        let fileArg = commandLine.find(arg => arg.endsWith('.elpack'));
         if (!fileArg) fileArg = commandLine.find(arg => arg.endsWith('.mrpack'));
         if (!fileArg) fileArg = commandLine.find(arg => arg.endsWith('.zip'));
         if (fileArg) {
