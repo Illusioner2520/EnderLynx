@@ -4074,6 +4074,7 @@ if (data.getDefault("hide_ip") == "true") {
 }
 
 let skinViewer;
+let refreshWardrobe;
 
 function showWardrobeContent(e) {
     if (!data.getDefaultProfile()) {
@@ -4126,6 +4127,14 @@ function showWardrobeContent(e) {
     ele.appendChild(optionsContainer);
     let skinOptions = document.createElement("div");
     skinOptions.className = "my-account-option-box";
+    let fileDrop = document.createElement("div");
+    fileDrop.dataset.action = "skin-import";
+    fileDrop.className = "small-drop-overlay drop-overlay";
+    let fileDropInner = document.createElement("div");
+    fileDropInner.className = "drop-overlay-inner";
+    fileDropInner.innerHTML = translate("app.import.skin.drop");
+    fileDrop.appendChild(fileDropInner);
+    skinOptions.appendChild(fileDrop);
     let capeOptions = document.createElement("div");
     capeOptions.className = "my-account-option-box";
     let skinTitle = document.createElement("h1");
@@ -4523,6 +4532,7 @@ function showWardrobeContent(e) {
         }
     }
     showContent();
+    refreshWardrobe = showContent;
     let info = document.createElement("div");
     info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.wardrobe.notice");
     info.className = "info";
@@ -4673,44 +4683,9 @@ function showWardrobeContent(e) {
                 info.name = info.name_l;
                 info.model = info.model_l;
             }
-            if (!info.skin) {
-                displayError(translate("app.wardrobe.import.no_file"));
-                return;
-            }
-            let dims = await getImageDimensionsFromDataURL(info.skin);
-            console.log(dims);
-            if (dims.width != 64) {
-                displayError(translate("app.wardrobe.import.wrong_width"));
-                return;
-            }
-            if (dims.height != 64 && dims.height != 32) {
-                displayError(translate("app.wardrobe.import.wrong_height"));
-                return;
-            }
-            let model = info.model;
-            if (info.model == "auto") {
-                const tempImg = new Image();
-                tempImg.onload = async () => {
-                    const tempCanvas = document.createElement("canvas");
-                    tempCanvas.width = dims.width;
-                    tempCanvas.height = dims.height;
-                    const ctx = tempCanvas.getContext("2d");
-                    ctx.drawImage(tempImg, 0, 0);
-                    const pixel = ctx.getImageData(54, 24, 1, 1).data;
-                    // pixel is [r, g, b, a]
-                    if (pixel[3] === 0) {
-                        model = "slim";
-                    } else {
-                        model = "wide";
-                    }
-                    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
-                    showContent();
-                };
-                tempImg.src = info.skin;
-                return;
-            }
-            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
-            showContent();
+            await importSkin(info, () => {
+                showContent();
+            });
         });
     }
     skinButtonContainer.appendChild(importButton);
@@ -4718,6 +4693,46 @@ function showWardrobeContent(e) {
     optionsContainer.appendChild(skinOptions);
     optionsContainer.appendChild(capeOptions);
     return ele;
+}
+
+async function importSkin(info, callback) {
+    if (!info.skin) {
+        displayError(translate("app.wardrobe.import.no_file"));
+        return;
+    }
+    let dims = await getImageDimensionsFromDataURL(info.skin);
+    if (dims.width != 64) {
+        displayError(translate("app.wardrobe.import.wrong_width"));
+        return;
+    }
+    if (dims.height != 64 && dims.height != 32) {
+        displayError(translate("app.wardrobe.import.wrong_height"));
+        return;
+    }
+    let model = info.model;
+    if (info.model == "auto") {
+        const tempImg = new Image();
+        tempImg.onload = async () => {
+            const tempCanvas = document.createElement("canvas");
+            tempCanvas.width = dims.width;
+            tempCanvas.height = dims.height;
+            const ctx = tempCanvas.getContext("2d");
+            ctx.drawImage(tempImg, 0, 0);
+            const pixel = ctx.getImageData(54, 24, 1, 1).data;
+            // pixel is [r, g, b, a]
+            if (pixel[3] === 0) {
+                model = "slim";
+            } else {
+                model = "wide";
+            }
+            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+            callback();
+        };
+        tempImg.src = info.skin;
+        return;
+    }
+    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+    callback();
 }
 
 async function getImageDimensionsFromDataURL(dataURL) {
@@ -12933,6 +12948,27 @@ document.body.ondrop = (e) => {
                 }
             };
             if (document.body.contains(overlay)) setInstanceTabContentWorlds(instance, overlay.parentElement);
+        });
+    } else if (overlay.dataset.action == "skin-import") {
+        new Promise(async (resolve) => {
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                if (window.electronAPI.isInstanceFile(file.path)) {
+                    let info = window.electronAPI.readPackFile(file.path);
+                    if (!info) return;
+                    importInstance(info, file.path);
+                }
+                console.log(file.path);
+                let dataUrl = await window.electronAPI.pathToDataUrl(file.path);
+                console.log(dataUrl);
+                importSkin({
+                    "skin": dataUrl,
+                    "name": translate("app.wardrobe.unnamed"),
+                    "model": "auto"
+                }, () => {
+                    if (document.body.contains(overlay) && refreshWardrobe) refreshWardrobe();
+                })
+            };
         });
     }
 };

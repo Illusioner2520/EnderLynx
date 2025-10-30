@@ -1715,6 +1715,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getSkinFromUsername,
     getSkinFromURL,
+    pathToDataUrl,
     downloadSkin,
     downloadCape: async (url, id) => {
         if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
@@ -3672,6 +3673,25 @@ async function downloadSkin(url) {
     return { hash, dataUrl };
 }
 
+async function pathToDataUrl(file_path) {
+    if (!file_path) return null;
+    
+    try {
+        if (fs.existsSync(file_path)) {
+            const buffer = fs.readFileSync(file_path);
+            try {
+                const pngBuf = await sharp(buffer).png().toBuffer();
+                return `data:image/png;base64,${pngBuf.toString('base64')}`;
+            } catch (err) {
+                return null;
+            }
+        }
+        return null;
+    } catch (err) {
+        return null;
+    }
+}
+
 function parseEnvString(input) {
     const env = {};
 
@@ -3746,7 +3766,7 @@ async function getMultiplayerWorlds(instance_id) {
     console.log(worlds);
 
     serverIndexList = [];
-    worlds.forEach((e,i) => {
+    worlds.forEach((e, i) => {
         serverIndexList[i] = i;
     });
 

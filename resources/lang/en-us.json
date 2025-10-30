@@ -776,10 +776,12 @@
     "app.import.drop": "Drop here to import instance",
     "app.import.content.drop": "Drop here to import content",
     "app.import.worlds.drop": "Drop here to import world",
+    "app.import.skin.drop": "Drop here to import skin",
     "app.import.instance.fail": "Unable to import instance file %f",
     "app.import.content.fail": "Unable to import content file %f",
     "app.import.content.locked": "Unable to import content because instance is locked",
     "app.import.worlds.fail": "Unable to import world file %f",
+    "app.import.skin.fail": "Unable to import skin file %f",
     "app.home.discover.refresh": "Refresh",
     "app.home.discover.refresh.failed": "Failed to fetch new modpacks"
 }
