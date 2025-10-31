@@ -1393,7 +1393,6 @@ class TabContent {
             buttonElement.innerHTML = sanitize(options[i].name);
             buttonElement.setAttribute("data-color", options[i].color);
             buttonElement.onclick = (e) => {
-                this.selectOption(options[i].value);
                 let oldLeft = this.offset_left;
                 this.offset_left = buttonElement.offsetLeft;
                 this.offset_right = element.offsetWidth - buttonElement.offsetLeft - buttonElement.offsetWidth;
@@ -1402,6 +1401,7 @@ class TabContent {
                 element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
                 if (options[i].color) element.style.setProperty("--color", options[i].color);
                 else element.style.removeProperty("--color");
+                this.selectOption(options[i].value);
             }
             element.appendChild(buttonElement);
             options[i].element = buttonElement;
@@ -2122,12 +2122,12 @@ class ContentList {
 
         this.items = [];
         this.second_column_elements = [];
-        for (let i = 0; i < content.length; i++) {
+        let renderEntry = (contentInfo) => {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
-            if (content[i].class) contentEle.classList.add(content[i].class);
-            if (content[i].type) contentEle.setAttribute("data-type", content[i].type);
-            this.items.push({ "name": [content[i].primary_column.title, content[i].primary_column.desc, content[i].secondary_column.title(), content[i].secondary_column.desc()].join("!!!!!!!!!!"), "element": contentEle, "type": content[i].type });
+            if (contentInfo.class) contentEle.classList.add(contentInfo.class);
+            if (contentInfo.type) contentEle.setAttribute("data-type", contentInfo.type);
+            this.items.push({ "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title(), contentInfo.secondary_column.desc()].join("!!!!!!!!!!"), "element": contentEle, "type": contentInfo.type });
             let checkboxElement;
             if (features?.checkbox?.enabled) {
                 checkboxElement = document.createElement("input");
@@ -2140,7 +2140,7 @@ class ContentList {
             }
             let imageElement = document.createElement("img");
             imageElement.className = "content-list-image";
-            imageElement.src = fixPathForImage(content[i].image ? content[i].image : "default.png");
+            imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : "default.png");
             imageElement.loading = "lazy";
             contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
@@ -2148,29 +2148,29 @@ class ContentList {
             contentEle.appendChild(infoElement1);
             let infoElement1Title = document.createElement("div");
             infoElement1Title.className = "content-list-info-title-1";
-            infoElement1Title.innerHTML = parseMinecraftFormatting(content[i].primary_column.title);
+            infoElement1Title.innerHTML = parseMinecraftFormatting(contentInfo.primary_column.title);
             infoElement1.appendChild(infoElement1Title);
             let infoElement1Desc = document.createElement("div");
             infoElement1Desc.className = "content-list-info-desc-1";
-            infoElement1Desc.innerHTML = sanitize(content[i].primary_column.desc);
+            infoElement1Desc.innerHTML = sanitize(contentInfo.primary_column.desc);
             infoElement1.appendChild(infoElement1Desc);
             let infoElement2 = document.createElement("div");
             infoElement2.className = "content-list-info";
             contentEle.appendChild(infoElement2);
             let infoElement2Title = document.createElement("div");
             infoElement2Title.className = "content-list-info-title-2";
-            infoElement2Title.innerHTML = sanitize(content[i].secondary_column.title());
+            infoElement2Title.innerHTML = sanitize(contentInfo.secondary_column.title());
             infoElement2.appendChild(infoElement2Title);
             let infoElement2Desc = document.createElement("div");
             infoElement2Desc.className = "content-list-info-desc-2";
-            infoElement2Desc.innerHTML = (content[i].secondary_column.desc());
+            infoElement2Desc.innerHTML = (contentInfo.secondary_column.desc());
             this.second_column_elements.push({
                 infoElement2Title,
                 infoElement2Desc,
-                "title_func": content[i].secondary_column.title,
-                "desc_func": content[i].secondary_column.desc
+                "title_func": contentInfo.secondary_column.title,
+                "desc_func": contentInfo.secondary_column.desc
             })
-            if (content[i]?.secondary_column?.desc_hidden) {
+            if (contentInfo?.secondary_column?.desc_hidden) {
                 infoElement2Desc.style.width = "fit-content";
                 infoElement2Desc.classList.add("hidden-text");
                 infoElement2Desc.onclick = () => {
@@ -2183,7 +2183,7 @@ class ContentList {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
                 toggle = new Toggle(toggleElement, (v) => {
-                    let result = toggleDisabledContent(content[i], theActionList, toggle, moreDropdown);
+                    let result = toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown);
                     if (!result) {
                         toggle.setValueWithoutTrigger(!v);
                         return;
@@ -2193,25 +2193,25 @@ class ContentList {
                     } else {
                         infoElement2Desc.innerHTML = sanitize(infoElement2Desc.innerHTML + ".disabled");
                     }
-                }, !content[i].disabled);
+                }, !contentInfo.disabled);
                 contentEle.appendChild(toggleElement);
             }
             if (checkboxElement) {
-                this.checkBoxes.push({ "element": checkboxElement, "content_info": content[i].pass_to_checkbox, "toggle": toggle });
+                this.checkBoxes.push({ "element": checkboxElement, "content_info": contentInfo.pass_to_checkbox, "toggle": toggle });
             }
             if (features?.remove?.enabled) {
                 let removeElement = document.createElement("button");
                 removeElement.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
                 removeElement.className = 'content-list-remove';
                 removeElement.onclick = () => {
-                    content[i].onremove(contentEle);
+                    contentInfo.onremove(contentEle);
                 }
                 contentEle.appendChild(removeElement);
             }
             let theActionList;
             let moreDropdown;
             if (features?.more?.enabled) {
-                let actionList = content[i].more.actionsList;
+                let actionList = contentInfo.more.actionsList;
                 actionList = actionList.map(e => {
                     let func = () => { };
                     if (e.func) func = e.func;
@@ -2243,7 +2243,10 @@ class ContentList {
                 moreDropdown = new MoreMenu(moreElement, theActionList);
                 contentEle.appendChild(moreElement);
             }
-            contentMainElement.appendChild(contentEle);
+            return contentEle;
+        }
+        for (let i = 0; i < content.length; i++) {
+            contentMainElement.appendChild(renderEntry(content[i]));
         }
         element.appendChild(contentMainElement);
     }
