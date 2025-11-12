@@ -2256,7 +2256,7 @@ class ContentList {
             return contentEle;
         }
         for (let i = 0; i < content.length; i++) {
-            contentMainElement.appendChild(renderEntry(content[i]));
+            renderEntry(content[i]);
         }
         this.contentElement = contentMainElement;
         element.appendChild(contentMainElement);
@@ -6578,7 +6578,15 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
 function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
 }
-async function setInstanceTabContentWorlds(instanceInfo, element) {
+function setInstanceTabContentWorlds(instanceInfo, element) {
+    let loading = new LoadingContainer();
+    element.innerHTML = "";
+    element.appendChild(loading.element);
+    setTimeout(() => {
+        setInstanceTabContentWorldsReal(instanceInfo, element);
+    }, 0);
+}
+async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     currentSubTab = "worlds";
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
@@ -6748,7 +6756,6 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     searchAndFilter.appendChild(typeDropdown);
     searchAndFilter.appendChild(importWorlds);
     searchAndFilter.appendChild(addContent);
-    element.innerHTML = "";
     let fileDrop = document.createElement("div");
     fileDrop.dataset.action = "world-import";
     fileDrop.dataset.instanceId = instanceInfo.instance_id;
@@ -6757,8 +6764,6 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     fileDropInner.className = "drop-overlay-inner";
     fileDropInner.innerHTML = translate("app.import.worlds.drop");
     fileDrop.appendChild(fileDropInner);
-    element.appendChild(fileDrop);
-    element.appendChild(searchAndFilter);
     let worldList = [];
 
     let worlds = await getInstanceWorlds(instanceInfo);
@@ -7044,6 +7049,9 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             "enabled": false
         }
     }, dropdownInfo, translate("app.worlds.not_found"));
+    element.innerHTML = "";
+    element.appendChild(fileDrop);
+    element.appendChild(searchAndFilter);
     element.appendChild(contentListWrap);
     clearMoreMenus();
 }
@@ -12970,7 +12978,7 @@ document.body.ondrop = (e) => {
                     document.body.style.cursor = "";
                     return;
                 }
-            };
+            }
             if (document.body.contains(overlay)) setInstanceTabContentContent(instance, overlay.parentElement);
             document.body.style.cursor = "";
         });
@@ -12989,7 +12997,7 @@ document.body.ondrop = (e) => {
                     displayError(translate("app.import.worlds.fail", "%f", file.name));
                     return;
                 }
-            };
+            }
             if (document.body.contains(overlay)) setInstanceTabContentWorlds(instance, overlay.parentElement);
         });
     } else if (overlay.dataset.action == "skin-import") {
@@ -13011,7 +13019,7 @@ document.body.ondrop = (e) => {
                 }, () => {
                     if (document.body.contains(overlay) && refreshWardrobe) refreshWardrobe();
                 })
-            };
+            }
         });
     }
 };
