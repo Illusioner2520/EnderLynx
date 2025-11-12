@@ -585,6 +585,8 @@
     "app.discover.vt.add.message": "%t added.<br>Click the button at the top of the page to add the selected packs to an instance.",
     "app.discover.unable_to_install": "Error: Unable to install %t",
     "app.discover.server.offline": "Offline",
+    "app.discover.datapack.world": "Unable to install %t. Unknown World",
+    "app.discover.vt.datapack.world": "Unable to install Vanilla Tweaks data pack. Unknown World",
     "app.loading": "Loading",
     "app.no_results_found": "No Results Found",
     "app.currently_installing": "Installation in Progress",

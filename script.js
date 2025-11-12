@@ -2101,14 +2101,24 @@ class ContentList {
         this.notFoundElement = notFoundElement;
         contentListTop.appendChild(totalText);
 
+        
+        this.paginationTop = new Pagination(1, Math.ceil(content.length / 25), (new_page) => {
+            this.applyFilters(searchBar.value, filter.value, new_page);
+        });
+        contentListTop.appendChild(this.paginationTop.element);
+
+        this.paginationBottom = new Pagination(1, Math.ceil(content.length / 25), (new_page) => {
+            this.applyFilters(searchBar.value, filter.value, new_page);
+        });
+
         searchBar.setOnInput((v) => {
-            this.applyFilters(v, filter.value);
+            this.applyFilters(v, filter.value, 1);
         });
         this.searchBar = searchBar;
         this.filter = filter;
 
         filter.setOnChange((v) => {
-            this.applyFilters(searchBar.value, v);
+            this.applyFilters(searchBar.value, v, 1);
         });
 
         let contentMainElement = document.createElement("div");
@@ -2248,28 +2258,41 @@ class ContentList {
         for (let i = 0; i < content.length; i++) {
             contentMainElement.appendChild(renderEntry(content[i]));
         }
+        this.contentElement = contentMainElement;
         element.appendChild(contentMainElement);
+        this.applyFilters("", "all", 1);
     }
 
     reApplyFilters() {
-        this.applyFilters(this.searchBar.value, this.filter.value);
+        this.applyFilters(this.searchBar.value, this.filter.value, this.paginationBottom.currentPage);
     }
 
-    applyFilters(search, dropdown) {
-        let numShown = 0;
+    applyFilters(search, dropdown, page) {
+        console.log([search, dropdown, page])
+        let count = 0;
+        this.paginationBottom.setPage(page);
+        this.paginationTop.setPage(page);
         for (let i = 0; i < this.items.length; i++) {
-            if (this.items[i].name.toLowerCase().includes(search.toLowerCase().trim()) && (this.items[i].type == dropdown || dropdown == "all")) {
-                this.items[i].element.style.display = "flex";
-                this.items[i].element.classList.remove("hidden");
-                if (document.body.contains(this.items[i].element)) numShown++;
-            } else {
-                this.items[i].element.style.display = "none";
-                this.items[i].element.classList.add("hidden");
+            let ele = this.items[i].element;
+            if (!this.items[i].name.toLowerCase().includes(search.toLowerCase().trim())) {
+                ele.remove();
+                continue;
             }
+            if (this.items[i].type != dropdown && dropdown != "all") {
+                ele.remove();
+                continue;
+            }
+            count++;
+            if (count <= (page * 25 - 25) || count > page * 25) {
+                ele.remove();
+                continue;
+            }
+            this.contentElement.appendChild(ele);
         }
-        console.log("numShown", numShown);
-        this.totalText.innerHTML = translate("app.list.total", "%c", numShown);
-        this.notFoundElement.style.display = numShown ? "none" : "";
+        this.paginationBottom.setTotalPages(Math.ceil(count / 25));
+        this.paginationTop.setTotalPages(Math.ceil(count / 25));
+        this.totalText.innerHTML = translate("app.list.total", "%c", count);
+        this.notFoundElement.style.display = count ? "none" : "";
         this.figureOutMainCheckedState();
     }
 
@@ -2287,10 +2310,10 @@ class ContentList {
         let checked = 0;
         let checkboxes = this.checkBoxes.map(e => e.element);
         for (let i = 0; i < checkboxes.length; i++) {
-            if (checkboxes[i].checked && isNotDisplayNone(checkboxes[i])) {
+            if (checkboxes[i].checked && document.body.contains(checkboxes[i])) {
                 checked++;
             }
-            if (isNotDisplayNone(checkboxes[i])) {
+            if (document.body.contains(checkboxes[i])) {
                 total++;
             }
         }
@@ -2312,13 +2335,13 @@ class ContentList {
     }
     checkCheckboxes() {
         this.checkBoxes.map(e => e.element).forEach((e) => {
-            if (isNotDisplayNone(e)) e.checked = true;
+            if (document.body.contains(e)) e.checked = true;
         });
         this.checkBoxActions.forEach(e => e.style.display = "");
     }
     uncheckCheckboxes() {
         this.checkBoxes.map(e => e.element).forEach((e) => {
-            if (isNotDisplayNone(e)) e.checked = false;
+            if (document.body.contains(e)) e.checked = false;
         });
         this.checkBoxActions.forEach(e => e.style.display = "none");
     }
@@ -6142,10 +6165,17 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         }
     });
 }
-
 function setInstanceTabContentContent(instanceInfo, element) {
-    currentSubTab = "content";
+    let loading = new LoadingContainer();
     element.innerHTML = "";
+    element.appendChild(loading.element);
+    setTimeout(() => {
+        setInstanceTabContentContentReal(instanceInfo, element);
+    }, 0);
+}
+
+async function setInstanceTabContentContentReal(instanceInfo, element) {
+    currentSubTab = "content";
     let fileDrop = document.createElement("div");
     fileDrop.dataset.action = "content-import";
     fileDrop.dataset.instanceId = instanceInfo.instance_id;
@@ -6154,7 +6184,6 @@ function setInstanceTabContentContent(instanceInfo, element) {
     fileDropInner.className = "drop-overlay-inner";
     fileDropInner.innerHTML = translate("app.import.content.drop");
     fileDrop.appendChild(fileDropInner);
-    element.appendChild(fileDrop);
     instanceInfo = instanceInfo.refresh();
     let instanceLockedBanner = document.createElement("div");
     instanceLockedBanner.className = "instance-locked-banner";
@@ -6172,9 +6201,6 @@ function setInstanceTabContentContent(instanceInfo, element) {
     }
     instanceLockedBanner.appendChild(instanceLockedText);
     instanceLockedBanner.appendChild(instanceLockedButton);
-    if (instanceInfo.locked) {
-        element.appendChild(instanceLockedBanner);
-    }
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let importContent = document.createElement("button");
@@ -6291,21 +6317,20 @@ function setInstanceTabContentContent(instanceInfo, element) {
     searchAndFilter.appendChild(typeDropdown);
     searchAndFilter.appendChild(importContent);
     searchAndFilter.appendChild(addContent);
-    element.appendChild(searchAndFilter);
     let contentListWrap = document.createElement("div");
+    let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
+    let newContent = await getInstanceContent(instanceInfo);
+    let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
+    newContentAdd.forEach(e => {
+        instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled, e.version_id);
+    });
+    let deleteContent = newContent.deleteContent;
+    deleteContent.forEach(e => {
+        let content = new Content(instanceInfo.instance_id, e);
+        content.delete();
+    });
     let showContent = () => {
         contentListWrap.innerHTML = '';
-        let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
-        let newContent = getInstanceContent(instanceInfo);
-        let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
-        newContentAdd.forEach(e => {
-            instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled, e.version_id);
-        });
-        let deleteContent = newContent.deleteContent;
-        deleteContent.forEach(e => {
-            let content = new Content(instanceInfo.instance_id, e);
-            content.delete();
-        });
         let content = [];
         let instance_content = instanceInfo.getContent();
         instance_content.sort((a, b) => {
@@ -6541,6 +6566,12 @@ function setInstanceTabContentContent(instanceInfo, element) {
         contentListWrap.innerHTML = "";
         contentListWrap.appendChild(currently_installing.element);
     }
+    element.innerHTML = "";
+    element.appendChild(fileDrop);
+    if (instanceInfo.locked) {
+        element.appendChild(instanceLockedBanner);
+    }
+    element.appendChild(searchAndFilter);
     element.appendChild(contentListWrap);
     clearMoreMenus();
 }
@@ -6554,7 +6585,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     let importWorlds = document.createElement("button");
     importWorlds.classList.add("add-content-button");
     importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.import")
-    importWorlds.onclick = () => {
+    importWorlds.onclick = async () => {
         let dialog = new Dialog();
         dialog.showDialog(translate("app.worlds.import.title"), "form", [
             {
@@ -6622,7 +6653,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                 "id": "instance",
                 "source": window.electronAPI.getLauncherInstances,
                 "options": [],
-                "onchange": (a, b, c) => {
+                "onchange": async (a, b, c) => {
                     let launcher = "";
                     let filePath = "";
                     for (let i = 0; i < b.length; i++) {
@@ -6639,9 +6670,9 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
                         }
                         if (b[i].id == "world") {
                             if (launcher == "vanilla") {
-                                b[i].element.setOptions(window.electronAPI.getWorldsFromOtherLauncher(filePath).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                                b[i].element.setOptions((await window.electronAPI.getWorldsFromOtherLauncher(filePath)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
                             } else {
-                                b[i].element.setOptions(window.electronAPI.getWorldsFromOtherLauncher(a).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                                b[i].element.setOptions((await window.electronAPI.getWorldsFromOtherLauncher(a)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
                             }
                         }
                     }
@@ -6650,7 +6681,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
             {
                 "type": "checkboxes",
                 "name": translate("app.worlds.import.worlds"),
-                "options": getInstanceWorlds(instanceInfo).map(e => ({ "name": e.name, "value": e.id })),
+                "options": (await getInstanceWorlds(instanceInfo)).map(e => ({ "name": e.name, "value": e.id })),
                 "id": "world"
             },
             {
@@ -6730,7 +6761,7 @@ async function setInstanceTabContentWorlds(instanceInfo, element) {
     element.appendChild(searchAndFilter);
     let worldList = [];
 
-    let worlds = getInstanceWorlds(instanceInfo);
+    let worlds = await getInstanceWorlds(instanceInfo);
     let worldsMultiplayer = await getInstanceWorldsMulti(instanceInfo);
     for (let i = 0; i < worlds.length; i++) {
         worldList.push(
@@ -7914,16 +7945,16 @@ function checkForProcess(pid) {
     return window.electronAPI.checkForProcess(pid);
 }
 
-function getInstanceWorlds(instanceInfo) {
-    return window.electronAPI.getSinglePlayerWorlds(instanceInfo.instance_id);
+async function getInstanceWorlds(instanceInfo) {
+    return await window.electronAPI.getSinglePlayerWorlds(instanceInfo.instance_id);
 }
 
 async function getInstanceWorldsMulti(instanceInfo) {
     return await window.electronAPI.getMultiplayerWorlds(instanceInfo.instance_id);
 }
 
-function getInstanceContent(instanceInfo) {
-    return window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent());
+async function getInstanceContent(instanceInfo) {
+    return await window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent());
 }
 
 function translate(key, ...params) {
@@ -9860,10 +9891,10 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         "type": "dropdown",
                         "id": "world",
                         "name": translate("app.discover.datapacks.world"),
-                        "options": instance_id ? getInstanceWorlds(new Instance(instance_id)).map(e => ({ "name": e.name, "value": e.id })) : [],
+                        "options": instance_id ? (await getInstanceWorlds(new Instance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
                         "input_source": instance_id ? null : "instance",
-                        "source": instance_id ? null : (i) => {
-                            return getInstanceWorlds(new Instance(i)).map(e => ({ "name": e.name, "value": e.id }));
+                        "source": instance_id ? null : async (i) => {
+                            return (await getInstanceWorlds(new Instance(i))).map(e => ({ "name": e.name, "value": e.id }));
                         }
                     }
                 ].filter(e => e), [
@@ -9874,6 +9905,10 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     e.forEach(e => { info[e.id] = e.value });
                     let instance = instance_id ? instance_id : info.instance;
                     let world = info.world;
+                    if (world == "loading" || world == "" || !world) {
+                        displayError(translate("app.discover.vt.datapack.world"));
+                        return;
+                    }
                     if (instance_id) {
                         submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                         submitButton.classList.add("disabled");
@@ -10460,7 +10495,7 @@ async function getRecentlyPlayedWorlds() {
         ...server,
         "last_played": getServerLastPlayed(server.instance_id, server.ip)
     }))
-    let last_played_worlds = window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
+    let last_played_worlds = await window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
     let all = last_played_worlds.concat(all_servers);
     all.sort((a, b) => b.last_played - a.last_played);
     return all.slice(0, 5);
@@ -12092,10 +12127,10 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 "type": "dropdown",
                 "id": "world",
                 "name": translate("app.discover.datapacks.world"),
-                "options": instance_id ? getInstanceWorlds(new Instance(instance_id)).map(e => ({ "name": e.name, "value": e.id })) : [],
+                "options": instance_id ? (await getInstanceWorlds(new Instance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
                 "input_source": instance_id ? null : "instance",
-                "source": instance_id ? null : (i) => {
-                    return getInstanceWorlds(new Instance(i)).map(e => ({ "name": e.name, "value": e.id }));
+                "source": instance_id ? null : async (i) => {
+                    return (await getInstanceWorlds(new Instance(i))).map(e => ({ "name": e.name, "value": e.id }));
                 }
             }
         ].filter(e => e), [
@@ -12106,6 +12141,11 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             e.forEach(e => { info[e.id] = e.value });
             let instance = instance_id ? instance_id : info.instance;
             let world = info.world;
+            console.log(world);
+            if (world == "loading" || world == "" || !world) {
+                displayError(translate("app.discover.datapack.world", "%t", title));
+                return;
+            }
             let success;
             button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
             button.classList.add("disabled");
