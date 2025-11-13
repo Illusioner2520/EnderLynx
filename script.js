@@ -2272,6 +2272,7 @@ class ContentList {
         let count = 0;
         this.paginationBottom.setPage(page);
         this.paginationTop.setPage(page);
+        const fragment = document.createDocumentFragment();
         for (let i = 0; i < this.items.length; i++) {
             let ele = this.items[i].element;
             if (!this.items[i].name.toLowerCase().includes(search.toLowerCase().trim())) {
@@ -2287,8 +2288,9 @@ class ContentList {
                 ele.remove();
                 continue;
             }
-            this.contentElement.appendChild(ele);
+            fragment.appendChild(ele);
         }
+        this.contentElement.appendChild(fragment);
         this.paginationBottom.setTotalPages(Math.ceil(count / 25));
         this.paginationTop.setTotalPages(Math.ceil(count / 25));
         this.totalText.innerHTML = translate("app.list.total", "%c", count);
@@ -6342,6 +6344,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
             }
             return 0;
         });
+        let firstTime = true;
         for (let i = 0; i < instance_content.length; i++) {
             let e = instance_content[i];
             content.push({
@@ -6350,8 +6353,8 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                     "desc": e.author ? "by " + e.author : ""
                 },
                 "secondary_column": {
-                    "title": () => e.refresh().version,
-                    "desc": () => e.refresh().file_name
+                    "title": () => firstTime ? e.version : e.refresh().version,
+                    "desc": () => firstTime ? e.version : e.refresh().file_name
                 },
                 "type": e.type,
                 "class": e.source,
@@ -6457,8 +6460,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                 "disabled": e.disabled,
                 "instance_info": instanceInfo,
                 "pass_to_checkbox": e
-            })
+            });
         }
+        firstTime = false;
         let contentList = new ContentList(contentListWrap, content, searchBar, {
             "checkbox": {
                 "enabled": instanceInfo.locked ? false : true,
@@ -6566,13 +6570,15 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
         contentListWrap.innerHTML = "";
         contentListWrap.appendChild(currently_installing.element);
     }
+    const fragment = document.createDocumentFragment();
     element.innerHTML = "";
-    element.appendChild(fileDrop);
+    fragment.appendChild(fileDrop);
     if (instanceInfo.locked) {
-        element.appendChild(instanceLockedBanner);
+        fragment.appendChild(instanceLockedBanner);
     }
-    element.appendChild(searchAndFilter);
-    element.appendChild(contentListWrap);
+    fragment.appendChild(searchAndFilter);
+    fragment.appendChild(contentListWrap);
+    element.appendChild(fragment);
     clearMoreMenus();
 }
 function isNotDisplayNone(element) {
