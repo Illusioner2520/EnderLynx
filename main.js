@@ -6,6 +6,7 @@ const fs = require('fs');
 const AdmZip = require('adm-zip');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
+const toml = require('toml');
 
 let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
 

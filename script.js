@@ -6126,9 +6126,6 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
         if (info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") {
-            if (instanceInfo.installing || !instanceInfo.mc_installed) {
-                displayError(translate("app.modpack.update.progress_already"));
-            }
             let source = instanceInfo.install_source;
             let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
             runModpackUpdate(instanceInfo, source, modpack_info);
@@ -12434,7 +12431,6 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
 
         instanceInfo.setLoader(mr_pack_info.loader);
         instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
-        if (mr_pack_info.allocated_ram) instance.setAllocatedRam(mr_pack_info.allocated_ram);
     }
     if (!mr_pack_info.loader_version) {
         displayError(mr_pack_info);

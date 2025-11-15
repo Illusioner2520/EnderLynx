@@ -698,7 +698,6 @@
     "app.discover.datapacks.world": "World",
     "app.instances.settings.modpack.version.title": "Modpack Version",
     "app.instances.settings.modpack.version.description": "If you change this value, the launcher will update or downgrade this modpack to the new version. Your worlds, screenshots and options will be preserved.",
-    "app.modpack.update.progress_already": "Cannot update or downgrade the modpack right now, as there is already an installation in progress for this instance.",
     "app.cf.code.error": "Unable to download modpack from CurseForge code. Check that the code hasn't expired and that it is actually valid.",
     "app.settings.def_opts.notice": "To add a default option to this list, go to an instance's option tab and set some as default. These defaults will then be applied to any new instance you create.",
     "app.login_error": "Unable to login. Please make sure you have a Minecraft account associated with that Microsoft account.",
