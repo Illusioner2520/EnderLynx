@@ -1950,13 +1950,16 @@ class ContentList {
         }
     } */
     constructor(element, content, searchBar, features, filter, notFoundMessage = translate("app.list.no_results_found")) {
+        const fragment = document.createDocumentFragment();
         let notFoundElement = new NoResultsFound(notFoundMessage).element;
         notFoundElement.style.background = "transparent";
         this.checkBoxes = [];
         element.classList.add("content-list-wrapper");
         let contentListTop = document.createElement("div");
         contentListTop.className = "content-list-top";
-        element.appendChild(contentListTop);
+        let contentListBottom = document.createElement("div");
+        contentListBottom.className = "content-list-bottom";
+        fragment.appendChild(contentListTop);
         if (features?.checkbox?.enabled) {
             let checkboxElement = document.createElement("input");
             checkboxElement.type = "checkbox";
@@ -2110,6 +2113,7 @@ class ContentList {
         this.paginationBottom = new Pagination(1, Math.ceil(content.length / 25), (new_page) => {
             this.applyFilters(searchBar.value, filter.value, new_page);
         });
+        contentListBottom.appendChild(this.paginationBottom.element);
 
         searchBar.setOnInput((v) => {
             this.applyFilters(v, filter.value, 1);
@@ -2259,7 +2263,9 @@ class ContentList {
             renderEntry(content[i]);
         }
         this.contentElement = contentMainElement;
-        element.appendChild(contentMainElement);
+        fragment.appendChild(contentMainElement);
+        fragment.appendChild(contentListBottom);
+        element.appendChild(fragment);
         this.applyFilters("", "all", 1);
     }
 
@@ -2267,8 +2273,19 @@ class ContentList {
         this.applyFilters(this.searchBar.value, this.filter.value, this.paginationBottom.currentPage);
     }
 
+    removeElement(ele) {
+        ele.remove();
+        this.items = this.items.filter(e => e.element != ele);
+        this.reApplyFilters();
+    }
+
+    removeElements(eles) {
+        eles.forEach(e => e.remove);
+        this.items = this.items.filter(e => !eles.includes(e.element));
+        this.reApplyFilters();
+    }
+
     applyFilters(search, dropdown, page) {
-        console.log([search, dropdown, page])
         let count = 0;
         this.paginationBottom.setPage(page);
         this.paginationTop.setPage(page);
@@ -5239,6 +5256,7 @@ function showInstanceContent(e) {
                 let instance = data.addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
                 showSpecificInstanceContent(instance);
                 let packInfo = await window.electronAPI.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
+                console.log(packInfo);
                 if (!packInfo) {
                     displayError(translate("app.cf.code.error"));
                     instance.delete();
@@ -6317,17 +6335,20 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     searchAndFilter.appendChild(importContent);
     searchAndFilter.appendChild(addContent);
     let contentListWrap = document.createElement("div");
-    let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
-    let newContent = await getInstanceContent(instanceInfo);
-    let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
-    newContentAdd.forEach(e => {
-        instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled, e.version_id);
-    });
-    let deleteContent = newContent.deleteContent;
-    deleteContent.forEach(e => {
-        let content = new Content(instanceInfo.instance_id, e);
-        content.delete();
-    });
+    let checkForPlayerContent = async () => {
+        let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
+        let newContent = await getInstanceContent(instanceInfo);
+        let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
+        newContentAdd.forEach(e => {
+            instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled, e.version_id);
+        });
+        let deleteContent = newContent.deleteContent;
+        deleteContent.forEach(e => {
+            let content = new Content(instanceInfo.instance_id, e);
+            content.delete();
+        });
+    }
+    await checkForPlayerContent();
     let showContent = () => {
         contentListWrap.innerHTML = '';
         let content = [];
@@ -6370,10 +6391,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                     ], [], async () => {
                         let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
                         if (success) {
-                            ele.remove();
                             displaySuccess(translate("app.content.delete.success").replace("%c", e.name));
                             e.delete();
-                            contentList.reApplyFilters();
+                            contentList.removeElement(ele);
                         } else {
                             displayError(translate("app.content.delete.fail").replace("%c", e.name));
                         }
@@ -6442,10 +6462,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                                 ], [], async () => {
                                     let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
                                     if (success) {
-                                        ele.remove();
                                         displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                         e.delete();
-                                        contentList.reApplyFilters();
+                                        contentList.removeElement(ele);
                                     } else {
                                         displayError(translate("app.content.delete.fail", "%c", e.name));
                                     }
@@ -6497,10 +6516,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         "func": async (ele, e) => {
                             let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
                             if (success) {
-                                ele.remove();
                                 displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                 e.delete();
-                                contentList.reApplyFilters();
+                                contentList.removeElement(ele);
                             } else {
                                 displayError(translate("app.content.delete.fail", "%c", e.name));
                             }
@@ -6553,8 +6571,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     }
     let currently_installing = new CurrentlyInstalling();
     contentListWrap.appendChild(currently_installing.element);
-    instanceInfo.watchForChange("installing", (v) => {
+    instanceInfo.watchForChange("installing", async (v) => {
         if (!v) {
+            await checkForPlayerContent();
             showContent();
         } else {
             contentListWrap.innerHTML = "";
@@ -6798,8 +6817,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                     ], [], async () => {
                         let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                         if (success) {
-                            ele.remove();
-                            contentList.reApplyFilters();
+                            contentList.removeElement(ele);
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
                         } else {
                             displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
@@ -6864,8 +6882,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                                 ], [], async () => {
                                     let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                                     if (success) {
-                                        ele.remove();
-                                        contentList.reApplyFilters();
+                                        contentList.removeElement(ele);
                                         displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
                                     } else {
                                         displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
@@ -6907,8 +6924,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                     ], [], async () => {
                         let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
                         if (success) {
-                            ele.remove();
-                            contentList.reApplyFilters();
+                            contentList.removeElement(ele);
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
                         } else {
                             displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
@@ -6966,8 +6982,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                                 ], [], async () => {
                                     let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
                                     if (success) {
-                                        ele.remove();
-                                        contentList.reApplyFilters();
+                                        contentList.removeElement(ele);
                                         displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
                                     } else {
                                         displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
@@ -7021,7 +7036,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                         } else {
                             displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(names.join(", "))));
                         }
-                        contentList.reApplyFilters();
+                        contentList.removeElements(elesm);
                     },
                     "show_confirmation_dialog": true,
                     "dialog_title": translate("app.worlds.delete.confirm.title"),

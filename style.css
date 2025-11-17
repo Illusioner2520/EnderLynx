@@ -1161,6 +1161,14 @@ i {
     padding: 10px;
 }
 
+.content-list-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    gap: 10px;
+    padding: 10px;
+}
+
 .content-list {
     display: grid;
     background-color: var(--color-1t);

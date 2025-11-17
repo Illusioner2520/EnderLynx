@@ -1,15 +1,12 @@
 const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
 const { JavaSearch } = require('./java_scan.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
 const { Auth } = require('msmc');
 const AdmZip = require('adm-zip');
 const https = require('https');
-const querystring = require('querystring');
-const toml = require('toml');
 const Database = require('better-sqlite3');
 const axios = require('axios');
 const FormData = require('form-data');
@@ -19,11 +16,9 @@ const os = require('os');
 const ws = require("windows-shortcuts");
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
-const stringArgv = require('string-argv').default;
 const pngToIco = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
-const pLimit = require('p-limit').default;
 
 let cfServerInfo = {};
 
@@ -122,12 +117,6 @@ db.pragma('journal_mode = WAL');
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
 let processWatches = {};
-
-class LoginError extends Error {
-    constructor(message) {
-        super(message);
-    }
-}
 
 function openInBrowser(url) {
     if (!url) return;
@@ -509,7 +498,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         fs.writeFileSync(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
     },
-    urlToFolder,
     databaseGet: (sql, ...params) => {
         return db.prepare(sql).get(...params);
     },
@@ -528,45 +516,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit, offline) => {
-        if (!player_info) throw new LoginError("Please sign in to your Microsoft account to play Minecraft.");
-
-        let date = new Date();
-        date.setHours(date.getHours() - 1);
-        if (new Date(player_info.expires) < date) {
-            try {
-                player_info = await getNewAccessToken(player_info.refresh_token);
-            } catch (err) {
-                if (!offline) throw new Error("Unable to update access token.");
-            }
-        }
-        let mc = new Minecraft(instance_id);
-        try {
-            return {
-                "minecraft": await mc.launchGame(loader, version, loaderVersion, player_info.name, player_info.uuid, {
-                    "accessToken": player_info.access_token,
-                    "xuid": player_info.xuid,
-                    "clientId": player_info.client_id
-                }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), parseEnvString(envVars), preLaunch, parseJavaArgs(wrapper), postExit), "player_info": player_info
-            };
-        } catch (err) {
-            throw new Error("Unable to launch Minecraft");
-        }
+        return await ipcRenderer.invoke('play-minecraft', loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit, offline);
     },
     getJavaInstallation: async (v) => {
-        let java = new Java();
-        return java.getJavaInstallation(v);
+        return await ipcRenderer.invoke('get-java-installation', v);
     },
     setJavaInstallation: async (v, f) => {
-        let java = new Java();
-        java.setJavaInstallation(v, f);
-    },
-    getFabricVanillaVersions: async () => {
-        let fabric = new Fabric();
-        return await fabric.getSupportedVanillaVersions();
-    },
-    getFabricLoaderVersions: async (v) => {
-        let fabric = new Fabric();
-        return await fabric.getVersions(v);
+        return await ipcRenderer.invoke('set-java-installation', v, f);
     },
     checkForProcess,
     clearActivity: () => ipcRenderer.send('remove-discord-activity'),
@@ -610,7 +566,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     getWorlds,
     getSinglePlayerWorlds,
-    addServer,
     deleteServer: async (instance_id, ip, index) => {
         return await ipcRenderer.invoke('delete-server', instance_id, ip, index);
     },
@@ -687,216 +642,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('get-instance-content', loader, instance_id, old_content);
     },
     downloadVanillaTweaksDataPacks: async (packs, version, instance_id, world_id) => {
-        if (version.split(".").length > 2) {
-            version = version.split(".").splice(0, 2).join(".");
-        }
-        let data_json = vt_dp[version];
-        let data_ct_json = vt_ct[version];
-        if (!vt_dp[version]) {
-            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
-            data_json = await data.json();
-            vt_dp[version] = data_json;
-        }
-        if (!vt_ct[version]) {
-            let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
-            data_ct_json = await data_ct.json();
-            vt_ct[version] = data_ct_json;
-        }
-        let pack_info = {};
-        let pack_ct_info = {};
-
-        console.log(data_json);
-        console.log(data_ct_json);
-
-        let process_category = (category, previous_categories = [], type) => {
-            previous_categories.push(category.category);
-            let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
-            let packs = category.packs.map(e => e.name);
-            packs.forEach(e => {
-                if (type == "dp") pack_info[e] = id;
-                if (type == "ct") pack_ct_info[e] = id;
-            });
-            if (category.categories) {
-                category.categories.forEach(e => {
-                    process_category(e, structuredClone(previous_categories), type);
-                })
-            }
-        }
-        for (let i = 0; i < data_json.categories.length; i++) {
-            process_category(data_json.categories[i], [], "dp");
-        }
-        for (let i = 0; i < data_ct_json.categories.length; i++) {
-            process_category(data_ct_json.categories[i], [], "ct");
-        }
-
-        let useDatapacks = false;
-        let useCraftingTweaks = false;
-
-        let packs_send = {};
-        let packs_ct_send = {};
-        for (let i = 0; i < packs.length; i++) {
-            if (packs[i].type == "ct") {
-                useCraftingTweaks = true;
-                let info = pack_ct_info[packs[i].id];
-                if (!packs_ct_send[info]) {
-                    packs_ct_send[info] = [packs[i].id]
-                } else {
-                    packs_ct_send[info].push(packs[i].id);
-                }
-            } else {
-                useDatapacks = true;
-                let info = pack_info[packs[i].id];
-                if (!packs_send[info]) {
-                    packs_send[info] = [packs[i].id]
-                } else {
-                    packs_send[info].push(packs[i].id);
-                }
-            }
-        }
-
-        let h = querystring.stringify({
-            "packs": JSON.stringify(packs_send),
-            "version": version
-        });
-        let h_ct = querystring.stringify({
-            "packs": JSON.stringify(packs_ct_send),
-            "version": version
-        });
-
-        const options = (type) => ({
-            hostname: 'vanillatweaks.net',
-            path: type == "dp" ? '/assets/server/zipdatapacks.php' : '/assets/server/zipcraftingtweaks.php',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Content-Length': type == "dp" ? h.length : h_ct.length
-            }
-        });
-        let data_vt = "{}";
-        let data_ct_vt = "{}";
-        if (useDatapacks) data_vt = await new Promise((resolve, reject) => {
-            const req = https.request(options("dp"), (res) => {
-                let data = '';
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    resolve(data);
-                });
-            });
-
-            req.on('error', (error) => {
-                reject(error);
-            });
-
-            req.write(h);
-            req.end();
-        });
-
-        if (useCraftingTweaks) data_ct_vt = await new Promise((resolve, reject) => {
-            const req = https.request(options("ct"), (res) => {
-                let data = '';
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    resolve(data);
-                });
-            });
-
-            req.on('error', (error) => {
-                reject(error);
-            });
-
-            req.write(h_ct);
-            req.end();
-        });
-
-        data_vt = JSON.parse(data_vt);
-        data_ct_vt = JSON.parse(data_ct_vt);
-
-        const datapacksDir = path.resolve(userPath, `minecraft/instances/${instance_id}/saves/${world_id}/datapacks`);
-        if (data_ct_vt.link) {
-            fs.mkdirSync(datapacksDir, { recursive: true });
-            let baseName = "vanilla_tweaks.zip";
-            let filePath = path.join(datapacksDir, baseName);
-            let counter = 1;
-            while (fs.existsSync(filePath)) {
-                baseName = `vanilla_tweaks_${counter}.zip`;
-                filePath = path.join(datapacksDir, baseName);
-                counter++;
-            }
-            await urlToFile("https://vanillatweaks.net" + data_ct_vt.link, filePath);
-
-            // return baseName;
-        }
-        if (data_vt.link) {
-            const tempDir = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_datapacks`);
-            fs.mkdirSync(tempDir, { recursive: true });
-            let baseName = "vanilla_tweaks.zip";
-            let filePath = path.join(tempDir, baseName);
-            let counter = 1;
-            while (fs.existsSync(filePath)) {
-                baseName = `vanilla_tweaks_${counter}.zip`;
-                filePath = path.join(tempDir, baseName);
-                counter++;
-            }
-            await urlToFile("https://vanillatweaks.net" + data_vt.link, filePath);
-
-            const zip = new AdmZip(filePath);
-            const entries = zip.getEntries();
-
-            for (const entry of entries) {
-                let entryName = entry.entryName;
-                let destPath = path.join(datapacksDir, entryName);
-
-                if (fs.existsSync(destPath)) {
-                    let ext = path.extname(entryName);
-                    let base = path.basename(entryName, ext);
-                    let dir = path.dirname(destPath);
-                    let i = 1;
-                    let newName;
-                    do {
-                        newName = ext
-                            ? `${base}_${i}${ext}`
-                            : `${base}_${i}`;
-                        destPath = path.join(dir, newName);
-                        i++;
-                    } while (fs.existsSync(destPath));
-                }
-
-                if (entry.isDirectory) {
-                    fs.mkdirSync(destPath, { recursive: true });
-                } else {
-                    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                    fs.writeFileSync(destPath, entry.getData());
-                }
-            }
-
-            fs.unlinkSync(filePath);
-        }
-
-        return true;
+        return await ipcRenderer.invoke('download-vanilla-tweaks-data-packs', packs, version, instance_id, world_id)
     },
     downloadVanillaTweaksResourcePacks: async (packs, version, instance_id) => {
-        let link = await getVanillaTweaksResourcePackLink(packs, version);
-        if (link) {
-            const resourcepacksDir = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`);
-            fs.mkdirSync(resourcepacksDir, { recursive: true });
-            let baseName = "vanilla_tweaks.zip";
-            let filePath = path.join(resourcepacksDir, baseName);
-            let counter = 1;
-            while (fs.existsSync(filePath)) {
-                baseName = `vanilla_tweaks_${counter}.zip`;
-                filePath = path.join(resourcepacksDir, baseName);
-                counter++;
-            }
-            await urlToFile(link, filePath);
-
-            return baseName;
-        } else {
-            return false;
-        }
+        return await ipcRenderer.invoke('download-vanilla-tweaks-resource-packs', packs, version, instance_id);
     },
     getVanillaTweaksResourcePacks: async (query = "", version = "1.21") => {
         query = query.toLowerCase().trim();
@@ -1027,20 +776,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return json.versions.map(e => e.id);
     },
     getFabricVersions: async () => {
-        let fabric = new Fabric();
-        return await fabric.getSupportedVanillaVersions();
+        return (await ipcRenderer.invoke('fabric-vanilla-versions'));
     },
     getForgeVersions: async () => {
-        let forge = new Forge();
-        return await forge.getSupportedVanillaVersions();
+        return (await ipcRenderer.invoke('forge-vanilla-versions'));
     },
     getNeoForgeVersions: async () => {
-        let neoforge = new NeoForge();
-        return await neoforge.getSupportedVanillaVersions();
+        return (await ipcRenderer.invoke('neoforge-vanilla-versions'));
     },
     getQuiltVersions: async () => {
-        let quilt = new Quilt();
-        return await quilt.getSupportedVanillaVersions();
+        return (await ipcRenderer.invoke('quilt-vanilla-versions'));
     },
     getInstanceFolderName: (instance_id) => {
         instance_id = instance_id.trim();
@@ -1090,74 +835,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ];
     },
     downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
-        try {
-            let mc = new Minecraft(instance_id);
-            let r = await mc.downloadGame(loader, vanilla_version);
-            if (loader == "fabric") {
-                await mc.installFabric(vanilla_version, loader_version);
-            } else if (loader == "forge") {
-                await mc.installForge(vanilla_version, loader_version);
-            } else if (loader == "neoforge") {
-                await mc.installNeoForge(vanilla_version, loader_version);
-            } else if (loader == "quilt") {
-                await mc.installQuilt(vanilla_version, loader_version);
-            }
-            return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
-        } catch (err) {
-            return { "error": true };
-        }
+        return await ipcRenderer.invoke('download-minecraft', instance_id, loader, vanilla_version, loader_version);
     },
     repairMinecraft: async (instance_id, loader, vanilla_version, loader_version, whatToRepair) => {
-        try {
-            let mc = new Minecraft(instance_id);
-            let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
-            if (whatToRepair.includes("mod_loader")) {
-                if (loader == "fabric") {
-                    await mc.installFabric(vanilla_version, loader_version, true);
-                } else if (loader == "forge") {
-                    await mc.installForge(vanilla_version, loader_version, true);
-                } else if (loader == "neoforge") {
-                    await mc.installNeoForge(vanilla_version, loader_version, true);
-                } else if (loader == "quilt") {
-                    await mc.installQuilt(vanilla_version, loader_version, true);
-                }
-            }
-            return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version };
-        } catch (err) {
-            return { "error": true }
-        }
+        return await ipcRenderer.invoke('repair-minecraft', instance_id, loader, vanilla_version, loader_version, whatToRepair);
     },
     getForgeVersion: async (mcversion) => {
-        let forge = new Forge();
-        return (await forge.getVersions(mcversion)).reverse()[0];
+        return (await ipcRenderer.invoke('forge-loader-versions', mcversion))[0];
     },
     getFabricVersion: async (mcversion) => {
-        let fabric = new Fabric();
-        return (await fabric.getVersions(mcversion))[0];
+        return (await ipcRenderer.invoke('fabric-loader-versions', mcversion))[0];
     },
     getNeoForgeVersion: async (mcversion) => {
-        let neoforge = new NeoForge();
-        return (await neoforge.getVersions(mcversion))[0];
+        return (await ipcRenderer.invoke('neoforge-loader-versions', mcversion))[0];
     },
     getQuiltVersion: async (mcversion) => {
-        let quilt = new Quilt();
-        return (await quilt.getVersions(mcversion))[0];
+        return (await ipcRenderer.invoke('fabric-loader-versions', mcversion))[0];
     },
     getForgeLoaderVersions: async (mcversion) => {
-        let forge = new Forge();
-        return (await forge.getVersions(mcversion)).reverse();
+        return (await ipcRenderer.invoke('forge-loader-versions', mcversion));
     },
     getFabricLoaderVersions: async (mcversion) => {
-        let fabric = new Fabric();
-        return (await fabric.getVersions(mcversion));
+        return (await ipcRenderer.invoke('fabric-loader-versions', mcversion));
     },
     getNeoForgeLoaderVersions: async (mcversion) => {
-        let neoforge = new NeoForge();
-        return (await neoforge.getVersions(mcversion));
+        return (await ipcRenderer.invoke('neoforge-loader-versions', mcversion));
     },
     getQuiltLoaderVersions: async (mcversion) => {
-        let quilt = new Quilt();
-        return (await quilt.getVersions(mcversion));
+        return (await ipcRenderer.invoke('quilt-loader-versions', mcversion));
     },
     watchFile: (filepath, callback) => {
         let lastSize = 0;
@@ -1286,126 +991,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return false;
     },
     addContent: async (instance_id, project_type, project_url, filename, data_pack_world) => {
-        if (project_type == "server") {
-            let v = await addServer(instance_id, project_url, filename, data_pack_world);
-            return v;
-        }
-
-        let install_path = "";
-        if (project_type == "mod") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`, filename);
-        } else if (project_type == "resourcepack" || project_type == "resource_pack") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`, filename);
-        } else if (project_type == "shader") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`, filename);
-        } else if (project_type == "world") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_worlds`, filename);
-        } else if (project_type == "datapack" || project_type == "data_pack") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/saves/${data_pack_world}/datapacks`, filename);
-        }
-
-        console.log("Installing", project_url, "to", install_path);
-
-        await urlToFile(project_url, install_path);
-
-        if (project_type === "world") {
-            const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
-            fs.mkdirSync(savesPath, { recursive: true });
-            const zip = new AdmZip(install_path);
-
-            // Get all top-level folders in the zip
-            const entries = zip.getEntries();
-            const topLevelFolders = new Set();
-            entries.forEach(entry => {
-                const parts = entry.entryName.split('/');
-                if (parts.length > 1) {
-                    topLevelFolders.add(parts[0]);
-                }
-            });
-
-            // For each top-level folder, check for conflicts and rename if needed
-            const folderRenameMap = {};
-            for (const folder of topLevelFolders) {
-                let targetFolder = folder;
-                let counter = 1;
-                while (fs.existsSync(path.join(savesPath, targetFolder))) {
-                    targetFolder = `${folder}_${counter}`;
-                    counter++;
-                }
-                folderRenameMap[folder] = targetFolder;
-            }
-
-            // Extract each entry, renaming top-level folders if needed
-            entries.forEach(entry => {
-                let entryName = entry.entryName;
-                const parts = entryName.split('/');
-                if (parts.length > 1 && folderRenameMap[parts[0]]) {
-                    parts[0] = folderRenameMap[parts[0]];
-                    entryName = parts.join('/');
-                }
-                const destPath = path.join(savesPath, entryName);
-                if (entry.isDirectory) {
-                    fs.mkdirSync(destPath, { recursive: true });
-                } else {
-                    fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                    fs.writeFileSync(destPath, entry.getData());
-                }
-            });
-
-            // Optionally delete the temp world zip after extraction
-            fs.unlinkSync(install_path);
-            const tempWorldPath = path.resolve(userPath, `minecraft/instances/${instance_id}/temp_worlds`);
-            if (fs.existsSync(tempWorldPath)) {
-                fs.rmSync(tempWorldPath, { recursive: true, force: true });
-            }
-        }
-
-        let type_convert = {
-            "mod": "mod",
-            "resourcepack": "resource_pack",
-            "shader": "shader",
-            "world": "world",
-            "datapack": "data_pack"
-        }
-
-        return {
-            type: type_convert[project_type],
-            file_name: filename
-        };
+        return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, filename, data_pack_world);
     },
-    parseJavaArgs,
     downloadModrinthPack: async (instance_id, url, title) => {
-        ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-        await urlToFile(url, path.resolve(userPath, `minecraft/instances/${instance_id}/pack.mrpack`));
-        ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
+        return await ipcRenderer.invoke('download-modrinth-pack', instance_id, url, title);
     },
     downloadCurseforgePack: async (instance_id, url, title) => {
-        ipcRenderer.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-        await urlToFile(url, path.resolve(userPath, `minecraft/instances/${instance_id}/pack.zip`));
-        ipcRenderer.send('progress-update', `Downloading ${title}`, 100, "Done!");
+        return await ipcRenderer.invoke('download-curseforge-pack', instance_id, url, title);
     },
     processPackFile: async (file_path, instance_id, title) => {
-        if (/^https?:\/\//.test(file_path)) {
-            const destPath = path.resolve(userPath, `minecraft/instances/${instance_id}/pack.zip`);
-            try {
-                await urlToFile(file_path, destPath);
-            } catch (e) {
-                return false;
-            }
-            file_path = destPath;
-        }
-        let extension = path.extname(file_path);
-        console.log(extension);
-        if (extension == ".mrpack") {
-            return await processMrPack(instance_id, file_path, null, title);
-        } else if (extension == ".zip") {
-            return await processCfZipWithoutID(instance_id, file_path, null, title);
-        } else if (extension == ".elpack") {
-            return await processElPack(instance_id, file_path, null, title);
-        } else if (extension == "") {
-            return;
-            return await processFolder(instance_id, file_path, title);
-        }
+        return await ipcRenderer.invoke('process-pack-file', file_path, instance_id, title, getMaxConcurrentDownloads());
     },
     processMrPack,
     processCfZip,
@@ -1483,8 +1078,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     pathToDataUrl,
     downloadSkin,
     downloadCape: async (url, id) => {
-        if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-        await urlToFile(url, path.resolve(userPath, `minecraft/capes/${id}.png`));
+        return await ipcRenderer.invoke('download-cape', url, id);
     },
     setCape: async (player_info, cape_id) => {
         let date = new Date();
@@ -2383,162 +1977,7 @@ async function getNewAccessToken(refresh_token) {
 }
 
 
-async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
-    try {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-        const zip = new AdmZip(zip_path);
 
-        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        if (!fs.existsSync(extractToPath)) {
-            fs.mkdirSync(extractToPath, { recursive: true });
-        }
-
-        zip.extractAllTo(extractToPath, true);
-
-        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        fs.mkdirSync(srcDir, { recursive: true });
-        fs.mkdirSync(destDir, { recursive: true });
-
-        const files = fs.readdirSync(srcDir);
-
-        for (const file of files) {
-            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-            const srcPath = path.join(srcDir, file);
-            const destPath = path.join(destDir, file);
-
-            if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
-            }
-            try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
-            } catch (err) {
-                return "Unable to enable overrides for folder " + file;
-            }
-        }
-
-        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
-        manifest_json = JSON.parse(manifest_json);
-
-        let dependency_res;
-        if (cf_id) dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`)
-        let dependency_json;
-        if (cf_id) dependency_json = await dependency_res.json()
-
-        let content = [];
-        let project_ids = [];
-
-        const limit = pLimit(getMaxConcurrentDownloads());
-
-        let allocated_ram = manifest_json.minecraft?.recommendedRam;
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
-
-        let count = 0;
-
-        const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-            let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
-
-            let folder = "mods";
-            if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
-            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shaderpacks";
-            let type = "mod";
-            if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
-            else if (dependency_item?.categoryClass?.slug == "shaders") type = "shader";
-            let file_name = "";
-            try {
-                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
-            } catch (e) {
-                let res = await fetch(`https://api.curse.tools/v1/cf/mods/${file.projectID}/files/${file.fileID}`);
-                let res_json = await res.json();
-                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, folder));
-            }
-
-            if (cf_id && dependency_item) {
-                project_ids.push(null);
-                content.push({
-                    "author": dependency_item?.authorName ?? "",
-                    "disabled": false,
-                    "file_name": file_name,
-                    "image": dependency_item?.logoUrl ?? "",
-                    "source": "curseforge",
-                    "source_id": file.projectID,
-                    "type": type,
-                    "version": "",
-                    "version_id": file.fileID,
-                    "name": dependency_item?.name ?? file_name
-                })
-            } else {
-                project_ids.push(file.projectID);
-                content.push({
-                    "source": "curseforge",
-                    "source_id": file.projectID,
-                    "version_id": file.fileID,
-                    "disabled": false,
-                    "type": type,
-                    "version": "",
-                    "file_name": file_name
-                });
-            }
-            if (count == manifest_json.files.length - 1) {
-                ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-            } else {
-                ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`);
-            }
-            count++;
-        }));
-        await Promise.all(downloadPromises);
-
-        if (project_ids.filter(e => e).length) {
-            let cfData = [];
-            try {
-                const response = await fetch("https://api.curse.tools/v1/cf/mods", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false })
-                });
-                if (response.ok) {
-                    const json = await response.json();
-                    cfData = json.data || [];
-                }
-            } catch (e) {
-                cfData = [];
-            }
-
-            cfData.forEach(e => {
-                content.forEach(item => {
-                    if (Number(item.source_id) == Number(e.id)) {
-                        item.name = e.name;
-                        item.image = e.logo.thumbnailUrl;
-                        item.author = e.authors[0].name;
-                    }
-                });
-            });
-        }
-
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-        return ({
-            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
-            "content": content,
-            "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
-            "vanilla_version": manifest_json.minecraft.version,
-            "allocated_ram": allocated_ram,
-            "name": manifest_json.name
-        })
-    } catch (err) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
-        return { "error": true };
-    }
-}
 async function importWorld(file_path, instance_id, worldName) {
     ipcRenderer.send('progress-update', `Importing ${worldName}`, 0, "Beginning...");
     try {
@@ -2771,542 +2210,18 @@ async function importContent(file_path, content_type, instance_id) {
         dest: finalPath
     };
 }
+
 async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
-    try {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-        const zip = new AdmZip(zip_path);
-
-        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        if (!fs.existsSync(extractToPath)) {
-            fs.mkdirSync(extractToPath, { recursive: true });
-        }
-
-        zip.extractAllTo(extractToPath, true);
-
-        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        fs.mkdirSync(srcDir, { recursive: true });
-        fs.mkdirSync(destDir, { recursive: true });
-
-        const files = fs.readdirSync(srcDir);
-
-        for (const file of files) {
-            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-            const srcPath = path.join(srcDir, file);
-            const destPath = path.join(destDir, file);
-
-            if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
-            }
-            try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
-            } catch (err) {
-                return "Unable to enable overrides for folder " + file;
-            }
-        }
-
-        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
-        manifest_json = JSON.parse(manifest_json);
-
-        let content = [];
-        let project_ids = [];
-
-        const limit = pLimit(getMaxConcurrentDownloads());
-
-        let allocated_ram = manifest_json.minecraft?.recommendedRam;
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
-
-        let count = 0;
-
-        const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-            ipcRenderer.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
-
-            let project_id = file.projectID;
-            let file_id = file.fileID;
-
-            project_ids.push(project_id);
-
-            try {
-                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
-            } catch (e) {
-                let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
-                let res_json = await res.json();
-                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, "temp"));
-            }
-
-            const tempFilePath = path.resolve(extractToPath, "temp", file_name);
-            let destFolder = "mods";
-            let project_type = "mod";
-
-            try {
-                if (file_name.endsWith(".jar")) {
-                    destFolder = "mods";
-                } else if (file_name.endsWith(".zip")) {
-                    const tempZip = new AdmZip(tempFilePath);
-                    if (tempZip.getEntry("pack.mcmeta")) {
-                        project_type = "resource_pack";
-                        destFolder = "resourcepacks";
-                    } else if (tempZip.getEntry("shaders/")) {
-                        destFolder = "shaderpacks";
-                        project_type = "shader";
-                    } else {
-                        destFolder = "resourcepacks";
-                        project_type = "resource_pack";
-                    }
-                }
-            } catch (e) {
-                destFolder = "mods";
-            }
-
-
-            const finalPath = path.resolve(extractToPath, destFolder, file_name);
-            fs.mkdirSync(path.dirname(finalPath), { recursive: true });
-            fs.renameSync(tempFilePath, finalPath);
-
-            content.push({
-                "source": "curseforge",
-                "source_id": project_id,
-                "version_id": file_id,
-                "disabled": false,
-                "type": project_type,
-                "version": "",
-                "file_name": path.basename(finalPath)
-            });
-
-            if (count == manifest_json.files.length - 1) {
-                ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-            } else {
-                ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
-            }
-            count++;
-        }));
-        await Promise.all(downloadPromises);
-
-        let cfData = [];
-        try {
-            const response = await fetch("https://api.curse.tools/v1/cf/mods", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
-            });
-            if (response.ok) {
-                const json = await response.json();
-                cfData = json.data || [];
-            }
-        } catch (e) {
-            cfData = [];
-        }
-
-        console.log(cfData);
-
-        cfData.forEach(e => {
-            content.forEach(item => {
-                if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
-                    item.name = e.name;
-                    item.image = e.logo.thumbnailUrl;
-                    item.author = e.authors[0].name;
-                }
-            });
-        });
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-        return ({
-            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
-            "content": cfData.length ? content : [],
-            "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
-            "vanilla_version": manifest_json.minecraft.version,
-            "allocated_ram": allocated_ram,
-            "name": manifest_json.name
-        });
-    } catch (err) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
-        return { "error": true };
-    }
+    return await ipcRenderer.invoke('process-cf-zip-without-id', instance_id, zip_path, cf_id, title, getMaxConcurrentDownloads());
 }
 async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
-    try {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-        const zip = new AdmZip(mrpack_path);
-
-        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        if (!fs.existsSync(extractToPath)) {
-            fs.mkdirSync(extractToPath, { recursive: true });
-        }
-
-        zip.extractAllTo(extractToPath, true);
-
-        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        fs.mkdirSync(srcDir, { recursive: true });
-        fs.mkdirSync(destDir, { recursive: true });
-
-        const files = fs.readdirSync(srcDir);
-
-        for (const file of files) {
-            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-            const srcPath = path.join(srcDir, file);
-            const destPath = path.join(destDir, file);
-
-            if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
-            }
-
-            try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
-            } catch (err) {
-                return "Unable to enable overrides for folder " + file;
-            }
-        }
-
-        let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
-        modrinth_index_json = JSON.parse(modrinth_index_json);
-
-        let content = [];
-
-        let project_ids = [];
-        let version_ids = [];
-        let team_ids = [];
-        let team_to_project_ids = {};
-
-        const limit = pLimit(getMaxConcurrentDownloads());
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`);
-
-        let count = 0;
-
-        const downloadPromises = modrinth_index_json.files.map((file, i) =>
-            limit(async () => {
-                await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path));
-                if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
-                    let split = file.downloads[0].split("/");
-                    let project_id = split[4];
-                    let file_id = split[6];
-                    if (project_id && file_id) {
-                        if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
-                            let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
-                            let res_json = await res.json();
-                            file_id = res_json.id;
-                        }
-                        project_ids.push(project_id);
-                        version_ids.push(file_id);
-                        content.push({
-                            "source": "modrinth",
-                            "source_id": project_id,
-                            "version_id": file_id,
-                            "disabled": false,
-                            "file_name": path.basename(file.path),
-                            "version": "",
-                            "name": path.basename(file.path),
-                            "image": "",
-                            "type": path.dirname(file.path) == "mods" ? "mod" : path.dirname(file.path) == "resourcepacks" ? "resource_pack" : "shader"
-                        });
-                    }
-                }
-                if (count == modrinth_index_json.files.length - 1) {
-                    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-                } else {
-                    ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`);
-                }
-                count++;
-            })
-        );
-
-        await Promise.all(downloadPromises);
-
-        let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
-        let res_json = await res.json();
-        res_json.forEach(e => {
-            content.forEach(item => {
-                if (item.source_id == e.id) {
-                    item.name = e.title;
-                    item.image = e.icon_url;
-                    item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                    team_ids.push(e.team);
-                    if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
-                    else team_to_project_ids[e.team].push(e.id);
-                }
-            });
-        });
-        let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`);
-        let res_json_1 = await res_1.json();
-        res_json_1.forEach(e => {
-            content.forEach(item => {
-                if (item.source_id == e.project_id) {
-                    item.version = e.version_number;
-                }
-            });
-        });
-        let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
-        let res_json_2 = await res_2.json();
-        res_json_2.forEach(e => {
-            if (Array.isArray(e)) {
-                let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                let author = authors.length ? authors[0] : "";
-                if (!team_to_project_ids[e[0].team_id]) return;
-                team_to_project_ids[e[0].team_id].forEach(f => {
-                    content.forEach(item => {
-                        if (item.source_id == f) {
-                            item.author = author;
-                        }
-                    });
-                });
-            }
-        });
-
-        if (!loader) {
-            loader = "vanilla";
-            let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
-            let keys = Object.keys(modrinth_index_json.dependencies)
-            for (const key of keys) {
-                if (loaders.includes(key)) {
-                    loader = key;
-                    break;
-                }
-            }
-        } else {
-            if (loader == "fabric") loader = "fabric-loader";
-            if (loader == "quilt") loader = "quilt-loader";
-        }
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-        return ({
-            "loader_version": modrinth_index_json.dependencies[loader],
-            "content": content,
-            "loader": loader.replace("-loader", ""),
-            "vanilla_version": modrinth_index_json.dependencies["minecraft"],
-            "name": modrinth_index_json.name
-        })
-    } catch (err) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
-        return { "error": true };
-    }
+    return await ipcRenderer.invoke('process-mr-pack', instance_id, mrpack_path, loader, title, getMaxConcurrentDownloads());
 }
 async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
-    try {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
-        const zip = new AdmZip(elpack_path);
-
-        let extractToPath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        if (!fs.existsSync(extractToPath)) {
-            fs.mkdirSync(extractToPath, { recursive: true });
-        }
-
-        zip.extractAllTo(extractToPath, true);
-
-        let srcDir = path.resolve(userPath, `minecraft/instances/${instance_id}/overrides`);
-        let destDir = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-
-        fs.mkdirSync(srcDir, { recursive: true });
-        fs.mkdirSync(destDir, { recursive: true });
-
-        const files = fs.readdirSync(srcDir);
-
-        for (const file of files) {
-            ipcRenderer.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
-            const srcPath = path.join(srcDir, file);
-            const destPath = path.join(destDir, file);
-
-            if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
-            }
-
-            try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
-            } catch (err) {
-                return "Unable to enable overrides for folder " + file;
-            }
-        }
-
-        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
-        manifest_json = JSON.parse(manifest_json);
-
-        let content = [];
-
-        let mr_project_ids = [];
-        let cf_project_ids = [];
-        let mr_version_ids = [];
-        let cf_version_ids = [];
-        let mr_team_ids = [];
-        let mr_team_to_project_ids = {};
-
-        const limit = pLimit(getMaxConcurrentDownloads());
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
-
-        let count = 0;
-
-        const downloadPromises = manifest_json.files.map((file, i) =>
-            limit(async () => {
-                let install_path = "";
-                if (file.type == "mod") install_path = "mods/";
-                if (file.type == "resource_pack") install_path = "resourcepacks/";
-                if (file.type == "shader") install_path = "shaderpacks/";
-                install_path += file.file_name;
-                let url = "";
-                if (file.source === "modrinth") {
-                    url = `https://cdn.modrinth.com/data/${file.source_info}/versions/${file.version_id}/${file.file_name.replace(".disabled", "")}`;
-                } else if (file.source === "curseforge") {
-                    url = `https://www.curseforge.com/api/v1/mods/${Number(file.source_info)}/files/${Number(file.version_id)}/download`;
-                } else if (file.source === "vanilla_tweaks") {
-                    url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
-                }
-                try {
-                    await urlToFile(url, path.resolve(extractToPath, install_path));
-                } catch (e) {
-                    if (file.source === "modrinth") {
-                        let url = `https://api.modrinth.com/v2/project/${file.source_info}/version/${file.version_id}`;
-                        let res_pre_json = await fetch(url);
-                        let res = await res_pre_json.json();
-                        await urlToFile(res.files[0].url, path.resolve(extractToPath, install_path));
-                    } else {
-                        throw e;
-                    }
-                }
-                content.push({
-                    "author": file.source == "vanilla_tweaks" ? "Vanilla Tweaks" : "",
-                    "disabled": file.disabled,
-                    "file_name": file.file_name,
-                    "image": file.source == "vanilla_tweaks" ? "https://vanillatweaks.net/assets/images/logo.png" : "",
-                    "source": file.source,
-                    "source_id": file.source_info,
-                    "type": file.type,
-                    "version": "",
-                    "version_id": file.version_id,
-                    "name": file.source == "vanilla_tweaks" ? "Vanilla Tweaks Resource Pack" : ""
-                });
-                if (file.source == "modrinth") {
-                    mr_project_ids.push(file.source_info);
-                    mr_version_ids.push(file.version_id);
-                } else if (file.source == "curseforge") {
-                    cf_project_ids.push(Number(file.source_info));
-                    cf_version_ids.push(Number(file.version_id));
-                }
-                if (count == manifest_json.files.length - 1) {
-                    ipcRenderer.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
-                } else {
-                    ipcRenderer.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
-                }
-                count++;
-            })
-        );
-
-        await Promise.all(downloadPromises);
-
-        if (mr_project_ids.length) {
-            try {
-                const res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${mr_project_ids.join('","')}"]`);
-                const res_json = await res.json();
-                res_json.forEach(e => {
-                    // Find all content items with matching source and source_info
-                    content.forEach((item, idx) => {
-                        if (item.source === "modrinth" && item.source_id === e.id) {
-                            item.name = e.title;
-                            item.image = e.icon_url;
-                            item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                            if (!mr_team_to_project_ids[e.team]) mr_team_to_project_ids[e.team] = [];
-                            mr_team_to_project_ids[e.team].push(e.id);
-                            if (!mr_team_ids.includes(e.team)) mr_team_ids.push(e.team);
-                        }
-                    });
-                });
-            } catch (e) { }
-        }
-
-        if (mr_version_ids.length) {
-            try {
-                const res = await fetch(`https://api.modrinth.com/v2/versions?ids=["${mr_version_ids.join('","')}"]`);
-                const res_json = await res.json();
-                res_json.forEach(e => {
-                    content.forEach(item => {
-                        if (item.source === "modrinth" && item.version_id === e.id) {
-                            item.version = e.version_number;
-                        }
-                    });
-                });
-            } catch (e) { }
-        }
-
-        if (mr_team_ids.length) {
-            try {
-                const res = await fetch(`https://api.modrinth.com/v2/teams?ids=["${mr_team_ids.join('","')}"]`);
-                const res_json = await res.json();
-                res_json.forEach(e => {
-                    if (Array.isArray(e)) {
-                        let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                        let author = authors.length ? authors[0] : "";
-                        if (!mr_team_to_project_ids[e[0].team_id]) return;
-                        mr_team_to_project_ids[e[0].team_id].forEach(projectId => {
-                            content.forEach(item => {
-                                if (item.source === "modrinth" && item.source_id === projectId) {
-                                    item.author = author;
-                                }
-                            });
-                        });
-                    }
-                });
-            } catch (e) { }
-        }
-
-        if (cf_project_ids.length) {
-            try {
-                const response = await fetch("https://api.curse.tools/v1/cf/mods", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
-                });
-                if (response.ok) {
-                    const json = await response.json();
-                    const cfData = json.data || [];
-                    cfData.forEach(e => {
-                        content.forEach(item => {
-                            if (item.source === "curseforge" && item.source_id == e.id + ".0") {
-                                item.name = e.name;
-                                item.image = e.logo.thumbnailUrl;
-                                item.author = e.authors[0].name;
-                            }
-                        });
-                    });
-                }
-            } catch (e) { }
-        }
-
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Done!");
-        return ({
-            "loader_version": manifest_json.loader_version,
-            "content": content,
-            "loader": manifest_json.loader,
-            "vanilla_version": manifest_json.game_version,
-            "allocated_ram": manifest_json.allocated_ram,
-            "image": manifest_json.icon,
-            "name": manifest_json.name
-        })
-    } catch (err) {
-        ipcRenderer.send('progress-update', `Installing ${title}`, 100, "Error");
-        return { "error": true };
-    }
+    return await ipcRenderer.invoke('process-el-pack', instance_id, elpack_path, loader, title, getMaxConcurrentDownloads());
+}
+async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
+    return await ipcRenderer.invoke('process-cf-zip', instance_id, zip_path, cf_id, title, getMaxConcurrentDownloads());
 }
 
 async function getSkinFromURL(url) {
@@ -3383,29 +2298,6 @@ async function pathToDataUrl(file_path) {
     } catch (err) {
         return null;
     }
-}
-
-function parseEnvString(input) {
-    const env = {};
-
-    if (!input) return env;
-
-    // Supports both space-separated or newline-separated input
-    const lines = input.split(/\s+|\n/);
-
-    for (const line of lines) {
-        if (!line || !line.includes('=')) continue;
-        const [key, ...rest] = line.split('=');
-        const value = rest.join('='); // Rejoin in case value had '='
-        env[key.trim()] = value.trim();
-    }
-
-    return env;
-}
-
-function parseJavaArgs(input) {
-    if (!input) return [];
-    return stringArgv(input);
 }
 
 function checkForProcess(pid) {
@@ -3607,161 +2499,8 @@ function getOptions(optionsPath) {
     return options;
 }
 
-async function addServer(instance_id, ip, title, image) {
-    let patha = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-    let serversDatPath = path.resolve(patha, 'servers.dat');
-    let data = {};
-    let serversDatExists = fs.existsSync(serversDatPath);
-    if (!serversDatExists) {
-        data.parsed = {
-            "name": "",
-            "type": "compound",
-            "value": {
-                "servers": {
-                    "type": "list",
-                    "value": {
-                        "type": "compound",
-                        "value": []
-                    }
-                }
-            }
-        }
-    }
-    try {
-        if (serversDatExists) {
-            const buffer = fs.readFileSync(serversDatPath);
-            data = await nbt.parse(buffer);
-        }
-        let servers = data.parsed?.value?.servers?.value?.value || [];
-
-        let iconBase64 = "";
-        if (image) {
-            let imageBuffer;
-            if (image.startsWith('data:image/')) {
-                iconBase64 = image.replace(/^data:image\/png;base64,/, '').replace(/^data:image\/[a-zA-Z]+;base64,/, '');
-            } else if (image.startsWith('http://') || image.startsWith('https://')) {
-                console.log(image);
-                const response = await axios.get(image, { responseType: "arraybuffer" });
-                console.log(response.data);
-                imageBuffer = Buffer.from(response.data);
-                iconBase64 = imageBuffer.toString('base64');
-            } else if (fs.existsSync(image)) {
-                imageBuffer = fs.readFileSync(image);
-                iconBase64 = imageBuffer.toString('base64');
-            }
-        }
-
-        servers.push({
-            "icon": {
-                "type": "string",
-                "value": iconBase64
-            },
-            "name": {
-                "type": "string",
-                "value": title
-            },
-            "ip": {
-                "type": "string",
-                "value": ip
-            },
-            "acceptTextures": {
-                "type": "byte",
-                "value": 1
-            },
-            "hidden": {
-                "type": "byte",
-                "value": 0
-            }
-        });
-
-        data.parsed.value.servers.value.value = servers;
-
-        const newBuffer = nbt.writeUncompressed(data.parsed);
-        fs.writeFileSync(serversDatPath, newBuffer);
-        return true;
-    } catch (e) {
-        console.error("Failed to add server to servers.dat:", e);
-        return false;
-    }
-}
-
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
     if (r?.value) return Number(r.value);
     return 10;
-}
-
-async function getVanillaTweaksResourcePackLink(packs, version) {
-    if (version.split(".").length > 2) {
-        version = version.split(".").splice(0, 2).join(".");
-    }
-    let data_json = vt_rp[version];
-    if (!vt_rp[version]) {
-        let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
-        data_json = await data.json();
-        vt_rp[version] = data_json;
-    }
-    let pack_info = {};
-
-    let process_category = (category, previous_categories = []) => {
-        previous_categories.push(category.category);
-        let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
-        let packs = category.packs.map(e => e.name);
-        packs.forEach(e => {
-            pack_info[e] = id;
-        });
-        if (category.categories) {
-            category.categories.forEach(e => {
-                process_category(e, structuredClone(previous_categories));
-            })
-        }
-    }
-    for (let i = 0; i < data_json.categories.length; i++) {
-        process_category(data_json.categories[i]);
-    }
-
-    let packs_send = {};
-    for (let i = 0; i < packs.length; i++) {
-        if (!packs_send[pack_info[packs[i].id]]) {
-            packs_send[pack_info[packs[i].id]] = [packs[i].id]
-        } else {
-            packs_send[pack_info[packs[i].id]].push(packs[i].id);
-        }
-    }
-
-    let h = querystring.stringify({
-        "packs": JSON.stringify(packs_send),
-        "version": version
-    });
-
-    const options = {
-        hostname: 'vanillatweaks.net',
-        path: '/assets/server/zipresourcepacks.php',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': h.length
-        }
-    };
-    let data_vt = await new Promise((resolve, reject) => {
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            res.on('end', () => {
-                resolve(data);
-            });
-        });
-
-        req.on('error', (error) => {
-            reject(error);
-        });
-
-        req.write(h);
-        req.end();
-    });
-    data_vt = JSON.parse(data_vt);
-    if (data_vt.link) return "https://vanillatweaks.net" + data_vt.link;
-    return null;
 }

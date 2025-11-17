@@ -13,9 +13,15 @@ const pLimit = require('p-limit').default;
 
 let launchername = "EnderLynx";
 let launcherversion = version;
+let userPath;
+let win;
 
-const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
-    .split('=')[1]);
+function setUserPath(user_path) {
+    userPath = user_path;
+}
+function setWindow(window) {
+    win = window;
+}
 
 class Minecraft {
     constructor(instance_id) {
@@ -23,14 +29,14 @@ class Minecraft {
     }
     async installFabric(mcversion, fabricversion, isRepair) {
         try {
-            ipcRenderer.send('progress-update', "Downloading Fabric", 0, "Download fabric info...");
+            win.webContents.send('progress-update', "Downloading Fabric", 0, "Download fabric info...");
             const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${mcversion}/${fabricversion}/profile/json`);
             const data = await fabric_json.json();
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/fabric/${mcversion}/${fabricversion}`), { recursive: true });
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/fabric/${mcversion}/${fabricversion}/fabric-${mcversion}-${fabricversion}.json`), JSON.stringify(data));
-            ipcRenderer.send('progress-update', "Downloading Fabric", 20, "Downloading fabric libraries...");
+            win.webContents.send('progress-update', "Downloading Fabric", 20, "Downloading fabric libraries...");
             for (let i = 0; i < data.libraries.length; i++) {
-                ipcRenderer.send('progress-update', "Downloading Fabric", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
+                win.webContents.send('progress-update', "Downloading Fabric", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
                 let lib_path = mavenPathToFilePath(data.libraries[i].name);
                 let lib_path_rel = mavenPathToRelPath(data.libraries[i].name);
                 if (!fs.existsSync(lib_path) || isRepair) {
@@ -45,20 +51,20 @@ class Minecraft {
             this.modded_args_game = data.arguments.game;
             this.modded_args_jvm = data.arguments.jvm;
         } catch (err) {
-            ipcRenderer.send('progress-update', "Downloading Fabric", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Fabric", 100, "Error");
             throw err;
         }
     }
     async installQuilt(mcversion, quiltversion, isRepair) {
         try {
-            ipcRenderer.send('progress-update', "Downloading Quilt", 0, "Download quilt info...");
+            win.webContents.send('progress-update', "Downloading Quilt", 0, "Download quilt info...");
             const quilt_json = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcversion}/${quiltversion}/profile/json`);
             const data = await quilt_json.json();
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/quilt/${mcversion}/${quiltversion}`), { recursive: true });
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/quilt/${mcversion}/${quiltversion}/quilt-${mcversion}-${quiltversion}.json`), JSON.stringify(data));
-            ipcRenderer.send('progress-update', "Downloading Quilt", 20, "Downloading quilt libraries...");
+            win.webContents.send('progress-update', "Downloading Quilt", 20, "Downloading quilt libraries...");
             for (let i = 0; i < data.libraries.length; i++) {
-                ipcRenderer.send('progress-update', "Downloading Quilt", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
+                win.webContents.send('progress-update', "Downloading Quilt", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
                 let lib_path = mavenPathToFilePath(data.libraries[i].name);
                 if (!fs.existsSync(lib_path) || isRepair) {
                     await urlToFile(data.libraries[i].url + mavenPathToRelPath(data.libraries[i].name), lib_path);
@@ -72,14 +78,14 @@ class Minecraft {
             if (data?.arguments?.jvm) this.modded_args_game = data.arguments.game;
             if (data?.arguments?.jvm) this.modded_args_jvm = data.arguments.jvm;
         } catch (err) {
-            ipcRenderer.send('progress-update', "Downloading Quilt", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Quilt", 100, "Error");
             throw err;
         }
     }
     async installForge(mcversion, forgeversion, isRepair) {
         try {
 
-            ipcRenderer.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...");
+            win.webContents.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...");
             const forgeInstallerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
             const forgeMetaDir = path.resolve(userPath, `minecraft/meta/forge/${mcversion}/${forgeversion}`);
             const forgeLibDir = path.resolve(userPath, `minecraft/meta/libraries`);
@@ -285,7 +291,7 @@ class Minecraft {
                 let libraries = version_json.libraries.map(e => ({ ...e, include_in_classpath: true })).concat(install_profile_json.libraries.map(e => ({ ...e, include_in_classpath: false })));
                 let paths = [];
                 for (let i = 0; i < libraries.length; i++) {
-                    ipcRenderer.send('progress-update', "Downloading Forge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
+                    win.webContents.send('progress-update', "Downloading Forge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
                     let e = libraries[i];
                     if (e.downloads.artifact) {
                         if (!e.downloads.artifact.url) {
@@ -352,7 +358,7 @@ class Minecraft {
                     }
 
                     for (let i = 0; i < processors.length; i++) {
-                        ipcRenderer.send('progress-update', "Downloading Forge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
+                        win.webContents.send('progress-update', "Downloading Forge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
                         let processor = processors[i];
                         if (processor.sides && !processor.sides.includes("client")) continue;
                         let cp = [...processor.classpath, processor.jar];
@@ -410,15 +416,15 @@ class Minecraft {
                 }
             }
 
-            ipcRenderer.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
+            win.webContents.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
         } catch (err) {
-            ipcRenderer.send('progress-update', "Downloading Forge", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Forge", 100, "Error");
             throw err;
         }
     }
     async installNeoForge(mcversion, neoforgeversion, isRepair) {
         try {
-            ipcRenderer.send('progress-update', "Downloading NeoForge", 0, "Downloading NeoForge installer...");
+            win.webContents.send('progress-update', "Downloading NeoForge", 0, "Downloading NeoForge installer...");
             const neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeversion}/neoforge-${neoforgeversion}-installer.jar`;
             const neoForgeMetaDir = path.resolve(userPath, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}`);
             const neoForgeLibDir = path.resolve(userPath, `minecraft/meta/libraries`);
@@ -466,7 +472,7 @@ class Minecraft {
             let libraries = version_json.libraries.map(e => ({ ...e, include_in_classpath: true })).concat(install_profile_json.libraries.map(e => ({ ...e, include_in_classpath: false })));
             let paths = [];
             for (let i = 0; i < libraries.length; i++) {
-                ipcRenderer.send('progress-update', "Downloading NeoForge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
+                win.webContents.send('progress-update', "Downloading NeoForge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
                 let e = libraries[i];
                 if (e.downloads.artifact) {
                     if (!e.downloads.artifact.url) {
@@ -538,7 +544,7 @@ class Minecraft {
                 }
 
                 for (let i = 0; i < processors.length; i++) {
-                    ipcRenderer.send('progress-update', "Downloading NeoForge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
+                    win.webContents.send('progress-update', "Downloading NeoForge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
                     let processor = processors[i];
                     if (processor.sides && !processor.sides.includes("client")) continue;
                     let cp = [...processor.classpath, processor.jar];
@@ -593,9 +599,9 @@ class Minecraft {
             this.main_class = version_json.mainClass;
             this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}-neoforge-${neoforgeversion}/${mcversion}-neoforge-${neoforgeversion}.jar`);
 
-            ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
+            win.webContents.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
         } catch (err) {
-            ipcRenderer.send('progress-update', "Downloading NeoForge", 100, "Error");
+            win.webContents.send('progress-update', "Downloading NeoForge", 100, "Error");
             throw err;
         }
     }
@@ -1009,9 +1015,9 @@ class Minecraft {
 
         child.once('error', (err) => {
             if (err.code === 'ENOENT') {
-                ipcRenderer.send('display-error', "Unable to launch Minecraft");
+                win.webContents.send('display-error', "Unable to launch Minecraft");
             } else {
-                ipcRenderer.send('display-error', "Unable to launch Minecraft (" + err + ")");
+                win.webContents.send('display-error', "Unable to launch Minecraft (" + err + ")");
             }
         });
 
@@ -1027,18 +1033,18 @@ class Minecraft {
     async downloadGame(loader, version, isRepair, whatToRepair) {
         if (!this.libNames) this.libNames = [];
         try {
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
+            win.webContents.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/versions/${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/logs`), { recursive: true });
             this.version = version;
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
+            win.webContents.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
             const version_manifest = await obtainVersionManifest.json();
             let version_json = {};
             for (let i = 0; i < version_manifest.versions.length; i++) {
                 if (version_manifest.versions[i].id == version) {
-                    ipcRenderer.send('progress-update', "Downloading Minecraft", 3, "Downloading version info...");
+                    win.webContents.send('progress-update', "Downloading Minecraft", 3, "Downloading version info...");
                     const obtainVersionJSON = await fetch(version_manifest.versions[i].url);
                     version_json = await obtainVersionJSON.json();
                     break;
@@ -1052,7 +1058,7 @@ class Minecraft {
                 fs.writeFileSync(path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`), JSON.stringify(version_json));
             }
             if (!isRepair || whatToRepair.includes("assets")) {
-                ipcRenderer.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
+                win.webContents.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
                 const assetJSON = await fetch(version_json.assetIndex.url);
                 let asset_json = await assetJSON.json();
                 fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/indexes`), { recursive: true });
@@ -1061,7 +1067,7 @@ class Minecraft {
                 let assetKeys = Object.keys(asset_json.objects);
                 const limit = pLimit(10);
                 const downloadPromises = assetKeys.map((asset, i) => limit(async () => {
-                    ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
+                    win.webContents.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
                     let asset_data = asset_json.objects[asset];
                     if (version_json.assets == "legacy") {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/legacy/${asset}`)) || isRepair) {
@@ -1082,14 +1088,14 @@ class Minecraft {
             }
             const jarFilePath = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.jar`);
             if ((!isRepair && !fs.existsSync(jarFilePath)) || whatToRepair?.includes("minecraft")) {
-                ipcRenderer.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
+                win.webContents.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
                 await urlToFile(version_json.downloads.client.url, jarFilePath);
                 this.jarfile = jarFilePath;
             }
             let java = new Java();
             let paths = "";
             if (!isRepair || whatToRepair?.includes("java")) {
-                ipcRenderer.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
+                win.webContents.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
                 this.java_installation = await java.getJavaInstallation(version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8, isRepair);
                 this.java_version = version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8;
             }
@@ -1111,9 +1117,9 @@ class Minecraft {
                 this.assets_index = version_json.assets;
                 let platformString = getPlatformString();
                 let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
-                ipcRenderer.send('progress-update', "Downloading Minecraft", 60, "Starting library download...");
+                win.webContents.send('progress-update', "Downloading Minecraft", 60, "Starting library download...");
                 libs: for (let i = 0; i < version_json.libraries.length; i++) {
-                    ipcRenderer.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`);
+                    win.webContents.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`);
                     if (version_json.libraries[i].rules) {
                         rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
                             let rule = version_json.libraries[i].rules[j];
@@ -1153,10 +1159,10 @@ class Minecraft {
                 }
                 this.libs += paths;
             }
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 100, "Done");
+            win.webContents.send('progress-update', "Downloading Minecraft", 100, "Done");
             return { "java_installation": this.java_installation, "java_version": this.java_version };
         } catch (err) {
-            ipcRenderer.send('progress-update', "Downloading Minecraft", 100, "Done");
+            win.webContents.send('progress-update', "Downloading Minecraft", 100, "Done");
             throw err;
         }
     }
@@ -1198,7 +1204,7 @@ class Java {
     }
     async downloadJava(version, isRepair) {
         try {
-            ipcRenderer.send('progress-update', "Downloading Java", 0, "Starting java download...");
+            win.webContents.send('progress-update', "Downloading Java", 0, "Starting java download...");
             const installDir = path.resolve(userPath, `java/java-${version}`);
             const platform = os.platform(); // 'win32', 'linux', 'darwin'
             const arch = os.arch(); // 'x64', 'arm64', etc.
@@ -1209,7 +1215,7 @@ class Java {
             };
             const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${getPlatformString()}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
 
-            ipcRenderer.send('progress-update', "Downloading Java", 5, "Fetching java version info...");
+            win.webContents.send('progress-update', "Downloading Java", 5, "Fetching java version info...");
             const res = await fetch(versionApi);
             const data = await res.json();
 
@@ -1222,9 +1228,9 @@ class Java {
             const fileName = path.basename(downloadUrl);
             const downloadPath = path.resolve(userPath, "java/" + fileName);
 
-            ipcRenderer.send('progress-update', "Downloading Java", 10, "Fetching java zip...");
+            win.webContents.send('progress-update', "Downloading Java", 10, "Fetching java zip...");
             await urlToFile(downloadUrl, downloadPath);
-            ipcRenderer.send('progress-update', "Downloading Java", 60, "Extracting java zip...");
+            win.webContents.send('progress-update', "Downloading Java", 60, "Extracting java zip...");
             let name = "";
             if (fileName.endsWith('.zip')) {
                 const zip = new AdmZip(downloadPath);
@@ -1236,15 +1242,15 @@ class Java {
             } else {
                 throw new Error("Isn't a .zip file?");
             }
-            ipcRenderer.send('progress-update', "Downloading Java", 95, "Deleting old zip...");
+            win.webContents.send('progress-update', "Downloading Java", 95, "Deleting old zip...");
 
             fs.unlinkSync(downloadPath);
-            ipcRenderer.send('progress-update', "Downloading Java", 98, "Remembering version...");
+            win.webContents.send('progress-update', "Downloading Java", 98, "Remembering version...");
             this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/javaw.exe`);
             fs.writeFileSync(path.resolve(userPath, "java/versions.json"), JSON.stringify(this.versions), 'utf-8');
-            ipcRenderer.send('progress-update', "Downloading Java", 100, "Done");
+            win.webContents.send('progress-update', "Downloading Java", 100, "Done");
         } catch (err) {
-            ipcRenderer.send('progress-update', "Downloading Java", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Java", 100, "Error");
             throw err;
         }
     }
@@ -1374,14 +1380,14 @@ function fileFormatDate(date) {
 
 class Fabric {
     constructor() { }
-    async getSupportedVanillaVersions() {
+    static async getSupportedVanillaVersions() {
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/game`);
         const data = await fabric_json.json();
         let versions = data.map((e) => e.version);
         versions = versions.filter((e) => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original"));
         return versions;
     }
-    async getVersions(v) {
+    static async getVersions(v) {
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${v}`);
         const data = await fabric_json.json();
         return data.map((e) => e.loader.version);
@@ -1391,7 +1397,7 @@ class Forge {
     constructor() { }
 
     // Returns a list of supported vanilla Minecraft versions for Forge
-    async getSupportedVanillaVersions() {
+    static async getSupportedVanillaVersions() {
         // Use the Forge version manifest
         const res = await fetch('https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json');
         const data = await res.json();
@@ -1405,7 +1411,7 @@ class Forge {
     }
 
     // Returns a list of Forge loader versions for a given vanilla version
-    async getVersions(mcVersion) {
+    static async getVersions(mcVersion) {
 
         const url = `https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json`;
         const res = await fetch(url);
@@ -1417,19 +1423,19 @@ class Forge {
             return split.join("-");
         });
 
-        return forgeVersions;
+        return forgeVersions.toReversed();
     }
 }
 class Quilt {
     constructor() { }
-    async getSupportedVanillaVersions() {
+    static async getSupportedVanillaVersions() {
         const res = await fetch('https://meta.quiltmc.org/v3/versions/game');
         const data = await res.json();
         let versions = data.map(e => e.version);
         versions = versions.filter(e => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original"));
         return versions;
     }
-    async getVersions(mcVersion) {
+    static async getVersions(mcVersion) {
         const res = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcVersion}`);
         const data = await res.json();
         return data.map(e => e.loader.version);
@@ -1438,7 +1444,7 @@ class Quilt {
 
 class NeoForge {
     constructor() { }
-    async getSupportedVanillaVersions() {
+    static async getSupportedVanillaVersions() {
 
         const res = await fetch('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge');
         const data = (await res.json()).versions;
@@ -1462,7 +1468,7 @@ class NeoForge {
         return versions.reverse();
     }
 
-    async getVersions(mcVersion) {
+    static async getVersions(mcVersion) {
         let start0 = "0";
         let start1 = mcVersion;
         let split = mcVersion.split(".");
@@ -1549,5 +1555,7 @@ module.exports = {
     Quilt,
     NeoForge,
     urlToFile,
-    urlToFolder
+    urlToFolder,
+    setUserPath,
+    setWindow
 }
