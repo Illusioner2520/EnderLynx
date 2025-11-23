@@ -1588,14 +1588,14 @@ class SearchBar {
         }
         this.value = "";
         searchInput.oninput = (e) => {
-            if (this.oninput) this.oninput(searchInput.value);
             this.value = searchInput.value;
+            if (this.oninput) this.oninput(searchInput.value);
         };
         searchInput.onkeydown = (e) => {
             if (e.key == "Enter") {
+                this.value = searchInput.value;
                 if (this.onenter) this.onenter(searchInput.value);
             }
-            this.value = searchInput.value;
         }
         searchClear.onclick = (e) => {
             searchInput.value = "";
@@ -1953,7 +1953,6 @@ class ContentList {
         const fragment = document.createDocumentFragment();
         let notFoundElement = new NoResultsFound(notFoundMessage).element;
         notFoundElement.style.background = "transparent";
-        this.checkBoxes = [];
         element.classList.add("content-list-wrapper");
         let contentListTop = document.createElement("div");
         contentListTop.className = "content-list-top";
@@ -1987,16 +1986,16 @@ class ContentList {
                 actionElement.onclick = async () => {
                     if (e.func_id) {
                         if (e.func_id == "disable") {
-                            this.checkBoxes.forEach(c => {
-                                if (c.element.checked && isNotDisplayNone(c.element) && c.toggle.toggled) {
+                            this.items.forEach(c => {
+                                if (c.checkbox && c.checkbox.checked && this.isCheckboxVisible(c.checkbox) && c.toggle.toggled) {
                                     c.toggle.toggle();
                                 }
                             });
                             this.uncheckCheckboxes();
                             this.figureOutMainCheckedState();
                         } else if (e.func_id == "enable") {
-                            this.checkBoxes.forEach(c => {
-                                if (c.element.checked && isNotDisplayNone(c.element) && !c.toggle.toggled) {
+                            this.items.forEach(c => {
+                                if (c.checkbox && c.checkbox.checked && this.isCheckboxVisible(c.checkbox) && !c.toggle.toggled) {
                                     c.toggle.toggle();
                                 }
                             });
@@ -2007,7 +2006,7 @@ class ContentList {
                     }
                     if (e.show_confirmation_dialog) {
                         let dialog = new Dialog();
-                        dialog.showDialog(e.dialog_title, "notice", e.dialog_content.replace("%s", this.checkBoxes.filter(c => c.element.checked && isNotDisplayNone(c.element)).length), [
+                        dialog.showDialog(e.dialog_title, "notice", e.dialog_content.replace("%s", this.items.filter(c => c.checkbox && c.checkbox.checked && this.isCheckboxVisible(c.checkbox)).length), [
                             {
                                 "type": "cancel",
                                 "content": "Cancel"
@@ -2020,10 +2019,10 @@ class ContentList {
                             if (e.dont_loop) {
                                 let eles = [];
                                 let infos = [];
-                                for (let i = 0; i < this.checkBoxes.length; i++) {
-                                    let c = this.checkBoxes[i];
-                                    if (c.element.checked && isNotDisplayNone(c.element)) {
-                                        eles.push(c.element.parentElement);
+                                for (let i = 0; i < this.items.length; i++) {
+                                    let c = this.items[i];
+                                    if (c.checkbox.checked && this.isCheckboxVisible(c.checkbox)) {
+                                        eles.push(c.checkbox.parentElement);
                                         infos.push(c.content_info);
                                     }
                                 }
@@ -2032,10 +2031,10 @@ class ContentList {
                                 this.figureOutMainCheckedState();
                                 return;
                             }
-                            for (let i = 0; i < this.checkBoxes.length; i++) {
-                                let c = this.checkBoxes[i];
-                                if (c.element.checked && isNotDisplayNone(c.element)) {
-                                    e.func(c.element.parentElement, c.content_info);
+                            for (let i = 0; i < this.items.length; i++) {
+                                let c = this.items[i];
+                                if (c.checkbox.checked && this.isCheckboxVisible(c.checkbox)) {
+                                    e.func(c.checkbox.parentElement, c.content_info);
                                 }
                             }
                             this.uncheckCheckboxes();
@@ -2046,10 +2045,10 @@ class ContentList {
                     if (e.dont_loop) {
                         let eles = [];
                         let infos = [];
-                        for (let i = 0; i < this.checkBoxes.length; i++) {
-                            let c = this.checkBoxes[i];
-                            if (c.element.checked && isNotDisplayNone(c.element)) {
-                                eles.push(c.element.parentElement);
+                        for (let i = 0; i < this.items.length; i++) {
+                            let c = this.items[i];
+                            if (c.checkbox.checked && this.isCheckboxVisible(c.checkbox)) {
+                                eles.push(c.checkbox.parentElement);
                                 infos.push(c.content_info);
                             }
                         }
@@ -2058,10 +2057,10 @@ class ContentList {
                         this.figureOutMainCheckedState();
                         return;
                     }
-                    for (let i = 0; i < this.checkBoxes.length; i++) {
-                        let c = this.checkBoxes[i];
-                        if (c.element.checked && isNotDisplayNone(c.element)) {
-                            e.func(c.element.parentElement, c.content_info);
+                    for (let i = 0; i < this.items.length; i++) {
+                        let c = this.items[i];
+                        if (c.checkbox.checked && this.isCheckboxVisible(c.element)) {
+                            e.func(c.checkbox.parentElement, c.content_info);
                         }
                     }
                     this.uncheckCheckboxes();
@@ -2141,7 +2140,12 @@ class ContentList {
             contentEle.classList.add("content-list-item");
             if (contentInfo.class) contentEle.classList.add(contentInfo.class);
             if (contentInfo.type) contentEle.setAttribute("data-type", contentInfo.type);
-            this.items.push({ "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title(), contentInfo.secondary_column.desc()].join("!!!!!!!!!!"), "element": contentEle, "type": contentInfo.type });
+            let item = {
+                "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title(), contentInfo.secondary_column.desc()].join("!!!!!!!!!!"),
+                "element": contentEle,
+                "type": contentInfo.type
+            }
+            this.items.push(item);
             let checkboxElement;
             if (features?.checkbox?.enabled) {
                 checkboxElement = document.createElement("input");
@@ -2211,7 +2215,9 @@ class ContentList {
                 contentEle.appendChild(toggleElement);
             }
             if (checkboxElement) {
-                this.checkBoxes.push({ "element": checkboxElement, "content_info": contentInfo.pass_to_checkbox, "toggle": toggle });
+                item.checkbox = checkboxElement;
+                item.content_info = contentInfo.pass_to_checkbox;
+                item.toggle = toggle;
             }
             if (features?.remove?.enabled) {
                 let removeElement = document.createElement("button");
@@ -2273,6 +2279,23 @@ class ContentList {
         this.applyFilters(this.searchBar.value, this.filter.value, this.paginationBottom.currentPage);
     }
 
+    isCheckboxVisible(element) {
+        let dropdown = this.filter.value;
+        let search = this.searchBar.value;
+        console.log(dropdown);
+        console.log(search);
+        let validCheckBoxes = this.items.filter((e) => {
+            if (!e.name.toLowerCase().includes(search.toLowerCase().trim())) {
+                return false;
+            }
+            if (e.type != dropdown && dropdown != "all") {
+                return false;
+            }
+            return true;
+        }).map(e => e.checkbox);
+        return validCheckBoxes.includes(element);
+    }
+
     removeElement(ele) {
         ele.remove();
         this.items = this.items.filter(e => e.element != ele);
@@ -2327,15 +2350,16 @@ class ContentList {
         if (!this.checkBox) return;
         let total = 0;
         let checked = 0;
-        let checkboxes = this.checkBoxes.map(e => e.element);
+        let checkboxes = this.items.map(e => e.checkbox);
         for (let i = 0; i < checkboxes.length; i++) {
-            if (checkboxes[i].checked && document.body.contains(checkboxes[i])) {
+            if (checkboxes[i].checked && this.isCheckboxVisible(checkboxes[i])) {
                 checked++;
             }
-            if (document.body.contains(checkboxes[i])) {
+            if (this.isCheckboxVisible(checkboxes[i])) {
                 total++;
             }
         }
+        console.log({total,checked})
         if (total == checked && total != 0) {
             this.checkBox.checked = true;
             this.checkBox.indeterminate = false;
@@ -2353,14 +2377,14 @@ class ContentList {
         }
     }
     checkCheckboxes() {
-        this.checkBoxes.map(e => e.element).forEach((e) => {
-            if (document.body.contains(e)) e.checked = true;
+        this.items.map(e => e.checkbox).forEach((e) => {
+            if (this.isCheckboxVisible(e)) e.checked = true;
         });
         this.checkBoxActions.forEach(e => e.style.display = "");
     }
     uncheckCheckboxes() {
-        this.checkBoxes.map(e => e.element).forEach((e) => {
-            if (document.body.contains(e)) e.checked = false;
+        this.items.map(e => e.checkbox).forEach((e) => {
+            if (this.isCheckboxVisible(e)) e.checked = false;
         });
         this.checkBoxActions.forEach(e => e.style.display = "none");
     }
