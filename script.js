@@ -7724,6 +7724,7 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
     let buttonLeft = document.createElement("button");
     buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
     buttonLeft.className = "screenshot-arrow";
+    let screenshotElement;
     let changeDisplay = (name, file, desc) => {
         screenshotDisplayW.innerHTML = '';
         let spinner = document.createElement("div");
@@ -7782,6 +7783,8 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
         screenshotDesc.innerHTML = sanitize(desc);
         screenshotDisplay.src = file;
         screenshotDisplay.alt = sanitize(name);
+        if (pixelationToggle.toggled) screenshotDisplay.style.imageRendering = "pixelated";
+        screenshotElement = screenshotDisplay;
     }
     let shiftLeft = () => {
         index--;
@@ -7857,6 +7860,18 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
     if (instanceInfo) {
         screenshotActions.appendChild(screenshotAction5);
     }
+    let screenshotAction6 = document.createElement("div");
+    screenshotAction6.className = "dialog-text-label-wrapper-horizontal";
+    let toggleElement = document.createElement("button");
+    let pixelationToggle = new Toggle(toggleElement, (v) => {
+        if (screenshotElement) screenshotElement.style.imageRendering = v ? "pixelated" : "";
+    }, false);
+    let label = document.createElement("label");
+    label.className= "dialog-label";
+    label.innerText = translate("app.gallery.pixelated");
+    screenshotAction6.appendChild(toggleElement);
+    screenshotAction6.appendChild(label);
+    screenshotActions.appendChild(screenshotAction6);
     screenshotWrapper.appendChild(buttonLeft);
     screenshotWrapper.appendChild(screenshotDisplayW);
     screenshotWrapper.appendChild(buttonRight);

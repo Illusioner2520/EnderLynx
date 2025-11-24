@@ -784,5 +784,6 @@
     "app.import.worlds.fail": "Unable to import world file %f",
     "app.import.skin.fail": "Unable to import skin file %f",
     "app.home.discover.refresh": "Refresh",
-    "app.home.discover.refresh.failed": "Failed to fetch new modpacks"
+    "app.home.discover.refresh.failed": "Failed to fetch new modpacks",
+    "app.gallery.pixelated": "View Pixelated"
 }
