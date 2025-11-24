@@ -3883,6 +3883,7 @@ dialog[open]::backdrop {
     ol,
     p,
     code,
+    kbd,
     pre,
     table,
     ul {
@@ -3969,14 +3970,15 @@ dialog[open]::backdrop {
         background-color: var(--color-1);
         overflow-x: auto;
 
-        code {
+        code, kbd {
             font-size: 100%;
             padding: 0;
             border-radius: 0;
         }
     }
 
-    code {
+    code,
+    kbd {
         padding: 2px 4px;
         font-size: 100%;
         border-radius: 5px;
