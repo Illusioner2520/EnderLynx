@@ -8009,6 +8009,41 @@ function formatDate(dateString, year_to_show_never_played_before) {
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
 }
 
+function formatTimeRelatively(timeString) {
+    let today = new Date();
+    let date = new Date(timeString);
+    let diff = today.getTime() - date.getTime();
+    if (diff < 60000) {
+        let value = Math.floor(diff / 1000);
+        if (value == 1) return translate("app.date.seconds.singular", "%t", 1);
+        return translate("app.date.seconds", "%t", value);
+    } else if (diff < 3600000) {
+        let value = Math.floor(diff / 60000);
+        if (value == 1) return translate("app.date.minutes.singular", "%t", 1);
+        return translate("app.date.minutes", "%t", value);
+    } else if (diff < 86400000) {
+        let value = Math.floor(diff / 3600000);
+        if (value == 1) return translate("app.date.hours.singular", "%t", 1);
+        return translate("app.date.hours", "%t", value);
+    } else if (diff < 604800000) {
+        let value = Math.floor(diff / 86400000);
+        if (value == 1) return translate("app.date.days.singular", "%t", 1);
+        return translate("app.date.days", "%t", value);
+    } else if (diff < 2628000000) {
+        let value = Math.round(diff / 604800000);
+        if (value == 1) return translate("app.date.weeks.singular", "%t", 1);
+        return translate("app.date.weeks", "%t", value);
+    } else if (diff < 31540000000) {
+        let value = Math.round(diff / 2628000000);
+        if (value == 1) return translate("app.date.months.singular", "%t", 1);
+        return translate("app.date.months", "%t", value);
+    } else {
+        let value = Math.round(diff / 31540000000);
+        if (value == 1) return translate("app.date.years.singular", "%t", 1);
+        return translate("app.date.years", "%t", value)
+    }
+}
+
 function formatDateAndTime(dateString) {
     let date = new Date(dateString);
     if (isNaN(date.getTime())) {

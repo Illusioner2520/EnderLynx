@@ -791,5 +791,19 @@
     "app.import.skin.fail": "Unable to import skin file %f",
     "app.home.discover.refresh": "Refresh",
     "app.home.discover.refresh.failed": "Failed to fetch new modpacks",
-    "app.gallery.pixelated": "View Pixelated"
+    "app.gallery.pixelated": "View Pixelated",
+    "app.date.seconds.singular": "%t second ago",
+    "app.date.seconds": "%t seconds ago",
+    "app.date.minutes.singular": "%t minute ago",
+    "app.date.minutes": "%t minutes ago",
+    "app.date.hours.singular": "%t hour ago",
+    "app.date.hours": "%t hours ago",
+    "app.date.days.singular": "%t day ago",
+    "app.date.days": "%t days ago",
+    "app.date.weeks.singular": "%t week ago",
+    "app.date.weeks": "%t weeks ago",
+    "app.date.months.singular": "%t month ago",
+    "app.date.months": "%t months ago",
+    "app.date.years.singular": "%t year ago",
+    "app.date.years": "%t years ago"
 }
