@@ -9,6 +9,7 @@ const zlib = require('zlib');
 const toml = require('toml');
 const pLimit = require('p-limit').default;
 const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt, setUserPath, setWindow } = require('./launch.js');
+const { queryServer } = require('./servers.js');
 const { Auth } = require('msmc');
 const querystring = require('querystring');
 const https = require('https');
@@ -1917,6 +1918,21 @@ ipcMain.handle('add-content', async (_, instance_id, project_type, project_url, 
     return await addContent(instance_id, project_type, project_url, filename, data_pack_world);
 });
 
+ipcMain.handle('add-server', async (_, instance_id, ip, name) => {
+    return await addServer(instance_id, ip, name, await getServerImage(ip));
+});
+
+async function getServerImage(ip) {
+    let ipSplit = ip.split(":");
+    let info;
+    try {
+        info = await queryServer(ipSplit[0], ipSplit[1] ? ipSplit[1] : 25565);
+    } catch (e) {
+        return null;
+    }
+    return info.favicon;
+}
+
 async function addContent(instance_id, project_type, project_url, filename, data_pack_world) {
     if (project_type == "server") {
         let v = await addServer(instance_id, project_url, filename, data_pack_world);
@@ -2011,7 +2027,12 @@ ipcMain.handle('download-cape', async (_, url, id) => {
     await urlToFile(url, path.resolve(user_path, `minecraft/capes/${id}.png`));
 });
 
+ipcMain.handle('query-server', async (_, host, port) => {
+    return await queryServer(host, port);
+});
+
 async function addServer(instance_id, ip, title, image) {
+    if (!title) title = "Minecraft Server";
     let patha = path.resolve(user_path, `minecraft/instances/${instance_id}`);
     let serversDatPath = path.resolve(patha, 'servers.dat');
     let data = {};

@@ -1862,6 +1862,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
             if (zip.getEntry('manifest.json')) return true;
         }
         return false;
+    },
+    queryServer: async (host, port) => {
+        return await ipcRenderer.invoke('query-server', host, port);
+    },
+    addServer: async (instance_id, ip, name) => {
+        return await ipcRenderer.invoke('add-server', instance_id, ip, name);
     }
 });
 

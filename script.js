@@ -6756,7 +6756,6 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
         ], [], (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            console.log(info);
             for (let i = 0; i < info.world.length; i++) {
                 let world = info.world[i];
                 try {
@@ -6774,6 +6773,38 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.add")
     addContent.onclick = () => {
         showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, "world");
+    }
+    let addServer = document.createElement("button");
+    addServer.classList.add("add-content-button");
+    addServer.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.server")
+    addServer.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.worlds.server.title"), "form", [
+            {
+                "type": "text",
+                "id": "name",
+                "name": translate("app.worlds.server.name")
+            },
+            {
+                "type": "text",
+                "id": "ip",
+                "name": translate("app.worlds.server.ip")
+            }
+        ], [
+            {
+                "type": "cancel",
+                "content": translate("app.worlds.server.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.worlds.server.confirm")
+            }
+        ], [], async (v) => {
+            let info = {};
+            v.forEach(e => info[e.id] = e.value);
+            await window.electronAPI.addServer(instanceInfo.instance_id, info.ip, info.name);
+            setInstanceTabContentWorlds(instanceInfo, element);
+        })
     }
     let contentSearch = document.createElement("div");
     contentSearch.style.flexGrow = 2;
@@ -6802,6 +6833,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     searchAndFilter.appendChild(typeDropdown);
     searchAndFilter.appendChild(importWorlds);
     searchAndFilter.appendChild(addContent);
+    searchAndFilter.appendChild(addServer);
     let fileDrop = document.createElement("div");
     fileDrop.dataset.action = "world-import";
     fileDrop.dataset.instanceId = instanceInfo.instance_id;
