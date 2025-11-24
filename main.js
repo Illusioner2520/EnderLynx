@@ -2066,10 +2066,6 @@ async function addServer(instance_id, ip, title, image) {
                 "type": "string",
                 "value": ip
             },
-            "acceptTextures": {
-                "type": "byte",
-                "value": 1
-            },
             "hidden": {
                 "type": "byte",
                 "value": 0
