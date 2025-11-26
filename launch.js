@@ -510,7 +510,9 @@ class Minecraft {
             signal.throwIfAborted();
 
             const installerPath = `${neoForgeMetaDir}/neoforge-installer.jar`;
-            await urlToFile(neoForgeInstallerUrl, installerPath, { signal });
+            await urlToFile(neoForgeInstallerUrl, installerPath, { signal, onProgress: (v) => {
+                win.webContents.send('progress-update', "Downloading NeoForge", v / 5, "Downloading NeoForge installer...", processId, "good", cancelId, true);
+            } });
             signal.throwIfAborted();
 
             let zip = new AdmZip(installerPath);
