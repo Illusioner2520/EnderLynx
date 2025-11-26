@@ -3386,6 +3386,17 @@ dialog[open]::backdrop {
     overflow: hidden;
 }
 
+.home-world-entry {
+    background-color: var(--color-1t);
+    border-radius: 10px;
+    display: flex;
+    padding: 8px;
+    gap: 8px;
+    align-items: center;
+    transition: background-color .25s, scale .1s;
+    overflow: hidden;
+}
+
 .home-entry:hover {
     background-color: var(--color-2t);
 }
@@ -3428,6 +3439,7 @@ dialog[open]::backdrop {
     padding-right: 10px;
     width: max-content;
     z-index: 2;
+    padding-left: 6px;
 }
 
 .home-list-section {
@@ -5098,4 +5110,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
 
 .instance-content:has(.instance-item) .loading-container {
     display: none;
+}
+
+.home-icon {
+    color: var(--subtle-text-color);
+    width: 1lh;
+    text-align: center;
 }

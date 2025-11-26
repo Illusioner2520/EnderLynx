@@ -3648,13 +3648,13 @@ async function showHomeContent(oldEle) {
     pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     let pinnedWorldTitle = document.createElement("h2");
-    pinnedWorldTitle.innerHTML = '<i class="fa-solid fa-thumbtack" style="color: var(--subtle-text-color)"></i> ' + translate("app.home.pinned_worlds");
+    pinnedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_worlds");
     let pinnedInstanceTitle = document.createElement("h2");
-    pinnedInstanceTitle.innerHTML = '<i class="fa-solid fa-thumbtack" style="color: var(--subtle-text-color)"></i> ' + translate("app.home.pinned_instances");
+    pinnedInstanceTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_instances");
     let lastPlayedWorldTitle = document.createElement("h2");
-    lastPlayedWorldTitle.innerHTML = '<i class="fa-solid fa-clock-rotate-left" style="color: var(--subtle-text-color)"></i> ' + translate("app.home.last_played_worlds");
+    lastPlayedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-clock-rotate-left"></i>' + translate("app.home.last_played_worlds");
     let lastPlayedInstanceTitle = document.createElement("h2");
-    lastPlayedInstanceTitle.innerHTML = '<i class="fa-solid fa-clock-rotate-left" style="color: var(--subtle-text-color)"></i> ' + translate("app.home.last_played_instances");
+    lastPlayedInstanceTitle.innerHTML = '<i class="home-icon fa-solid fa-clock-rotate-left"></i>' + translate("app.home.last_played_instances");
     let pinnedWorldGrid = document.createElement("div");
     pinnedWorldGrid.className = "home-list-section";
     let lastPlayedWorldGrid = document.createElement("div");
@@ -3668,7 +3668,7 @@ async function showHomeContent(oldEle) {
         else e.type = "multiplayer";
 
         let item = document.createElement("div");
-        item.className = "home-entry";
+        item.className = "home-world-entry";
         item.style.cursor = "auto";
         let icon = document.createElement("img");
         icon.className = "instance-image";
