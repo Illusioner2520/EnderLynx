@@ -3401,6 +3401,7 @@ dialog[open]::backdrop {
     justify-content: center;
     text-align: center;
     position: relative;
+    flex-direction: column;
 }
 
 .home-element {
@@ -5071,4 +5072,30 @@ div:has(> .dialog-wrapper-hidden.shown) {
 .download-ignore-button:hover {
     background-color: var(--text-color);
     color: var(--background-color);
+}
+
+.home-create-button {
+    border-radius: 10px;
+    padding: 8px;
+    background-color: var(--color-1t);
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.home-create-button:active {
+    scale: .95;
+}
+
+.home-create-button:hover {
+    background-color: var(--color-2t);
+}
+
+.instance-content:has(.instance-item) .loading-container {
+    display: none;
 }

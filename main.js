@@ -42,7 +42,9 @@ if (!fs.existsSync(pathPath)) {
     }
 }
 
-if (!fs.existsSync(user_path)) user_path = userDataPath;
+if (!fs.existsSync(user_path)) {
+    fs.mkdirSync(user_path);
+}
 
 setUserPath(user_path);
 

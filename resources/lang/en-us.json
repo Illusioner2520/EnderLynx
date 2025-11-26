@@ -813,5 +813,6 @@
     "app.downloads.all_processes": "All Processes",
     "app.downloads.done": "Done",
     "app.downloads.canceling": "Canceling",
-    "app.downloads.none": "No Processes Running"
+    "app.downloads.none": "No Processes Running",
+    "app.instances.none": "No Instances Found"
 }

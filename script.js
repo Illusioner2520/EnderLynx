@@ -3979,6 +3979,13 @@ async function showHomeContent(oldEle) {
     let noPlayedInstances = document.createElement("div");
     noPlayedInstances.className = "home-entry-empty";
     noPlayedInstances.innerHTML = translate("app.instances.no_played");
+    let createButton = document.createElement("button");
+    createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
+    createButton.className = 'home-create-button';
+    createButton.onclick = () => {
+        showCreateInstanceDialog();
+    }
+    noPlayedInstances.appendChild(createButton);
     if (pinnedWorlds.length || pinnedInstances.length) {
         column1.appendChild(pinnedWorldTitle);
         column1.appendChild(pinnedWorlds.length ? pinnedWorldGrid : noPinnedWorlds);
@@ -5047,267 +5054,7 @@ function showInstanceContent(e) {
     createButton.classList.add("create-button");
     createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
     createButton.onclick = (e) => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.button.instances.create"), "form", [
-            {
-                "type": "image-upload",
-                "id": "icon",
-                "tab": "custom",
-                "name": translate("app.instances.icon")
-            },
-            {
-                "type": "text",
-                "name": translate("app.instances.name"),
-                "id": "name",
-                "tab": "custom",
-                "maxlength": 50
-            },
-            {
-                "type": "multi-select",
-                "name": translate("app.instances.loader"),
-                "options": [
-                    { "name": loaders["vanilla"], "value": "vanilla" },
-                    { "name": loaders["fabric"], "value": "fabric" },
-                    { "name": loaders["forge"], "value": "forge" },
-                    { "name": loaders["neoforge"], "value": "neoforge" },
-                    { "name": loaders["quilt"], "value": "quilt" }
-                ],
-                "id": "loader",
-                "tab": "custom"
-            },
-            {
-                "type": "dropdown",
-                "name": translate("app.instances.game_version"),
-                "options": [],
-                "id": "game_version",
-                "input_source": "loader",
-                "source": VersionList.getVersions,
-                "tab": "custom",
-                "default": VersionList.getLatestRelease()
-            },
-            {
-                "type": "image-upload",
-                "id": "icon_c",
-                "tab": "code",
-                "name": translate("app.instances.icon")
-            },
-            {
-                "type": "text",
-                "id": "name_c",
-                "tab": "code",
-                "name": translate("app.instances.name"),
-                "maxlength": 50
-            },
-            {
-                "type": "text",
-                "id": "profile_code",
-                "tab": "code",
-                "name": translate("app.instances.cf_code")
-            },
-            {
-                "type": "image-upload",
-                "id": "icon_f",
-                "tab": "file",
-                "name": translate("app.instances.icon")
-            },
-            {
-                "type": "text",
-                "id": "name_f",
-                "tab": "file",
-                "name": translate("app.instances.name"),
-                "maxlength": 50
-            },
-            {
-                "type": "text",
-                "id": "file",
-                "tab": "file",
-                "name": translate("app.instances.file"),
-                "desc": translate("app.instances.file.description"),
-                "default": "",
-                "buttons": [
-                    {
-                        "name": translate("app.instances.file.browse"),
-                        "icon": '<i class="fa-solid fa-file"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 0);
-                            if (newValue) i.value = newValue;
-                        }
-                    }/*,
-                    {
-                        "name": "Browse Folders",
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 1);
-                            if (newValue) i.value = newValue;
-                        }
-                    }*/
-                ]
-            }//,
-            // {
-            //     "type": "dropdown",
-            //     "id": "launcher",
-            //     "tab": "launcher",
-            //     "name": translate("app.instances.launcher"),
-            //     "options": [
-            //         {
-            //             "name": translate("app.launcher.modrinth"),
-            //             "value": "modrinth"
-            //         },
-            //         {
-            //             "name": translate("app.launcher.curseforge"),
-            //             "value": "curseforge"
-            //         },
-            //         {
-            //             "name": translate("app.launcher.multimc"),
-            //             "value": "multimc"
-            //         },
-            //         {
-            //             "name": translate("app.launcher.prism"),
-            //             "value": "prism"
-            //         },
-            //         {
-            //             "name": translate("app.launcher.atlauncher"),
-            //             "value": "atlauncher"
-            //         },
-            //         {
-            //             "name": translate("app.launcher.gdlauncher"),
-            //             "value": "gdlauncher"
-            //         },
-            //         {
-            //             "name": translate("app.launcher.vanilla"),
-            //             "value": "vanilla"
-            //         }
-            //     ]
-            // }
-        ], [
-            { "content": translate("app.instances.cancel"), "type": "cancel" },
-            { "content": translate("app.instances.submit"), "type": "confirm" }
-        ], [
-            {
-                "name": translate("app.instances.tab.custom"),
-                "value": "custom"
-            },
-            {
-                "name": translate("app.instances.tab.file"),
-                "value": "file"
-            },
-            {
-                "name": translate("app.instances.tab.code"),
-                "value": "code"
-            }//,
-            // {
-            //     "name": translate("app.instances.tab.launcher"),
-            //     "value": "launcher"
-            // }
-        ], async (e) => {
-            let info = {};
-            e.forEach(e => { info[e.id] = e.value });
-            if (info.selected_tab == "custom") {
-                if (info.game_version == "loading") {
-                    displayError(translate("app.instances.no_game_version"));
-                    return;
-                }
-                if (!info.name) {
-                    displayError(translate("app.instances.no_name"));
-                    return;
-                }
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
-                let loader_version = "";
-                try {
-                    if (info.loader == "fabric") {
-                        loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
-                    } else if (info.loader == "forge") {
-                        loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
-                    } else if (info.loader == "neoforge") {
-                        loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
-                    } else if (info.loader == "quilt") {
-                        loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
-                    }
-                } catch (e) {
-                    displayError(translate("app.instances.failed_to_create"));
-                    return;
-                }
-                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
-                showSpecificInstanceContent(instance);
-                let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
-                if (r.error) {
-                    instance.setFailed(true);
-                } else {
-                    instance.setJavaPath(r.java_installation);
-                    instance.setJavaVersion(r.java_version);
-                    instance.setMcInstalled(true);
-                }
-            } else if (info.selected_tab == "file") {
-                if (!info.name_if) info.name_if = "";
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
-                let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
-                showSpecificInstanceContent(instance);
-                let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
-                console.log(packInfo);
-                if (packInfo.error) {
-                    instance.setFailed(true);
-                    instance.setInstalling(false);
-                    return;
-                }
-                if (!("loader_version" in packInfo)) {
-                    displayError(packInfo);
-                    return;
-                }
-                instance.setLoader(packInfo.loader);
-                instance.setVanillaVersion(packInfo.vanilla_version);
-                instance.setLoaderVersion(packInfo.loader_version);
-                if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
-                if (!instance.name && packInfo.name) instance.setName(packInfo.name);
-                if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
-                packInfo.content.forEach(e => {
-                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-                });
-                instance.setInstalling(false);
-                let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-                if (r.error) {
-                    instance.setFailed(true);
-                } else {
-                    instance.setJavaPath(r.java_installation);
-                    instance.setJavaVersion(r.java_version);
-                    instance.setMcInstalled(true);
-                }
-            } else if (info.selected_tab == "launcher") {
-                // Import from launcher here
-            } else if (info.selected_tab == "code") {
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name_c);
-                let instance = data.addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
-                showSpecificInstanceContent(instance);
-                let packInfo = await window.electronAPI.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
-                console.log(packInfo);
-                if (!packInfo) {
-                    displayError(translate("app.cf.code.error"));
-                    instance.delete();
-                    instanceContent.displayContent();
-                    return;
-                }
-                if (!("loader_version" in packInfo)) {
-                    displayError(packInfo);
-                    return;
-                }
-                instance.setLoader(packInfo.loader);
-                instance.setVanillaVersion(packInfo.vanilla_version);
-                instance.setLoaderVersion(packInfo.loader_version);
-                if (!instance.name && packInfo.name) instance.setName(packInfo.name);
-                if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
-                packInfo.content.forEach(e => {
-                    instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-                });
-                instance.setInstalling(false);
-                let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-                if (r.error) {
-                    instance.setFailed(true);
-                } else {
-                    instance.setJavaPath(r.java_installation);
-                    instance.setJavaVersion(r.java_version);
-                    instance.setMcInstalled(true);
-                }
-            }
-        })
+        showCreateInstanceDialog();
     }
     title.appendChild(createButton);
     ele.appendChild(title);
@@ -5333,6 +5080,9 @@ function showInstanceContent(e) {
     let groupOne = document.createElement("div");
     groupOne.setAttribute("data-group-title", "");
     groupOne.classList.add("group");
+    let noResultsEle = new NoResultsFound(translate("app.instances.none")).element;
+    noResultsEle.style.gridColumn = "1 / -1";
+    ele.appendChild(noResultsEle);
     instanceGrid.appendChild(groupOne);
     ele.appendChild(instanceGrid);
     let instances = data.getInstances();
@@ -5506,6 +5256,271 @@ function showInstanceContent(e) {
     }
     return ele;
 }
+
+function showCreateInstanceDialog() {
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.button.instances.create"), "form", [
+        {
+            "type": "image-upload",
+            "id": "icon",
+            "tab": "custom",
+            "name": translate("app.instances.icon")
+        },
+        {
+            "type": "text",
+            "name": translate("app.instances.name"),
+            "id": "name",
+            "tab": "custom",
+            "maxlength": 50
+        },
+        {
+            "type": "multi-select",
+            "name": translate("app.instances.loader"),
+            "options": [
+                { "name": loaders["vanilla"], "value": "vanilla" },
+                { "name": loaders["fabric"], "value": "fabric" },
+                { "name": loaders["forge"], "value": "forge" },
+                { "name": loaders["neoforge"], "value": "neoforge" },
+                { "name": loaders["quilt"], "value": "quilt" }
+            ],
+            "id": "loader",
+            "tab": "custom"
+        },
+        {
+            "type": "dropdown",
+            "name": translate("app.instances.game_version"),
+            "options": [],
+            "id": "game_version",
+            "input_source": "loader",
+            "source": VersionList.getVersions,
+            "tab": "custom",
+            "default": VersionList.getLatestRelease()
+        },
+        {
+            "type": "image-upload",
+            "id": "icon_c",
+            "tab": "code",
+            "name": translate("app.instances.icon")
+        },
+        {
+            "type": "text",
+            "id": "name_c",
+            "tab": "code",
+            "name": translate("app.instances.name"),
+            "maxlength": 50
+        },
+        {
+            "type": "text",
+            "id": "profile_code",
+            "tab": "code",
+            "name": translate("app.instances.cf_code")
+        },
+        {
+            "type": "image-upload",
+            "id": "icon_f",
+            "tab": "file",
+            "name": translate("app.instances.icon")
+        },
+        {
+            "type": "text",
+            "id": "name_f",
+            "tab": "file",
+            "name": translate("app.instances.name"),
+            "maxlength": 50
+        },
+        {
+            "type": "text",
+            "id": "file",
+            "tab": "file",
+            "name": translate("app.instances.file"),
+            "desc": translate("app.instances.file.description"),
+            "default": "",
+            "buttons": [
+                {
+                    "name": translate("app.instances.file.browse"),
+                    "icon": '<i class="fa-solid fa-file"></i>',
+                    "func": async (v, b, i) => {
+                        let newValue = await window.electronAPI.triggerFileImportBrowse(v, 0);
+                        if (newValue) i.value = newValue;
+                    }
+                }/*,
+                    {
+                        "name": "Browse Folders",
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 1);
+                            if (newValue) i.value = newValue;
+                        }
+                    }*/
+            ]
+        }//,
+        // {
+        //     "type": "dropdown",
+        //     "id": "launcher",
+        //     "tab": "launcher",
+        //     "name": translate("app.instances.launcher"),
+        //     "options": [
+        //         {
+        //             "name": translate("app.launcher.modrinth"),
+        //             "value": "modrinth"
+        //         },
+        //         {
+        //             "name": translate("app.launcher.curseforge"),
+        //             "value": "curseforge"
+        //         },
+        //         {
+        //             "name": translate("app.launcher.multimc"),
+        //             "value": "multimc"
+        //         },
+        //         {
+        //             "name": translate("app.launcher.prism"),
+        //             "value": "prism"
+        //         },
+        //         {
+        //             "name": translate("app.launcher.atlauncher"),
+        //             "value": "atlauncher"
+        //         },
+        //         {
+        //             "name": translate("app.launcher.gdlauncher"),
+        //             "value": "gdlauncher"
+        //         },
+        //         {
+        //             "name": translate("app.launcher.vanilla"),
+        //             "value": "vanilla"
+        //         }
+        //     ]
+        // }
+    ], [
+        { "content": translate("app.instances.cancel"), "type": "cancel" },
+        { "content": translate("app.instances.submit"), "type": "confirm" }
+    ], [
+        {
+            "name": translate("app.instances.tab.custom"),
+            "value": "custom"
+        },
+        {
+            "name": translate("app.instances.tab.file"),
+            "value": "file"
+        },
+        {
+            "name": translate("app.instances.tab.code"),
+            "value": "code"
+        }//,
+        // {
+        //     "name": translate("app.instances.tab.launcher"),
+        //     "value": "launcher"
+        // }
+    ], async (e) => {
+        let info = {};
+        e.forEach(e => { info[e.id] = e.value });
+        if (info.selected_tab == "custom") {
+            if (info.game_version == "loading") {
+                displayError(translate("app.instances.no_game_version"));
+                return;
+            }
+            if (!info.name) {
+                displayError(translate("app.instances.no_name"));
+                return;
+            }
+            let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+            let loader_version = "";
+            try {
+                if (info.loader == "fabric") {
+                    loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                } else if (info.loader == "forge") {
+                    loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                } else if (info.loader == "neoforge") {
+                    loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                } else if (info.loader == "quilt") {
+                    loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                }
+            } catch (e) {
+                displayError(translate("app.instances.failed_to_create"));
+                return;
+            }
+            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+            showSpecificInstanceContent(instance);
+            let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+            if (r.error) {
+                instance.setFailed(true);
+            } else {
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
+            }
+        } else if (info.selected_tab == "file") {
+            if (!info.name_if) info.name_if = "";
+            let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
+            let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
+            showSpecificInstanceContent(instance);
+            let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
+            console.log(packInfo);
+            if (packInfo.error) {
+                instance.setFailed(true);
+                instance.setInstalling(false);
+                return;
+            }
+            if (!("loader_version" in packInfo)) {
+                displayError(packInfo);
+                return;
+            }
+            instance.setLoader(packInfo.loader);
+            instance.setVanillaVersion(packInfo.vanilla_version);
+            instance.setLoaderVersion(packInfo.loader_version);
+            if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
+            if (!instance.name && packInfo.name) instance.setName(packInfo.name);
+            if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
+            packInfo.content.forEach(e => {
+                instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+            });
+            instance.setInstalling(false);
+            let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+            if (r.error) {
+                instance.setFailed(true);
+            } else {
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
+            }
+        } else if (info.selected_tab == "launcher") {
+            // Import from launcher here
+        } else if (info.selected_tab == "code") {
+            let instance_id = window.electronAPI.getInstanceFolderName(info.name_c);
+            let instance = data.addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
+            showSpecificInstanceContent(instance);
+            let packInfo = await window.electronAPI.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
+            console.log(packInfo);
+            if (!packInfo) {
+                displayError(translate("app.cf.code.error"));
+                instance.delete();
+                instanceContent.displayContent();
+                return;
+            }
+            if (!("loader_version" in packInfo)) {
+                displayError(packInfo);
+                return;
+            }
+            instance.setLoader(packInfo.loader);
+            instance.setVanillaVersion(packInfo.vanilla_version);
+            instance.setLoaderVersion(packInfo.loader_version);
+            if (!instance.name && packInfo.name) instance.setName(packInfo.name);
+            if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
+            packInfo.content.forEach(e => {
+                instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+            });
+            instance.setInstalling(false);
+            let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+            if (r.error) {
+                instance.setFailed(true);
+            } else {
+                instance.setJavaPath(r.java_installation);
+                instance.setJavaVersion(r.java_version);
+                instance.setMcInstalled(true);
+            }
+        }
+    });
+}
+
 function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log) {
     if (!dont_add_to_log) {
         page_log = page_log.slice(0, page_index + 1).concat([() => {
@@ -8247,7 +8262,7 @@ class DownloadLogEntry {
         cancelButton.className = "download-cancel-button";
         cancelButton.onclick = () => {
             if (this.cancelFunction) this.cancelFunction();
-            cancelButton.onclick = () => {};
+            cancelButton.onclick = () => { };
             cancelButton.innerHTML = '<i class="spinner"></i>' + translate("app.downloads.canceling");
             cancelButton.classList.add("disabled");
         }
