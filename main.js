@@ -150,11 +150,12 @@ app.on('open-file', (event, path) => {
     }
 });
 
-ipcMain.handle('set-user-path', (event, new_path, old_path) => {
+function setUserPathMain(new_path, old_path) {
     user_path = new_path;
     fs.writeFileSync(pathPath, JSON.stringify({ user_path, old_path }), 'utf8');
+    setUserPath(new_path);
     return true;
-});
+}
 
 ipcMain.on('progress-update', (event, title, progress, desc) => {
     win.webContents.send('progress-update', title, progress, desc);
@@ -202,130 +203,171 @@ rpc.on('ready', () => {
 });
 
 ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overrides) => {
-    win.webContents.send('progress-update', `Creating .elpack`, 0, `Creating manifest...`);
-    const tempDir = path.resolve(user_path, "temp");
-    fs.mkdirSync(tempDir, { recursive: true });
-    const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.elpack`);
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        win.webContents.send('progress-update', `Creating .elpack`, 0, `Creating manifest...`, processId, "good", cancelId);
+        const tempDir = path.resolve(user_path, "out");
+        fs.mkdirSync(tempDir, { recursive: true });
+        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.elpack`);
 
-    const zip = new AdmZip();
+        const zip = new AdmZip();
 
-    zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+        zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
 
-    for (let i = 0; i < overrides.length; i++) {
-        win.webContents.send('progress-update', `Creating .elpack`, (i + 1) / overrides.length * 95, `Moving Override ${i + 1} of ${overrides.length}`);
-        let override = overrides[i];
-        const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
-        const destPath = "overrides/" + override;
-        if (fs.existsSync(srcPath)) {
-            const stat = fs.statSync(srcPath);
-            if (stat.isDirectory()) {
-                function addDirToZip(dir, zipPath) {
-                    const entries = fs.readdirSync(dir, { withFileTypes: true });
-                    for (const entry of entries) {
-                        const entrySrc = path.join(dir, entry.name);
-                        const entryDest = path.join(zipPath, entry.name);
-                        if (entry.isDirectory()) {
-                            addDirToZip(entrySrc, entryDest);
-                        } else {
-                            zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+        for (let i = 0; i < overrides.length; i++) {
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Creating .elpack`, (i + 1) / overrides.length * 100, `Moving Override ${i + 1} of ${overrides.length}`, processId, "good", cancelId);
+            let override = overrides[i];
+            const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
+            const destPath = "overrides/" + override;
+            if (fs.existsSync(srcPath)) {
+                const stat = fs.statSync(srcPath);
+                if (stat.isDirectory()) {
+                    async function addDirToZip(dir, zipPath) {
+                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        for (const entry of entries) {
+                            const entrySrc = path.join(dir, entry.name);
+                            const entryDest = path.join(zipPath, entry.name);
+                            if (entry.isDirectory()) {
+                                await addDirToZip(entrySrc, entryDest);
+                            } else {
+                                zip.addFile(entryDest.replace(/\\/g, "/"), await fs.promises.readFile(entrySrc));
+                            }
                         }
                     }
+                    addDirToZip(srcPath, destPath);
+                } else {
+                    zip.addFile(destPath.replace(/\\/g, "/"), await fs.promises.readFile(srcPath));
                 }
-                addDirToZip(srcPath, destPath);
-            } else {
-                zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
             }
         }
+        signal.throwIfAborted();
+
+        zip.writeZip(zipPath);
+        signal.throwIfAborted();
+
+        win.webContents.send('progress-update', `Creating .elpack`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('open-file-share', zipPath);
+    } catch (err) {
+        win.webContents.send('progress-update', `Creating .elpack`, 100, err, processId, "error", cancelId);
     }
-
-    zip.writeZip(zipPath);
-
-    win.webContents.send('progress-update', `Creating .elpack`, 100, `Done`);
-    win.webContents.send('open-file-share', zipPath);
 });
 ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overrides) => {
-    win.webContents.send('progress-update', `Creating .mrpack`, 0, `Creating manifest...`);
-    const tempDir = path.resolve(user_path, "temp");
-    fs.mkdirSync(tempDir, { recursive: true });
-    const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.mrpack`);
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        win.webContents.send('progress-update', `Creating .mrpack`, 0, `Creating manifest...`, processId, "good", cancelId);
+        const tempDir = path.resolve(user_path, "out");
+        fs.mkdirSync(tempDir, { recursive: true });
+        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.mrpack`);
 
-    const zip = new AdmZip();
+        const zip = new AdmZip();
 
-    zip.addFile("modrinth.index.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+        zip.addFile("modrinth.index.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+        signal.throwIfAborted();
 
-    for (let i = 0; i < overrides.length; i++) {
-        win.webContents.send('progress-update', `Creating .mrpack`, (i + 1) / overrides.length * 95, `Moving Override ${i + 1} of ${overrides.length}`);
-        let override = overrides[i];
-        const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
-        const destPath = "overrides/" + override;
-        if (fs.existsSync(srcPath)) {
-            const stat = fs.statSync(srcPath);
-            if (stat.isDirectory()) {
-                function addDirToZip(dir, zipPath) {
-                    const entries = fs.readdirSync(dir, { withFileTypes: true });
-                    for (const entry of entries) {
-                        const entrySrc = path.join(dir, entry.name);
-                        const entryDest = path.join(zipPath, entry.name);
-                        if (entry.isDirectory()) {
-                            addDirToZip(entrySrc, entryDest);
-                        } else {
-                            zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+        for (let i = 0; i < overrides.length; i++) {
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Creating .mrpack`, (i + 1) / overrides.length * 100, `Moving Override ${i + 1} of ${overrides.length}`, processId, "good", cancelId);
+            let override = overrides[i];
+            const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
+            const destPath = "overrides/" + override;
+            if (fs.existsSync(srcPath)) {
+                const stat = fs.statSync(srcPath);
+                if (stat.isDirectory()) {
+                    async function addDirToZip(dir, zipPath) {
+                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        for (const entry of entries) {
+                            const entrySrc = path.join(dir, entry.name);
+                            const entryDest = path.join(zipPath, entry.name);
+                            if (entry.isDirectory()) {
+                                await addDirToZip(entrySrc, entryDest);
+                            } else {
+                                zip.addFile(entryDest.replace(/\\/g, "/"), await fs.promises.readFile(entrySrc));
+                            }
                         }
                     }
+                    addDirToZip(srcPath, destPath);
+                } else {
+                    zip.addFile(destPath.replace(/\\/g, "/"), await fs.promises.readFile(srcPath));
                 }
-                addDirToZip(srcPath, destPath);
-            } else {
-                zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
             }
         }
+        signal.throwIfAborted();
+
+        zip.writeZip(zipPath);
+        signal.throwIfAborted();
+
+        win.webContents.send('progress-update', `Creating .mrpack`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('open-file-share', zipPath);
+    } catch (err) {
+        win.webContents.send('progress-update', `Creating .mrpack`, 100, err, processId, "error", cancelId);
     }
-
-    zip.writeZip(zipPath);
-
-    win.webContents.send('progress-update', `Creating .mrpack`, 100, `Done`);
-    win.webContents.send('open-file-share', zipPath);
 });
 ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overrides) => {
-    win.webContents.send('progress-update', `Creating .zip`, 0, `Creating manifest...`);
-    const tempDir = path.resolve(user_path, "temp");
-    fs.mkdirSync(tempDir, { recursive: true });
-    const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.zip`);
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        win.webContents.send('progress-update', `Creating .zip`, 0, `Creating manifest...`, processId, "good", cancelId);
+        const tempDir = path.resolve(user_path, "out");
+        fs.mkdirSync(tempDir, { recursive: true });
+        const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.zip`);
 
-    const zip = new AdmZip();
+        const zip = new AdmZip();
 
-    zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+        zip.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"));
+        signal.throwIfAborted();
 
-    for (let i = 0; i < overrides.length; i++) {
-        win.webContents.send('progress-update', `Creating .zip`, (i + 1) / overrides.length * 95, `Moving Override ${i + 1} of ${overrides.length}`);
-        let override = overrides[i];
-        const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
-        const destPath = "overrides/" + override;
-        if (fs.existsSync(srcPath)) {
-            const stat = fs.statSync(srcPath);
-            if (stat.isDirectory()) {
-                function addDirToZip(dir, zipPath) {
-                    const entries = fs.readdirSync(dir, { withFileTypes: true });
-                    for (const entry of entries) {
-                        const entrySrc = path.join(dir, entry.name);
-                        const entryDest = path.join(zipPath, entry.name);
-                        if (entry.isDirectory()) {
-                            addDirToZip(entrySrc, entryDest);
-                        } else {
-                            zip.addFile(entryDest.replace(/\\/g, "/"), fs.readFileSync(entrySrc));
+        for (let i = 0; i < overrides.length; i++) {
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Creating .zip`, (i + 1) / overrides.length * 100, `Moving Override ${i + 1} of ${overrides.length}`, processId, "good", cancelId);
+            let override = overrides[i];
+            const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
+            const destPath = "overrides/" + override;
+            if (fs.existsSync(srcPath)) {
+                const stat = fs.statSync(srcPath);
+                if (stat.isDirectory()) {
+                    async function addDirToZip(dir, zipPath) {
+                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        for (const entry of entries) {
+                            const entrySrc = path.join(dir, entry.name);
+                            const entryDest = path.join(zipPath, entry.name);
+                            if (entry.isDirectory()) {
+                                await addDirToZip(entrySrc, entryDest);
+                            } else {
+                                zip.addFile(entryDest.replace(/\\/g, "/"), await fs.promises.readFile(entrySrc));
+                            }
                         }
                     }
+                    addDirToZip(srcPath, destPath);
+                } else {
+                    zip.addFile(destPath.replace(/\\/g, "/"), await fs.promises.readFile(srcPath));
                 }
-                addDirToZip(srcPath, destPath);
-            } else {
-                zip.addFile(destPath.replace(/\\/g, "/"), fs.readFileSync(srcPath));
             }
         }
+        signal.throwIfAborted();
+
+        zip.writeZip(zipPath);
+        signal.throwIfAborted();
+
+        win.webContents.send('progress-update', `Creating .zip`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('open-file-share', zipPath);
+    } catch (err) {
+        win.webContents.send('progress-update', `Creating .zip`, 100, err, processId, "error", cancelId)
     }
-
-    zip.writeZip(zipPath);
-
-    win.webContents.send('progress-update', `Creating .zip`, 100, `Done`);
-    win.webContents.send('open-file-share', zipPath);
 });
 
 let serverIndexList = [];
@@ -709,8 +751,16 @@ ipcMain.handle('process-cf-zip', async (_, instance_id, zip_path, cf_id, title, 
 });
 
 async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file", max_downloads) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        processCfZipWithoutID(instance_id, zip_path, title, max_downloads);
+    }
+    let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
         const zip = new AdmZip(zip_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -718,8 +768,11 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
         }
+        signal.throwIfAborted();
 
-        zip.extractAllTo(extractToPath, true);
+        await new Promise((resolve) => zip.extractAllToAsync(extractToPath, true, false, (v) => {
+            resolve(v);
+        }));
 
         let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -730,7 +783,8 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
         const files = fs.readdirSync(srcDir);
 
         for (const file of files) {
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -743,8 +797,12 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
                 }
             }
             try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
+                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
+                    resolve(v);
+                }));
+                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
+                    resolve(v);
+                }));
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
@@ -760,12 +818,14 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
 
         let allocated_ram = manifest_json.minecraft?.recommendedRam;
 
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`, processId, "good", cancelId);
 
         let count = 0;
 
         const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-            win.webContents.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`, processId, "good", cancelId);
 
             let project_id = file.projectID;
             let file_id = file.fileID;
@@ -819,10 +879,11 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
                 "file_name": path.basename(finalPath)
             });
 
+            signal.throwIfAborted();
             if (count == manifest_json.files.length - 1) {
-                win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+                win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
             } else {
-                win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
+                win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`, processId, "good", cancelId);
             }
             count++;
         }));
@@ -834,7 +895,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
-            });
+            }, { signal });
             if (response.ok) {
                 const json = await response.json();
                 cfData = json.data || [];
@@ -855,7 +916,8 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
             });
         });
 
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!");
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
         return ({
             "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
             "content": cfData.length ? content : [],
@@ -865,13 +927,21 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
             "name": manifest_json.name
         });
     } catch (err) {
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Error");
+        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
 async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file", max_downloads) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        processMrPack(instance_id, mrpack_path, loader, title, max_downloads);
+    }
+    let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
         const zip = new AdmZip(mrpack_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -879,19 +949,24 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
         }
+        signal.throwIfAborted();
 
-        zip.extractAllTo(extractToPath, true);
+        await new Promise((resolve) => zip.extractAllToAsync(extractToPath, true, false, (v) => {
+            resolve(v);
+        }));
+        signal.throwIfAborted();
 
         let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
         fs.mkdirSync(srcDir, { recursive: true });
         fs.mkdirSync(destDir, { recursive: true });
+        signal.throwIfAborted();
 
         const files = fs.readdirSync(srcDir);
 
         for (const file of files) {
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -905,11 +980,16 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             }
 
             try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
+                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
+                    resolve(v);
+                }));
+                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
+                    resolve(v);
+                }));
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
+            signal.throwIfAborted();
         }
 
         let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
@@ -923,21 +1003,23 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         let team_to_project_ids = {};
 
         const limit = pLimit(max_downloads);
+        signal.throwIfAborted();
 
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`);
+        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`, processId, "good", cancelId);
 
         let count = 0;
 
         const downloadPromises = modrinth_index_json.files.map((file, i) =>
             limit(async () => {
-                await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path));
+                signal.throwIfAborted();
+                await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path), { signal });
                 if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
                     let split = file.downloads[0].split("/");
                     let project_id = split[4];
                     let file_id = split[6];
                     if (project_id && file_id) {
                         if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
-                            let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`);
+                            let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`, { signal });
                             let res_json = await res.json();
                             file_id = res_json.id;
                         }
@@ -956,18 +1038,20 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                         });
                     }
                 }
+                signal.throwIfAborted();
                 if (count == modrinth_index_json.files.length - 1) {
-                    win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+                    win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
                 } else {
-                    win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`);
+                    win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`, processId, "good", cancelId);
                 }
                 count++;
             })
         );
 
         await Promise.all(downloadPromises);
+        signal.throwIfAborted();
 
-        let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
+        let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`, { signal });
         let res_json = await res.json();
         res_json.forEach(e => {
             content.forEach(item => {
@@ -981,7 +1065,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                 }
             });
         });
-        let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`);
+        signal.throwIfAborted();
+        let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`, { signal });
         let res_json_1 = await res_1.json();
         res_json_1.forEach(e => {
             content.forEach(item => {
@@ -990,7 +1075,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                 }
             });
         });
-        let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
+        signal.throwIfAborted();
+        let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`, { signal });
         let res_json_2 = await res_2.json();
         res_json_2.forEach(e => {
             if (Array.isArray(e)) {
@@ -1021,7 +1107,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             if (loader == "fabric") loader = "fabric-loader";
             if (loader == "quilt") loader = "quilt-loader";
         }
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!");
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
         return ({
             "loader_version": modrinth_index_json.dependencies[loader],
             "content": content,
@@ -1031,13 +1118,21 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         })
     } catch (err) {
         console.log(err);
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Error");
+        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
 async function processElPack(instance_id, elpack_path, title = ".elpack file", max_downloads) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        processElPack(instance_id, elpack_path, title, max_downloads);
+    }
+    let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
         const zip = new AdmZip(elpack_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1045,8 +1140,11 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
         }
+        signal.throwIfAborted();
 
-        zip.extractAllTo(extractToPath, true);
+        await new Promise((resolve) => zip.extractAllToAsync(extractToPath, true, false, (v) => {
+            resolve(v);
+        }));
 
         let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1057,7 +1155,8 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
         const files = fs.readdirSync(srcDir);
 
         for (const file of files) {
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -1071,8 +1170,12 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
             }
 
             try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
+                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
+                    resolve(v);
+                }));
+                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
+                    resolve(v);
+                }));
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
@@ -1092,12 +1195,14 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
 
         const limit = pLimit(max_downloads);
 
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`, processId, "good", cancelId);
 
         let count = 0;
 
         const downloadPromises = manifest_json.files.map((file, i) =>
             limit(async () => {
+                signal.throwIfAborted();
                 let install_path = "";
                 if (file.type == "mod") install_path = "mods/";
                 if (file.type == "resource_pack") install_path = "resourcepacks/";
@@ -1112,13 +1217,13 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                     url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
                 }
                 try {
-                    await urlToFile(url, path.resolve(extractToPath, install_path));
+                    await urlToFile(url, path.resolve(extractToPath, install_path), { signal });
                 } catch (e) {
                     if (file.source === "modrinth") {
                         let url = `https://api.modrinth.com/v2/project/${file.source_info}/version/${file.version_id}`;
-                        let res_pre_json = await fetch(url);
+                        let res_pre_json = await fetch(url, { signal });
                         let res = await res_pre_json.json();
-                        await urlToFile(res.files[0].url, path.resolve(extractToPath, install_path));
+                        await urlToFile(res.files[0].url, path.resolve(extractToPath, install_path), { signal });
                     } else {
                         throw e;
                     }
@@ -1142,10 +1247,11 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                     cf_project_ids.push(Number(file.source_info));
                     cf_version_ids.push(Number(file.version_id));
                 }
+                signal.throwIfAborted();
                 if (count == manifest_json.files.length - 1) {
-                    win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+                    win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
                 } else {
-                    win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`);
+                    win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`, processId, "good", cancelId);
                 }
                 count++;
             })
@@ -1155,7 +1261,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
 
         if (mr_project_ids.length) {
             try {
-                const res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${mr_project_ids.join('","')}"]`);
+                const res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${mr_project_ids.join('","')}"]`, { signal });
                 const res_json = await res.json();
                 res_json.forEach(e => {
                     // Find all content items with matching source and source_info
@@ -1172,10 +1278,11 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                 });
             } catch (e) { }
         }
+        signal.throwIfAborted();
 
         if (mr_version_ids.length) {
             try {
-                const res = await fetch(`https://api.modrinth.com/v2/versions?ids=["${mr_version_ids.join('","')}"]`);
+                const res = await fetch(`https://api.modrinth.com/v2/versions?ids=["${mr_version_ids.join('","')}"]`, { signal });
                 const res_json = await res.json();
                 res_json.forEach(e => {
                     content.forEach(item => {
@@ -1186,10 +1293,11 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                 });
             } catch (e) { }
         }
+        signal.throwIfAborted();
 
         if (mr_team_ids.length) {
             try {
-                const res = await fetch(`https://api.modrinth.com/v2/teams?ids=["${mr_team_ids.join('","')}"]`);
+                const res = await fetch(`https://api.modrinth.com/v2/teams?ids=["${mr_team_ids.join('","')}"]`, { signal });
                 const res_json = await res.json();
                 res_json.forEach(e => {
                     if (Array.isArray(e)) {
@@ -1207,13 +1315,15 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                 });
             } catch (e) { }
         }
+        signal.throwIfAborted();
 
         if (cf_project_ids.length) {
             try {
                 const response = await fetch("https://api.curse.tools/v1/cf/mods", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
+                    body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false }),
+                    signal
                 });
                 if (response.ok) {
                     const json = await response.json();
@@ -1231,7 +1341,8 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
             } catch (e) { }
         }
 
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!");
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
         return ({
             "loader_version": manifest_json.loader_version,
             "content": content,
@@ -1243,13 +1354,21 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
         })
     } catch (err) {
         console.error(err);
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Error");
+        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
 async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", max_downloads) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        processCfZip(instance_id, zip_path, cf_id, title, max_downloads);
+    }
+    let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...");
+        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
         const zip = new AdmZip(zip_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1257,8 +1376,11 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
         }
+        signal.throwIfAborted();
 
-        zip.extractAllTo(extractToPath, true);
+        await new Promise((resolve) => zip.extractAllToAsync(extractToPath, true, false, (v) => {
+            resolve(v);
+        }));
 
         let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1269,7 +1391,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
         const files = fs.readdirSync(srcDir);
 
         for (const file of files) {
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -1282,8 +1405,12 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
                 }
             }
             try {
-                fs.cpSync(srcPath, destPath, { recursive: true });
-                fs.rmSync(srcPath, { recursive: true, force: true });
+                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
+                    resolve(v);
+                }));
+                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
+                    resolve(v);
+                }));
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
@@ -1304,11 +1431,13 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
 
         let allocated_ram = manifest_json.minecraft?.recommendedRam;
 
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`);
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`, processId, "good", cancelId);
 
         let count = 0;
 
         const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
+            signal.throwIfAborted();
             let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
 
             let folder = "mods";
@@ -1352,10 +1481,11 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
                     "file_name": file_name
                 });
             }
+            signal.throwIfAborted();
             if (count == manifest_json.files.length - 1) {
-                win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...");
+                win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
             } else {
-                win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`);
+                win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`, processId, "good", cancelId);
             }
             count++;
         }));
@@ -1367,7 +1497,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
                 const response = await fetch("https://api.curse.tools/v1/cf/mods", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false })
+                    body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false }),
+                    signal
                 });
                 if (response.ok) {
                     const json = await response.json();
@@ -1388,8 +1519,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
             });
         }
 
-
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!");
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
         return ({
             "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
             "content": content,
@@ -1399,7 +1530,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
             "name": manifest_json.name
         })
     } catch (err) {
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Error");
+        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
@@ -1576,15 +1707,49 @@ ipcMain.handle('download-curseforge-pack', async (_, instance_id, url, title) =>
 });
 
 async function downloadModrinthPack(instance_id, url, title) {
-    win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-    await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`));
-    win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!");
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        downloadModrinthPack(instance_id, url, title);
+    }
+    let signal = abortController.signal;
+    win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...", processId, "good", cancelId);
+    try {
+        await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`), {
+            signal, onProgress: (v) => {
+                win.webContents.send('progress-update', `Downloading ${title}`, v, "Downloading...", processId, "good", cancelId);
+            }
+        });
+        win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!", processId, "done", cancelId);
+    } catch (err) {
+        win.webContents.send('progress-update', `Downloading ${title}`, 100, err, processId, "error", cancelId);
+        throw err;
+    }
 }
 
 async function downloadCurseforgePack(instance_id, url, title) {
-    win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-    await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`));
-    win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!");
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        downloadCurseforgePack(instance_id, url, title);
+    }
+    let signal = abortController.signal;
+    win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...", processId, "good", cancelId);
+    try {
+        await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`), {
+            signal, onProgress: (v) => {
+                win.webContents.send('progress-update', `Downloading ${title}`, v, "Downloading...", processId, "good", cancelId);
+            }
+        });
+        win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!", processId, "done", cancelId);
+    } catch (err) {
+        win.webContents.send('progress-update', `Downloading ${title}`, 100, err, processId, "error", cancelId);
+        throw err;
+    }
 }
 
 ipcMain.handle('process-pack-file', async (_, file_path, instance_id, title, max_downloads) => {
@@ -1593,15 +1758,7 @@ ipcMain.handle('process-pack-file', async (_, file_path, instance_id, title, max
 
 async function processPackFile(file_path, instance_id, title, max_downloads) {
     if (/^https?:\/\//.test(file_path)) {
-        win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...");
-        const destPath = path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`);
-        try {
-            await urlToFile(file_path, destPath);
-        } catch (e) {
-            return false;
-        }
-        file_path = destPath;
-        win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!");
+        await downloadCurseforgePack(instance_id, file_path, title);
     }
     let extension = path.extname(file_path);
     if (extension == ".mrpack") {
@@ -1837,8 +1994,6 @@ async function downloadVanillaTweaksDataPacks(packs, version, instance_id, world
             counter++;
         }
         await urlToFile("https://vanillatweaks.net" + data_ct_vt.link, filePath);
-
-        // return baseName;
     }
     if (data_vt.link) {
         const tempDir = path.resolve(user_path, `minecraft/instances/${instance_id}/temp_datapacks`);
@@ -2120,4 +2275,457 @@ ipcMain.handle('set-java-installation', async (_, v, f) => {
 async function setJavaInstallation(v, f) {
     let java = new Java();
     return await java.setJavaInstallation(v, f);
+}
+
+let cancelFunctions = {};
+let retryFunctions = {};
+
+function generateNewCancelId() {
+    let id = 0;
+    do {
+        id = Math.floor(Math.random() * 1000000)
+    } while (cancelFunctions[id]);
+    return id;
+}
+
+function generateNewProcessId() {
+    return Math.floor(Math.random() * 10000000000);
+}
+
+ipcMain.handle('cancel', (_, cancelId) => {
+    try {
+        cancelFunctions[cancelId].abort("Canceled by User");
+        delete cancelFunctions[cancelId];
+    } catch (e) { }
+});
+
+ipcMain.handle('retry', (_, retryId) => {
+    retryFunctions[retryId]();
+    delete retryFunctions[retryId];
+    delete cancelFunctions[retryId];
+});
+
+ipcMain.handle('delete-instance-files', async (_, instance_id) => {
+    return await deleteInstanceFiles(instance_id);
+});
+
+async function deleteInstanceFiles(instance_id) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    const instancePath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+    if (!fs.existsSync(instancePath)) {
+        return false;
+    }
+    // Recursively collect all files and folders for progress calculation
+    async function getAllFiles(dir) {
+        let files = [];
+        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                files = files.concat(await getAllFiles(fullPath));
+            } else {
+                files.push(fullPath);
+            }
+        }
+        return files;
+    }
+    signal.throwIfAborted();
+
+    try {
+        const allFiles = await getAllFiles(instancePath);
+        let deleted = 0;
+        for (const file of allFiles) {
+            await fs.promises.unlink(file);
+            deleted++;
+            const percent = Math.round((deleted / allFiles.length) * 100);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', 'Deleting Instance', percent, `Deleting ${path.basename(file)} (${deleted} of ${allFiles.length})`, processId, "good", cancelId);
+        }
+        // Remove directories (bottom-up)
+        async function removeDirs(dir) {
+            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    await removeDirs(fullPath);
+                }
+            }
+            await fs.promises.rmdir(dir);
+        }
+        signal.throwIfAborted();
+        await removeDirs(instancePath);
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', 'Deleting Instance', 100, 'Instance deleted', processId, "done", cancelId);
+        return true;
+    } catch (err) {
+        win.webContents.send('progress-update', 'Deleting Instance', 100, err, processId, "error", cancelId);
+        throw err;
+    }
+}
+
+ipcMain.handle('duplicate-instance-files', async (_, old_instance_id, new_instance_id) => {
+    return await duplicateInstanceFiles(old_instance_id, new_instance_id);
+});
+
+async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        win.webContents.send('progress-update', `Duplicating Instance`, 0, `Beginning Duplication...`, processId, "good", cancelId);
+        const src = path.resolve(user_path, `minecraft/instances/${old_instance_id}`);
+        const dest = path.resolve(user_path, `minecraft/instances/${new_instance_id}`);
+        if (!fs.existsSync(src)) return false;
+        await fs.promises.mkdir(dest, { recursive: true });
+        // Get all files and folders in the source directory
+        const entries = await fs.promises.readdir(src, { withFileTypes: true });
+        const total = entries.length;
+        let completed = 0;
+
+        for (const entry of entries) {
+            signal.throwIfAborted();
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+
+            if (entry.isDirectory()) {
+                await fs.promises.mkdir(destPath, { recursive: true });
+                // Recursively copy subdirectory
+                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
+                for (const subEntry of subEntries) {
+                    const subSrcPath = path.join(srcPath, subEntry.name);
+                    const subDestPath = path.join(destPath, subEntry.name);
+                    if (subEntry.isDirectory()) {
+                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
+                    } else {
+                        await fs.promises.copyFile(subSrcPath, subDestPath);
+                    }
+                }
+            } else {
+                await fs.promises.copyFile(srcPath, destPath);
+            }
+
+            completed++;
+            const percent = Math.round((completed / total) * 100);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Duplicating Instance`, percent, `Copying ${entry.name} (${completed} of ${total})`, processId, "good", cancelId);
+        }
+        win.webContents.send('progress-update', `Duplicating Instance`, 100, `Done`, processId, "done", cancelId);
+        return true;
+    } catch (err) {
+        win.webContents.send('progress-update', `Duplicating Instance`, 100, err, processId, "error", cancelId);
+        throw err;
+    }
+}
+
+ipcMain.handle('change-folder', async (_, old_path, new_path) => {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        let src = path.resolve(old_path);
+        let dest = path.resolve(new_path);
+
+        if (src === dest) return false;
+
+        if (!fs.existsSync(src)) return false;
+        await fs.promises.mkdir(dest, { recursive: true });
+        const entries = await fs.promises.readdir(src, { withFileTypes: true });
+        const total = entries.length;
+        let completed = 0;
+
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+
+            const percent = Math.round((completed / total) * 100);
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', `Moving User Path`, percent, `Copying ${entry.name} (${completed + 1} of ${total})`, processId, "good", cancelId);
+
+            if (entry.isDirectory()) {
+                await fs.promises.mkdir(destPath, { recursive: true });
+                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
+                for (const subEntry of subEntries) {
+                    const subSrcPath = path.join(srcPath, subEntry.name);
+                    const subDestPath = path.join(destPath, subEntry.name);
+                    if (subEntry.isDirectory()) {
+                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
+                    } else {
+                        await fs.promises.copyFile(subSrcPath, subDestPath);
+                    }
+                }
+            } else {
+                await fs.promises.copyFile(srcPath, destPath);
+            }
+
+            completed++;
+        }
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', `Moving User Path`, 100, `Done`, processId, "done", cancelId);
+
+        setUserPathMain(dest, src);
+        return true;
+    } catch (err) {
+        win.webContents.send('progress-update', `Moving User Path`, 100, err, processId, "error", cancelId);
+        throw err;
+    }
+});
+
+ipcMain.handle('import-world', async (_, file_path, instance_id, worldName) => {
+    return await importWorld(file_path, instance_id, worldName);
+});
+
+async function importWorld(file_path, instance_id, worldName) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        ipcRenderer.send('progress-update', `Importing ${worldName}`, 0, "Beginning...", processId, "good", cancelId);
+        const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
+        fs.mkdirSync(savesPath, { recursive: true });
+        signal.throwIfAborted();
+
+        if (fs.existsSync(file_path) && fs.statSync(file_path).isDirectory()) {
+            const baseName = path.basename(file_path);
+            let targetName = baseName;
+            let counter = 1;
+            while (fs.existsSync(path.join(savesPath, targetName))) {
+                targetName = `${baseName} (${counter})`;
+                counter++;
+            }
+            const destPath = path.join(savesPath, targetName);
+            async function collectFiles(dir, base) {
+                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+                let files = [];
+                for (const entry of entries) {
+                    const full = path.join(dir, entry.name);
+                    const rel = path.relative(base, full).replace(/\\/g, '/');
+                    if (entry.isDirectory()) {
+                        files.push({ full, rel, isDirectory: true });
+                        const sub = await collectFiles(full, base);
+                        files = files.concat(sub);
+                    } else if (entry.isFile()) {
+                        files.push({ full, rel, isDirectory: false });
+                    }
+                }
+                return files;
+            }
+
+            signal.throwIfAborted();
+            await fs.promises.mkdir(destPath, { recursive: true });
+            const allEntries = await collectFiles(file_path, file_path);
+
+            const dirs = allEntries.filter(e => e.isDirectory);
+            for (const d of dirs) {
+                const targetDir = path.join(destPath, d.rel);
+                await fs.promises.mkdir(targetDir, { recursive: true });
+            }
+
+            const files = allEntries.filter(e => !e.isDirectory);
+            const total = files.length || 1;
+            let done = 0;
+
+            for (const fileEntry of files) {
+                const srcFile = fileEntry.full;
+                const destFile = path.join(destPath, fileEntry.rel);
+                await fs.promises.mkdir(path.dirname(destFile), { recursive: true });
+
+                await fs.promises.copyFile(srcFile, destFile);
+
+                done++;
+                const percent = Math.round((done / total) * 95);
+                signal.throwIfAborted();
+                ipcRenderer.send('progress-update', `Importing ${worldName}`, percent, `Copying ${done} of ${total}...`, processId, "good", cancelId);
+            }
+
+            signal.throwIfAborted();
+            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+            return { new_world_path: destPath };
+        }
+
+        const ext = path.extname(file_path).toLowerCase();
+        if (ext === ".zip" && fs.existsSync(file_path)) {
+            const zip = new AdmZip(file_path);
+            const entries = zip.getEntries().map(e => ({
+                entry: e,
+                name: e.entryName.replace(/^\/+/, '')
+            }));
+
+            const rootLevel = entries.find(e => e.name === "level.dat");
+            if (rootLevel) {
+                let baseName = path.basename(file_path, ext);
+                let targetName = baseName;
+                let counter = 1;
+                while (fs.existsSync(path.join(savesPath, targetName))) {
+                    targetName = `${baseName} (${counter})`;
+                    counter++;
+                }
+                const destPath = path.join(savesPath, targetName);
+                fs.mkdirSync(destPath, { recursive: true });
+
+                let count = 0;
+                for (const { entry, name } of entries) {
+                    count++;
+                    const dest = path.join(destPath, name);
+                    if (entry.isDirectory) {
+                        fs.mkdirSync(dest, { recursive: true });
+                    } else {
+                        signal.throwIfAborted();
+                        ipcRenderer.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`, processId, "good", cancelId);
+                        fs.mkdirSync(path.dirname(dest), { recursive: true });
+                        await new Promise((resolve) => {
+                            fs.writeFile(dest, entry.getData(), () => resolve());
+                        });
+                    }
+                }
+                signal.throwIfAborted();
+                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+                return { new_world_path: destPath };
+            }
+
+            const candidateTopFolders = new Set();
+            for (const { name } of entries) {
+                if (name.endsWith("/level.dat")) {
+                    const parts = name.split("/");
+                    if (parts[0]) candidateTopFolders.add(parts[0]);
+                }
+            }
+
+            if (candidateTopFolders.size > 0) {
+                const imported = [];
+                let outerCount = 0;
+                for (const top of candidateTopFolders) {
+                    outerCount++;
+                    let targetName = top;
+                    let counter = 1;
+                    while (fs.existsSync(path.join(savesPath, targetName))) {
+                        targetName = `${top} (${counter})`;
+                        counter++;
+                    }
+                    const destPath = path.join(savesPath, targetName);
+                    fs.mkdirSync(destPath, { recursive: true });
+                    let count = 0;
+                    for (const { entry, name } of entries) {
+                        count++;
+                        if (name === top || name.startsWith(top + "/")) {
+                            const rel = name === top ? "" : name.slice(top.length + 1);
+                            const dest = rel ? path.join(destPath, rel) : destPath;
+                            if (entry.isDirectory) {
+                                fs.mkdirSync(dest, { recursive: true });
+                            } else {
+                                signal.throwIfAborted();
+                                ipcRenderer.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`, processId, "good", cancelId);
+                                fs.mkdirSync(path.dirname(dest), { recursive: true });
+                                await new Promise((resolve) => {
+                                    fs.writeFile(dest, entry.getData(), () => resolve());
+                                });
+                            }
+                        }
+                    }
+                    signal.throwIfAborted();
+                    imported.push(destPath);
+                }
+                signal.throwIfAborted();
+                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+                return { imported };
+            }
+            signal.throwIfAborted();
+            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
+            return null;
+        }
+        signal.throwIfAborted();
+        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
+        return null;
+    } catch (e) {
+        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, e, processId, "error", cancelId);
+        return null;
+    }
+}
+
+ipcMain.handle('download-update', async (_, download_url, new_version, checksum) => {
+    return await downloadUpdate(download_url, new_version, checksum);
+});
+
+async function downloadUpdate(download_url, new_version, checksum) {
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => { }
+    let signal = abortController.signal;
+    try {
+        ipcRenderer.send('progress-update', `Downloading Update`, 0, "Beginning download...", processId, "good", cancelId);
+        const tempDir = path.resolve(user_path, "temp", new_version);
+        fs.mkdirSync(tempDir, { recursive: true });
+
+        const zipPath = path.join(tempDir, "update.zip");
+        signal.throwIfAborted();
+
+        const response = await axios.get(download_url, {
+            responseType: "arraybuffer",
+            onDownloadProgress: (progressEvent) => {
+                const percentCompleted = progressEvent.loaded * 80 / progressEvent.total;
+                signal.throwIfAborted();
+                ipcRenderer.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...", processId, "good", cancelId);
+            }
+        });
+        let data = Buffer.from(response.data);
+        fs.writeFileSync(zipPath, data);
+        signal.throwIfAborted();
+
+        try {
+            let hash = crypto.createHash('sha256')
+                .update(data)
+                .digest('hex');
+            if ("sha256:" + hash != checksum) throw new Error();
+        } catch (e) {
+            fs.unlinkSync(zipPath);
+            ipcRenderer.send('progress-update', `Downloading Update`, 100, "Failed to verify download.", processId, "error", cancelId);
+            throw new Error("Failed to verify download. Stopping update.");
+        }
+
+        const zip = new AdmZip(zipPath);
+        signal.throwIfAborted();
+
+        const prev = process.noAsar;
+        process.noAsar = true;
+
+        ipcRenderer.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...", processId, "good", cancelId);
+
+        zip.extractAllTo(tempDir);
+        signal.throwIfAborted();
+
+        process.noAsar = prev;
+
+        fs.unlinkSync(zipPath);
+        signal.throwIfAborted();
+
+        ipcRenderer.send('progress-update', `Downloading Update`, 100, "Done!", processId, "done", cancelId);
+
+        const updaterPath = path.join(user_path, "updater", "updater.exe");
+        const sourceDir = path.resolve(tempDir);
+        const targetDir = process.execPath.replace(/\\[^\\]+$/, "");
+        const exeToLaunch = process.execPath;
+        const oldPid = process.pid.toString();
+
+        spawn(updaterPath, [sourceDir, targetDir, exeToLaunch, oldPid], {
+            detached: true,
+            stdio: "ignore"
+        }).unref();
+    } catch (err) {
+        ipcRenderer.send('progress-update', `Downloading Update`, 100, err, processId, "error", cancelId);
+    }
 }

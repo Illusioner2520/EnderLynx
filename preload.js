@@ -22,7 +22,7 @@ const readline = require('readline');
 
 let cfServerInfo = {};
 
-const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
+let userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
     .split('=')[1]);
 
 let enableDevMode = false;
@@ -395,89 +395,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     deleteInstanceFiles: async (instance_id) => {
-        const instancePath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-        if (!fs.existsSync(instancePath)) {
-            return false;
-        }
-        // Recursively collect all files and folders for progress calculation
-        async function getAllFiles(dir) {
-            let files = [];
-            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                const fullPath = path.join(dir, entry.name);
-                if (entry.isDirectory()) {
-                    files = files.concat(await getAllFiles(fullPath));
-                } else {
-                    files.push(fullPath);
-                }
-            }
-            return files;
-        }
-
-        try {
-            const allFiles = await getAllFiles(instancePath);
-            let deleted = 0;
-            for (const file of allFiles) {
-                await fs.promises.unlink(file);
-                deleted++;
-                const percent = Math.round((deleted / allFiles.length) * 100);
-                ipcRenderer.send('progress-update', 'Deleting Instance', percent, `Deleting ${path.basename(file)} (${deleted} of ${allFiles.length})`);
-            }
-            // Remove directories (bottom-up)
-            async function removeDirs(dir) {
-                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-                for (const entry of entries) {
-                    const fullPath = path.join(dir, entry.name);
-                    if (entry.isDirectory()) {
-                        await removeDirs(fullPath);
-                    }
-                }
-                await fs.promises.rmdir(dir);
-            }
-            await removeDirs(instancePath);
-            ipcRenderer.send('progress-update', 'Deleting Instance', 100, 'Instance deleted');
-            return true;
-        } catch (err) {
-            ipcRenderer.send('progress-update', 'Deleting Instance', 100, 'Error deleting instance');
-            throw err;
-        }
+        return await ipcRenderer.invoke('delete-instance-files', instance_id);
     },
     duplicateInstanceFiles: async (old_instance_id, new_instance_id) => {
-        const src = path.resolve(userPath, `minecraft/instances/${old_instance_id}`);
-        const dest = path.resolve(userPath, `minecraft/instances/${new_instance_id}`);
-        if (!fs.existsSync(src)) return false;
-        await fs.promises.mkdir(dest, { recursive: true });
-        // Get all files and folders in the source directory
-        const entries = await fs.promises.readdir(src, { withFileTypes: true });
-        const total = entries.length;
-        let completed = 0;
-
-        for (const entry of entries) {
-            const srcPath = path.join(src, entry.name);
-            const destPath = path.join(dest, entry.name);
-
-            if (entry.isDirectory()) {
-                await fs.promises.mkdir(destPath, { recursive: true });
-                // Recursively copy subdirectory
-                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
-                for (const subEntry of subEntries) {
-                    const subSrcPath = path.join(srcPath, subEntry.name);
-                    const subDestPath = path.join(destPath, subEntry.name);
-                    if (subEntry.isDirectory()) {
-                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
-                    } else {
-                        await fs.promises.copyFile(subSrcPath, subDestPath);
-                    }
-                }
-            } else {
-                await fs.promises.copyFile(srcPath, destPath);
-            }
-
-            completed++;
-            const percent = Math.round((completed / total) * 100);
-            ipcRenderer.send('progress-update', `Duplicating Instance`, percent, `Copying ${entry.name} (${completed} of ${total})`);
-        }
-        return true;
+        return await ipcRenderer.invoke('duplicate-instance-files', old_instance_id, new_instance_id);
     },
     updateOptionsTXT: (instance_id, key, value) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
@@ -744,8 +665,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return return_data;
     },
     onProgressUpdate: (callback) => {
-        ipcRenderer.on('progress-update', (_event, title, progress, desc) => {
-            callback(title, progress, desc);
+        ipcRenderer.on('progress-update', (_event, title, progress, desc, id, status, cancel_id, from_launch) => {
+            callback(title, progress, desc, id, status, from_launch ? () => {
+                ipcRenderer.invoke('launch-cancel', cancel_id);
+            } : () => {
+                ipcRenderer.invoke('cancel', cancel_id);
+            }, from_launch ? () => {
+                ipcRenderer.invoke('launch-retry', cancel_id);
+            } : () => {
+                ipcRenderer.invoke('retry', cancel_id);
+            });
         });
     },
     onOpenFileShare: (callback) => {
@@ -1548,8 +1477,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             current_count++;
         }
 
-        console.log(iconPath);
-
         try {
             await convertToIco(iconSource, iconPath);
         } catch (e) { }
@@ -1792,49 +1719,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateEnderLynx,
     downloadUpdate,
     changeFolder: async (old_path, new_path) => {
-        let src = path.resolve(old_path);
-        let dest = path.resolve(new_path);
-
-        if (src === dest) return false;
-
-        if (!fs.existsSync(src)) return false;
-        await fs.promises.mkdir(dest, { recursive: true });
-        const entries = await fs.promises.readdir(src, { withFileTypes: true });
-        const total = entries.length;
-        let completed = 0;
-
-        for (const entry of entries) {
-            const srcPath = path.join(src, entry.name);
-            const destPath = path.join(dest, entry.name);
-
-            const percent = Math.round((completed / total) * 100);
-            ipcRenderer.send('progress-update', `Moving User Path`, percent, `Copying ${entry.name} (${completed + 1} of ${total})`);
-
-            if (entry.isDirectory()) {
-                await fs.promises.mkdir(destPath, { recursive: true });
-                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
-                for (const subEntry of subEntries) {
-                    const subSrcPath = path.join(srcPath, subEntry.name);
-                    const subDestPath = path.join(destPath, subEntry.name);
-                    if (subEntry.isDirectory()) {
-                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
-                    } else {
-                        await fs.promises.copyFile(subSrcPath, subDestPath);
-                    }
-                }
-            } else {
-                await fs.promises.copyFile(srcPath, destPath);
-            }
-
-            completed++;
+        try {
+            await ipcRenderer.invoke('change-folder', old_path, new_path);
+            userPath = new_path;
+        } catch (err) {
+            throw err;
         }
-        ipcRenderer.send('progress-update', `Moving User Path`, 100, `Done`);
-
-        await ipcRenderer.invoke("set-user-path", dest, src);
-        return true;
     },
     generateOptionsTXT: (values) => {
-        const tempDir = path.resolve(userPath, "temp");
+        const tempDir = path.resolve(userPath, "out");
         fs.mkdirSync(tempDir, { recursive: true });
         const filePath = path.join(tempDir, `options_${Date.now()}.txt`);
         const lines = [];
@@ -1982,159 +1875,8 @@ async function getNewAccessToken(refresh_token) {
     }
 }
 
-
-
 async function importWorld(file_path, instance_id, worldName) {
-    ipcRenderer.send('progress-update', `Importing ${worldName}`, 0, "Beginning...");
-    try {
-        const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
-        fs.mkdirSync(savesPath, { recursive: true });
-
-        if (fs.existsSync(file_path) && fs.statSync(file_path).isDirectory()) {
-            const baseName = path.basename(file_path);
-            let targetName = baseName;
-            let counter = 1;
-            while (fs.existsSync(path.join(savesPath, targetName))) {
-                targetName = `${baseName} (${counter})`;
-                counter++;
-            }
-            const destPath = path.join(savesPath, targetName);
-            async function collectFiles(dir, base) {
-                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-                let files = [];
-                for (const entry of entries) {
-                    const full = path.join(dir, entry.name);
-                    const rel = path.relative(base, full).replace(/\\/g, '/');
-                    if (entry.isDirectory()) {
-                        files.push({ full, rel, isDirectory: true });
-                        const sub = await collectFiles(full, base);
-                        files = files.concat(sub);
-                    } else if (entry.isFile()) {
-                        files.push({ full, rel, isDirectory: false });
-                    }
-                }
-                return files;
-            }
-
-            await fs.promises.mkdir(destPath, { recursive: true });
-            const allEntries = await collectFiles(file_path, file_path);
-
-            const dirs = allEntries.filter(e => e.isDirectory);
-            for (const d of dirs) {
-                const targetDir = path.join(destPath, d.rel);
-                await fs.promises.mkdir(targetDir, { recursive: true });
-            }
-
-            const files = allEntries.filter(e => !e.isDirectory);
-            const total = files.length || 1;
-            let done = 0;
-
-            for (const fileEntry of files) {
-                const srcFile = fileEntry.full;
-                const destFile = path.join(destPath, fileEntry.rel);
-                await fs.promises.mkdir(path.dirname(destFile), { recursive: true });
-
-                await fs.promises.copyFile(srcFile, destFile);
-
-                done++;
-                const percent = Math.round((done / total) * 95);
-                ipcRenderer.send('progress-update', `Importing ${worldName}`, percent, `Copying ${done} of ${total}...`);
-            }
-
-            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done");
-            return { new_world_path: destPath };
-        }
-
-        const ext = path.extname(file_path).toLowerCase();
-        if (ext === ".zip" && fs.existsSync(file_path)) {
-            const zip = new AdmZip(file_path);
-            const entries = zip.getEntries().map(e => ({
-                entry: e,
-                name: e.entryName.replace(/^\/+/, '')
-            }));
-
-            const rootLevel = entries.find(e => e.name === "level.dat");
-            if (rootLevel) {
-                let baseName = path.basename(file_path, ext);
-                let targetName = baseName;
-                let counter = 1;
-                while (fs.existsSync(path.join(savesPath, targetName))) {
-                    targetName = `${baseName} (${counter})`;
-                    counter++;
-                }
-                const destPath = path.join(savesPath, targetName);
-                fs.mkdirSync(destPath, { recursive: true });
-
-                let count = 0;
-                for (const { entry, name } of entries) {
-                    count++;
-                    const dest = path.join(destPath, name);
-                    if (entry.isDirectory) {
-                        fs.mkdirSync(dest, { recursive: true });
-                    } else {
-                        ipcRenderer.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`);
-                        fs.mkdirSync(path.dirname(dest), { recursive: true });
-                        await new Promise((resolve) => {
-                            fs.writeFile(dest, entry.getData(), () => resolve());
-                        });
-                    }
-                }
-                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done");
-                return { new_world_path: destPath };
-            }
-
-            const candidateTopFolders = new Set();
-            for (const { name } of entries) {
-                if (name.endsWith("/level.dat")) {
-                    const parts = name.split("/");
-                    if (parts[0]) candidateTopFolders.add(parts[0]);
-                }
-            }
-
-            if (candidateTopFolders.size > 0) {
-                const imported = [];
-                let outerCount = 0;
-                for (const top of candidateTopFolders) {
-                    outerCount++;
-                    let targetName = top;
-                    let counter = 1;
-                    while (fs.existsSync(path.join(savesPath, targetName))) {
-                        targetName = `${top} (${counter})`;
-                        counter++;
-                    }
-                    const destPath = path.join(savesPath, targetName);
-                    fs.mkdirSync(destPath, { recursive: true });
-                    let count = 0;
-                    for (const { entry, name } of entries) {
-                        count++;
-                        if (name === top || name.startsWith(top + "/")) {
-                            const rel = name === top ? "" : name.slice(top.length + 1);
-                            const dest = rel ? path.join(destPath, rel) : destPath;
-                            if (entry.isDirectory) {
-                                fs.mkdirSync(dest, { recursive: true });
-                            } else {
-                                ipcRenderer.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`);
-                                fs.mkdirSync(path.dirname(dest), { recursive: true });
-                                await new Promise((resolve) => {
-                                    fs.writeFile(dest, entry.getData(), () => resolve());
-                                });
-                            }
-                        }
-                    }
-                    imported.push(destPath);
-                }
-                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done");
-                return { imported };
-            }
-            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error");
-            return null;
-        }
-        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error");
-        return null;
-    } catch (e) {
-        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error");
-        return null;
-    }
+    return await ipcRenderer.invoke('import-world', file_path, instance_id, worldName);
 }
 async function importContent(file_path, content_type, instance_id) {
     let destFolder = "";
@@ -2418,58 +2160,7 @@ async function checkForUpdates() {
 }
 
 async function downloadUpdate(download_url, new_version, checksum) {
-    ipcRenderer.send('progress-update', `Downloading Update`, 0, "Beginning download...");
-    const tempDir = path.resolve(userPath, "temp", new_version);
-    fs.mkdirSync(tempDir, { recursive: true });
-
-    const zipPath = path.join(tempDir, "update.zip");
-
-    const response = await axios.get(download_url, {
-        responseType: "arraybuffer",
-        onDownloadProgress: (progressEvent) => {
-            const percentCompleted = progressEvent.loaded * 80 / progressEvent.total;
-            ipcRenderer.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...");
-        }
-    });
-    let data = Buffer.from(response.data);
-    fs.writeFileSync(zipPath, data);
-
-    try {
-        let hash = crypto.createHash('sha256')
-            .update(data)
-            .digest('hex');
-        if ("sha256:" + hash != checksum) throw new Error();
-    } catch (e) {
-        fs.unlinkSync(zipPath);
-        ipcRenderer.send('progress-update', `Downloading Update`, 100, "err");
-        throw new Error("Failed to verify download. Stopping update.");
-    }
-
-    const zip = new AdmZip(zipPath);
-
-    const prev = process.noAsar;
-    process.noAsar = true;
-
-    ipcRenderer.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...");
-
-    zip.extractAllTo(tempDir);
-
-    process.noAsar = prev;
-
-    fs.unlinkSync(zipPath);
-
-    ipcRenderer.send('progress-update', `Downloading Update`, 100, "Done!");
-
-    const updaterPath = path.join(userPath, "updater", "updater.exe");
-    const sourceDir = path.resolve(tempDir);
-    const targetDir = process.execPath.replace(/\\[^\\]+$/, "");
-    const exeToLaunch = process.execPath;
-    const oldPid = process.pid.toString();
-
-    spawn(updaterPath, [sourceDir, targetDir, exeToLaunch, oldPid], {
-        detached: true,
-        stdio: "ignore"
-    }).unref();
+    ipcRenderer.invoke('download-update', download_url, new_version, checksum);
 }
 
 function updateEnderLynx() {

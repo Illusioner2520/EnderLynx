@@ -6,10 +6,10 @@ const path = require('path');
 const AdmZip = require('adm-zip');
 const os = require('os');
 const { spawn, execSync } = require('child_process');
-const { ipcRenderer } = require('electron');
 const { pathToFileURL } = require('url');
 const { version } = require('./package.json');
 const pLimit = require('p-limit').default;
+const { ipcMain } = require('electron');
 
 let launchername = "EnderLynx";
 let launcherversion = version;
@@ -23,24 +23,60 @@ function setWindow(window) {
     win = window;
 }
 
+let cancelLaunchFunctions = {};
+let retryLaunchFunctions = {};
+
+function generateNewCancelId() {
+    let id = 0;
+    do {
+        id = Math.floor(Math.random() * 1000000)
+    } while (cancelLaunchFunctions[id]);
+    return id;
+}
+
+function generateNewProcessId() {
+    return Math.floor(Math.random() * 10000000000);
+}
+
+ipcMain.handle('launch-cancel', (_, cancelId) => {
+    try {
+        cancelLaunchFunctions[cancelId].abort("Canceled by User");
+        delete cancelLaunchFunctions[cancelId];
+    } catch (e) { }
+});
+
+ipcMain.handle('launch-retry', (_, retryId) => {
+    retryLaunchFunctions[retryId]();
+    delete retryLaunchFunctions[retryId];
+    delete cancelLaunchFunctions[retryId];
+});
+
 class Minecraft {
     constructor(instance_id) {
         this.instance_id = instance_id;
     }
     async installFabric(mcversion, fabricversion, isRepair) {
+        let processId = generateNewProcessId();
+        let cancelId = generateNewCancelId();
+        let abortController = new AbortController();
+        cancelLaunchFunctions[cancelId] = abortController;
+        retryLaunchFunctions[cancelId] = () => { }
+        let signal = abortController.signal;
         try {
-            win.webContents.send('progress-update', "Downloading Fabric", 0, "Download fabric info...");
-            const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${mcversion}/${fabricversion}/profile/json`);
+            win.webContents.send('progress-update', "Downloading Fabric", 0, "Download fabric info...", processId, "good", cancelId, true);
+            const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/loader/${mcversion}/${fabricversion}/profile/json`, { signal });
             const data = await fabric_json.json();
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/fabric/${mcversion}/${fabricversion}`), { recursive: true });
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/fabric/${mcversion}/${fabricversion}/fabric-${mcversion}-${fabricversion}.json`), JSON.stringify(data));
-            win.webContents.send('progress-update', "Downloading Fabric", 20, "Downloading fabric libraries...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Fabric", 20, "Downloading fabric libraries...", processId, "good", cancelId, true);
             for (let i = 0; i < data.libraries.length; i++) {
-                win.webContents.send('progress-update', "Downloading Fabric", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading Fabric", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`, processId, "good", cancelId, true);
                 let lib_path = mavenPathToFilePath(data.libraries[i].name);
                 let lib_path_rel = mavenPathToRelPath(data.libraries[i].name);
                 if (!fs.existsSync(lib_path) || isRepair) {
-                    await urlToFile(`https://maven.fabricmc.net/${lib_path_rel}`, lib_path);
+                    await urlToFile(`https://maven.fabricmc.net/${lib_path_rel}`, lib_path, { signal });
                 }
                 this.libs += lib_path + ";";
                 let libName = data.libraries[i].name.split(":");
@@ -50,24 +86,34 @@ class Minecraft {
             this.main_class = data.mainClass;
             this.modded_args_game = data.arguments.game;
             this.modded_args_jvm = data.arguments.jvm;
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Fabric", 100, "Done", processId, "done", cancelId, true);
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading Fabric", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Fabric", 100, err, processId, "error", cancelId, true);
             throw err;
         }
     }
     async installQuilt(mcversion, quiltversion, isRepair) {
+        let processId = generateNewProcessId();
+        let cancelId = generateNewCancelId();
+        let abortController = new AbortController();
+        cancelLaunchFunctions[cancelId] = abortController;
+        retryLaunchFunctions[cancelId] = () => { }
+        let signal = abortController.signal;
         try {
-            win.webContents.send('progress-update', "Downloading Quilt", 0, "Download quilt info...");
-            const quilt_json = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcversion}/${quiltversion}/profile/json`);
+            win.webContents.send('progress-update', "Downloading Quilt", 0, "Download quilt info...", processId, "good", cancelId, true);
+            const quilt_json = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcversion}/${quiltversion}/profile/json`, { signal });
             const data = await quilt_json.json();
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/quilt/${mcversion}/${quiltversion}`), { recursive: true });
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/quilt/${mcversion}/${quiltversion}/quilt-${mcversion}-${quiltversion}.json`), JSON.stringify(data));
-            win.webContents.send('progress-update', "Downloading Quilt", 20, "Downloading quilt libraries...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Quilt", 20, "Downloading quilt libraries...", processId, "good", cancelId, true);
             for (let i = 0; i < data.libraries.length; i++) {
-                win.webContents.send('progress-update', "Downloading Quilt", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`);
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading Quilt", ((i + 1) / data.libraries.length) * 80 + 20, `Downloading library ${i + 1} of ${data.libraries.length}...`, processId, "good", cancelId, true);
                 let lib_path = mavenPathToFilePath(data.libraries[i].name);
                 if (!fs.existsSync(lib_path) || isRepair) {
-                    await urlToFile(data.libraries[i].url + mavenPathToRelPath(data.libraries[i].name), lib_path);
+                    await urlToFile(data.libraries[i].url + mavenPathToRelPath(data.libraries[i].name), lib_path, { signal });
                 }
                 this.libs += lib_path + ";";
                 let libName = data.libraries[i].name.split(":");
@@ -77,23 +123,34 @@ class Minecraft {
             this.main_class = data.mainClass;
             if (data?.arguments?.jvm) this.modded_args_game = data.arguments.game;
             if (data?.arguments?.jvm) this.modded_args_jvm = data.arguments.jvm;
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Quilt", 100, "Done", processId, "done", cancelId, true);
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading Quilt", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Quilt", 100, err, processId, "error", cancelId, true);
             throw err;
         }
     }
     async installForge(mcversion, forgeversion, isRepair) {
+        let processId = generateNewProcessId();
+        let cancelId = generateNewCancelId();
+        let abortController = new AbortController();
+        cancelLaunchFunctions[cancelId] = abortController;
+        retryLaunchFunctions[cancelId] = () => { }
+        let signal = abortController.signal;
         try {
-
-            win.webContents.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...");
+            win.webContents.send('progress-update', "Downloading Forge", 0, "Downloading Forge installer...", processId, "good", cancelId, true);
             const forgeInstallerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcversion}-${forgeversion}/forge-${mcversion}-${forgeversion}-installer.jar`;
             const forgeMetaDir = path.resolve(userPath, `minecraft/meta/forge/${mcversion}/${forgeversion}`);
             const forgeLibDir = path.resolve(userPath, `minecraft/meta/libraries`);
             fs.mkdirSync(forgeMetaDir, { recursive: true });
             fs.mkdirSync(forgeLibDir, { recursive: true });
+            signal.throwIfAborted();
 
             const installerPath = `${forgeMetaDir}/forge-installer.jar`;
-            await urlToFile(forgeInstallerUrl, installerPath);
+            await urlToFile(forgeInstallerUrl, installerPath, { signal, onProgress: (v) => {
+                win.webContents.send('progress-update', "Downloading Forge", v / 5, "Downloading Forge installer...", processId, "good", cancelId, true);
+            } });
+            signal.throwIfAborted();
 
             let zip = new AdmZip(installerPath);
             let version_json_entry = zip.getEntry("version.json");
@@ -109,7 +166,7 @@ class Minecraft {
             } else {
                 install_profile_json = {};
             }
-
+            signal.throwIfAborted();
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/forge/${mcversion}/${forgeversion}/forge-${mcversion}-${forgeversion}.json`), JSON.stringify(version_json));
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/forge/${mcversion}/${forgeversion}/forge-${mcversion}-${forgeversion}-install-profile.json`), JSON.stringify(install_profile_json));
 
@@ -121,6 +178,7 @@ class Minecraft {
                 return e;
             }) : [];
 
+            signal.throwIfAborted();
             let java = new Java();
             let installation = await java.getJavaInstallation(21);
 
@@ -159,6 +217,7 @@ class Minecraft {
                 let installation_path = `${package_.replace(".", "/")}/${name}/${version}`;
                 installation_path = path.resolve(userPath, "minecraft/meta/libraries", installation_path);
                 let installation_path_w_file = path.resolve(installation_path, forge_library_path);
+                signal.throwIfAborted();
                 if (!fs.existsSync(installation_path_w_file) || isRepair) {
                     zip.extractEntryTo(forge_library_path, installation_path, true, true);
                 }
@@ -166,6 +225,7 @@ class Minecraft {
                 this.libs += installation_path_w_file + ";";
 
                 for (let i = 0; i < install_profile_json.versionInfo.libraries.length; i++) {
+                    signal.throwIfAborted();
                     let entry = install_profile_json.versionInfo.libraries[i];
                     // handle natives and native extraction
                     try {
@@ -208,12 +268,13 @@ class Minecraft {
                             let mavenWithClassifier = entry.name + ":" + nativeClassifier;
                             let lib_rel = mavenPathToRelPath(mavenWithClassifier);
                             let lib_path = mavenPathToFilePath(mavenWithClassifier);
+                            signal.throwIfAborted();
 
                             if (!fs.existsSync(lib_path) || isRepair) {
                                 if (entry.url && !entry.url.includes("https://libraries.minecraft.net/")) {
-                                    await urlToFile(entry.url + lib_rel, lib_path);
+                                    await urlToFile(entry.url + lib_rel, lib_path, { signal });
                                 } else {
-                                    await urlToFile(`https://maven.creeperhost.net/${lib_rel}`, lib_path);
+                                    await urlToFile(`https://maven.creeperhost.net/${lib_rel}`, lib_path, { signal });
                                 }
                             }
 
@@ -240,6 +301,7 @@ class Minecraft {
                                         }
                                     }
                                     if (excluded) continue;
+                                    signal.throwIfAborted();
 
                                     const outPath = path.resolve(nativesOut, entryName);
                                     if (!fs.existsSync(outPath) || isRepair) {
@@ -263,7 +325,7 @@ class Minecraft {
                         let lib_path_rel = mavenPathToRelPath(entry.name);
                         let lib_path = mavenPathToFilePath(entry.name);
                         if (!fs.existsSync(lib_path) || isRepair) {
-                            await urlToFile(`${entry.url}${lib_path_rel}`, lib_path);
+                            await urlToFile(`${entry.url}${lib_path_rel}`, lib_path, { signal });
                         }
                         this.libs += lib_path + ";";
                         let libName = entry.name.split(":");
@@ -273,7 +335,7 @@ class Minecraft {
                         let lib_path_rel = mavenPathToRelPath(entry.name);
                         let lib_path = mavenPathToFilePath(entry.name);
                         if (!fs.existsSync(lib_path) || isRepair) {
-                            await urlToFile(`https://maven.creeperhost.net/${lib_path_rel}`, lib_path);
+                            await urlToFile(`https://maven.creeperhost.net/${lib_path_rel}`, lib_path, { signal });
                         }
                         this.libs += lib_path + ";";
                         let libName = entry.name.split(":");
@@ -284,6 +346,7 @@ class Minecraft {
                 this.main_class = install_profile_json.versionInfo.mainClass;
                 this.legacy_modded_arguments = install_profile_json.versionInfo.minecraftArguments;
                 this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}/${mcversion}.jar`);
+                signal.throwIfAborted();
             } else if (compareVersions(forgeversion, upperBound) > 0) {
                 let no_need_to_process = false;
                 if (!install_profile_json.libraries || !version_json.libraries) return;
@@ -291,7 +354,8 @@ class Minecraft {
                 let libraries = version_json.libraries.map(e => ({ ...e, include_in_classpath: true })).concat(install_profile_json.libraries.map(e => ({ ...e, include_in_classpath: false })));
                 let paths = [];
                 for (let i = 0; i < libraries.length; i++) {
-                    win.webContents.send('progress-update', "Downloading Forge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
+                    signal.throwIfAborted();
+                    win.webContents.send('progress-update', "Downloading Forge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`, processId, "good", cancelId, true);
                     let e = libraries[i];
                     if (e.downloads.artifact) {
                         if (!e.downloads.artifact.url) {
@@ -300,8 +364,9 @@ class Minecraft {
                             }
                             continue;
                         }
+                        signal.throwIfAborted();
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`)) || isRepair) {
-                            await urlToFile(e.downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`));
+                            await urlToFile(e.downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`), { signal });
                         }
                         let libName = e.name.split(":");
                         libName.splice(libName.length - 1, 1);
@@ -317,6 +382,7 @@ class Minecraft {
                     for (let i = 0; i < Object.keys(install_profile_json.data).length; i++) {
                         let key = Object.keys(install_profile_json.data)[i];
                         let entry = Object.entries(install_profile_json.data)[i][1];
+                        signal.throwIfAborted();
                         async function extract_data(file_path) {
                             let extract_file = zip.getEntry(file_path.slice(1));
                             let parsed_path = path.parse(file_path);
@@ -334,6 +400,7 @@ class Minecraft {
                             let maven_path = `me.illusioner.enderlynx:forge-installer-extracts:${mcversion}-${forgeversion}:${file_name}@${ext}`;
                             return `[${maven_path}]`;
                         }
+                        signal.throwIfAborted();
                         let client = entry.client.startsWith("/") ? await extract_data(entry.client) : entry.client;
                         let server = entry.server.startsWith("/") ? await extract_data(entry.server) : entry.server;
                         new_data[key] = {
@@ -358,7 +425,8 @@ class Minecraft {
                     }
 
                     for (let i = 0; i < processors.length; i++) {
-                        win.webContents.send('progress-update', "Downloading Forge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
+                        signal.throwIfAborted();
+                        win.webContents.send('progress-update', "Downloading Forge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`, processId, "good", cancelId, true);
                         let processor = processors[i];
                         if (processor.sides && !processor.sides.includes("client")) continue;
                         let cp = [...processor.classpath, processor.jar];
@@ -381,6 +449,7 @@ class Minecraft {
                                 return e;
                             }
                         }));
+                        signal.throwIfAborted();
                         await new Promise((resolve, reject) => {
                             const processor = spawn(installation, args, {
                                 "cwd": path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
@@ -414,25 +483,35 @@ class Minecraft {
                     this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}/${mcversion}.jar`);
                     this.legacy_modded_arguments = version_json.minecraftArguments;
                 }
+                signal.throwIfAborted();
             }
+            signal.throwIfAborted();
 
-            win.webContents.send('progress-update', "Downloading Forge", 100, "Forge install complete.");
+            win.webContents.send('progress-update', "Downloading Forge", 100, "Forge install complete.", processId, "done", cancelId, true);
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading Forge", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Forge", 100, err, processId, "error", cancelId, true);
             throw err;
         }
     }
     async installNeoForge(mcversion, neoforgeversion, isRepair) {
+        let processId = generateNewProcessId();
+        let cancelId = generateNewCancelId();
+        let abortController = new AbortController();
+        cancelLaunchFunctions[cancelId] = abortController;
+        retryLaunchFunctions[cancelId] = () => { }
+        let signal = abortController.signal;
         try {
-            win.webContents.send('progress-update', "Downloading NeoForge", 0, "Downloading NeoForge installer...");
+            win.webContents.send('progress-update', "Downloading NeoForge", 0, "Downloading NeoForge installer...", processId, "good", cancelId, true);
             const neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeversion}/neoforge-${neoforgeversion}-installer.jar`;
             const neoForgeMetaDir = path.resolve(userPath, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}`);
             const neoForgeLibDir = path.resolve(userPath, `minecraft/meta/libraries`);
             fs.mkdirSync(neoForgeMetaDir, { recursive: true });
             fs.mkdirSync(neoForgeLibDir, { recursive: true });
+            signal.throwIfAborted();
 
             const installerPath = `${neoForgeMetaDir}/neoforge-installer.jar`;
-            await urlToFile(neoForgeInstallerUrl, installerPath);
+            await urlToFile(neoForgeInstallerUrl, installerPath, { signal });
+            signal.throwIfAborted();
 
             let zip = new AdmZip(installerPath);
             let version_json_entry = zip.getEntry("version.json");
@@ -448,10 +527,12 @@ class Minecraft {
             } else {
                 install_profile_json = {};
             }
+            signal.throwIfAborted();
 
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}/neoforge-${mcversion}-${neoforgeversion}.json`), JSON.stringify(version_json));
             fs.writeFileSync(path.resolve(userPath, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}/neoforge-${mcversion}-${neoforgeversion}-install-profile.json`), JSON.stringify(install_profile_json));
 
+            signal.throwIfAborted();
             this.modded_args_game = version_json?.arguments?.game ? version_json.arguments.game : [];
             this.modded_args_jvm = version_json?.arguments?.jvm ? version_json.arguments.jvm.map(e => {
                 e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
@@ -459,9 +540,11 @@ class Minecraft {
                 e = e.replaceAll("${version_name}", `${mcversion}-neoforge-${neoforgeversion}`);
                 return e;
             }) : [];
+            signal.throwIfAborted();
 
             let java = new Java();
             let installation = await java.getJavaInstallation(21);
+            signal.throwIfAborted();
 
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}`), { recursive: true });
 
@@ -472,7 +555,8 @@ class Minecraft {
             let libraries = version_json.libraries.map(e => ({ ...e, include_in_classpath: true })).concat(install_profile_json.libraries.map(e => ({ ...e, include_in_classpath: false })));
             let paths = [];
             for (let i = 0; i < libraries.length; i++) {
-                win.webContents.send('progress-update', "Downloading NeoForge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`);
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading NeoForge", ((i + 1) / libraries.length) * 40 + 20, `Downloading library ${i + 1} of ${libraries.length}`, processId, "good", cancelId, true);
                 let e = libraries[i];
                 if (e.downloads.artifact) {
                     if (!e.downloads.artifact.url) {
@@ -482,9 +566,8 @@ class Minecraft {
                         continue;
                     }
                     if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`)) || isRepair) {
-                        await urlToFile(e.downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`));
+                        await urlToFile(e.downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`), { signal });
                     }
-                    console.log("downloading ", e.name);
                     let libName = e.name.split(":");
                     libName.splice(libName.length - 1, 1);
                     libName = libName.join(":");
@@ -495,12 +578,12 @@ class Minecraft {
                 }
             }
             if (!no_need_to_process || isRepair) {
+                signal.throwIfAborted();
                 let new_data = {};
                 for (let i = 0; i < Object.keys(install_profile_json.data).length; i++) {
                     let key = Object.keys(install_profile_json.data)[i];
                     let entry = Object.entries(install_profile_json.data)[i][1];
                     async function extract_data(file_path) {
-                        console.log("extracting data for ", file_path);
                         let extract_file = zip.getEntry(file_path.slice(1));
                         let parsed_path = path.parse(file_path);
                         let file_name = parsed_path.name;
@@ -517,7 +600,6 @@ class Minecraft {
                         let maven_path = `me.illusioner.enderlynx:neoforge-installer-extracts:${mcversion}-${neoforgeversion}:${file_name}@${ext}`;
                         return `[${maven_path}]`;
                     }
-                    console.log(entry);
                     let client = entry.client.startsWith("/") ? await extract_data(entry.client) : entry.client;
                     let server = entry.server.startsWith("/") ? await extract_data(entry.server) : entry.server;
                     new_data[key] = {
@@ -525,8 +607,6 @@ class Minecraft {
                         server
                     }
                 }
-                console.log(new_data);
-
                 new_data.SIDE = {
                     client: "client"
                 };
@@ -544,7 +624,8 @@ class Minecraft {
                 }
 
                 for (let i = 0; i < processors.length; i++) {
-                    win.webContents.send('progress-update', "Downloading NeoForge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`);
+                    signal.throwIfAborted();
+                    win.webContents.send('progress-update', "Downloading NeoForge", ((i + 1) / processors.length) * 35 + 60, `Running processor ${i + 1} of ${processors.length}`, processId, "good", cancelId, true);
                     let processor = processors[i];
                     if (processor.sides && !processor.sides.includes("client")) continue;
                     let cp = [...processor.classpath, processor.jar];
@@ -555,22 +636,20 @@ class Minecraft {
                     });
                     let main_class = getMainClass(mavenPathToFilePath(processor.jar));
                     let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
-                        console.log(e);
                         if (e.startsWith("{")) {
                             return new_data[e.slice(1, e.length - 1)].client
                         } else {
                             return e;
                         }
                     }).map(e => {
-                        console.log(e);
                         if (e.startsWith("[")) {
                             return mavenPathToFilePath(e.slice(1, e.length - 1));
                         } else {
                             return e;
                         }
                     }));
+                    signal.throwIfAborted();
                     await new Promise((resolve, reject) => {
-                        console.log(args);
                         const processor = spawn(installation, args, {
                             "cwd": path.resolve(userPath, `minecraft/instances/${this.instance_id}`)
                         });
@@ -598,10 +677,10 @@ class Minecraft {
             });
             this.main_class = version_json.mainClass;
             this.modded_jarfile = path.resolve(userPath, `minecraft/meta/versions/${mcversion}-neoforge-${neoforgeversion}/${mcversion}-neoforge-${neoforgeversion}.jar`);
-
-            win.webContents.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.", processId, "done", cancelId, true);
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading NeoForge", 100, "Error");
+            win.webContents.send('progress-update', "Downloading NeoForge", 100, "Error", processId, "error", cancelId, true);
             throw err;
         }
     }
@@ -1031,20 +1110,28 @@ class Minecraft {
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
     async downloadGame(loader, version, isRepair, whatToRepair) {
+        let processId = generateNewProcessId();
+        let cancelId = generateNewCancelId();
+        let abortController = new AbortController();
+        cancelLaunchFunctions[cancelId] = abortController;
+        retryLaunchFunctions[cancelId] = () => { }
+        let signal = abortController.signal;
         if (!this.libNames) this.libNames = [];
         try {
-            win.webContents.send('progress-update', "Downloading Minecraft", 0, "Creating directories...");
+            win.webContents.send('progress-update', "Downloading Minecraft", 0, "Creating directories...", processId, "good", cancelId, true);
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/versions/${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`), { recursive: true });
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/logs`), { recursive: true });
             this.version = version;
-            win.webContents.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Minecraft", 2, "Downloading version list...", processId, "good", cancelId, true);
             const obtainVersionManifest = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
             const version_manifest = await obtainVersionManifest.json();
             let version_json = {};
             for (let i = 0; i < version_manifest.versions.length; i++) {
                 if (version_manifest.versions[i].id == version) {
-                    win.webContents.send('progress-update', "Downloading Minecraft", 3, "Downloading version info...");
+                    signal.throwIfAborted();
+                    win.webContents.send('progress-update', "Downloading Minecraft", 3, "Downloading version info...", processId, "good", cancelId, true);
                     const obtainVersionJSON = await fetch(version_manifest.versions[i].url);
                     version_json = await obtainVersionJSON.json();
                     break;
@@ -1054,11 +1141,13 @@ class Minecraft {
                 console.error("Invalid version");
                 return;
             }
+            signal.throwIfAborted();
             if (!isRepair || whatToRepair.includes("minecraft")) {
                 fs.writeFileSync(path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`), JSON.stringify(version_json));
             }
             if (!isRepair || whatToRepair.includes("assets")) {
-                win.webContents.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...");
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading Minecraft", 5, "Downloading asset info...", processId, "good", cancelId, true);
                 const assetJSON = await fetch(version_json.assetIndex.url);
                 let asset_json = await assetJSON.json();
                 fs.mkdirSync(path.resolve(userPath, `minecraft/meta/assets/indexes`), { recursive: true });
@@ -1067,19 +1156,20 @@ class Minecraft {
                 let assetKeys = Object.keys(asset_json.objects);
                 const limit = pLimit(10);
                 const downloadPromises = assetKeys.map((asset, i) => limit(async () => {
-                    win.webContents.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`);
+                    signal.throwIfAborted();
+                    win.webContents.send('progress-update', "Downloading Minecraft", ((i + 1) / assetKeys.length) * 30 + 5, `Downloading asset ${i + 1} of ${assetKeys.length}...`, processId, "good", cancelId, true);
                     let asset_data = asset_json.objects[asset];
                     if (version_json.assets == "legacy") {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/legacy/${asset}`)) || isRepair) {
-                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/legacy/${asset}`));
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/legacy/${asset}`), { signal });
                         }
                     } else if (version_json.assets == "pre-1.6") {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${asset}`)) || isRepair) {
-                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${asset}`));
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/instances/${this.instance_id}/resources/${asset}`), { signal });
                         }
                     } else {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`)) || isRepair) {
-                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`));
+                            await urlToFile(`https://resources.download.minecraft.net/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`, path.resolve(userPath, `minecraft/meta/assets/objects/${asset_data.hash.substring(0, 2)}/${asset_data.hash}`), { signal });
                         }
                     }
                 }));
@@ -1088,14 +1178,18 @@ class Minecraft {
             }
             const jarFilePath = path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.jar`);
             if ((!isRepair && !fs.existsSync(jarFilePath)) || whatToRepair?.includes("minecraft")) {
-                win.webContents.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...");
-                await urlToFile(version_json.downloads.client.url, jarFilePath);
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...", processId, "good", cancelId, true);
+                await urlToFile(version_json.downloads.client.url, jarFilePath, { signal, onProgress: (v) => {
+                    win.webContents.send('progress-update', "Downloading Minecraft", v * (3 / 20) + 40, "Downloading version jar...", processId, "good", cancelId, true);
+                } });
                 this.jarfile = jarFilePath;
             }
             let java = new Java();
             let paths = "";
             if (!isRepair || whatToRepair?.includes("java")) {
-                win.webContents.send('progress-update', "Downloading Minecraft", 45, "Checking for java...");
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading Minecraft", 55, "Checking for java...", processId, "good", cancelId, true);
                 this.java_installation = await java.getJavaInstallation(version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8, isRepair);
                 this.java_version = version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8;
             }
@@ -1117,9 +1211,11 @@ class Minecraft {
                 this.assets_index = version_json.assets;
                 let platformString = getPlatformString();
                 let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
-                win.webContents.send('progress-update', "Downloading Minecraft", 60, "Starting library download...");
+                signal.throwIfAborted();
+                win.webContents.send('progress-update', "Downloading Minecraft", 60, "Starting library download...", processId, "good", cancelId, true);
                 libs: for (let i = 0; i < version_json.libraries.length; i++) {
-                    win.webContents.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`);
+                    signal.throwIfAborted();
+                    win.webContents.send('progress-update', "Downloading Minecraft", ((i + 1) / version_json.libraries.length) * 40 + 60, `Downloading library ${i + 1} of ${version_json.libraries.length}`, processId, "good", cancelId, true);
                     if (version_json.libraries[i].rules) {
                         rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
                             let rule = version_json.libraries[i].rules[j];
@@ -1131,9 +1227,10 @@ class Minecraft {
                             }
                         }
                     }
+                    signal.throwIfAborted();
                     if (version_json.libraries[i].downloads.artifact) {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`)) || isRepair) {
-                            await urlToFile(version_json.libraries[i].downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`));
+                            await urlToFile(version_json.libraries[i].downloads.artifact.url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`), { signal });
                         }
                         let libName = version_json.libraries[i].name.split(":");
                         libName.splice(libName.length - 1, 1);
@@ -1143,9 +1240,10 @@ class Minecraft {
                         }
                         this.libNames.push(libName);
                     }
+                    signal.throwIfAborted();
                     if (version_json.libraries[i].natives && version_json.libraries[i].natives[platformString]) {
                         if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`)) || isRepair) {
-                            await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`));
+                            await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`), { signal });
                         }
                         let libName = version_json.libraries[i].name.split(":");
                         libName.splice(libName.length - 1, 1);
@@ -1159,10 +1257,11 @@ class Minecraft {
                 }
                 this.libs += paths;
             }
-            win.webContents.send('progress-update', "Downloading Minecraft", 100, "Done");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Minecraft", 100, "Done", processId, "done", cancelId, true);
             return { "java_installation": this.java_installation, "java_version": this.java_version };
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading Minecraft", 100, "Done");
+            win.webContents.send('progress-update', "Downloading Minecraft", 100, err, processId, "error", cancelId, true);
             throw err;
         }
     }
@@ -1203,8 +1302,14 @@ class Java {
         }
     }
     async downloadJava(version, isRepair) {
+        let processId = generateNewProcessId();
+        let cancelId = generateNewCancelId();
+        let abortController = new AbortController();
+        cancelLaunchFunctions[cancelId] = abortController;
+        retryLaunchFunctions[cancelId] = () => { }
+        let signal = abortController.signal;
         try {
-            win.webContents.send('progress-update', "Downloading Java", 0, "Starting java download...");
+            win.webContents.send('progress-update', "Downloading Java", 0, "Starting java download...", processId, "good", cancelId, true);
             const installDir = path.resolve(userPath, `java/java-${version}`);
             const platform = os.platform(); // 'win32', 'linux', 'darwin'
             const arch = os.arch(); // 'x64', 'arm64', etc.
@@ -1214,8 +1319,8 @@ class Java {
                 return 'linux';
             };
             const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${getPlatformString()}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
-
-            win.webContents.send('progress-update', "Downloading Java", 5, "Fetching java version info...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Java", 5, "Fetching java version info...", processId, "good", cancelId, true);
             const res = await fetch(versionApi);
             const data = await res.json();
 
@@ -1227,10 +1332,13 @@ class Java {
             const downloadUrl = binary.download_url;
             const fileName = path.basename(downloadUrl);
             const downloadPath = path.resolve(userPath, "java/" + fileName);
-
-            win.webContents.send('progress-update', "Downloading Java", 10, "Fetching java zip...");
-            await urlToFile(downloadUrl, downloadPath);
-            win.webContents.send('progress-update', "Downloading Java", 60, "Extracting java zip...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Java", 10, "Fetching java zip...", processId, "good", cancelId, true);
+            await urlToFile(downloadUrl, downloadPath, { signal, onProgress: (v) => {
+                win.webContents.send('progress-update', "Downloading Java", v / 2 + 10, "Fetching java zip...", processId, "good", cancelId, true);
+            } });
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Java", 60, "Extracting java zip...", processId, "good", cancelId, true);
             let name = "";
             if (fileName.endsWith('.zip')) {
                 const zip = new AdmZip(downloadPath);
@@ -1242,15 +1350,18 @@ class Java {
             } else {
                 throw new Error("Isn't a .zip file?");
             }
-            win.webContents.send('progress-update', "Downloading Java", 95, "Deleting old zip...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Java", 95, "Deleting old zip...", processId, "good", cancelId, true);
 
             fs.unlinkSync(downloadPath);
-            win.webContents.send('progress-update', "Downloading Java", 98, "Remembering version...");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Java", 98, "Remembering version...", processId, "good", cancelId, true);
             this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/javaw.exe`);
             fs.writeFileSync(path.resolve(userPath, "java/versions.json"), JSON.stringify(this.versions), 'utf-8');
-            win.webContents.send('progress-update', "Downloading Java", 100, "Done");
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', "Downloading Java", 100, "Done", processId, "done", cancelId, true);
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading Java", 100, "Error");
+            win.webContents.send('progress-update', "Downloading Java", 100, err, processId, "error", cancelId, true);
             throw err;
         }
     }
@@ -1267,54 +1378,112 @@ class Java {
     }
 }
 
-function urlToFile(url, filepath, redirectCount = 0) {
+function urlToFile(url, filepath, {
+    signal = null,
+    onProgress = null,
+    redirectCount = 0
+} = {}) {
     return new Promise((resolve, reject) => {
+        try {
+            if (signal) signal.throwIfAborted();
+        } catch (err) {
+            return reject(err);
+        }
+
         if (redirectCount > 5) {
-            return reject(new Error('Too many redirects'));
+            return reject(new Error("Too many redirects"));
         }
 
         const parsedUrl = urlModule.parse(url);
-        const protocol = parsedUrl.protocol === 'https:' ? https : http;
+        const protocol = parsedUrl.protocol === "https:" ? https : http;
 
         fs.mkdirSync(path.dirname(filepath), { recursive: true });
-
         const file = fs.createWriteStream(filepath);
 
-        const request = protocol.get(url, (response) => {
-            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        let request;
+
+        const cleanup = (err) => {
+            try { file.close(() => {}); } catch {}
+            fs.unlink(filepath, () => {});
+            reject(err);
+        };
+
+        const abortHandler = () => {
+            cleanup(signal.reason);
+        };
+        if (signal) signal.addEventListener("abort", abortHandler);
+
+        try {
+            request = protocol.get(url, (response) => {
+                try {
+                    if (signal) signal.throwIfAborted();
+                } catch (e) {
+                    return cleanup(e);
+                }
+
                 // Handle redirect
-                const redirectUrl = new URL(response.headers.location, url).href;
-                file.close();
-                fs.unlink(filepath, () => {
-                    urlToFile(redirectUrl, filepath, redirectCount + 1)
-                        .then(resolve)
-                        .catch(reject);
+                if (
+                    response.statusCode >= 300 &&
+                    response.statusCode < 400 &&
+                    response.headers.location
+                ) {
+                    const redirectUrl = new URL(response.headers.location, url).href;
+                    file.close();
+                    fs.unlink(filepath, () => {
+                        if (signal) signal.removeEventListener("abort", abortHandler);
+
+                        urlToFile(redirectUrl, filepath, {
+                            signal,
+                            onProgress,
+                            redirectCount: redirectCount + 1
+                        }).then(resolve).catch(reject);
+                    });
+                    return;
+                }
+
+                if (response.statusCode !== 200) {
+                    return cleanup(new Error(`Failed to get '${url}' (${response.statusCode})`));
+                }
+
+                const total = parseInt(response.headers["content-length"] || "0", 10);
+                let downloaded = 0;
+
+                response.on("data", (chunk) => {
+                    downloaded += chunk.length;
+
+                    if (signal?.aborted) {
+                        return; // abortHandler will handle cleanup
+                    }
+
+                    if (total && onProgress) {
+                        onProgress((downloaded / total) * 100);
+                    }
                 });
-                return;
-            }
 
-            if (response.statusCode !== 200) {
-                file.close();
-                fs.unlink(filepath, () => { });
-                return reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
-            }
+                response.pipe(file);
 
-            response.pipe(file);
+                file.on("finish", () => {
+                    file.close(() => {
+                        if (signal) signal.removeEventListener("abort", abortHandler);
+                        resolve(filepath);
+                    });
+                });
 
-            file.on('finish', () => {
-                file.close(() => resolve(filepath));
+                response.on("error", cleanup);
             });
-        });
 
-        request.on('error', (err) => {
-            fs.unlink(filepath, () => { });
-            reject(err);
-        });
+            request.on("error", cleanup);
 
-        file.on('error', (err) => {
-            fs.unlink(filepath, () => { });
-            reject(err);
-        });
+            // Abort request if needed
+            if (signal) {
+                signal.addEventListener("abort", () => {
+                    try { request.destroy(); } catch {}
+                });
+            }
+
+        } catch (err) {
+            cleanup(err);
+        }
     });
 }
 

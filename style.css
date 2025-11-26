@@ -1659,27 +1659,27 @@ body.compact .live-stop {
     border-style: solid;
     border-color: var(--color-2);
     border-radius: 8px;
-    padding-inline: 8px;
     inset: unset;
     position: static;
     width: auto;
     height: auto;
     opacity: 0;
-    transition: opacity .2s, display .2s allow-discrete, overlay .2s allow-discrete, transform .2s;
+    transition: opacity .2s, display .2s allow-discrete, overlay .2s allow-discrete, scale .2s;
+    padding: 0;
+}
+
+body.compact .download-log-wrapper {
+    scale: .8;
 }
 
 .download-log-wrapper:popover-open {
     opacity: 1;
-    transform: scaleY(1) !important;
+    scale: 1 !important;
 
     @starting-style {
         opacity: 0;
-        transform: scaleY(.8) !important;
+        scale: .8 !important;
     }
-}
-
-body.compact .download-log-wrapper {
-    transform: scaleY(.8);
 }
 
 body.compact .download-log-wrapper {
@@ -1694,9 +1694,17 @@ body:not(.compact) .download-log-toggle {
     display: none;
 }
 
+.download-log:not(:has(.download-item)) .download-log-toggle {
+    display: none;
+}
+
 body:not(.compact) .download-log-wrapper:not(:empty) {
     display: flex;
     opacity: 1;
+}
+
+.download-log:not(:has(.download-item)) .download-log-wrapper {
+    display: none !important;
 }
 
 .download-log:has(.download-log-wrapper:empty) .download-log-toggle {
@@ -1733,23 +1741,15 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
     scale: .95;
 }
 
-.download-log:has(.download-log-wrapper:popover-open) .download-log-toggle {
-    transform: rotateZ(180deg);
-}
-
-.download-log-toggle::after {
+.download-log:has(.download-error) .download-log-toggle::after {
     height: 10px;
     width: 10px;
     border-radius: 50%;
     content: "";
     right: -2px;
     top: -2px;
-    background-color: var(--accent-color);
+    background-color: var(--error-color);
     position: absolute;
-}
-
-.download-log:has(.download-log-wrapper:popover-open) .download-log-toggle::after {
-    display: none;
 }
 
 .download-log-wrapper:empty {
@@ -1760,13 +1760,45 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding-block: 8px;
-}
-
-.download-item:not(:last-child) {
+    padding: 8px;
+    position: relative;
     border-bottom-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
+}
+
+.download-grid-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-block: 8px;
+    position: relative;
+}
+
+.download-item.download-error {
+    background-color: color-mix(in srgb, var(--color-1), var(--error-color));
+}
+
+.download-item > * {
+    z-index: 2;
+}
+
+.view-downloads-button {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    cursor: pointer;
+    transition: background-color .25s;
+    font-size: 1rem;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 0px 0px 8px 8px;
+    width: 100%;
+}
+
+.view-downloads-button:hover {
+    background-color: var(--color-1t);
 }
 
 .download-title {
@@ -2607,6 +2639,10 @@ dialog[open]::backdrop {
     background-color: var(--color-1t);
 }
 
+#settingsButtonEle:hover {
+    background-color: var(--color-2t);
+}
+
 .loading-container {
     display: flex;
     flex-direction: column;
@@ -3112,12 +3148,6 @@ dialog[open]::backdrop {
 
 .option-item:has(.fa-minus) {
     background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
-}
-
-.option-item:not(.hidden):not(:last-of-type) {
-    border-bottom-style: solid;
-    border-bottom-color: var(--color-1t);
-    border-bottom-width: 1px;
 }
 
 .option-title {
@@ -4904,4 +4934,141 @@ div:has(> .dialog-wrapper-hidden.shown) {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.download-grid {
+    grid-template-columns: 1fr auto auto;
+    display: grid;
+    border-radius: 10px;
+}
+
+.download-grid:has(.download-grid-entry) .loading-container {
+    display: none;
+}
+
+.download-grid-entry {
+    display: grid;
+    grid-template-columns: subgrid;
+    gap: 10px;
+    align-items: center;
+    grid-column: span 3;
+    position: relative;
+}
+
+.download-grid-entry > * {
+    z-index: 2;
+}
+
+.download-grid-entry.download-error::after {
+    content: "";
+    top: 0;
+    bottom: 0;
+    right: -10px;
+    left: -10px;
+    position: absolute;
+    background-color: color-mix(in srgb, transparent, var(--error-color));
+}
+
+.download-grid-entry:not(.download-error) .download-retry-button,
+.download-grid-entry:not(.download-error) .download-ignore-button {
+    display: none;
+}
+
+.download-grid-entry.download-error .download-cancel-button {
+    display: none;
+}
+
+.download-cancel-button {
+    border-radius: 4px;
+    padding: 8px;
+    background-color: transparent;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s, color .25s;
+    display: flex;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    border-style: solid;
+    border-color: var(--danger-color);
+    color: var(--danger-color);
+    border-width: 1px;
+    grid-column: span 2;
+    margin-left: auto;
+}
+
+.download-cancel-button:active {
+    scale: .95;
+}
+
+.download-cancel-button:hover {
+    background-color: var(--danger-color);
+    color: var(--text-color)
+}
+
+.download-cancel-button.disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+.download-cancel-button.disabled:active {
+    scale: 1;
+}
+
+.download-cancel-button.disabled:hover {
+    background-color: transparent;
+    color: var(--danger-color);
+}
+
+.download-retry-button {
+    border-radius: 4px;
+    padding: 8px;
+    background-color: transparent;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s, color .25s;
+    display: flex;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    border-style: solid;
+    border-color: var(--text-color);
+    border-width: 1px;
+    display: none; /* remove to enable retry later */
+}
+
+.download-retry-button:active {
+    scale: .95;
+}
+
+.download-retry-button:hover {
+    background-color: var(--text-color);
+    color: var(--background-color);
+}
+
+.download-ignore-button {
+    border-radius: 4px;
+    padding: 8px;
+    background-color: transparent;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s, color .25s;
+    display: flex;
+    gap: 8px;
+    font-size: 1rem;
+    align-items: center;
+    border-style: solid;
+    border-color: var(--text-color);
+    border-width: 1px;
+    grid-column: span 2; /* remove to enable retry later */
+    margin-left: auto; /* remove to enable retry later */
+}
+
+.download-ignore-button:active {
+    scale: .95;
+}
+
+.download-ignore-button:hover {
+    background-color: var(--text-color);
+    color: var(--background-color);
 }

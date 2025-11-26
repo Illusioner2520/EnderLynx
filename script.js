@@ -2103,7 +2103,7 @@ class ContentList {
         this.notFoundElement = notFoundElement;
         contentListTop.appendChild(totalText);
 
-        
+
         this.paginationTop = new Pagination(1, Math.ceil(content.length / 25), (new_page) => {
             this.applyFilters(searchBar.value, filter.value, new_page);
         });
@@ -2282,8 +2282,6 @@ class ContentList {
     isCheckboxVisible(element) {
         let dropdown = this.filter.value;
         let search = this.searchBar.value;
-        console.log(dropdown);
-        console.log(search);
         let validCheckBoxes = this.items.filter((e) => {
             if (!e.name.toLowerCase().includes(search.toLowerCase().trim())) {
                 return false;
@@ -2359,7 +2357,7 @@ class ContentList {
                 total++;
             }
         }
-        console.log({total,checked})
+        console.log({ total, checked })
         if (total == checked && total != 0) {
             this.checkBox.checked = true;
             this.checkBox.indeterminate = false;
@@ -6216,6 +6214,7 @@ function setInstanceTabContentContent(instanceInfo, element) {
 }
 
 async function setInstanceTabContentContentReal(instanceInfo, element) {
+    clearMoreMenus();
     currentSubTab = "content";
     let fileDrop = document.createElement("div");
     fileDrop.dataset.action = "content-import";
@@ -6619,7 +6618,6 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     fragment.appendChild(searchAndFilter);
     fragment.appendChild(contentListWrap);
     element.appendChild(fragment);
-    clearMoreMenus();
 }
 function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
@@ -7406,8 +7404,10 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         for (let i = 0; i < values.length; i++) {
             if (values[i].key.toLowerCase().includes(searchBar.value.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == v || v == "all")) {
                 values[i].element.style.display = "grid";
+                values[i].element.classList.remove("hidden");
             } else {
                 values[i].element.style.display = "none";
+                values[i].element.classList.add("hidden");
             }
         }
     });
@@ -7899,7 +7899,7 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
         if (screenshotElement) screenshotElement.style.imageRendering = v ? "pixelated" : "";
     }, false);
     let label = document.createElement("label");
-    label.className= "dialog-label";
+    label.className = "dialog-label";
     label.innerText = translate("app.gallery.pixelated");
     screenshotAction6.appendChild(toggleElement);
     screenshotAction6.appendChild(label);
@@ -8178,8 +8178,25 @@ function parseMinecraftFormatting(text) {
 let live = new LiveMinecraft(liveMinecraft);
 live.findLive();
 
+
+class NoResultsFound {
+    constructor(message = translate("app.no_results_found")) {
+        let element = document.createElement("div");
+        element.className = "loading-container";
+        let question = document.createElement("div");
+        question.className = "loading-container-question";
+        question.innerHTML = '<i class="fa-solid fa-question"></i>';
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        element.appendChild(question);
+        element.appendChild(text);
+        text.innerHTML = message;
+        this.element = element;
+    }
+}
+
 class DownloadLogEntry {
-    constructor(startingTitle, startingDescription, startingProgress) {
+    constructor(startingTitle, startingDescription, startingProgress, id, status, startingCancelFunction, startingRetryFunction) {
         let element = document.createElement("div");
         element.className = "download-item";
         let title = document.createElement("div");
@@ -8189,8 +8206,8 @@ class DownloadLogEntry {
         progress.className = "download-progress";
         desc.className = "download-desc";
         progress.style.setProperty("--percent", startingProgress + "%");
-        title.innerHTML = sanitize(startingTitle);
-        desc.innerHTML = sanitize(startingDescription);
+        title.innerText = startingTitle;
+        desc.innerText = startingDescription;
         element.appendChild(title);
         element.appendChild(progress);
         element.appendChild(desc);
@@ -8200,27 +8217,104 @@ class DownloadLogEntry {
         this.ele = element;
         this.title = startingTitle;
         this.progress = startingProgress;
-    }
+        this.id = id;
+        this.status = status;
+        this.cancelFunction = startingCancelFunction;
+        this.retryFunction = startingRetryFunction;
 
-    get getTitle() {
-        return this.title;
-    }
+        let listElement = document.createElement("div");
+        listElement.className = "download-grid-entry";
+        this.listEle = listElement;
+        let itemElement = document.createElement("div");
+        itemElement.className = "download-grid-item";
+        let title2 = document.createElement("div");
+        let progress2 = document.createElement("div");
+        let desc2 = document.createElement("div");
+        title2.className = "download-title";
+        progress2.className = "download-progress";
+        desc2.className = "download-desc";
+        progress2.style.setProperty("--percent", startingProgress + "%");
+        title2.innerText = startingTitle;
+        desc2.innerText = startingDescription;
+        itemElement.appendChild(title2);
+        itemElement.appendChild(progress2);
+        itemElement.appendChild(desc2);
+        this.titleEle2 = title2;
+        this.descEle2 = desc2;
+        this.progressEle2 = progress2;
+        let cancelButton = document.createElement("button");
+        cancelButton.innerHTML = '<i class="fa-solid fa-ban"></i>' + translate("app.downloads.cancel");
+        cancelButton.className = "download-cancel-button";
+        cancelButton.onclick = () => {
+            if (this.cancelFunction) this.cancelFunction();
+            cancelButton.onclick = () => {};
+            cancelButton.innerHTML = '<i class="spinner"></i>' + translate("app.downloads.canceling");
+            cancelButton.classList.add("disabled");
+        }
+        let retryButton = document.createElement("button");
+        retryButton.innerHTML = '<i class="fa-solid fa-arrow-rotate-left"></i>' + translate("app.downloads.retry");
+        retryButton.className = "download-retry-button";
+        retryButton.onclick = () => {
+            if (this.retryFunction) this.retryFunction();
+            this.remove();
+        }
+        let ignoreButton = document.createElement("button");
+        ignoreButton.innerHTML = '<i class="fa-solid fa-file-circle-xmark"></i>' + translate("app.downloads.ignore");
+        ignoreButton.className = "download-ignore-button";
+        ignoreButton.onclick = () => {
+            this.remove();
+        }
+        listElement.appendChild(itemElement);
+        listElement.appendChild(cancelButton);
+        listElement.appendChild(retryButton);
+        listElement.appendChild(ignoreButton);
 
-    get getProgress() {
-        return this.progress;
+        if (status == "error") {
+            listElement.classList.add("download-error");
+            element.classList.add("download-error");
+        }
     }
 
     setDesc(desc) {
-        this.descEle.innerHTML = sanitize(desc);
+        this.descEle.innerText = desc;
+        this.descEle2.innerText = desc;
     }
 
     setProgress(progress) {
         this.progressEle.style.setProperty("--percent", progress + "%");
+        this.progressEle2.style.setProperty("--percent", progress + "%");
         this.progress = progress;
     }
 
+    setTitle(title) {
+        this.title = title;
+        this.titleEle.innerText = title;
+        this.titleEle2.innerText = title;
+    }
+
+    setCancelFunction(cancelFunction) {
+        this.cancelFunction = cancelFunction;
+    }
+
+    setRetryFunction(retryFunction) {
+        this.retryFunction = retryFunction;
+    }
+
+    setStatus(status) {
+        this.status = status;
+        if (status == "error") {
+            this.ele.classList.add("download-error");
+            this.listEle.classList.add("download-error");
+        } else {
+            this.ele.classList.remove("download-error");
+            this.listEle.classList.remove("download-error");
+        }
+    }
+
     remove() {
+        this.markForRemoval = true;
         this.ele.remove();
+        this.listEle.remove();
     }
 }
 
@@ -8232,63 +8326,90 @@ class DownloadLog {
         downloadLogToggle.className = "download-log-toggle";
         downloadLogToggle.innerHTML = '<i class="fa-solid fa-bars-progress"></i>';
         downloadLogToggle.setAttribute("popovertarget", "download-log-wrapper");
-        // let close = () => {
-        //     downloadLogToggle.classList.remove("open");
-        //     downloadLogToggle.onclick = open;
-        //     logsWrapper.hidePopover();
-        //     downloadLogToggle.setAttribute("title", "Hide Downloads");
-        // }
-        // let open = () => {
-        //     downloadLogToggle.classList.add("open");
-        //     downloadLogToggle.onclick = close;
-        //     logsWrapper.showPopover();
-        //     downloadLogToggle.setAttribute("title", "Show Downloads");
-        // }
-        // downloadLogToggle.onclick = open;
         element.appendChild(downloadLogToggle);
         let logsWrapper = document.createElement("div");
         logsWrapper.className = "download-log-wrapper";
         logsWrapper.id = "download-log-wrapper";
         logsWrapper.setAttribute("popover", "");
         element.appendChild(logsWrapper);
-        this.element = logsWrapper;
+        let itemWrapper = document.createElement("div");
+        itemWrapper.className = "download-item-wrapper";
+        itemWrapper.id = "download-item-wrapper";
+        logsWrapper.appendChild(itemWrapper);
+        let downloadsButton = document.createElement("button");
+        downloadsButton.className = "view-downloads-button";
+        downloadsButton.innerText = translate("app.downloads.view");
+        downloadsButton.onclick = () => {
+            this.openAllProcesses();
+        }
+        logsWrapper.appendChild(downloadsButton);
+        this.element = itemWrapper;
         this.toggle = downloadLogToggle;
+        this.allProcessesElement = document.createElement("div");
+        this.allProcessesElement.className = "download-grid";
+        let noProcessesElement = new NoResultsFound(translate("app.downloads.none"));
+        let noProcessesRunningElement = noProcessesElement.element;
+        this.allProcessesElement.appendChild(noProcessesRunningElement);
+        noProcessesRunningElement.style.padding = "20px";
+        noProcessesRunningElement.style.borderRadius = "10px";
     }
 
-    setData(info) {
+    openAllProcesses() {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.downloads.all_processes"), "notice", this.allProcessesElement, [
+            {
+                "content": translate("app.downloads.done"),
+                "type": "confirm"
+            }
+        ], [], () => { });
+    }
+
+    sendData(info) {
         info: for (let i = 0; i < info.length; i++) {
-            logs: for (let j = 0; j < this.logs.length; j++) {
-                if (this.logs[j].getTitle == info[i].title) {
+            for (let j = 0; j < this.logs.length; j++) {
+                if (this.logs[j].id == info[i].id) {
                     this.logs[j].setDesc(info[i].desc);
                     this.logs[j].setProgress(info[i].progress);
+                    this.logs[j].setStatus(info[i].status);
+                    this.logs[j].setTitle(info[i].title);
+                    this.logs[j].setCancelFunction(info[i].cancel);
+                    this.logs[j].setRetryFunction(info[i].retry);
                     continue info;
                 }
             }
-            let log = new DownloadLogEntry(info[i].title, info[i].desc, info[i].progress);
+            let log = new DownloadLogEntry(info[i].title, info[i].desc, info[i].progress, info[i].id, info[i].status, info[i].cancel, info[i].retry);
+            this.allProcessesElement.appendChild(log.listEle);
             this.logs.push(log);
             this.element.appendChild(log.ele);
         }
 
-        this.logs.forEach((e) => {
-            if (e.getProgress == 100) {
+        this.logs = this.logs.filter((e) => {
+            if (e.status == "done" || e.markForRemoval) {
                 e.remove();
+                return false;
             }
-        })
-        this.logs = this.logs.filter((e) => e.getProgress != 100);
+            return true;
+        });
         if (this.logs[0]) {
-            this.toggle.style.setProperty("--percent-preview", this.logs[0].getProgress + "%");
+            this.toggle.style.setProperty("--percent-preview", this.logs[0].progress + "%");
+        } else {
+            this.toggle.style.setProperty("--percent-preview", "0%");
         }
     }
 }
 
 let log = new DownloadLog(downloadLog);
 
-window.electronAPI.onProgressUpdate((a, b, c) => {
-    log.setData([
+window.electronAPI.onProgressUpdate((title, progress, task, id, status, cancelFunction, retryFunction) => {
+    log.sendData([
         {
-            "title": a,
-            "progress": b,
-            "desc": c
+            "title": title,
+            "progress": progress,
+            "desc": task,
+            "id": id,
+            "status": status,
+            "cancel": cancelFunction,
+            "retry": retryFunction
         }
     ]);
 });
@@ -10366,22 +10487,6 @@ class LoadingContainer {
     }
 }
 
-class NoResultsFound {
-    constructor(message = translate("app.no_results_found")) {
-        let element = document.createElement("div");
-        element.className = "loading-container";
-        let question = document.createElement("div");
-        question.className = "loading-container-question";
-        question.innerHTML = '<i class="fa-solid fa-question"></i>';
-        let text = document.createElement("div");
-        text.className = "loading-container-text";
-        element.appendChild(question);
-        element.appendChild(text);
-        text.innerHTML = message;
-        this.element = element;
-    }
-}
-
 class CurrentlyInstalling {
     constructor() {
         let element = document.createElement("div");
@@ -10565,13 +10670,6 @@ function duplicateInstance(instanceInfo) {
             "content": translate("app.instances.duplicate.confirm")
         }
     ], [], async (v) => {
-        log.setData([
-            {
-                "title": translate("app.instances.duplicate.log.title"),
-                "progress": 0,
-                "desc": translate("app.instances.duplicate.log.start")
-            }
-        ]);
         let info = {};
         v.forEach(e => info[e.id] = e.value);
         let new_instance_id = window.electronAPI.getInstanceFolderName(info.name);
@@ -10861,7 +10959,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             project_type = "datapack"
         }
         content = {
-            "icon_url": cf_content.data.logo.thumbnailUrl ? cf_content.data.logo.thumbnailUrl : cf_content.data.logo.url,
+            "icon_url": cf_content.data?.logo?.thumbnailUrl ? cf_content.data.logo.thumbnailUrl : (cf_content.data?.logo?.url ? cf_content.data.logo.url : ""),
             "title": cf_content.data.name,
             "project_type": project_type,
             "downloads": cf_content.data.downloadCount,

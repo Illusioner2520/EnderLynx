@@ -732,7 +732,7 @@
     "app.home.mc_news": "Minecraft News",
     "app.settings.folder_location": "Folder Location",
     "app.settings.folder_location.browse": "Browse",
-    "app.settings.folder_location.description": "Location to store all of your Minecraft instances and data. Only change this if you need to, as you will need to update the java path for all of your instances. Requires app restart after folder is moved.",
+    "app.settings.folder_location.description": "Location to store all of your Minecraft instances and data. Only change this if you need to, as you will need to update the java path for all of your instances. This will duplicate everything from the old path to the new path. Then, if the move is successful, the next time you open the launcher, it will remove the old files.",
     "app.launch_error": "Unable to launch instance",
     "app.settings.def_opts.import": "Import from options.txt",
     "app.settings.def_opts.export": "Export to options.txt",
@@ -805,5 +805,13 @@
     "app.date.months.singular": "%t month ago",
     "app.date.months": "%t months ago",
     "app.date.years.singular": "%t year ago",
-    "app.date.years": "%t years ago"
+    "app.date.years": "%t years ago",
+    "app.downloads.view": "View All Processes",
+    "app.downloads.cancel": "Cancel",
+    "app.downloads.retry": "Retry",
+    "app.downloads.ignore": "Ignore",
+    "app.downloads.all_processes": "All Processes",
+    "app.downloads.done": "Done",
+    "app.downloads.canceling": "Canceling",
+    "app.downloads.none": "No Processes Running"
 }
