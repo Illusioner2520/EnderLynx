@@ -36,6 +36,7 @@
     "app.button.instances.open_folder": "Open Folder",
     "app.button.instances.share": "Export Instance",
     "app.button.instances.open_settings": "Open Instance Settings",
+    "app.button.instances.repair": "Repair Instance",
     "app.button.instances.delete": "Delete Instance",
     "app.button.instances.play_short": "Play",
     "app.button.instances.stop_short": "Stop",
@@ -370,7 +371,7 @@
     "app.instances.repair": "Repair Instance",
     "app.instances.repair.title": "Repair Instance",
     "app.instances.repair.notice": "Are you sure that you want to repair this instance? Select what you want to repair below. This might take some time. It will not delete your worlds, mod configs or other saved data.",
-    "app.instances.repair.notice_modpack": "Are you sure that you want to repair this instance? Select what you want to repair below. This might take some time. It will not delete your worlds, mod configs or other saved data. If you believe the issue is caused by the modpack or a mod in the modpack, please try to update the modpack to the latest version to see if that fixes the issue.",
+    "app.instances.repair.notice_modpack": "Are you sure that you want to repair this instance? Select what you want to repair below. This might take some time. It will not delete your worlds, mod configs or other saved data. If you believe the issue is caused by the modpack or a mod in the modpack, please try to update the modpack to the latest version or reinstall the modpack to see if that fixes the issue.",
     "app.instances.repair.cancel": "Cancel",
     "app.instances.repair.confirm": "Confirm Repair",
     "app.instances.settings.width": "Width",
@@ -743,7 +744,7 @@
     "app.settings.def_opts.import.cancel": "Cancel",
     "app.settings.def_opts.import.confirm": "Import",
     "app.instances.repair.java": "Java Installation",
-    "app.instances.repair.java.description": "Select this if the game isn't starting at all or there is a crash that wasn't caused by Minecraft or and loaded mods.",
+    "app.instances.repair.java.description": "Select this if the game isn't starting at all or there is a crash that wasn't caused by Minecraft or loaded mods.",
     "app.instances.repair.minecraft": "Minecraft Itself",
     "app.instances.repair.minecraft.description": "Select this if the game is crashing and it wasn't caused by a specific mod. This will reinstall Minecraft's code and its libraries.",
     "app.instances.repair.assets": "Assets",
@@ -814,5 +815,6 @@
     "app.downloads.done": "Done",
     "app.downloads.canceling": "Canceling",
     "app.downloads.none": "No Processes Running",
-    "app.instances.none": "No Instances Found"
+    "app.instances.none": "No Instances Found",
+    "app.modpack.repair": "Reinstall Modpack"
 }

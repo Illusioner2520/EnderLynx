@@ -3899,6 +3899,13 @@ async function showHomeContent(oldEle) {
                 }
             },
             {
+                "icon": '<i class="fa-solid fa-wrench"></i>',
+                "title": translate("app.button.instances.repair"),
+                "func": () => {
+                    showRepairDialog(instanceInfo.refresh());
+                }
+            },
+            {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
                 "func": (e) => {
@@ -5190,6 +5197,13 @@ function showInstanceContent(e) {
                 }
             },
             {
+                "icon": '<i class="fa-solid fa-wrench"></i>',
+                "title": translate("app.button.instances.repair"),
+                "func": () => {
+                    showRepairDialog(instances[i].refresh());
+                }
+            },
+            {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
                 "func": (e) => {
@@ -5743,6 +5757,13 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log)
             }
         },
         {
+            "icon": '<i class="fa-solid fa-wrench"></i>',
+            "title": translate("app.button.instances.repair"),
+            "func": () => {
+                showRepairDialog(instanceInfo.refresh());
+            }
+        },
+        {
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
             "func": (e) => {
@@ -5960,61 +5981,12 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             },
             "default": instanceInfo.installed_version
         } : null,
-        {
-            "type": "button",
-            "name": translate("app.instances.repair"),
-            "icon": '<i class="fa-solid fa-wrench"></i>',
-            "tab": instanceInfo.locked ? "general" : "installation",
-            "func": () => {
-                let dialog = new Dialog();
-                dialog.showDialog(translate("app.instances.repair.title"), "form", [
-                    {
-                        "type": "notice",
-                        "content": instanceInfo.install_source == "custom" ? translate("app.instances.repair.notice") : translate("app.instances.repair.notice_modpack")
-                    },
-                    {
-                        "type": "toggle",
-                        "name": translate("app.instances.repair.minecraft"),
-                        "desc": translate("app.instances.repair.minecraft.description"),
-                        "id": "minecraft",
-                        "default": false
-                    },
-                    {
-                        "type": "toggle",
-                        "name": translate("app.instances.repair.java"),
-                        "desc": translate("app.instances.repair.java.description"),
-                        "id": "java",
-                        "default": false
-                    },
-                    {
-                        "type": "toggle",
-                        "name": translate("app.instances.repair.assets"),
-                        "desc": translate("app.instances.repair.assets.description"),
-                        "id": "assets",
-                        "default": false
-                    },
-                    instanceInfo.loader != "vanilla" ? {
-                        "type": "toggle",
-                        "name": translate("app.instances.repair.mod_loader", "%l", loaders[instanceInfo.loader]),
-                        "desc": translate("app.instances.repair.mod_loader.description", "%l", loaders[instanceInfo.loader]),
-                        "id": "mod_loader",
-                        "default": false
-                    } : null
-                ].filter(e => e), [
-                    {
-                        "type": "cancel",
-                        "content": translate("app.instances.repair.cancel")
-                    },
-                    {
-                        "type": "confirm",
-                        "content": translate("app.instances.repair.confirm")
-                    }
-                ], [], (v) => {
-                    repairInstance(instanceInfo.refresh(), v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
-                });
-            },
-            "close_dialog": true
-        },
+        instanceInfo.installed_version ? {
+            "type": "toggle",
+            "name": translate("app.modpack.repair"),
+            "tab": "modpack",
+            "id": "modpack_reinstall"
+        } : null,
         {
             "type": "number",
             "name": translate("app.instances.settings.width"),
@@ -6180,7 +6152,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         instanceInfo.setPreLaunchHook(info.pre_launch_hook);
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
-        if (info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") {
+        if ((info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") || info.modpack_reinstall) {
             let source = instanceInfo.install_source;
             let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
             runModpackUpdate(instanceInfo, source, modpack_info);
@@ -6217,6 +6189,54 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             }
             instanceInfo.setMcInstalled(true);
         }
+    });
+}
+function showRepairDialog(instanceInfo) {
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.instances.repair.title"), "form", [
+        {
+            "type": "notice",
+            "content": instanceInfo.install_source == "custom" ? translate("app.instances.repair.notice") : translate("app.instances.repair.notice_modpack")
+        },
+        {
+            "type": "toggle",
+            "name": translate("app.instances.repair.minecraft"),
+            "desc": translate("app.instances.repair.minecraft.description"),
+            "id": "minecraft",
+            "default": false
+        },
+        {
+            "type": "toggle",
+            "name": translate("app.instances.repair.java"),
+            "desc": translate("app.instances.repair.java.description"),
+            "id": "java",
+            "default": false
+        },
+        {
+            "type": "toggle",
+            "name": translate("app.instances.repair.assets"),
+            "desc": translate("app.instances.repair.assets.description"),
+            "id": "assets",
+            "default": false
+        },
+        instanceInfo.loader != "vanilla" ? {
+            "type": "toggle",
+            "name": translate("app.instances.repair.mod_loader", "%l", loaders[instanceInfo.loader]),
+            "desc": translate("app.instances.repair.mod_loader.description", "%l", loaders[instanceInfo.loader]),
+            "id": "mod_loader",
+            "default": false
+        } : null
+    ].filter(e => e), [
+        {
+            "type": "cancel",
+            "content": translate("app.instances.repair.cancel")
+        },
+        {
+            "type": "confirm",
+            "content": translate("app.instances.repair.confirm")
+        }
+    ], [], (v) => {
+        repairInstance(instanceInfo.refresh(), v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
     });
 }
 function setInstanceTabContentContent(instanceInfo, element) {
