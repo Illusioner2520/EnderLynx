@@ -15,6 +15,7 @@ const querystring = require('querystring');
 const https = require('https');
 const stringArgv = require('string-argv').default;
 const axios = require('axios');
+const crypto = require('crypto');
 
 let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
 
