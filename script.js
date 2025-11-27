@@ -1591,11 +1591,9 @@ class SearchBar {
             this.value = searchInput.value;
             if (this.oninput) this.oninput(searchInput.value);
         };
-        searchInput.onkeydown = (e) => {
-            if (e.key == "Enter") {
-                this.value = searchInput.value;
-                if (this.onenter) this.onenter(searchInput.value);
-            }
+        searchInput.onchange = (e) => {
+            this.value = searchInput.value;
+            if (this.onenter) this.onenter(searchInput.value);
         }
         searchClear.onclick = (e) => {
             searchInput.value = "";
@@ -9847,10 +9845,30 @@ class Pagination {
                 gap = 0;
             } else {
                 if (gap == 0) {
+                    let pageCollapseGroup = document.createElement("div");
+                    pageCollapseGroup.className = "page-collapse-group";
+
                     let pageCollapse = document.createElement("div");
                     pageCollapse.className = "page-collapse";
                     pageCollapse.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
-                    element.appendChild(pageCollapse);
+                    pageCollapseGroup.appendChild(pageCollapse);
+
+                    let pageInput = document.createElement("input");
+                    pageInput.className = "page-input";
+                    pageInput.type = "number";
+                    pageCollapseGroup.appendChild(pageInput);
+
+                    pageInput.onchange = () => {
+                        let value = Math.floor(pageInput.valueAsNumber);
+                        if (value <= 0 || value > this.totalPages || !value) return;
+                        this.change_page_function(value);
+                    }
+
+                    pageCollapse.onclick = () => {
+                        pageInput.focus();
+                    }
+
+                    element.appendChild(pageCollapseGroup);
                 }
                 gap = 1;
             }
