@@ -2729,5 +2729,6 @@ async function downloadUpdate(download_url, new_version, checksum) {
         }).unref();
     } catch (err) {
         win.webContents.send('progress-update', `Downloading Update`, 100, err, processId, "error", cancelId);
+        throw err;
     }
 }
