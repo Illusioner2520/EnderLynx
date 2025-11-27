@@ -2495,7 +2495,7 @@ async function importWorld(file_path, instance_id, worldName) {
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        ipcRenderer.send('progress-update', `Importing ${worldName}`, 0, "Beginning...", processId, "good", cancelId);
+        win.webContents.send('progress-update', `Importing ${worldName}`, 0, "Beginning...", processId, "good", cancelId);
         const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
         fs.mkdirSync(savesPath, { recursive: true });
         signal.throwIfAborted();
@@ -2550,11 +2550,11 @@ async function importWorld(file_path, instance_id, worldName) {
                 done++;
                 const percent = Math.round((done / total) * 95);
                 signal.throwIfAborted();
-                ipcRenderer.send('progress-update', `Importing ${worldName}`, percent, `Copying ${done} of ${total}...`, processId, "good", cancelId);
+                win.webContents.send('progress-update', `Importing ${worldName}`, percent, `Copying ${done} of ${total}...`, processId, "good", cancelId);
             }
 
             signal.throwIfAborted();
-            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+            win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
             return { new_world_path: destPath };
         }
 
@@ -2586,7 +2586,7 @@ async function importWorld(file_path, instance_id, worldName) {
                         fs.mkdirSync(dest, { recursive: true });
                     } else {
                         signal.throwIfAborted();
-                        ipcRenderer.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`, processId, "good", cancelId);
+                        win.webContents.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`, processId, "good", cancelId);
                         fs.mkdirSync(path.dirname(dest), { recursive: true });
                         await new Promise((resolve) => {
                             fs.writeFile(dest, entry.getData(), () => resolve());
@@ -2594,7 +2594,7 @@ async function importWorld(file_path, instance_id, worldName) {
                     }
                 }
                 signal.throwIfAborted();
-                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+                win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
                 return { new_world_path: destPath };
             }
 
@@ -2629,7 +2629,7 @@ async function importWorld(file_path, instance_id, worldName) {
                                 fs.mkdirSync(dest, { recursive: true });
                             } else {
                                 signal.throwIfAborted();
-                                ipcRenderer.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`, processId, "good", cancelId);
+                                win.webContents.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`, processId, "good", cancelId);
                                 fs.mkdirSync(path.dirname(dest), { recursive: true });
                                 await new Promise((resolve) => {
                                     fs.writeFile(dest, entry.getData(), () => resolve());
@@ -2641,18 +2641,18 @@ async function importWorld(file_path, instance_id, worldName) {
                     imported.push(destPath);
                 }
                 signal.throwIfAborted();
-                ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+                win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
                 return { imported };
             }
             signal.throwIfAborted();
-            ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
+            win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
             return null;
         }
         signal.throwIfAborted();
-        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
+        win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
         return null;
     } catch (e) {
-        ipcRenderer.send('progress-update', `Importing ${worldName}`, 100, e, processId, "error", cancelId);
+        win.webContents.send('progress-update', `Importing ${worldName}`, 100, e, processId, "error", cancelId);
         return null;
     }
 }
@@ -2669,7 +2669,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        ipcRenderer.send('progress-update', `Downloading Update`, 0, "Beginning download...", processId, "good", cancelId);
+        win.webContents.send('progress-update', `Downloading Update`, 0, "Beginning download...", processId, "good", cancelId);
         const tempDir = path.resolve(user_path, "temp", new_version);
         fs.mkdirSync(tempDir, { recursive: true });
 
@@ -2681,7 +2681,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
             onDownloadProgress: (progressEvent) => {
                 const percentCompleted = progressEvent.loaded * 80 / progressEvent.total;
                 signal.throwIfAborted();
-                ipcRenderer.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...", processId, "good", cancelId);
+                win.webContents.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...", processId, "good", cancelId);
             }
         });
         let data = Buffer.from(response.data);
@@ -2695,7 +2695,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
             if ("sha256:" + hash != checksum) throw new Error();
         } catch (e) {
             fs.unlinkSync(zipPath);
-            ipcRenderer.send('progress-update', `Downloading Update`, 100, "Failed to verify download.", processId, "error", cancelId);
+            win.webContents.send('progress-update', `Downloading Update`, 100, "Failed to verify download.", processId, "error", cancelId);
             throw new Error("Failed to verify download. Stopping update.");
         }
 
@@ -2705,7 +2705,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
         const prev = process.noAsar;
         process.noAsar = true;
 
-        ipcRenderer.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...", processId, "good", cancelId);
+        win.webContents.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...", processId, "good", cancelId);
 
         zip.extractAllTo(tempDir);
         signal.throwIfAborted();
@@ -2715,7 +2715,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
         fs.unlinkSync(zipPath);
         signal.throwIfAborted();
 
-        ipcRenderer.send('progress-update', `Downloading Update`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', `Downloading Update`, 100, "Done!", processId, "done", cancelId);
 
         const updaterPath = path.join(user_path, "updater", "updater.exe");
         const sourceDir = path.resolve(tempDir);
@@ -2728,6 +2728,6 @@ async function downloadUpdate(download_url, new_version, checksum) {
             stdio: "ignore"
         }).unref();
     } catch (err) {
-        ipcRenderer.send('progress-update', `Downloading Update`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', `Downloading Update`, 100, err, processId, "error", cancelId);
     }
 }

@@ -2160,7 +2160,7 @@ async function checkForUpdates() {
 }
 
 async function downloadUpdate(download_url, new_version, checksum) {
-    ipcRenderer.invoke('download-update', download_url, new_version, checksum);
+    return await ipcRenderer.invoke('download-update', download_url, new_version, checksum);
 }
 
 function updateEnderLynx() {
