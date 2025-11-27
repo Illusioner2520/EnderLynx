@@ -16,6 +16,7 @@ const https = require('https');
 const stringArgv = require('string-argv').default;
 const axios = require('axios');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 
 let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
 
