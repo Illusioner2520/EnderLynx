@@ -6150,7 +6150,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         instanceInfo.setPreLaunchHook(info.pre_launch_hook);
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
-        if ((info.modpack_version && info.modpack_version != instanceInfo.installed_version && info.modpack_version != "loading") || info.modpack_reinstall) {
+        if (info.modpack_version && (info.modpack_version != instanceInfo.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
             let source = instanceInfo.install_source;
             let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
             runModpackUpdate(instanceInfo, source, modpack_info);
