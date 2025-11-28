@@ -2143,7 +2143,8 @@ async function addContent(instance_id, project_type, project_url, filename, data
         }
 
         // Extract each entry, renaming top-level folders if needed
-        entries.forEach(entry => {
+        for (let i = 0; i < entries.length; i++) {
+            let entry = entries[i];
             let entryName = entry.entryName;
             const parts = entryName.split('/');
             if (parts.length > 1 && folderRenameMap[parts[0]]) {
@@ -2155,9 +2156,9 @@ async function addContent(instance_id, project_type, project_url, filename, data
                 fs.mkdirSync(destPath, { recursive: true });
             } else {
                 fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                fs.writeFileSync(destPath, entry.getData());
+                await fs.promises.writeFile(destPath, entry.getData());
             }
-        });
+        }
 
         // Optionally delete the temp world zip after extraction
         fs.unlinkSync(install_path);
