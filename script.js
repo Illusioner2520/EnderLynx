@@ -6392,6 +6392,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     addContent.classList.add("add-content-button");
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
     addContent.onclick = () => {
+        instanceInfo = instanceInfo.refresh();
         showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
     }
     if (instanceInfo.locked) {
