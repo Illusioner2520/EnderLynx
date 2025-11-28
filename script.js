@@ -12397,7 +12397,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
         ], [], () => { });
         return;
     }
-    if (project_type == "datapack" || content_loaders.includes("datapack")) {
+    if (project_type == "datapack" || (content_loaders.length == 1 && content_loaders[0] == "datapack")) {
         let dialog = new Dialog();
         dialog.showDialog(translate("app.discover.datapacks.title"), "form", [
             instance_id ? null : {
