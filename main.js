@@ -2709,7 +2709,12 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         win.webContents.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...", processId, "good", cancelId);
 
-        zip.extractAllTo(tempDir);
+        await new Promise((resolve, reject) => {
+            zip.extractAllToAsync(tempDir, true, false, (v) => {
+                if (v) reject(v);
+                else resolve("");
+            })
+        });
         signal.throwIfAborted();
 
         process.noAsar = prev;
