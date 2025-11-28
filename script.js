@@ -6172,14 +6172,51 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         } else {
             if (info.update_content) {
                 let content = instanceInfo.getContent();
+                let processId = Math.random();
+                let cancel = false;
                 for (let i = 0; i < content.length; i++) {
+                    log.sendData([{
+                        "title": "Updating Content",
+                        "progress": content.length / i * 100,
+                        "desc": `Updating ${i + 1} of ${content.length}`,
+                        "id": processId,
+                        "status": "good",
+                        "cancel": () => {
+                            cancel = true;
+                        },
+                        "retry": () => { }
+                    }]);
                     let c = content[i];
                     try {
                         await updateContent(instanceInfo, c);
                     } catch (e) {
                         displayError(translate("app.content.update_failed").replace("%c", c.name));
                     }
+                    if (cancel) {
+                        log.sendData([{
+                            "title": "Updating Content",
+                            "progress": 100,
+                            "desc": "Canceled by User",
+                            "id": processId,
+                            "status": "error",
+                            "cancel": () => { },
+                            "retry": () => { }
+                        }]);
+                        if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
+                            setInstanceTabContentContent(instanceInfo, tabsInfo);
+                        }
+                        return;
+                    }
                 }
+                log.sendData([{
+                    "title": "Updating Content",
+                    "progress": 100,
+                    "desc": "Done",
+                    "id": processId,
+                    "status": "done",
+                    "cancel": () => { },
+                    "retry": () => { }
+                }]);
                 displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
                 if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
                     setInstanceTabContentContent(instanceInfo, tabsInfo);
@@ -6609,16 +6646,53 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                 "func": async (b) => {
                     b.innerHTML = "<i class='spinner'></i>" + translate("app.content.updating")
                     let content = instanceInfo.getContent();
+                    let processId = Math.random();
+                    let cancel = false;
                     for (let i = 0; i < content.length; i++) {
+                        log.sendData([{
+                            "title": "Updating Content",
+                            "progress": i / content.length * 100,
+                            "desc": `Updating ${i + 1} of ${content.length}`,
+                            "id": processId,
+                            "status": "good",
+                            "cancel": () => {
+                                cancel = true;
+                            },
+                            "retry": () => { }
+                        }]);
                         let c = content[i];
                         try {
                             await updateContent(instanceInfo, c);
                         } catch (e) {
-                            displayError(translate("app.content.update_failed", "%c", c.name));
+                            displayError(translate("app.content.update_failed").replace("%c", c.name));
+                        }
+                        if (cancel) {
+                            log.sendData([{
+                                "title": "Updating Content",
+                                "progress": 100,
+                                "desc": "Canceled by User",
+                                "id": processId,
+                                "status": "error",
+                                "cancel": () => { },
+                                "retry": () => { }
+                            }]);
+                            if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
+                                setInstanceTabContentContent(instanceInfo, element);
+                            }
+                            return;
                         }
                     }
+                    log.sendData([{
+                        "title": "Updating Content",
+                        "progress": 100,
+                        "desc": "Done",
+                        "id": processId,
+                        "status": "done",
+                        "cancel": () => { },
+                        "retry": () => { }
+                    }]);
                     displaySuccess(translate("app.instances.updated_all", "%i", instanceInfo.name));
-                    if (document.body.contains(b)) {
+                    if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
                         setInstanceTabContentContent(instanceInfo, element);
                     }
                 }

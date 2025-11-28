@@ -682,7 +682,7 @@ class Minecraft {
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading NeoForge", 100, "NeoForge install complete.", processId, "done", cancelId, true);
         } catch (err) {
-            win.webContents.send('progress-update', "Downloading NeoForge", 100, "Error", processId, "error", cancelId, true);
+            win.webContents.send('progress-update', "Downloading NeoForge", 100, err, processId, "error", cancelId, true);
             throw err;
         }
     }
