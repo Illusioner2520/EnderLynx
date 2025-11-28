@@ -1344,7 +1344,12 @@ class Java {
             let name = "";
             if (fileName.endsWith('.zip')) {
                 const zip = new AdmZip(downloadPath);
-                zip.extractAllTo(installDir, true);
+                await new Promise((resolve, reject) => {
+                    zip.extractAllToAsync(installDir, true, false, (v) => {
+                        if (v) reject(v);
+                        else resolve("");
+                    });
+                });
                 const items = fs.readdirSync(installDir, { withFileTypes: true });
                 const dirs = items.filter(item => item.isDirectory());
 
