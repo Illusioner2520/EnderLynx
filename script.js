@@ -10322,30 +10322,166 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
                 submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             } else {
-                let instances = data.getInstances();
                 let dialog = new Dialog();
-                dialog.showDialog(translate("app.discover.select_instance.vt.title"), "form", [
-                    {
-                        "type": "dropdown",
-                        "name": translate("app.discover.select_instance.instance"),
-                        "id": "instance",
-                        "options": instances.map(e => ({ "name": e.name, "value": e.instance_id }))
+                let instances = data.getInstances();
+
+                let installGrid = document.createElement("div");
+                installGrid.className = "install-grid";
+
+                let installGridEntry = document.createElement("div");
+                installGridEntry.className = "install-grid-entry";
+
+                let createNewButton = document.createElement("button");
+                createNewButton.className = "install-grid-create";
+                createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
+                createNewButton.onclick = () => {
+                    let dialog2 = new Dialog();
+                    dialog2.showDialog(translate("app.button.instances.create"), "form", [
+                        {
+                            "type": "image-upload",
+                            "id": "icon",
+                            "name": translate("app.instances.icon")
+                        },
+                        {
+                            "type": "text",
+                            "name": translate("app.instances.name"),
+                            "id": "name",
+                            "maxlength": 50
+                        },
+                        {
+                            "type": "multi-select",
+                            "name": translate("app.instances.loader"),
+                            "options": [
+                                { "name": loaders["vanilla"], "value": "vanilla" },
+                                { "name": loaders["fabric"], "value": "fabric" },
+                                { "name": loaders["forge"], "value": "forge" },
+                                { "name": loaders["neoforge"], "value": "neoforge" },
+                                { "name": loaders["quilt"], "value": "quilt" }
+                            ],
+                            "id": "loader"
+                        },
+                        {
+                            "type": "dropdown",
+                            "name": translate("app.instances.game_version"),
+                            "options": [],
+                            "id": "game_version",
+                            "input_source": "loader",
+                            "source": VersionList.getVersions,
+                            "default": VersionList.getLatestRelease()
+                        }
+                    ], [
+                        { "content": translate("app.instances.cancel"), "type": "cancel" },
+                        { "content": translate("app.instances.submit"), "type": "confirm" }
+                    ], [], async (e) => {
+                        dialog.closeDialog();
+                        contentInfo.close();
+                        let info = {};
+                        e.forEach(e => { info[e.id] = e.value });
+                        if (info.game_version == "loading") {
+                            displayError(translate("app.instances.no_game_version"));
+                            return;
+                        }
+                        if (!info.name) {
+                            displayError(translate("app.instances.no_name"));
+                            return;
+                        }
+                        let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                        let loader_version = "";
+                        try {
+                            if (info.loader == "fabric") {
+                                loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                            } else if (info.loader == "forge") {
+                                loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                            } else if (info.loader == "neoforge") {
+                                loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                            } else if (info.loader == "quilt") {
+                                loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                            }
+                        } catch (e) {
+                            displayError(translate("app.instances.failed_to_create"));
+                            return;
+                        }
+                        let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                        instance.setInstalling(true);
+                        showSpecificInstanceContent(instance);
+                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
+                        if (file_name) {
+                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                        }
+                        instance.setInstalling(false);
+                        let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+                        if (r.error) {
+                            instance.setFailed(true);
+                        } else {
+                            instance.setJavaPath(r.java_installation);
+                            instance.setJavaVersion(r.java_version);
+                            instance.setMcInstalled(true);
+                        }
+                    });
+                }
+
+                installGridEntry.appendChild(createNewButton);
+                installGrid.appendChild(installGridEntry);
+                for (let i = 0; i < instances.length; i++) {
+                    if (instances[i].locked) continue;
+                    let installGridEntry = document.createElement("div");
+                    installGridEntry.className = "install-grid-entry";
+
+                    let installGridInstance = document.createElement("div");
+                    installGridInstance.className = "install-grid-instance";
+
+                    let image = document.createElement("img");
+                    image.src = instances[i].image ? instances[i].image : "default.png";
+                    image.className = "instance-image";
+
+                    let info = document.createElement("div");
+                    info.className = "instance-info";
+
+                    let name = document.createElement("div");
+                    name.className = "instance-name";
+                    name.innerText = instances[i].name;
+
+                    let desc = document.createElement("div");
+                    desc.className = "instance-desc";
+                    desc.innerText = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
+
+                    info.appendChild(name);
+                    info.appendChild(desc);
+
+                    installGridInstance.appendChild(image);
+                    installGridInstance.appendChild(info);
+
+                    let installButton = document.createElement("button");
+                    installButton.className = "install-grid-install";
+                    installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
+                    installButton.onclick = async () => {
+                        let success;
+                        installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                        installButton.classList.add("disabled");
+                        installButton.onclick = () => { };
+                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instances[i].instance_id);
+                        if (!file_name) {
+                            success = false;
+                        } else {
+                            success = true;
+                        }
+                        if (success) {
+                            let instance = instances[i];
+                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                        } else {
+                            installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
+                        }
                     }
-                ], [
-                    { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
+
+                    installGridEntry.appendChild(installGridInstance);
+                    installGridEntry.appendChild(installButton);
+
+                    installGrid.appendChild(installGridEntry);
+                }
+                dialog.showDialog(translate("app.discover.select_instance.vt.title"), "notice", installGrid, [
                     { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-                ], null, async (e) => {
-                    let info = {};
-                    e.forEach(e => { info[e.id] = e.value });
-                    let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, info.instance);
-                    if (!file_name) {
-                        displayError(translate("app.discover.vt.fail"));
-                        return;
-                    }
-                    let instance = new Instance(info.instance);
-                    instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
-                    displaySuccess(translate("app.discover.vt.success", "%i", instance.name));
-                });
+                ], null, () => { });
             }
         }
         buttonWrapper.append(submitButton);
@@ -12215,6 +12351,96 @@ async function openShareDialog(title, url, text) {
     ], [], () => { });
 }
 
+async function checkForContentUpdates(source, project_id, version_ids, loaders, game_versions, type) {
+    let results = [];
+    if (source == "modrinth") {
+        let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version`);
+        let version_json = await res.json();
+        for (let i = 0; i < version_ids.length; i++) {
+            versions: for (let j = 0; j < version_json.length; j++) {
+                if ((version_json[j].game_versions.includes(game_versions[i]) && (type != "mod" || version_json[j].loaders.includes(loaders[i])))) {
+                    if (version_json[j].id == version_ids[i]) {
+                        results[i] = false;
+                        break versions;
+                    }
+                    results[i] = version_json[j].id;
+                    break versions;
+                }
+            }
+        }
+    } else if (source == "curseforge") {
+        let version_json = await window.electronAPI.getCurseforgePage(project_id, 1);
+        max_pages = Math.ceil(version_json.pagination.totalCount / version_json.pagination.pageSize) + 1;
+        version_json = version_json.data.map(e => ({
+            "game_versions": e.gameVersions,
+            "files": [
+                {
+                    "filename": e.fileName,
+                    "url": (`https://mediafilez.forgecdn.net/files/${Number(e.id.toString().substring(0, 4))}/${Number(e.id.toString().substring(4, 7))}/${encodeURIComponent(e.fileName)}`)
+                }
+            ],
+            "loaders": e.gameVersions.map(e => {
+                return e.toLowerCase();
+            }),
+            "id": e.id
+        }));
+
+        ids: for (let i = 0; i < version_ids.length; i++) {
+            for (let j = 0; j < version_json.length; j++) {
+                if ((version_json[j].game_versions.includes(game_versions[i]) && (type != "mod" || version_json[j].loaders.includes(loaders[i])))) {
+                    if (Number(version_json[j].id) == Number(version_ids[i])) {
+                        results[i] = false;
+                        continue ids;
+                    }
+                    results[i] = version_json[j].id;
+                    continue ids;
+                }
+            }
+        }
+
+        if (results.length != version_ids.length || results.includes(undefined)) {
+            let not_found = true;
+            let count = 1;
+            while (not_found) {
+                count++;
+                if (count >= max_pages) {
+                    not_found = false;
+                    continue;
+                }
+                version_json = await window.electronAPI.getCurseforgePage(project_id, count);
+                version_json = version_json.data.map(e => ({
+                    "game_versions": e.gameVersions,
+                    "files": [
+                        {
+                            "filename": e.fileName,
+                            "url": (`https://mediafilez.forgecdn.net/files/${Number(e.id.toString().substring(0, 4))}/${Number(e.id.toString().substring(4, 7))}/${encodeURIComponent(e.fileName)}`)
+                        }
+                    ],
+                    "loaders": e.gameVersions.map(e => {
+                        return e.toLowerCase();
+                    }),
+                    "id": e.id
+                }));
+                ids: for (let i = 0; i < version_ids.length; i++) {
+                    for (let j = 0; j < version_json.length; j++) {
+                        if ((version_json[j].game_versions.includes(game_versions[i]) && (type != "mod" || version_json[j].loaders.includes(loaders[i])))) {
+                            if (Number(version_json[j].id) == Number(version_ids[i])) {
+                                results[i] = false;
+                                continue ids;
+                            }
+                            results[i] = version_json[i].id;
+                            continue ids;
+                        }
+                    }
+                }
+                not_found = results.length != version_ids.length || results.includes(undefined);
+            }
+        }
+    }
+    console.log(results);
+    return results;
+}
+
 async function updateContent(instanceInfo, content, contentversion, forced) {
     instanceInfo = instanceInfo.refresh();
     if (content.source == "modrinth") {
@@ -12694,56 +12920,266 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
         }
     } else {
+        button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.loading");
+        button.classList.add("disabled");
         let dialog = new Dialog();
         let instances = data.getInstances();
-        dialog.showDialog(translate("app.discover.select_instance.title", "%t", title), "form", [
-            {
-                "type": "dropdown",
-                "name": translate("app.discover.select_instance.instance"),
-                "id": "instance",
-                "options": source == "curseforge" ? instances.map(e => ({ "name": e.name, "value": e.instance_id })) : (project_type == "mod" ? instances.filter(e => content_loaders.includes(e.loader)).filter(e => game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "resourcepack" || project_type == "datapack" ? instances.filter(e => game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : project_type == "shader" ? instances.filter(e => e.loader != "vanilla").filter(e => game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })) : instances.filter(game_versions.includes(e.vanilla_version)).map(e => ({ "name": e.name, "value": e.instance_id })))
+        if (source == "modrinth") {
+            if (project_type == "mod") {
+                instances = instances.filter(e => content_loaders.includes(e.loader)).filter(e => game_versions.includes(e.vanilla_version));
+            } else if (project_type == "shader") {
+                instances = instances.filter(e => e.loader != "vanilla").filter(e => game_versions.includes(e.vanilla_version));
+            } else {
+                instances = instances.filter(e => game_versions.includes(e.vanilla_version));
             }
-        ], [
-            { "content": translate("app.discover.select_instance.cancel"), "type": "cancel" },
-            { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-        ], null, async (e) => {
-            if (dialog_to_close) dialog_to_close.close();
-            let info = {};
-            e.forEach(e => { info[e.id] = e.value });
-            let success;
-            if (override_version) {
-                if (source == "modrinth") {
-                    success = await installSpecificVersion(override_version, source, new Instance(info.instance), project_type, title, author, icon, project_id);
-                } else if (source == "curseforge") {
-                    let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
-                    let dependencies_json = await dependencies.json();
-                    let dependency_list = dependencies_json.data;
-                    success = await installSpecificVersion({
-                        "game_versions": game_versions,
-                        "files": [
-                            {
-                                "filename": override_version.fileName,
-                                "url": (`https://mediafilez.forgecdn.net/files/${Number(override_version.id.toString().substring(0, 4))}/${Number(override_version.id.toString().substring(4, 7))}/${encodeURIComponent(override_version.fileName)}`)
-                            }
-                        ],
-                        "loaders": game_versions.map(e => {
-                            return e.toLowerCase();
-                        }),
-                        "id": override_version.id,
-                        "dependencies": dependency_list
-                    }, "curseforge", new Instance(info.instance), project_type, title, author, icon, project_id)
+        }
+        let installGrid = document.createElement("div");
+        installGrid.className = "install-grid";
+        let content = db.prepare("SELECT * FROM content WHERE source_info = ?").all(source == "curseforge" ? project_id.toString() + ".0" : project_id);
+        let instanceIdsWithContent = content.map(e => e.instance);
+        let instancesWithContent = instanceIdsWithContent.map(e => new Instance(e));
+        let updates = [];
+        if (content.length > 0) {
+            try {
+                updates = await checkForContentUpdates(source, project_id, content.map(e => e.version_id), instancesWithContent.map(e => e.loader), instancesWithContent.map(e => e.vanilla_version), project_type);
+            } catch (e) { }
+        }
+
+        let installGridEntry = document.createElement("div");
+        installGridEntry.className = "install-grid-entry";
+
+        let createNewButton = document.createElement("button");
+        createNewButton.className = "install-grid-create";
+        createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
+        createNewButton.onclick = () => {
+            let dialog2 = new Dialog();
+            dialog2.showDialog(translate("app.button.instances.create"), "form", [
+                {
+                    "type": "image-upload",
+                    "id": "icon",
+                    "name": translate("app.instances.icon")
+                },
+                {
+                    "type": "text",
+                    "name": translate("app.instances.name"),
+                    "id": "name",
+                    "maxlength": 50
+                },
+                {
+                    "type": "multi-select",
+                    "name": translate("app.instances.loader"),
+                    "options": [
+                        { "name": loaders["vanilla"], "value": "vanilla" },
+                        { "name": loaders["fabric"], "value": "fabric" },
+                        { "name": loaders["forge"], "value": "forge" },
+                        { "name": loaders["neoforge"], "value": "neoforge" },
+                        { "name": loaders["quilt"], "value": "quilt" }
+                    ],
+                    "id": "loader"
+                },
+                {
+                    "type": "dropdown",
+                    "name": translate("app.instances.game_version"),
+                    "options": [],
+                    "id": "game_version",
+                    "input_source": "loader",
+                    "source": VersionList.getVersions,
+                    "default": VersionList.getLatestRelease()
                 }
-            } else if (project_type == "server") {
-                success = await addContent(info.instance, project_type, project_id, title, icon);
-            } else {
-                success = await installContent(source, project_id, info.instance, project_type, title, author, icon);
+            ], [
+                { "content": translate("app.instances.cancel"), "type": "cancel" },
+                { "content": translate("app.instances.submit"), "type": "confirm" }
+            ], [], async (e) => {
+                dialog.closeDialog();
+                contentInfo.close();
+                let info = {};
+                e.forEach(e => { info[e.id] = e.value });
+                if (info.game_version == "loading") {
+                    displayError(translate("app.instances.no_game_version"));
+                    return;
+                }
+                if (!info.name) {
+                    displayError(translate("app.instances.no_name"));
+                    return;
+                }
+                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                let loader_version = "";
+                try {
+                    if (info.loader == "fabric") {
+                        loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                    } else if (info.loader == "forge") {
+                        loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                    } else if (info.loader == "neoforge") {
+                        loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                    } else if (info.loader == "quilt") {
+                        loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                    }
+                } catch (e) {
+                    displayError(translate("app.instances.failed_to_create"));
+                    return;
+                }
+                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                instance.setInstalling(true);
+                showSpecificInstanceContent(instance);
+                if (override_version) {
+                    if (source == "modrinth") {
+                        success = await installSpecificVersion(override_version, source, instance, project_type, title, author, icon, project_id);
+                    } else if (source == "curseforge") {
+                        let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
+                        let dependencies_json = await dependencies.json();
+                        let dependency_list = dependencies_json.data;
+                        success = await installSpecificVersion({
+                            "game_versions": game_versions,
+                            "files": [
+                                {
+                                    "filename": override_version.fileName,
+                                    "url": (`https://mediafilez.forgecdn.net/files/${Number(override_version.id.toString().substring(0, 4))}/${Number(override_version.id.toString().substring(4, 7))}/${encodeURIComponent(override_version.fileName)}`)
+                                }
+                            ],
+                            "loaders": game_versions.map(e => {
+                                return e.toLowerCase();
+                            }),
+                            "id": override_version.id,
+                            "dependencies": dependency_list
+                        }, "curseforge", instance, project_type, title, author, icon, project_id)
+                    }
+                } else if (project_type == "server") {
+                    success = await addContent(instance_id, project_type, project_id, title, icon);
+                } else {
+                    success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
+                }
+                instance.setInstalling(false);
+                let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+                if (r.error) {
+                    instance.setFailed(true);
+                } else {
+                    instance.setJavaPath(r.java_installation);
+                    instance.setJavaVersion(r.java_version);
+                    instance.setMcInstalled(true);
+                }
+            });
+        }
+
+        installGridEntry.appendChild(createNewButton);
+        installGrid.appendChild(installGridEntry);
+        for (let i = 0; i < instances.length; i++) {
+            if (instances[i].locked) continue;
+            let contentForThisInstance = content.filter(e => e.instance == instances[i].instance_id);
+
+            let updatesIndex = instanceIdsWithContent.indexOf(instances[i].instance_id);
+
+            let installGridEntry = document.createElement("div");
+            installGridEntry.className = "install-grid-entry";
+
+            let installGridInstance = document.createElement("div");
+            installGridInstance.className = "install-grid-instance";
+
+            let image = document.createElement("img");
+            image.src = instances[i].image ? instances[i].image : "default.png";
+            image.className = "instance-image";
+
+            let info = document.createElement("div");
+            info.className = "instance-info";
+
+            let name = document.createElement("div");
+            name.className = "instance-name";
+            name.innerText = instances[i].name;
+
+            let desc = document.createElement("div");
+            desc.className = "instance-desc";
+            desc.innerText = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
+
+            info.appendChild(name);
+            info.appendChild(desc);
+
+            installGridInstance.appendChild(image);
+            installGridInstance.appendChild(info);
+
+            let installButton = document.createElement("button");
+            installButton.className = "install-grid-install";
+            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
+            installButton.onclick = async () => {
+                let success;
+                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                installButton.classList.add("disabled");
+                installButton.onclick = () => { };
+                if (override_version) {
+                    if (source == "modrinth") {
+                        success = await installSpecificVersion(override_version, source, instances[i], project_type, title, author, icon, project_id);
+                    } else if (source == "curseforge") {
+                        let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
+                        let dependencies_json = await dependencies.json();
+                        let dependency_list = dependencies_json.data;
+                        success = await installSpecificVersion({
+                            "game_versions": game_versions,
+                            "files": [
+                                {
+                                    "filename": override_version.fileName,
+                                    "url": (`https://mediafilez.forgecdn.net/files/${Number(override_version.id.toString().substring(0, 4))}/${Number(override_version.id.toString().substring(4, 7))}/${encodeURIComponent(override_version.fileName)}`)
+                                }
+                            ],
+                            "loaders": game_versions.map(e => {
+                                return e.toLowerCase();
+                            }),
+                            "id": override_version.id,
+                            "dependencies": dependency_list
+                        }, "curseforge", instances[i], project_type, title, author, icon, project_id)
+                    }
+                } else if (project_type == "server") {
+                    success = await addContent(instances[i].instance_id, project_type, project_id, title, icon);
+                } else {
+                    success = await installContent(source, project_id, instances[i].instance_id, project_type, title, author, icon);
+                }
+                if (success) {
+                    installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                } else {
+                    installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
+                }
             }
-            if (success) {
-                displaySuccess(translate("app.discover.select_instance.success", "%t", title, "%i", (new Instance(info.instance)).name));
-            } else {
-                displayError(translate("app.discover.select_instance.fail", "%t", title, "%i", (new Instance(info.instance)).name));
+
+            let updateToSpecificVersion = async (version_id) => {
+                let instanceInfo = instances[i];
+                let contentList = instanceInfo.getContent();
+                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                installButton.classList.add("disabled");
+                installButton.onclick = () => { };
+                let theContent = null;
+                for (let i = 0; i < contentList.length; i++) {
+                    if (contentList[i].source_info == project_id || (source == "curseforge" && Number(contentList[i].source_info) == Number(project_id))) {
+                        theContent = contentList[i];
+                    }
+                }
+                if (!theContent) return;
+                await updateContent(instanceInfo, theContent, version_id);
+                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             }
-        });
+
+            if (!override_version && updatesIndex != -1 && updates[updatesIndex]) {
+                installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
+                installButton.onclick = () => {
+                    updateToSpecificVersion(updates[updatesIndex]);
+                }
+            } else if (override_version && contentForThisInstance[0] && (source == "curseforge" ? Number(contentForThisInstance[0].version_id) != Number(override_version.id) : contentForThisInstance[0].version_id != override_version.id)) {
+                installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
+                installButton.onclick = () => {
+                    updateToSpecificVersion(override_version.id);
+                }
+            } else if (contentForThisInstance[0]) {
+                installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                installButton.classList.add("disabled");
+                installButton.onclick = () => { };
+            }
+
+            installGridEntry.appendChild(installGridInstance);
+            installGridEntry.appendChild(installButton);
+
+            installGrid.appendChild(installGridEntry);
+        }
+        dialog.showDialog(translate("app.discover.select_instance.title", "%t", title), "notice", installGrid, [
+            { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
+        ], null, () => { });
+        button.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
+        button.classList.remove("disabled");
     }
 }
 

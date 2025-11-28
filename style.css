@@ -1779,7 +1779,7 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
     background-color: color-mix(in srgb, var(--color-1), var(--error-color));
 }
 
-.download-item > * {
+.download-item>* {
     z-index: 2;
 }
 
@@ -3604,15 +3604,15 @@ dialog[open]::backdrop {
 }
 
 @property --left-color {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: transparent;
+    syntax: "<color>";
+    inherits: true;
+    initial-value: transparent;
 }
 
 @property --right-color {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: transparent;
+    syntax: "<color>";
+    inherits: true;
+    initial-value: transparent;
 }
 
 .home-discover-wrapper {
@@ -3645,14 +3645,17 @@ dialog[open]::backdrop {
         --right-color: var(--background-color);
         --left-color: transparent;
     }
+
     5% {
         --right-color: var(--background-color);
         --left-color: var(--background-color);
     }
+
     95% {
         --right-color: var(--background-color);
         --left-color: var(--background-color);
     }
+
     100% {
         --right-color: transparent;
         --left-color: var(--background-color);
@@ -4017,7 +4020,8 @@ dialog[open]::backdrop {
         background-color: var(--color-1);
         overflow-x: auto;
 
-        code, kbd {
+        code,
+        kbd {
             font-size: 100%;
             padding: 0;
             border-radius: 0;
@@ -4094,7 +4098,7 @@ dialog[open]::backdrop {
         &[open] {
             padding: 8px;
 
-            > summary {
+            >summary {
                 margin-bottom: 8px;
                 border-radius: 8px 8px 0px 0px;
             }
@@ -4360,7 +4364,7 @@ dialog {
     translate: -50% -100%;
     pointer-events: none;
     width: max-content;
-    transition: opacity .2s .2s, display allow-discrete .2s .2s, overlay allow-discrete .2s  .2s, .1s left, .1s top, transform .2s .2s;
+    transition: opacity .2s .2s, display allow-discrete .2s .2s, overlay allow-discrete .2s .2s, .1s left, .1s top, transform .2s .2s;
     opacity: 0;
     overflow: visible;
     border: none;
@@ -4881,6 +4885,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 .drop-overlay.shown {
     display: flex;
     opacity: 1;
+
     @starting-style {
         opacity: 0;
     }
@@ -4904,7 +4909,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     padding: 20px;
 }
 
-.small-drop-overlay > .drop-overlay-inner {
+.small-drop-overlay>.drop-overlay-inner {
     max-height: calc(100vh - 16px);
     position: sticky;
     top: 8px;
@@ -4972,7 +4977,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     position: relative;
 }
 
-.download-grid-entry > * {
+.download-grid-entry>* {
     z-index: 2;
 }
 
@@ -5051,7 +5056,8 @@ div:has(> .dialog-wrapper-hidden.shown) {
     border-style: solid;
     border-color: var(--text-color);
     border-width: 1px;
-    display: none; /* remove to enable retry later */
+    display: none;
+    /* remove to enable retry later */
 }
 
 .download-retry-button:active {
@@ -5077,8 +5083,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
     border-style: solid;
     border-color: var(--text-color);
     border-width: 1px;
-    grid-column: span 2; /* remove to enable retry later */
-    margin-left: auto; /* remove to enable retry later */
+    grid-column: span 2;
+    /* remove to enable retry later */
+    margin-left: auto;
+    /* remove to enable retry later */
 }
 
 .download-ignore-button:active {
@@ -5163,4 +5171,92 @@ div:has(> .dialog-wrapper-hidden.shown) {
 .page-collapse-group {
     display: flex;
     align-items: center;
+}
+
+.install-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    padding: 0px;
+}
+
+.install-grid-entry {
+    display: grid;
+    grid-template-columns: subgrid;
+    grid-column: span 2;
+}
+
+.install-grid-instance {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.install-grid-install {
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+    font-size: 1rem;
+    font-weight: bold;
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-width: 2px;
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+}
+
+.install-grid-install:active {
+    scale: .95;
+}
+
+.install-grid-install:hover {
+    background-color: var(--color-1t);
+}
+
+.install-grid-install.disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+
+.install-grid-install.disabled:active {
+    scale: 1;
+}
+
+.install-grid-install.disabled:hover {
+    background-color: transparent;
+}
+
+.install-grid-create {
+    background-color: transparent;
+    border-radius: 10px;
+    padding: 8px;
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+    font-size: 1rem;
+    font-weight: bold;
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-width: 2px;
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    grid-column: span 2;
+    margin-left: auto;
+}
+
+.install-grid-create:active {
+    scale: .95;
+}
+
+.install-grid-create:hover {
+    background-color: var(--color-1t);
 }
