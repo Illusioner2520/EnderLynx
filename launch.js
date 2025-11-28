@@ -147,9 +147,11 @@ class Minecraft {
             signal.throwIfAborted();
 
             const installerPath = `${forgeMetaDir}/forge-installer.jar`;
-            await urlToFile(forgeInstallerUrl, installerPath, { signal, onProgress: (v) => {
-                win.webContents.send('progress-update', "Downloading Forge", v / 5, "Downloading Forge installer...", processId, "good", cancelId, true);
-            } });
+            await urlToFile(forgeInstallerUrl, installerPath, {
+                signal, onProgress: (v) => {
+                    win.webContents.send('progress-update', "Downloading Forge", v / 5, "Downloading Forge installer...", processId, "good", cancelId, true);
+                }
+            });
             signal.throwIfAborted();
 
             let zip = new AdmZip(installerPath);
@@ -437,11 +439,13 @@ class Minecraft {
                         });
                         let main_class = getMainClass(mavenPathToFilePath(processor.jar));
                         let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
-                            if (e.startsWith("{")) {
-                                return new_data[e.slice(1, e.length - 1)].client
-                            } else {
-                                return e;
+                            while (e.includes("{")) {
+                                let startIndex = e.indexOf("{");
+                                let endIndex = e.indexOf("}");
+                                let data = new_data[e.slice(startIndex + 1, endIndex)].client;
+                                e = e.substring(0, startIndex) + data + e.substring(endIndex + 1);
                             }
+                            return e;
                         }).map(e => {
                             if (e.startsWith("[")) {
                                 return mavenPathToFilePath(e.slice(1, e.length - 1));
@@ -510,9 +514,11 @@ class Minecraft {
             signal.throwIfAborted();
 
             const installerPath = `${neoForgeMetaDir}/neoforge-installer.jar`;
-            await urlToFile(neoForgeInstallerUrl, installerPath, { signal, onProgress: (v) => {
-                win.webContents.send('progress-update', "Downloading NeoForge", v / 5, "Downloading NeoForge installer...", processId, "good", cancelId, true);
-            } });
+            await urlToFile(neoForgeInstallerUrl, installerPath, {
+                signal, onProgress: (v) => {
+                    win.webContents.send('progress-update', "Downloading NeoForge", v / 5, "Downloading NeoForge installer...", processId, "good", cancelId, true);
+                }
+            });
             signal.throwIfAborted();
 
             let zip = new AdmZip(installerPath);
@@ -638,11 +644,13 @@ class Minecraft {
                     });
                     let main_class = getMainClass(mavenPathToFilePath(processor.jar));
                     let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
-                        if (e.startsWith("{")) {
-                            return new_data[e.slice(1, e.length - 1)].client
-                        } else {
-                            return e;
+                        while (e.includes("{")) {
+                            let startIndex = e.indexOf("{");
+                            let endIndex = e.indexOf("}");
+                            let data = new_data[e.slice(startIndex + 1, endIndex)].client;
+                            e = e.substring(0, startIndex) + data + e.substring(endIndex + 1);
                         }
+                        return e;
                     }).map(e => {
                         if (e.startsWith("[")) {
                             return mavenPathToFilePath(e.slice(1, e.length - 1));
@@ -1182,9 +1190,11 @@ class Minecraft {
             if ((!isRepair && !fs.existsSync(jarFilePath)) || whatToRepair?.includes("minecraft")) {
                 signal.throwIfAborted();
                 win.webContents.send('progress-update', "Downloading Minecraft", 40, "Downloading version jar...", processId, "good", cancelId, true);
-                await urlToFile(version_json.downloads.client.url, jarFilePath, { signal, onProgress: (v) => {
-                    win.webContents.send('progress-update', "Downloading Minecraft", v * (3 / 20) + 40, "Downloading version jar...", processId, "good", cancelId, true);
-                } });
+                await urlToFile(version_json.downloads.client.url, jarFilePath, {
+                    signal, onProgress: (v) => {
+                        win.webContents.send('progress-update', "Downloading Minecraft", v * (3 / 20) + 40, "Downloading version jar...", processId, "good", cancelId, true);
+                    }
+                });
                 this.jarfile = jarFilePath;
             }
             let java = new Java();
@@ -1336,9 +1346,11 @@ class Java {
             const downloadPath = path.resolve(userPath, "java/" + fileName);
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 10, "Fetching java zip...", processId, "good", cancelId, true);
-            await urlToFile(downloadUrl, downloadPath, { signal, onProgress: (v) => {
-                win.webContents.send('progress-update', "Downloading Java", v / 2 + 10, "Fetching java zip...", processId, "good", cancelId, true);
-            } });
+            await urlToFile(downloadUrl, downloadPath, {
+                signal, onProgress: (v) => {
+                    win.webContents.send('progress-update', "Downloading Java", v / 2 + 10, "Fetching java zip...", processId, "good", cancelId, true);
+                }
+            });
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 60, "Extracting java zip...", processId, "good", cancelId, true);
             let name = "";
@@ -1410,8 +1422,8 @@ function urlToFile(url, filepath, {
         let request;
 
         const cleanup = (err) => {
-            try { file.close(() => {}); } catch {}
-            fs.unlink(filepath, () => {});
+            try { file.close(() => { }); } catch { }
+            fs.unlink(filepath, () => { });
             reject(err);
         };
 
@@ -1484,7 +1496,7 @@ function urlToFile(url, filepath, {
             // Abort request if needed
             if (signal) {
                 signal.addEventListener("abort", () => {
-                    try { request.destroy(); } catch {}
+                    try { request.destroy(); } catch { }
                 });
             }
 
