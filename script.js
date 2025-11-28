@@ -1599,6 +1599,7 @@ class SearchBar {
             searchInput.value = "";
             if (this.oninput) this.oninput("");
             if (this.onenter) this.onenter("");
+            searchInput.focus();
         }
     }
     setOnInput(oninput) {
