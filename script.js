@@ -6443,7 +6443,6 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
             content.delete();
         });
     }
-    await checkForPlayerContent();
     let showContent = () => {
         contentListWrap.innerHTML = '';
         let content = [];
@@ -6713,6 +6712,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
         }
     });
     if (!instanceInfo.refresh().installing) {
+        await checkForPlayerContent();
         showContent();
     } else {
         contentListWrap.innerHTML = "";

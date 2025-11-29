@@ -1519,31 +1519,31 @@ function urlToFolder(url, folder, redirectCount = 0) {
 
         fs.mkdirSync(folder, { recursive: true });
 
-        const file = fs.createWriteStream(filepath);
-
         const request = protocol.get(url, (response) => {
             if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
                 // Handle redirect
                 const redirectUrl = new URL(response.headers.location, url).href;
-                file.close();
-                fs.unlink(filepath, () => {
-                    urlToFolder(redirectUrl, folder, redirectCount + 1)
-                        .then(resolve)
-                        .catch(reject);
-                });
+                urlToFolder(redirectUrl, folder, redirectCount + 1)
+                    .then(resolve)
+                    .catch(reject);
                 return;
             }
 
             if (response.statusCode !== 200) {
-                file.close();
-                fs.unlink(filepath, () => { });
                 return reject(new Error(`Failed to get '${url}' (${response.statusCode})`));
             }
+
+            const file = fs.createWriteStream(filepath, { flags: 'w' });
 
             response.pipe(file);
 
             file.on('finish', () => {
                 file.close(() => resolve(fileName));
+            });
+
+            file.on('error', (err) => {
+                fs.unlink(filepath, () => { });
+                reject(err);
             });
         });
 
@@ -1552,10 +1552,6 @@ function urlToFolder(url, folder, redirectCount = 0) {
             reject(err);
         });
 
-        file.on('error', (err) => {
-            fs.unlink(filepath, () => { });
-            reject(err);
-        });
     });
 }
 
