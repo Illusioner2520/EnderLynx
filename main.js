@@ -17,6 +17,9 @@ const stringArgv = require('string-argv').default;
 const axios = require('axios');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
+const { version } = require('./package.json');
+
+app.userAgentFallback = `EnderLynx/${version}`;
 
 let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
 
