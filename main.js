@@ -2192,6 +2192,8 @@ async function addContent(instance_id, project_type, project_url, filename, data
         return v;
     }
 
+    let stop_installing_dependencies = false;
+
     let install_path = "";
     if (project_type == "mod") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/mods`, filename);
@@ -2206,6 +2208,10 @@ async function addContent(instance_id, project_type, project_url, filename, data
     }
 
     console.log("Installing", project_url, "to", install_path);
+
+    if (fs.existsSync(install_path)) {
+        stop_installing_dependencies = true;
+    }
 
     await urlToFile(project_url, install_path);
 
@@ -2272,7 +2278,8 @@ async function addContent(instance_id, project_type, project_url, filename, data
 
     return {
         type: type_convert[project_type],
-        file_name: filename
+        file_name: filename,
+        stop_installing_dependencies
     };
 }
 

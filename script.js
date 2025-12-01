@@ -10677,6 +10677,8 @@ async function installSpecificVersion(version_info, source, instance, project_ty
     if (instance.getContent().map(e => e.source_id).includes(project_id)) {
         return;
     }
+    if (project_type != "world" && project_type != "datapack") instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false, version_id);
+    if (initialContent.stop_installing_dependencies) return initialContent;
     if (dependencies && source == "modrinth" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
@@ -10706,7 +10708,6 @@ async function installSpecificVersion(version_info, source, instance, project_ty
             }
         }
     }
-    if (project_type != "world" && project_type != "datapack") instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false, version_id);
     return initialContent;
 }
 
