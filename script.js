@@ -826,7 +826,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10 };
+            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_java_args": "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -3396,6 +3396,14 @@ settingsButtonEle.onclick = () => {
             "default": data.getDefault("hide_ip") == "true"
         },
         {
+            "type": "toggle",
+            "name": translate("app.settings.modrinth_link"),
+            "tab": "appearance",
+            "id": "modrinth_link",
+            "desc": translate("app.settings.modrinth_link.description"),
+            "default": data.getDefault("link_with_modrinth") == "true"
+        },
+        {
             "type": "slider",
             "name": translate("app.settings.resources.downloads"),
             "desc": translate("app.settings.resources.downloads.description"),
@@ -3558,6 +3566,7 @@ settingsButtonEle.onclick = () => {
         data.setDefault("discord_rpc", (info.discord_rpc).toString());
         data.setDefault("potato_mode", (info.potato_mode).toString());
         data.setDefault("hide_ip", (info.hide_ip).toString());
+        data.setDefault("link_with_modrinth", (info.modrinth_link).toString());
         if (info.potato_mode) {
             document.body.classList.add("potato");
         } else {
@@ -6434,8 +6443,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
         let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
         let newContent = await getInstanceContent(instanceInfo);
         let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
+        console.log(newContentAdd);
         newContentAdd.forEach(e => {
-            instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, "", e.disabled, e.version_id);
+            instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
         });
         let deleteContent = newContent.deleteContent;
         deleteContent.forEach(e => {
@@ -8195,7 +8205,7 @@ async function getInstanceWorldsMulti(instanceInfo) {
 }
 
 async function getInstanceContent(instanceInfo) {
-    return await window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent());
+    return await window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent(), data.getDefault("link_with_modrinth") == "true");
 }
 
 function translate(key, ...params) {

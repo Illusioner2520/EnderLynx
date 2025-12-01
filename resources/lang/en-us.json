@@ -251,6 +251,8 @@
     "app.settings.potato_pc.description": "Toggle this on to disable graphically intensive effects in the launcher.",
     "app.settings.hide_ips": "Hide IP Addresses",
     "app.settings.hide_ips.description": "Hide the IP Addresses in the world list. (Click to reveal them)",
+    "app.settings.modrinth_link": "Link Player Installed Content to Modrinth",
+    "app.settings.modrinth_link.description": "Searches Modrinth for a file with the same hash and then will link the content with Modrinth, allowing it to be updated and viewed.",
     "app.settings.defaults.notice": "Note: These defaults will only apply to new instances you create and will not be retroactively applied. For previously created instances, you can edit these settings in that instance's settings.",
     "app.settings.defaults.width": "Default Width",
     "app.settings.defaults.width.description": "The width of the game when launched",

@@ -565,7 +565,7 @@ async function getWorld(levelDatPath) {
     })
 }
 
-ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => {
+ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_content, link_with_modrinth) => {
     let old_files = old_content.map((e) => e.file_name);
     let patha = path.resolve(user_path, `minecraft/instances/${instance_id}/mods`);
     let pathb = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`);
@@ -573,6 +573,7 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
     fs.mkdirSync(patha, { recursive: true });
     fs.mkdirSync(pathb, { recursive: true });
     fs.mkdirSync(pathc, { recursive: true });
+    let all_hashes = [];
     let mods = [];
     if (loader != "vanilla") mods = fs.readdirSync(patha).map(file => {
         if (old_files.includes(file)) {
@@ -583,9 +584,14 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
         if (path.extname(file).toLowerCase() !== '.jar' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".jar.disabled"))) {
             return null;
         }
+        let sha512 = null;
         let modJson = {};
         try {
             const zip = fs.readFileSync(filePath);
+            try {
+                sha512 = crypto.createHash('sha512').update(zip).digest('hex');
+                all_hashes.push(sha512);
+            } catch (e) { }
 
             const admZip = new AdmZip(zip);
             const entry2 = admZip.getEntry('quilt.mod.json');
@@ -671,10 +677,11 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
             version: modJson?.version ?? "",
             disabled: file.includes(".jar.disabled"),
             author: modJson?.authors && modJson?.authors[0] ? (modJson?.authors[0]?.name ? modJson.authors[0].name : modJson.authors[0]) : "",
-            image: modJson?.icon ?? ""
+            image: modJson?.icon ?? "",
+            hash: sha512
         };
     }).filter(Boolean);
-    const resourcepacks = fs.readdirSync(pathb).map(file => {
+    let resourcepacks = fs.readdirSync(pathb).map(file => {
         if (old_files.includes(file)) {
             old_files[old_files.indexOf(file)] = null;
             return null;
@@ -683,9 +690,14 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
         if (path.extname(file).toLowerCase() !== '.zip' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".zip.disabled"))) {
             return null;
         }
+        let sha512 = null;
         let packMcMeta = null;
         try {
             const zip = fs.readFileSync(filePath);
+            try {
+                sha512 = crypto.createHash('sha512').update(zip).digest('hex');
+                all_hashes.push(sha512);
+            } catch (e) { }
 
             const admZip = new AdmZip(zip);
             const entry = admZip.getEntry('pack.mcmeta');
@@ -711,7 +723,8 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
             version: "",
             disabled: file.includes(".zip.disabled"),
             author: "",
-            image: packMcMeta?.icon ?? ""
+            image: packMcMeta?.icon ?? "",
+            hash: sha512
         };
     });
     let shaderpacks = [];
@@ -723,6 +736,12 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
         if (path.extname(file).toLowerCase() !== '.zip' && (path.extname(file).toLowerCase() !== '.disabled' || !file.includes(".zip.disabled"))) {
             return null;
         }
+        let sha512 = null;
+        try {
+            const buf = fs.readFileSync(filePath);
+            sha512 = crypto.createHash('sha512').update(buf).digest('hex');
+            all_hashes.push(sha512);
+        } catch (e) { }
         return {
             type: 'shader',
             name: file.replace(".zip.disabled", ".zip"),
@@ -731,12 +750,83 @@ ipcMain.handle('get-instance-content', (_, loader, instance_id, old_content) => 
             version: "",
             disabled: file.includes(".zip.disabled"),
             author: "",
-            image: ""
+            image: "",
+            hash: sha512
         };
     });
     let deleteFromContent = old_files.filter(e => e);
+    let content = [...mods, ...resourcepacks, ...shaderpacks].filter(e => e);
+    let project_ids = [];
+    let team_ids = [];
+    let team_to_project_ids = {};
+
+    if (link_with_modrinth && all_hashes.length > 0) {
+        let res_1 = await fetch(`https://api.modrinth.com/v2/version_files`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "hashes": all_hashes,
+                "algorithm": "sha512"
+            })
+        });
+        let res_json_1 = await res_1.json();
+        all_hashes.forEach(e => {
+            if (res_json_1[e]) {
+                content.forEach(f => {
+                    if (f.hash == e) {
+                        f.source = "modrinth";
+                        f.version = res_json_1[e].version_number;
+                        f.version_id = res_json_1[e].id;
+                        f.source_id = res_json_1[e].project_id;
+                        project_ids.push(res_json_1[e].project_id);
+                    }
+                });
+            }
+        });
+    }
+
+    if (link_with_modrinth && project_ids.length > 0) {
+        let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
+        let res_json = await res.json();
+        res_json.forEach(e => {
+            content.forEach(item => {
+                if (item.source_id == e.id) {
+                    item.name = e.title;
+                    item.image = e.icon_url;
+                    item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                    team_ids.push(e.team);
+                    if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+                    else team_to_project_ids[e.team].push(e.id);
+                }
+            });
+        });
+        let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
+        let res_json_2 = await res_2.json();
+        res_json_2.forEach(e => {
+            if (Array.isArray(e)) {
+                let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
+                let author = authors.length ? authors[0] : "";
+                if (!team_to_project_ids[e[0].team_id]) return;
+                team_to_project_ids[e[0].team_id].forEach(f => {
+                    content.forEach(item => {
+                        if (item.source_id == f) {
+                            item.author = author;
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    content = content.map(e => {
+        if (!e.source_id) e.source_id = "";
+        return e;
+    });
+
     return {
-        "newContent": [...mods, ...resourcepacks, ...shaderpacks].filter(e => e),
+        "newContent": content.filter(e => e),
         "deleteContent": deleteFromContent
     }
 });
@@ -1047,7 +1137,6 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             })
         });
         let res_json_1 = await res_1.json();
-        console.log(res_json_1);
         version_hashes.forEach(e => {
             if (res_json_1[e]) {
                 content.forEach(f => {

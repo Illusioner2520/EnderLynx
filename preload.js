@@ -559,8 +559,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         return true;
     },
-    getInstanceContent: async (loader, instance_id, old_content) => {
-        return await ipcRenderer.invoke('get-instance-content', loader, instance_id, old_content);
+    getInstanceContent: async (loader, instance_id, old_content, link_with_modrinth) => {
+        return await ipcRenderer.invoke('get-instance-content', loader, instance_id, old_content, link_with_modrinth);
     },
     downloadVanillaTweaksDataPacks: async (packs, version, instance_id, world_id) => {
         return await ipcRenderer.invoke('download-vanilla-tweaks-data-packs', packs, version, instance_id, world_id)
