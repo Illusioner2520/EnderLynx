@@ -1002,7 +1002,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         let content = [];
 
         let project_ids = [];
-        let version_ids = [];
+        let version_hashes = [];
         let team_ids = [];
         let team_to_project_ids = {};
 
@@ -1017,31 +1017,12 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             limit(async () => {
                 signal.throwIfAborted();
                 await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path), { signal });
-                if (file.downloads[0].includes("https://cdn.modrinth.com/data")) {
-                    let split = file.downloads[0].split("/");
-                    let project_id = split[4];
-                    let file_id = split[6];
-                    if (project_id && file_id) {
-                        if (!/^[a-zA-Z0-9]{8,}$/.test(file_id.replace(/%2B/gi, ""))) {
-                            let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version/${file_id}`, { signal });
-                            let res_json = await res.json();
-                            file_id = res_json.id;
-                        }
-                        project_ids.push(project_id);
-                        version_ids.push(file_id);
-                        content.push({
-                            "source": "modrinth",
-                            "source_id": project_id,
-                            "version_id": file_id,
-                            "disabled": false,
-                            "file_name": path.basename(file.path),
-                            "version": "",
-                            "name": path.basename(file.path),
-                            "image": "",
-                            "type": path.dirname(file.path) == "mods" ? "mod" : path.dirname(file.path) == "resourcepacks" ? "resource_pack" : "shader"
-                        });
-                    }
-                }
+                version_hashes.push(file.hashes.sha512);
+                content.push({
+                    "disabled": false,
+                    "file_name": path.basename(file.path),
+                    "version_hash": file.hashes.sha512
+                });
                 signal.throwIfAborted();
                 if (count == modrinth_index_json.files.length - 1) {
                     win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
@@ -1054,6 +1035,35 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
 
         await Promise.all(downloadPromises);
         signal.throwIfAborted();
+        let res_1 = await fetch(`https://api.modrinth.com/v2/version_files`, {
+            signal,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "hashes": version_hashes,
+                "algorithm": "sha512"
+            })
+        });
+        let res_json_1 = await res_1.json();
+        console.log(res_json_1);
+        version_hashes.forEach(e => {
+            if (res_json_1[e]) {
+                content.forEach(f => {
+                    if (f.version_hash == e) {
+                        f.source_id = res_json_1[e].project_id;
+                        project_ids.push(res_json_1[e].project_id);
+                        f.version_id = res_json_1[e].id;
+                        f.version = res_json_1[e].version_number;
+                        f.source = "modrinth";
+                    }
+                });
+            }
+        });
+        signal.throwIfAborted();
+
+        content = content.filter(e => e.source);
 
         let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`, { signal });
         let res_json = await res.json();
@@ -1066,16 +1076,6 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                     team_ids.push(e.team);
                     if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
                     else team_to_project_ids[e.team].push(e.id);
-                }
-            });
-        });
-        signal.throwIfAborted();
-        let res_1 = await fetch(`https://api.modrinth.com/v2/versions?ids=["${version_ids.join('","')}"]`, { signal });
-        let res_json_1 = await res_1.json();
-        res_json_1.forEach(e => {
-            content.forEach(item => {
-                if (item.source_id == e.project_id) {
-                    item.version = e.version_number;
                 }
             });
         });
@@ -1111,6 +1111,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             if (loader == "fabric") loader = "fabric-loader";
             if (loader == "quilt") loader = "quilt-loader";
         }
+        console.log(content);
         signal.throwIfAborted();
         win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
         return ({
