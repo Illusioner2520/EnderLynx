@@ -760,64 +760,68 @@ ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_conten
     let team_ids = [];
     let team_to_project_ids = {};
 
-    if (link_with_modrinth && all_hashes.length > 0) {
-        let res_1 = await fetch(`https://api.modrinth.com/v2/version_files`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                "hashes": all_hashes,
-                "algorithm": "sha512"
-            })
-        });
-        let res_json_1 = await res_1.json();
-        all_hashes.forEach(e => {
-            if (res_json_1[e]) {
-                content.forEach(f => {
-                    if (f.hash == e) {
-                        f.source = "modrinth";
-                        f.version = res_json_1[e].version_number;
-                        f.version_id = res_json_1[e].id;
-                        f.source_id = res_json_1[e].project_id;
-                        project_ids.push(res_json_1[e].project_id);
-                    }
-                });
-            }
-        });
-    }
-
-    if (link_with_modrinth && project_ids.length > 0) {
-        let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
-        let res_json = await res.json();
-        res_json.forEach(e => {
-            content.forEach(item => {
-                if (item.source_id == e.id) {
-                    item.name = e.title;
-                    item.image = e.icon_url;
-                    item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                    team_ids.push(e.team);
-                    if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
-                    else team_to_project_ids[e.team].push(e.id);
-                }
+    try {
+        if (link_with_modrinth && all_hashes.length > 0) {
+            let res_1 = await fetch(`https://api.modrinth.com/v2/version_files`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    "hashes": all_hashes,
+                    "algorithm": "sha512"
+                })
             });
-        });
-        let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
-        let res_json_2 = await res_2.json();
-        res_json_2.forEach(e => {
-            if (Array.isArray(e)) {
-                let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                let author = authors.length ? authors[0] : "";
-                if (!team_to_project_ids[e[0].team_id]) return;
-                team_to_project_ids[e[0].team_id].forEach(f => {
-                    content.forEach(item => {
-                        if (item.source_id == f) {
-                            item.author = author;
+            let res_json_1 = await res_1.json();
+            all_hashes.forEach(e => {
+                if (res_json_1[e]) {
+                    content.forEach(f => {
+                        if (f.hash == e) {
+                            f.source = "modrinth";
+                            f.version = res_json_1[e].version_number;
+                            f.version_id = res_json_1[e].id;
+                            f.source_id = res_json_1[e].project_id;
+                            project_ids.push(res_json_1[e].project_id);
                         }
                     });
+                }
+            });
+        }
+
+        if (link_with_modrinth && project_ids.length > 0) {
+            let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
+            let res_json = await res.json();
+            res_json.forEach(e => {
+                content.forEach(item => {
+                    if (item.source_id == e.id) {
+                        item.name = e.title;
+                        item.image = e.icon_url;
+                        item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                        team_ids.push(e.team);
+                        if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+                        else team_to_project_ids[e.team].push(e.id);
+                    }
                 });
-            }
-        });
+            });
+            let res_2 = await fetch(`https://api.modrinth.com/v2/teams?ids=["${team_ids.join('","')}"]`);
+            let res_json_2 = await res_2.json();
+            res_json_2.forEach(e => {
+                if (Array.isArray(e)) {
+                    let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
+                    let author = authors.length ? authors[0] : "";
+                    if (!team_to_project_ids[e[0].team_id]) return;
+                    team_to_project_ids[e[0].team_id].forEach(f => {
+                        content.forEach(item => {
+                            if (item.source_id == f) {
+                                item.author = author;
+                            }
+                        });
+                    });
+                }
+            });
+        }
+    } catch (e) {
+
     }
 
     content = content.map(e => {
