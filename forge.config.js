@@ -14,6 +14,7 @@ module.exports = {
       /^\/temp_icons($|\/)/,
       /^\/\.github($|\/)/,
       /^\/installer($|\/)/,
+      /^\/updater($|\/)/,
       /\.gitignore$/,
       /\.devdbrc$/,
       /app\.db$/,

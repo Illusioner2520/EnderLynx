@@ -20,4 +20,5 @@ out/
 
 dist/
 
-updater/
+updater/target
+updater/Cargo.lock

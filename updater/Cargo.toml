@@ -1,0 +1,10 @@
+[package]
+name = "updater"
+version = "0.4.4"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+fs_extra = "1"
+nix = { version = "0.28", optional = true }
+windows-sys = { version = "0.52", features = ["Win32_System_Threading", "Win32_Foundation"] }

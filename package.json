@@ -6,7 +6,7 @@
     "start": "electron-forge start",
     "package": "electron-forge package",
     "installer": "makensis installer/installer.nsi",
-    "updater": "pkg updater.js --targets node18-win-x64 --output updater.exe",
+    "updater": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
     "build": "npm run updater && npm run package && npm run installer"
   },
   "author": "Illusioner",
