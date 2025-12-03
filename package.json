@@ -7,7 +7,7 @@
     "package": "electron-forge package",
     "installer": "makensis installer/installer.nsi",
     "updater": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
-    "build": "npm run updater && npm run package && npm run installer"
+    "build": "npm run updater && npm run package && forfiles /p out\\EnderLynx-win32-x64\\locales /m *.* /c \"cmd /c if /I not @file == \\\"en-US.pak\\\" del @file\" && npm run installer"
   },
   "author": "Illusioner",
   "license": "MIT",
