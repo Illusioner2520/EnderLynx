@@ -9581,6 +9581,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     discoverButton.setSelected();
     added_vt_dp_packs = [];
     added_vt_rp_packs = [];
+    let discover_content_states = {};
     content.innerHTML = "";
     let titleTop = document.createElement("div");
     titleTop.className = "title-top";
@@ -9606,49 +9607,49 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
             "name": translate("app.discover.modpacks"),
             "value": "modpack",
             "func": () => {
-                contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         } : null,
         !loader || loader != "vanilla" ? {
             "name": translate("app.discover.mods"),
             "value": "mod",
             "func": () => {
-                contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         } : null,
         {
             "name": translate("app.discover.resource_packs"),
             "value": "resourcepack",
             "func": () => {
-                contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         },
         !loader || loader != "vanilla" ? {
             "name": translate("app.discover.shaders"),
             "value": "shader",
             "func": () => {
-                contentTabSelect("shader", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("shader", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         } : null,
         {
             "name": translate("app.discover.worlds"),
             "value": "world",
             "func": () => {
-                contentTabSelect("world", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("world", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         },
         {
             "name": translate("app.discover.servers"),
             "value": "servers",
             "func": () => {
-                contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         },
         {
             "name": translate("app.discover.data_packs"),
             "value": "datapack",
             "func": () => {
-                contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id);
+                contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
             }
         }
     ].filter(e => e));
@@ -9657,19 +9658,19 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     ele.appendChild(tabInfo);
     if (default_tab) {
         tabs.selectOptionAdvanced(default_tab);
-        contentTabSelect(default_tab, tabInfo, loader, vanilla_version, instance_id);
+        contentTabSelect(default_tab, tabInfo, loader, vanilla_version, instance_id, discover_content_states);
     } else if (!instance_id) {
-        contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id);
+        contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
     } else if (!loader || loader != "vanilla") {
-        contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id);
+        contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
     } else {
-        contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id);
+        contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
     }
     clearMoreMenus();
 }
 
 class ContentSearchEntry {
-    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type, offline) {
+    constructor(title, author, description, downloadCount, imageURL, installContent, installFunction, tags, infoData, id, source, source_id, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type, offline, states) {
         let element = document.createElement("div");
         element.className = "discover-item";
         if (experimental) {
@@ -9681,13 +9682,13 @@ class ContentSearchEntry {
             element.title = translate("app.discover.offline");
         }
         element.onclick = () => {
-            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type);
+            displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type, states);
         }
         element.setAttribute("tabindex", "0");
         element.setAttribute("role", "button");
         element.onkeydown = (e) => {
             if (e.key == "Enter" || e.key == " ") {
-                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type);
+                displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type, states);
             }
         }
         this.element = element;
@@ -9748,10 +9749,23 @@ class ContentSearchEntry {
             evnt.stopPropagation();
             installFunction(infoData, installButton);
         }
-        if (alreadyInstalled) {
+        if (states && !states[source_id]) {
+            states[source_id] = {
+                "state": alreadyInstalled ? "installed" : "default",
+                "buttons": [installButton]
+            }
+        } else if (states) {
+            states[source_id].buttons.push(installButton);
+        }
+        if (states && states[source_id].state == "installed") {
             installButton.onclick = () => { };
             installButton.classList.add("disabled");
             installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed")
+        }
+        if (states && states[source_id].state == "installing") {
+            installButton.onclick = () => { };
+            installButton.classList.add("disabled");
+            installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing")
         }
         actions.appendChild(installButton);
     }
@@ -9768,7 +9782,7 @@ function formatNumber(num) {
     return "Some Number";
 }
 
-function contentTabSelect(tab, ele, loader, version, instance_id) {
+function contentTabSelect(tab, ele, loader, version, instance_id, states) {
     let tabsElement = document.createElement("div");
     ele.innerHTML = '';
     let sources = [];
@@ -9814,15 +9828,15 @@ function contentTabSelect(tab, ele, loader, version, instance_id) {
     let searchContents = "";
     let s = new SearchBar(searchElement, () => { }, (v) => {
         searchContents = v;
-        getContent(discoverList, instance_id, d.getSelected, v, loader, version, tab);
+        getContent(discoverList, instance_id, d.getSelected, v, loader, version, tab, undefined, undefined, undefined, undefined, states);
     });
     if (tab == "server") s.disable(translate("app.discover.server_search_not_available"));
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
     let d = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
-        getContent(discoverList, instance_id, d.getSelected, searchContents, loader, version, tab);
+        getContent(discoverList, instance_id, d.getSelected, searchContents, loader, version, tab, undefined, undefined, undefined, undefined, states);
     });
-    getContent(discoverList, instance_id, sources[0].value, "", loader, version, tab);
+    getContent(discoverList, instance_id, sources[0].value, "", loader, version, tab, undefined, undefined, undefined, undefined, states);
     searchAndFilter.appendChild(dropdownElement);
     searchAndFilter.appendChild(searchElement);
     ele.appendChild(searchAndFilter);
@@ -9963,7 +9977,7 @@ class Pagination {
     }
 }
 
-async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version, page = 1, pageSize = 20, sortBy = "relevance") {
+async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version, page = 1, pageSize = 20, sortBy = "relevance", states) {
     let instance_content = [];
     if (instance_id) instance_content = (new Instance(instance_id)).getContent();
     let content_ids = instance_content.map(e => e.source_info);
@@ -9981,7 +9995,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
         }
         pages = Math.ceil(apiresult.total_hits / pageSize);
         let paginationTop = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
         }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.sort.relevance"),
@@ -10000,7 +10014,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 "value": "updated"
             }
         ], sortBy, (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v);
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v, states);
         }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.view.5"),
@@ -10027,9 +10041,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 "value": "100"
             }
         ], pageSize.toString(), (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy, states);
         }, ["server"].includes(project_type) ? null : [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
-            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy);
+            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy, states);
         }, ["resourcepack", "shader", "world", "datapack", "server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.loader.all"),
@@ -10052,10 +10066,10 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 "value": "quilt"
             }
         ], loader ? loader : "all", (v) => {
-            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy);
+            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy, states);
         });
         let paginationBottom = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
         });
         if (!apiresult.hits || !apiresult.hits.length) {
             let noresults = new NoResultsFound();
@@ -10066,8 +10080,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
         for (let i = 0; i < apiresult.hits.length; i++) {
             let e = apiresult.hits[i];
             let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                installButtonClick(project_type, "modrinth", i.categories, i.icon_url, i.title, i.author, i.versions, i.project_id, instance_id, button, null)
-            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id), false, project_type);
+                installButtonClick(project_type, "modrinth", i.categories, i.icon_url, i.title, i.author, i.versions, i.project_id, instance_id, button, null, undefined, undefined, states)
+            }, e.categories.map(e => formatCategory(e)), e, null, "modrinth", e.project_id, instance_id, version, loader, content_ids.includes(e.project_id), false, project_type, undefined, states);
             element.appendChild(entry.element);
         }
         element.appendChild(paginationBottom.element);
@@ -10082,7 +10096,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
         }
         pages = Math.ceil(project_type == "server" ? (apiresult.meta.total / 50) : (apiresult.pagination.totalCount / pageSize));
         let paginationTop = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
         }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.sort.relevance"),
@@ -10101,7 +10115,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 "value": "updated"
             }
         ], sortBy, (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v);
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v, states);
         }, ["server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.view.5"),
@@ -10128,9 +10142,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 "value": "100"
             }
         ], pageSize.toString(), (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy);
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy, states);
         }, ["server"].includes(project_type) ? null : [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
-            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy);
+            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy, states);
         }, ["resourcepack", "shader", "world", "datapack", "server"].includes(project_type) ? null : [
             {
                 "name": translate("app.discover.loader.all"),
@@ -10153,10 +10167,10 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 "value": "quilt"
             }
         ], loader ? loader : "all", (v) => {
-            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy);
+            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy, states);
         });
         let paginationBottom = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy)
+            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
         });
         if (!apiresult.data || !apiresult.data.length) {
             let noresults = new NoResultsFound();
@@ -10169,12 +10183,12 @@ async function getContent(element, instance_id, source, query, loader, version, 
             let entry;
             if (project_type == "server") {
                 entry = new ContentSearchEntry(e.name, "", e.serverConnection, e.latestPing.online + "/" + e.latestPing.total, e.favicon, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                    installButtonClick(project_type, "curseforge", [], e.favicon, e.name, "", [], e.serverConnection, instance_id, button, null);
-                }, e.tags.map(e => e.name), e, null, "curseforge", e.serverConnection, instance_id, version, loader, false, false, project_type, !e.latestPing.successful);
+                    installButtonClick(project_type, "curseforge", [], e.favicon, e.name, "", [], e.serverConnection, instance_id, button, null, undefined, undefined, states);
+                }, e.tags.map(e => e.name), e, null, "curseforge", e.serverConnection, instance_id, version, loader, false, false, project_type, !e.latestPing.successful, states);
             } else {
                 entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                    installButtonClick(project_type, "curseforge", [], e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, e.name, i.author.username, [], e.id, instance_id, button, null);
-                }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type);
+                    installButtonClick(project_type, "curseforge", [], e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, e.name, i.author.username, [], e.id, instance_id, button, null, undefined, undefined, states);
+                }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type, undefined, states);
             }
             element.appendChild(entry.element);
         }
@@ -10561,7 +10575,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     checkForIncompatibilities();
                 }
             }
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment, project_type);
+            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment, project_type, undefined, states);
             e.entry = entry;
             element.appendChild(entry.element);
         }
@@ -10573,6 +10587,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
     let instance = new Instance(instance_id);
     let version_json;
     let max_pages = 10;
+    let id;
     if (source == "modrinth") {
         let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version`);
         version_json = await res.json();
@@ -10605,6 +10620,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
     }
     for (let j = 0; j < version_json.length; j++) {
         if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type != "mod" || version_json[j].loaders.includes(instance.loader)) && (source != "modrinth" || project_type != "datapack" || version_json[j].loaders.includes("datapack"))) {
+            id = version_json[j].id;
             initialContent = await installSpecificVersion(version_json[j], source, instance, project_type, title, author, icon_url, project_id, false, data_pack_world);
             break;
         }
@@ -10645,6 +10661,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
             }
             for (let j = 0; j < version_json.length; j++) {
                 if (version_json[j].game_versions.includes(instance.vanilla_version) && (project_type != "mod" || version_json[j].loaders.includes(instance.loader))) {
+                    id = version_json[j].id;
                     initialContent = await installSpecificVersion(version_json[j], source, instance, project_type, title, author, icon_url, project_id, false, data_pack_world);
                     break;
                 }
@@ -10660,7 +10677,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
         return false;
     }
 
-    return true;
+    return {id};
 }
 
 async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate, data_pack_world) {
@@ -11070,7 +11087,7 @@ async function getModpackVersions(source, content_id) {
 let contentInfoHistory = [];
 let contentInfoIndex = 0;
 
-async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, disableAddToHistory = false, content_list_to_update, infoData, pt) {
+async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, disableAddToHistory = false, content_list_to_update, infoData, pt, states) {
     if (!content_source) return;
     if (!disableAddToHistory) {
         if (contentInfo.open) {
@@ -11084,6 +11101,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     }
     let instance_content = [];
     if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+    let currentlyInstalling = false;
 
     contentInfo.innerHTML = "";
     contentInfo.showModal();
@@ -11105,7 +11123,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonBack.onclick = () => {
             contentInfoIndex--;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type, states);
         }
     }
     contentNav.appendChild(buttonBack);
@@ -11117,7 +11135,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonForward.onclick = () => {
             contentInfoIndex++;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type, states);
         }
     }
     contentNav.appendChild(buttonForward);
@@ -11216,7 +11234,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             if (versions.data) versions = versions.data;
         } catch (e) {
             loading.errorOut(e, () => {
-                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true);
+                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true, content_list_to_update, infoData, pt, states);
             });
             return;
         }
@@ -11339,8 +11357,15 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     installButton.className = "content-top-install-button";
     installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
     installButton.onclick = () => {
-        installButtonClick(content.project_type, content.source, content.loaders, content.icon_url, content.title, content.author, content.game_versions, content.id, instance_id, installButton, contentInfo, null);
+        currentlyInstalling = true;
+        installButtonClick(content.project_type, content.source, content.loaders, content.icon_url, content.title, content.author, content.game_versions, content.id, instance_id, installButton, contentInfo, null, (id) => {
+            if (tabs.selected == "files" && refreshVersionsList) {
+                setVerionIdAndIndex(id);
+                refreshVersionsList();
+            }
+        }, states);
     }
+    if (states) states[content_id].buttons.push(installButton);
     let threeDots = document.createElement("button");
     threeDots.classList.add("content-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -11418,11 +11443,19 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     contentWrapper.appendChild(topBar);
     let content_ids = instance_content.map(e => e.source_info);
     if (content.convert_version_ids_to_numbers) content_ids = content_ids.map(Number);
-    if (content_ids.includes(content.id)) {
-        installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
+    if (states && states[content_id].state == "installed") {
+        installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
         installButton.classList.add("disabled");
         installButton.onclick = () => { };
-        installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
+    } else if (states && states[content_id].state == "installing") {
+        installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+        installButton.classList.add("disabled");
+        installButton.onclick = () => { };
+        currentlyInstalling = true;
+    } else if (content_ids.includes(content.id)) {
+        installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+        installButton.classList.add("disabled");
+        installButton.onclick = () => { };
     }
 
     let tabsElement = document.createElement("div");
@@ -11433,6 +11466,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     contentWrapper.appendChild(tabContent);
     contentInfo.showModal();
     tabsElement.style.marginInline = "auto";
+    let refreshVersionsList;
+    let setVerionIdAndIndex;
     let tabs = new TabContent(tabsElement, [
         {
             "name": translate("app.discover.tabs.description"),
@@ -11458,9 +11493,6 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 content_ids = instance_content.map(e => e.source_info);
                 if (content.convert_version_ids_to_numbers) content_ids = content_ids.map(Number);
                 if (content_ids.includes(content.id)) {
-                    installButton.innerHTML = '<i class="fa-solid fa-check"></i>Installed';
-                    installButton.classList.add("disabled");
-                    installButton.onclick = () => { };
                     installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
                 }
                 if (content.project_type == "modpack" && instance_id) {
@@ -11621,6 +11653,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 let installedVersionIndex = content.versions.findIndex(v => v.id === installedVersion);
 
                 let showVersions = () => {
+                    currentlyInstalling = false;
                     versionInfo = [];
                     wrapper.innerHTML = "";
                     wrapper.appendChild(topBar);
@@ -11700,6 +11733,8 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         installButton.setAttribute("title", translate("app.discover.install_specific_version"));
                         installButton.className = "version-file-install"
                         let updateToSpecificVersion = async () => {
+                            if (currentlyInstalling) return;
+                            currentlyInstalling = true;
                             if (content.project_type == "modpack") {
                                 contentInfo.close();
                                 runModpackUpdate(new Instance(instance_id), content.source, e.original_version_info);
@@ -11710,6 +11745,14 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
                             installButton.classList.add("disabled");
                             installButton.onclick = () => { };
+                            if (states) {
+                                states[content_id].state = "installing";
+                                states[content_id].buttons.forEach(e => {
+                                    e.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                                    e.classList.add("disabled");
+                                    e.onclick = () => { };
+                                });
+                            }
                             let theContent = null;
                             for (let i = 0; i < contentList.length; i++) {
                                 if (contentList[i].source_info == content.id || (content.convert_version_ids_to_numbers && Number(contentList[i].source_info) == Number(content.id))) {
@@ -11719,6 +11762,12 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             if (!theContent) return;
                             await updateContent(instanceInfo, theContent, e.id);
                             installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                            if (states) {
+                                states[content_id].state = "installed";
+                                states[content_id].buttons.forEach(e => {
+                                    e.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                                });
+                            }
                             if (content_list_to_update) content_list_to_update.updateSecondaryColumn();
                             if (instance_id) {
                                 installedVersion = e.id;
@@ -11737,13 +11786,19 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             installButton.onclick = updateToSpecificVersion;
                         } else {
                             installButton.onclick = () => {
+                                if (currentlyInstalling) return;
+                                currentlyInstalling = true;
+                                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                                installButton.classList.add("disabled");
+                                installButton.onclick = () => { };
                                 installButtonClick(content.project_type, content.source, e.loaders, content.icon_url, content.title, content.author, e.game_versions, content_id, instance_id, installButton, contentInfo, e.original_version_info, () => {
+                                    installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                                     if (instance_id) {
                                         installedVersion = e.id;
                                         installedVersionIndex = i;
                                         showVersions();
                                     }
-                                });
+                                }, states);
                             }
                         }
 
@@ -11805,6 +11860,13 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     });
                     filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value, 1);
                 }
+
+                setVerionIdAndIndex = (id) => {
+                    installedVersion = id;
+                    installedVersionIndex = content.versions.findIndex(v => v.id === installedVersion);
+                }
+
+                refreshVersionsList = showVersions;
 
                 showVersions();
 
@@ -12694,7 +12756,7 @@ async function repairInstance(instance, whatToRepair) {
     }
 }
 
-async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version, oncomplete) {
+async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version, oncomplete = () => { }, states) {
     let plugin_loaders = ["folia", "spigot", "paper", "bungeecord", "purpur", "waterfall", "velocity", "bukkit", "sponge"];
     let count = 0;
     content_loaders.forEach(e => {
@@ -12737,15 +12799,23 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             e.forEach(e => { info[e.id] = e.value });
             let instance = instance_id ? instance_id : info.instance;
             let world = info.world;
-            console.log(world);
             if (world == "loading" || world == "" || !world) {
                 displayError(translate("app.discover.datapack.world", "%t", title));
                 return;
             }
             let success;
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-            button.classList.add("disabled");
-            button.onclick = () => { };
+            if (states) {
+                states[project_id].state = "installing";
+                states[project_id].buttons.forEach(e => {
+                    e.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                    e.classList.add("disabled");
+                    e.onclick = () => { };
+                });
+            } else {
+                button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                button.classList.add("disabled");
+                button.onclick = () => { };
+            }
             if (override_version) {
                 if (source == "modrinth") {
                     success = await installSpecificVersion(override_version, source, new Instance(instance), "datapack", title, author, icon, project_id, false, world);
@@ -12769,10 +12839,24 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 success = await installContent(source, project_id, instance, "datapack", title, author, icon, world);
             }
             if (success) {
-                button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                oncomplete();
+                if (states) {
+                    states[project_id].state = "installed";
+                    states[project_id].buttons.forEach(e => {
+                        e.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                    });
+                } else {
+                    button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                }
+                if (oncomplete) oncomplete();
             } else {
-                button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+                if (states) {
+                    states[project_id].state = "failed";
+                    states[project_id].buttons.forEach(e => {
+                        e.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
+                    });
+                } else {
+                    button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
+                }
             }
         })
     } else if (project_type == "modpack") {
@@ -12894,9 +12978,18 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             }
         })
     } else if (instance_id) {
-        button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-        button.classList.add("disabled");
-        button.onclick = () => { };
+        if (states) {
+            states[project_id].state = "installing";
+            states[project_id].buttons.forEach(e => {
+                e.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+                e.classList.add("disabled");
+                e.onclick = () => { };
+            });
+        } else {
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
+            button.classList.add("disabled");
+            button.onclick = () => { };
+        }
         let success;
         if (override_version) {
             if (source == "modrinth") {
@@ -12926,10 +13019,24 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
         }
         if (success) {
-            button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-            if (oncomplete) oncomplete();
+            if (states) {
+                states[project_id].state = "installed";
+                states[project_id].buttons.forEach(e => {
+                    e.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                });
+            } else {
+                button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+            }
+            if (oncomplete) oncomplete(override_version ? override_version.id : (success.id ? success.id : ""));
         } else {
-            button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
+            if (states) {
+                states[project_id].state = "failed";
+                states[project_id].buttons.forEach(e => {
+                    e.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
+                });
+            } else {
+                button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
+            }
         }
     } else {
         button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.loading");
