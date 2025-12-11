@@ -6187,7 +6187,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                 for (let i = 0; i < content.length; i++) {
                     log.sendData([{
                         "title": "Updating Content",
-                        "progress": content.length / i * 100,
+                        "progress": i / content.length * 100,
                         "desc": `Updating ${i + 1} of ${content.length}`,
                         "id": processId,
                         "status": "good",
