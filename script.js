@@ -10921,7 +10921,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
     } else if (dependencies && source == "curseforge" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
-            if (curseforge_ids.includes(Number(dependency.id)));
+            if (curseforge_ids.includes(Number(dependency.id))) continue;
             let project_type = "mod";
             if (dependency.categoryClass.slug == "texture-packs") project_type = "resourcepack";
             if (dependency.categoryClass.slug == "shaders") project_type = "shader";
