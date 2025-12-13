@@ -11685,7 +11685,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 tabContent.innerHTML = "";
                 let element = document.createElement("div");
                 element.className = "markdown-body";
-                element.style.maxWidth = "700px";
+                element.style.maxWidth = "800px";
                 element.style.marginInline = "auto";
                 tabContent.appendChild(element);
                 element.innerHTML = parseModrinthMarkdown(content.description);
