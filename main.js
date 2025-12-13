@@ -1978,9 +1978,6 @@ async function downloadVanillaTweaksDataPacks(packs, version, instance_id, world
     let pack_info = {};
     let pack_ct_info = {};
 
-    console.log(data_json);
-    console.log(data_ct_json);
-
     let process_category = (category, previous_categories = [], type) => {
         previous_categories.push(category.category);
         let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
@@ -2150,22 +2147,26 @@ async function downloadVanillaTweaksDataPacks(packs, version, instance_id, world
     return true;
 }
 
-ipcMain.handle('download-vanilla-tweaks-resource-packs', async (_, packs, version, instance_id) => {
-    return await downloadVanillaTweaksResourcePacks(packs, version, instance_id);
+ipcMain.handle('download-vanilla-tweaks-resource-packs', async (_, packs, version, instance_id, file_path) => {
+    return await downloadVanillaTweaksResourcePacks(packs, version, instance_id, file_path);
 });
 
-async function downloadVanillaTweaksResourcePacks(packs, version, instance_id) {
+async function downloadVanillaTweaksResourcePacks(packs, version, instance_id, file_path) {
     let link = await getVanillaTweaksResourcePackLink(packs, version);
     if (link) {
         const resourcepacksDir = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`);
         fs.mkdirSync(resourcepacksDir, { recursive: true });
         let baseName = "vanilla_tweaks.zip";
         let filePath = path.join(resourcepacksDir, baseName);
-        let counter = 1;
-        while (fs.existsSync(filePath)) {
-            baseName = `vanilla_tweaks_${counter}.zip`;
-            filePath = path.join(resourcepacksDir, baseName);
-            counter++;
+        if (file_path) {
+            filePath = path.join(resourcepacksDir, file_path);
+        } else {
+            let counter = 1;
+            while (fs.existsSync(filePath)) {
+                baseName = `vanilla_tweaks_${counter}.zip`;
+                filePath = path.join(resourcepacksDir, baseName);
+                counter++;
+            }
         }
         await urlToFile(link, filePath);
 

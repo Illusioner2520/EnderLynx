@@ -715,7 +715,7 @@ h1 {
 
 .search-bar {
     display: flex;
-    background-color: var(--color-1t);
+    background-color: var(--color-1);
     border-radius: 8px;
     align-items: center;
     grid-column: span 2;
@@ -1956,6 +1956,10 @@ dialog[open] {
     }
 }
 
+.dialog[open] {
+    display: flex;
+}
+
 dialog::backdrop {
     background-color: var(--dialog-backdrop);
     transition-property: overlay display opacity;
@@ -1983,6 +1987,8 @@ dialog[open]::backdrop {
     border-bottom-style: solid;
     border-width: 1px;
     border-color: var(--color-2);
+    flex-grow: 0;
+    flex-shrink: 0;
 }
 
 .dialog-title {
@@ -2027,13 +2033,16 @@ dialog[open]::backdrop {
     min-width: 400px;
     box-shadow: 0px 0px 10px black;
     max-width: 700px;
+    display: flex;
+    flex-direction: column;
 }
 
 .dialog-content {
     padding: 10px;
     display: grid;
     gap: 10px;
-    max-height: calc(90vh - 2 * 4rem);
+    flex-grow: 1;
+    flex-shrink: 1;
     overflow-y: auto;
 }
 
@@ -2049,6 +2058,8 @@ dialog[open]::backdrop {
     border-top-style: solid;
     border-width: 1px;
     border-color: var(--color-2);
+    flex-grow: 0;
+    flex-shrink: 0;
 }
 
 .dialog-button {
@@ -2443,19 +2454,114 @@ dialog[open]::backdrop {
 
 .vt-button-wrapper {
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 300px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 8px;
+    align-self: start;
+    max-height: calc(100dvh - 16px);
+}
+
+.dialog .vt-button-wrapper {
+    top: 0;
+}
+
+.vt-wrapper {
+    display: flex;
+    gap: 8px;
+}
+
+.vt-entry {
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color .25s, opacity .1s;
+    padding: 8px;
+    gap: 8px;
+    background-color: var(--color-1t);
+}
+
+.vt-entry:has(.toggle.toggled) {
+    background-color: color-mix(in srgb, 80% transparent, var(--go-color));
+}
+
+.vt-entry:has(.toggle.toggled):hover {
+    background-color: color-mix(in srgb, 60% transparent, var(--go-color));
+}
+
+.vt-entry.incompatible {
+    background-color: color-mix(in srgb, 80% transparent, var(--danger-color)) !important;
+}
+
+.vt-entry.experimental {
+    background-color: color-mix(in srgb, 80% transparent, var(--accent-color)) !important;
+}
+
+.vt-entry:hover {
+    background-color: var(--color-2t);
+}
+
+.vt-entry.incompatible:hover {
+    background-color: color-mix(in srgb, 60% transparent, var(--danger-color)) !important;
+}
+
+.vt-entry.experimental:hover {
+    background-color: color-mix(in srgb, 60% transparent, var(--accent-color)) !important;
+}
+
+.vt-icon {
+    width: 50px;
+    height: 50px;
+}
+
+.vt-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-grow: 1;
+    align-self: start;
+}
+
+.vt-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.vt-title {
+    font-size: 1.1rem;
+    color: var(--text-color);
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.vt-desc {
+    color: var(--subtle-text-color);
+    font-size: 0.9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.vt-toggle {
+    margin-left: auto;
 }
 
 .vt-submit-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
-    width: max-content;
+    align-self: center;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-left: auto;
     font-size: 1rem;
     font-weight: bold;
 }
@@ -2650,7 +2756,8 @@ dialog[open]::backdrop {
     background-color: var(--color-1t);
     gap: 20px;
     padding: 45px;
-    border-radius: 20px;
+    border-radius: 8px;
+    flex-grow: 1;
 }
 
 .loading-container-spinner {
@@ -3744,6 +3851,13 @@ dialog[open]::backdrop {
     height: 100%;
 }
 
+.dialog-full {
+    width: 100%;
+    height: 100%;
+    max-width: calc(100% - 2em - 6px);
+    max-height: calc(100% - 2em - 6px);
+}
+
 .content-wrapper {
     display: grid;
     gap: 10px;
@@ -4403,10 +4517,10 @@ dialog {
     width: 100%;
     display: flex;
     flex-direction: column;
-    border-width: 1px;
+    border-width: 2px;
     border-radius: 8px;
     border-style: solid;
-    border-color: var(--color-1);
+    border-color: var(--color-2);
     overflow: hidden;
 }
 
@@ -4427,34 +4541,42 @@ dialog {
 
 .details-top-text {
     font-weight: bold;
+    font-size: 1.3rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .details-top-chevron {
     margin-left: auto;
     transition: rotate .25s;
+    font-size: 1.3rem;
 }
 
-.details.open .details-top-chevron {
+.details.open > * > .details-top-chevron {
     rotate: 180deg;
 }
 
 .details-content {
-    transition: height .25s, padding-block .25s, display .25s allow-discrete;
+    transition: height .25s, padding-block .25s, display .25s allow-discrete, opacity .25s;
     interpolate-size: allow-keywords;
     height: 0px;
     padding: 8px;
     padding-block: 0px;
+    opacity: 1;
     display: none;
 }
 
-.details.open .details-content {
+.details.open > .details-content {
     height: max-content;
     padding-block: 8px;
     display: block;
+    opacity: 1;
 
     @starting-style {
         height: 0px;
         padding-block: 0px;
+        opacity: 0;
     }
 }
 
@@ -5259,4 +5381,49 @@ div:has(> .dialog-wrapper-hidden.shown) {
 
 .install-grid-create:hover {
     background-color: var(--color-1t);
+}
+
+.breadcrumb-prefix {
+    color: var(--subtle-text-color);
+}
+
+.breadcrumb-delimiter {
+    font-weight: normal;
+}
+
+.vt-preview-image-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2rem;
+    height: 160.5px;
+    border-radius: 8px;
+    background-color: var(--color-1t);
+    position: relative;
+    overflow: hidden;
+}
+
+.vt-preview-image-loading-spinner {
+    color: var(--subtle-text-color);
+}
+
+.vt-preview-image {
+    height: 100%;
+    width: 100%;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.vt-selected-pack-count {
+    align-self: center;
+}
+
+.vt-selected-pack-count:empty {
+    display: none;
+}
+
+.vt-editor-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }

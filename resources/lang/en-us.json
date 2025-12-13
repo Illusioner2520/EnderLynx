@@ -444,6 +444,9 @@
     "app.content.delete.success": "Deleted %c",
     "app.content.delete.fail": "Unable to delete %c",
     "app.content.view": "View Content",
+    "app.content.edit_packs": "Edit Packs",
+    "app.content.edit_packs.confirm": "Install Selected Packs",
+    "app.content.edit_packs.cancel": "Cancel",
     "app.wardrobe.username_import.default_name": "%u's Skin",
     "app.content.updated": "Updated '%c' to the latest version.",
     "app.content.update_failed": "Unable to update '%c'",
@@ -590,6 +593,7 @@
     "app.discover.vt.incompatible": "Incompatible with %p",
     "app.discover.vt.remove": "Remove Pack",
     "app.discover.vt.add": "Add Pack",
+    "app.discover.vt.version": "Version",
     "app.discover.vt.remove.message": "%t removed.<br>Click the button at the top of the page to add the selected packs to an instance.",
     "app.discover.vt.add.message": "%t added.<br>Click the button at the top of the page to add the selected packs to an instance.",
     "app.discover.unable_to_install": "Error: Unable to install %t",
@@ -727,6 +731,7 @@
     "app.offline": "You are currently offline. You can still play singleplayer as long as you previously signed in.",
     "app.discover.vt.fail": "Unable to download Vanilla Tweaks Packs.",
     "app.discover.vt.success": "Vanilla Tweaks Packs installed to %i",
+    "app.discover.vt.success_edit": "Vanilla Tweaks Packs installed",
     "app.discover.experimental": "Experimental Pack. May produce errors when trying to download.",
     "app.discover.offline": "Server is marked as offline.",
     "app.discover.plugin.title": "That's a plugin",
@@ -818,5 +823,8 @@
     "app.downloads.canceling": "Canceling",
     "app.downloads.none": "No Processes Running",
     "app.instances.none": "No Instances Found",
-    "app.modpack.repair": "Reinstall Modpack"
+    "app.modpack.repair": "Reinstall Modpack",
+    "app.vt.selected_pack_count": "%c Packs Selected",
+    "app.vt.selected_pack_count.singular": "%c Pack Selected",
+    "app.vt.incompatible_selected_pack_count": "%c Incompatible Packs Selected"
 }

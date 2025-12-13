@@ -1877,14 +1877,14 @@ class Slider {
 }
 
 class Toggle {
-    constructor(element, onchange, startToggled) {
+    constructor(element, onchange, startToggled, disableDefaultClickListener = false) {
         element.classList.add("toggle");
         this.element = element;
         this.onchange = onchange;
         let insideToggle = document.createElement("div");
         insideToggle.classList.add("toggle-inside");
         element.appendChild(insideToggle);
-        element.onclick = (e) => {
+        if (!disableDefaultClickListener) element.onclick = (e) => {
             this.processToggle();
         }
         if (startToggled) {
@@ -6527,6 +6527,14 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                                 displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
                             }
                         } : null,
+                        e.source == "vanilla_tweaks" && !instanceInfo.locked ? {
+                            "title": translate("app.content.edit_packs"),
+                            "icon": '<i class="fa-solid fa-pencil"></i>',
+                            "func": () => {
+                                let refreshed = e.refresh();
+                                displayVanillaTweaksEditor(instanceInfo.instance_id, instanceInfo.vanilla_version, JSON.parse(refreshed.source_info), refreshed.file_name, refreshed);
+                            }
+                        } : null,
                         instanceInfo.locked ? null : e.source == "player_install" ? null : {
                             "title": translate("app.content.update"),
                             "icon": '<i class="fa-solid fa-download"></i>',
@@ -9051,7 +9059,7 @@ class Dialog {
     closeDialog() {
         this.element.close();
     }
-    showDialog(title, type, info, buttons, tabs, onsubmit, onclose) {
+    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen) {
         let element = document.createElement("dialog");
         element.className = "dialog";
         element.oncancel = (e) => {
@@ -9061,6 +9069,7 @@ class Dialog {
             }, 1000);
         }
         this.element = element;
+        if (full_screen) element.classList.add("dialog-full");
         let dialogTop = document.createElement("div");
         dialogTop.className = "dialog-top";
         let dialogTitle = document.createElement("div");
@@ -9579,8 +9588,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
         navButtons[i].removeSelected();
     }
     discoverButton.setSelected();
-    added_vt_dp_packs = [];
-    added_vt_rp_packs = [];
+    added_vt_packs = [];
     let discover_content_states = {};
     content.innerHTML = "";
     let titleTop = document.createElement("div");
@@ -9807,8 +9815,7 @@ function contentTabSelect(tab, ele, loader, version, instance_id, states) {
             "value": "vanilla_tweaks",
             "func": () => { }
         });
-        added_vt_dp_packs = [];
-        added_vt_rp_packs = [];
+        added_vt_packs = [];
     }
     // if (tab == "world") {
     //     sources.push({
@@ -9843,9 +9850,6 @@ function contentTabSelect(tab, ele, loader, version, instance_id, states) {
     ele.appendChild(discoverList);
 }
 
-let added_vt_rp_packs = [];
-let added_vt_dp_packs = [];
-let selected_vt_version = "1.21";
 let pages = 0;
 
 class Pagination {
@@ -9977,7 +9981,9 @@ class Pagination {
     }
 }
 
-async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version = selected_vt_version, page = 1, pageSize = 20, sortBy = "relevance", states) {
+let added_vt_packs = [];
+
+async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version, page = 1, pageSize = 20, sortBy = "relevance", states) {
     let instance_content = [];
     if (instance_id) instance_content = (new Instance(instance_id)).getContent();
     let content_ids = instance_content.map(e => e.source_info);
@@ -10194,100 +10200,197 @@ async function getContent(element, instance_id, source, query, loader, version, 
         }
         element.appendChild(paginationBottom.element);
     } else if (source == "vanilla_tweaks") {
+        new VanillaTweaksSelector(project_type, version, instance_id, vt_version, element, query);
+    }
+}
+
+function displayVanillaTweaksEditor(instance_id, version, packs, file_name, content) {
+    let wrapper = document.createElement("div");
+    wrapper.className = "vt-editor-wrapper";
+    let dialog = new Dialog();
+    let searchElement = document.createElement("div");
+    searchElement.style.height = "48.8px";
+    let element = document.createElement("div");
+    new SearchBar(searchElement, () => { }, (q) => {
+        element.innerHTML = "";
+        vt = new VanillaTweaksSelector("resourcepack", version, instance_id, undefined, element, q, true);
+    });
+    added_vt_packs = packs;
+    let vt = new VanillaTweaksSelector("resourcepack", version, instance_id, undefined, element, "", true);
+    wrapper.appendChild(searchElement);
+    wrapper.appendChild(element);
+    dialog.showDialog(translate("app.content.edit_packs"), "notice", wrapper, [
+        {
+            "type": "cancel",
+            "content": translate("app.content.edit_packs.cancel")
+        },
+        {
+            "type": "confirm",
+            "content": translate("app.content.edit_packs.confirm")
+        }
+    ], [], async () => {
+        let instanceInfo = new Instance(instance_id);
+        let file = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, instanceInfo.vanilla_version, instanceInfo.instance_id, file_name);
+        if (!file) {
+            displayError(translate("app.discover.vt.fail"));
+        } else {
+            displaySuccess(translate("app.discover.vt.success_edit"));
+            content.setSourceInfo(JSON.stringify(added_vt_packs));
+        }
+    }, () => { }, true);
+}
+
+class VanillaTweaksSelector {
+    constructor(type, version, instance_id, vt_version, element, query, hide_install_button) {
+        this.type = type;
+        this.version = version;
+        this.instance_id = instance_id
+        this.vt_version = vt_version;
+        this.element = element;
+        this.query = query;
+        this.hide_install_button = hide_install_button;
+        this.initialize();
+    }
+    async initialize() {
+        this.element.innerHTML = "";
+        let loading = new LoadingContainer();
+        this.element.appendChild(loading.element);
+        let vanillaTweaksWrapper = document.createElement("div");
+        vanillaTweaksWrapper.className = "vt-wrapper";
         let result;
-        if (project_type == "datapack" && (vt_version == "1.11" || vt_version == "1.12")) {
-            vt_version = "1.13";
+        if (this.type == "datapack" && (this.vt_version == "1.11" || this.vt_version == "1.12")) {
+            this.vt_version = "1.13";
         }
         let incompatible_rp_versions = ["1.0", "1.1", "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.3", "1.3.1", "1.3.2", "1.4", "1.4.1", "1.4.2", "1.4.3", "1.4.4", "1.4.5", "1.4.6", "1.4.7", "1.5", "1.5.1", "1.5.2", "1.6", "1.6.1", "1.6.2", "1.6.3", "1.6.4", "1.7", "1.7.1", "1.7.2", "1.7.3", "1.7.4", "1.7.5", "1.7.6", "1.7.7", "1.7.8", "1.7.9", "1.7.10", "1.8", "1.8.1", "1.8.2", "1.8.3", "1.8.4", "1.8.5", "1.8.6", "1.8.7", "1.8.8", "1.8.9", "1.9", "1.9.1", "1.9.2", "1.RV-Pre1", "1.9.3", "1.9.4", "1.10", "1.10.1", "1.10.2"];
         let incompatible_dp_versions = incompatible_rp_versions.concat(["1.11", "1.11.1", "1.11.2", "1.12", "1.12.1", "1.12.2"]);
-        if (version && (version.includes("rd") || version.includes("rc") || version.includes("w") || version.includes("pre") || version.includes("c") || version.includes("inf") || version.includes("a") || version.includes("b"))) {
-            element.innerHTML = "";
+        if (this.version && (this.version.includes("rd") || this.version.includes("rc") || this.version.includes("w") || this.version.includes("pre") || this.version.includes("c") || this.version.includes("inf") || this.version.includes("a") || this.version.includes("b") || this.version.includes("snapshot"))) {
+            this.element.innerHTML = "";
             let noresults = new NoResultsFound();
-            element.appendChild(noresults.element);
+            this.element.appendChild(noresults.element);
             return;
         }
-        if (version && ((project_type == "datapack" && incompatible_dp_versions.includes(version)) || (project_type == "resourcepack" && incompatible_rp_versions.includes(version)))) {
-            element.innerHTML = "";
+        if (this.version && ((this.type == "datapack" && incompatible_dp_versions.includes(this.version)) || (this.type == "resourcepack" && incompatible_rp_versions.includes(this.version)))) {
+            this.element.innerHTML = "";
             let noresults = new NoResultsFound();
-            element.appendChild(noresults.element);
+            this.element.appendChild(noresults.element);
             return;
         }
+        if (this.version && !this.vt_version) {
+            this.vt_version = this.version.split(".").splice(0, 2).join(".");
+        }
+        if (!this.vt_version) this.vt_version = "1.21";
         try {
-            if (project_type == "resourcepack") {
-                result = await window.electronAPI.getVanillaTweaksResourcePacks(query, version ? version : vt_version);
-            } else if (project_type == "datapack") {
-                result = await window.electronAPI.getVanillaTweaksDataPacks(query, version ? version : vt_version);
+            if (this.type == "resourcepack") {
+                result = await window.electronAPI.getVanillaTweaksResourcePacks(this.query, this.vt_version);
+            } else if (this.type == "datapack") {
+                result = await window.electronAPI.getVanillaTweaksDataPacks(this.query, this.vt_version);
             }
-            element.innerHTML = "";
+            this.element.innerHTML = "";
         } catch (err) {
-            loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version, page, pageSize, sortBy) });
+            loading.errorOut(err, () => { this.initialize() });
             return;
         }
+        this.element.appendChild(vanillaTweaksWrapper);
         let buttonWrapper = document.createElement("div");
         buttonWrapper.className = "vt-button-wrapper";
-        if (!version) {
-            let dropdownElement = document.createElement("div");
-            let drodpown = new Dropdown("Version", [
-                {
-                    "name": "1.21",
-                    "value": "1.21"
-                },
-                {
-                    "name": "1.20",
-                    "value": "1.20"
-                },
-                {
-                    "name": "1.19",
-                    "value": "1.19"
-                },
-                {
-                    "name": "1.18",
-                    "value": "1.18"
-                },
-                {
-                    "name": "1.17",
-                    "value": "1.17"
-                },
-                {
-                    "name": "1.16",
-                    "value": "1.16"
-                },
-                {
-                    "name": "1.15",
-                    "value": "1.15"
-                },
-                {
-                    "name": "1.14",
-                    "value": "1.14"
-                },
-                {
-                    "name": "1.13",
-                    "value": "1.13"
-                },
-                project_type == "resourcepack" ? {
-                    "name": "1.12",
-                    "value": "1.12"
-                } : null,
-                project_type == "resourcepack" ? {
-                    "name": "1.11",
-                    "value": "1.11"
-                } : null
-            ].filter(e => e), dropdownElement, vt_version, (s) => {
-                getContent(element, instance_id, source, query, loader, version, project_type, s, page, pageSize, sortBy);
-                selected_vt_version = s;
-                added_vt_rp_packs = [];
-                added_vt_dp_packs = [];
-            });
-            buttonWrapper.appendChild(dropdownElement);
+        let previewImageWrapper = document.createElement("div");
+        previewImageWrapper.className = "vt-preview-image-wrapper";
+        let loadingSpinner = document.createElement("span");
+        loadingSpinner.innerHTML = '<i class="fa-regular fa-image"></i>';
+        loadingSpinner.className = "vt-preview-image-loading-spinner";
+        previewImageWrapper.appendChild(loadingSpinner);
+        let previewImage = document.createElement("img");
+        previewImage.className = "vt-preview-image";
+        previewImage.style.display = "none";
+        previewImageWrapper.appendChild(previewImage);
+        let setImage = (img) => {
+            previewImage.style.display = "none";
+            loadingSpinner.style.display = "block";
+            if (!img) {
+                loadingSpinner.innerHTML = '<i class="fa-regular fa-image"></i>'
+                return;
+            }
+            loadingSpinner.innerHTML = '<i class="spinner"></i>';
+            previewImage.src = img;
+            previewImage.onload = () => {
+                loadingSpinner.style.display = "none";
+                previewImage.style.display = "block";
+            }
+            previewImage.onerror = () => {
+                loadingSpinner.innerHTML = '<i class="fa-regular fa-image"></i>'
+            }
         }
+        let dropdownElement = document.createElement("div");
+        new Dropdown(translate("app.discover.vt.version"), [
+            {
+                "name": "1.21",
+                "value": "1.21"
+            },
+            {
+                "name": "1.20",
+                "value": "1.20"
+            },
+            {
+                "name": "1.19",
+                "value": "1.19"
+            },
+            {
+                "name": "1.18",
+                "value": "1.18"
+            },
+            {
+                "name": "1.17",
+                "value": "1.17"
+            },
+            {
+                "name": "1.16",
+                "value": "1.16"
+            },
+            {
+                "name": "1.15",
+                "value": "1.15"
+            },
+            {
+                "name": "1.14",
+                "value": "1.14"
+            },
+            {
+                "name": "1.13",
+                "value": "1.13"
+            },
+            this.type == "resourcepack" ? {
+                "name": "1.12",
+                "value": "1.12"
+            } : null,
+            this.type == "resourcepack" ? {
+                "name": "1.11",
+                "value": "1.11"
+            } : null
+        ].filter(e => e), dropdownElement, this.vt_version, (s) => {
+            this.vt_version = s;
+            added_vt_packs = [];
+            this.initialize();
+        });
+        buttonWrapper.appendChild(dropdownElement);
+        buttonWrapper.appendChild(previewImageWrapper);
+        let selectedPackCount = document.createElement("div");
+        selectedPackCount.className = "vt-selected-pack-count";
+        let updatePackCount = () => {
+            selectedPackCount.innerText = added_vt_packs.length == 1 ? translate("app.vt.selected_pack_count.singular", "%c", added_vt_packs.length) : translate("app.vt.selected_pack_count", "%c", added_vt_packs.length);
+        }
+        updatePackCount();
+        buttonWrapper.appendChild(selectedPackCount);
+        let incompatibleSelectedPackCount = document.createElement("div");
+        incompatibleSelectedPackCount.className = "vt-selected-pack-count";
+        buttonWrapper.appendChild(incompatibleSelectedPackCount);
         let submitButton = document.createElement("button");
         submitButton.className = "vt-submit-button";
         submitButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.vt.install");
         submitButton.onclick = async () => {
-            if (project_type == "datapack") {
+            if (this.type == "datapack") {
                 let dialog = new Dialog();
                 dialog.showDialog(translate("app.discover.datapacks.title"), "form", [
-                    instance_id ? null : {
+                    this.instance_id ? null : {
                         "type": "dropdown",
                         "id": "instance",
                         "name": translate("app.discover.datapacks.instance"),
@@ -10297,9 +10400,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         "type": "dropdown",
                         "id": "world",
                         "name": translate("app.discover.datapacks.world"),
-                        "options": instance_id ? (await getInstanceWorlds(new Instance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
-                        "input_source": instance_id ? null : "instance",
-                        "source": instance_id ? null : async (i) => {
+                        "options": this.instance_id ? (await getInstanceWorlds(new Instance(this.instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
+                        "input_source": this.instance_id ? null : "instance",
+                        "source": this.instance_id ? null : async (i) => {
                             return (await getInstanceWorlds(new Instance(i))).map(e => ({ "name": e.name, "value": e.id }));
                         }
                     }
@@ -10309,19 +10412,19 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 ], [], async (e) => {
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
-                    let instance = instance_id ? instance_id : info.instance;
+                    let instance = this.instance_id ? this.instance_id : info.instance;
                     let world = info.world;
                     if (world == "loading" || world == "" || !world) {
                         displayError(translate("app.discover.vt.datapack.world"));
                         return;
                     }
-                    if (instance_id) {
+                    if (this.instance_id) {
                         submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                         submitButton.classList.add("disabled");
                         submitButton.onclick = () => { };
                     }
-                    let success = await window.electronAPI.downloadVanillaTweaksDataPacks(added_vt_dp_packs, version ? version : vt_version, instance, world);
-                    if (instance_id) {
+                    let success = await window.electronAPI.downloadVanillaTweaksDataPacks(added_vt_packs, this.vt_version, instance, world);
+                    if (this.instance_id) {
                         if (success) {
                             submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                         } else {
@@ -10335,16 +10438,16 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         }
                     }
                 })
-            } else if (instance_id) {
+            } else if (this.instance_id) {
                 submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                 submitButton.onclick = () => { };
-                let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
+                let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, this.instance_id);
                 if (!file_name) {
                     displayError(translate("app.discover.vt.fail"));
                     return;
                 }
-                let instance = new Instance(instance_id);
-                instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                let instance = new Instance(this.instance_id);
+                instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                 submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             } else {
                 let dialog = new Dialog();
@@ -10429,9 +10532,9 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                         instance.setInstalling(true);
                         showSpecificInstanceContent(instance);
-                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instance_id);
+                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
                         if (file_name) {
-                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                         }
                         instance.setInstalling(false);
                         let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
@@ -10484,7 +10587,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                         installButton.classList.add("disabled");
                         installButton.onclick = () => { };
-                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_rp_packs, version ? version : vt_version, instances[i].instance_id);
+                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instances[i].instance_id);
                         if (!file_name) {
                             success = false;
                         } else {
@@ -10492,7 +10595,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         }
                         if (success) {
                             let instance = instances[i];
-                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_rp_packs), false);
+                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                             installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                         } else {
                             installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
@@ -10509,19 +10612,19 @@ async function getContent(element, instance_id, source, query, loader, version, 
                 ], null, () => { });
             }
         }
-        buttonWrapper.append(submitButton);
-        element.appendChild(buttonWrapper);
+        if (!this.hide_install_button) buttonWrapper.append(submitButton);
+        let vanillaTweaksEntries = document.createElement("div");
+        vanillaTweaksEntries.className = "vt-entries";
         if (!result.hits || !result.hits.length) {
             let noresults = new NoResultsFound();
-            element.appendChild(noresults.element);
-            return;
+            vanillaTweaksEntries.appendChild(noresults.element);
         }
         let name_map = {};
         result.hits.map(e => {
             name_map[e.vt_id] = e.title;
         })
         let checkForIncompatibilities = () => {
-            result.hits.map(e => e.entry.element).forEach(e => {
+            result.hits.map(e => e.entry).forEach(e => {
                 e.classList.remove("incompatible");
                 if (e.classList.contains("experimental")) {
                     e.title = translate("app.discover.experimental");
@@ -10529,7 +10632,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     e.removeAttribute("title");
                 }
             });
-            let added_packs_ids = project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id) : added_vt_dp_packs.map(e => e.id);
+            let added_packs_ids = added_vt_packs.map(e => e.id);
+            let count = 0;
             result.hits.forEach(e => {
                 if (added_packs_ids.includes(e.vt_id)) {
                     let incompatibleWith = [];
@@ -10539,47 +10643,133 @@ async function getContent(element, instance_id, source, query, loader, version, 
                         }
                     }
                     if (incompatibleWith.length) {
-                        e.entry.element.classList.add("incompatible");
-                        e.entry.element.setAttribute("title", translate("app.discover.vt.incompatible", "%p", incompatibleWith.join(", ")));
+                        e.entry.classList.add("incompatible");
+                        e.entry.setAttribute("title", translate("app.discover.vt.incompatible", "%p", incompatibleWith.join(", ")));
+                        count++;
                     }
                 }
             });
+            if (count > 0) {
+                incompatibleSelectedPackCount.innerText = translate("app.vt.incompatible_selected_pack_count", "%c", count);
+            } else {
+                incompatibleSelectedPackCount.innerText = "";
+            }
         }
+        let categoryElements = {};
+        let current_ids = added_vt_packs.map(e => e.id);
         for (let i = 0; i < result.hits.length; i++) {
             let e = result.hits[i];
-            let onAddPack = (info, button) => {
-                button.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove");
-                button.onclick = () => {
-                    onRemovePack(info, button);
-                }
-                displaySuccess(translate("app.discover.vt.add.message", "%t", e.title));
-                if (project_type == "resourcepack") {
-                    added_vt_rp_packs.push({ "id": info.vt_id, "name": e.title, "type": e.type });
-                    checkForIncompatibilities();
-                } else if (project_type == "datapack") {
-                    added_vt_dp_packs.push({ "id": info.vt_id, "name": e.title, "type": e.type });
-                    checkForIncompatibilities();
-                }
-            }
-            let onRemovePack = (info, button) => {
-                button.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add");
-                button.onclick = () => {
-                    onAddPack(info, button);
-                }
-                displaySuccess(translate("app.discover.vt.remove.message", "%t", e.title));
-                if (project_type == "resourcepack") {
-                    added_vt_rp_packs = added_vt_rp_packs.filter(e => e.id != info.vt_id);
-                    checkForIncompatibilities();
-                } else if (project_type == "datapack") {
-                    added_vt_dp_packs = added_vt_dp_packs.filter(e => e.id != info.vt_id);
-                    checkForIncompatibilities();
-                }
-            }
-            let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? '<i class="fa-solid fa-minus"></i>' + translate("app.discover.vt.remove") : '<i class="fa-solid fa-plus"></i>' + translate("app.discover.vt.add"), (project_type == "resourcepack" ? added_vt_rp_packs.map(e => e.id).includes(e.vt_id) : added_vt_dp_packs.map(e => e.id).includes(e.vt_id)) ? onRemovePack : onAddPack, e.categories, e, "vt-" + e.vt_id, null, null, null, null, null, null, e.experiment, project_type, undefined, states);
+            let entry = document.createElement("div");
+            entry.className = "vt-entry";
             e.entry = entry;
-            element.appendChild(entry.element);
+            entry.onmouseenter = () => {
+                if (!e.type || e.type == "ct") setImage(e.image);
+                else setImage();
+            }
+            if (e.experiment) {
+                entry.classList.add("experimental");
+                entry.title = translate("app.discover.experimental");
+            }
+            let vtIcon = document.createElement("img");
+            vtIcon.className = "vt-icon";
+            vtIcon.src = e.icon_url ? e.icon_url : "default.png";
+            let vtInfo = document.createElement("div");
+            vtInfo.className = "vt-info";
+            let vtTitle = document.createElement("div");
+            vtTitle.className = "vt-title";
+            vtTitle.innerText = e.title;
+            let vtDesc = document.createElement("div");
+            vtDesc.className = "vt-desc";
+            vtDesc.innerHTML = e.description;
+            vtInfo.appendChild(vtTitle);
+            vtInfo.appendChild(vtDesc);
+            let vtToggle = document.createElement("button");
+            vtToggle.className = "vt-toggle";
+            let toggle = new Toggle(vtToggle, (v) => {
+                if (v) {
+                    added_vt_packs.push({ "id": e.vt_id, "type": e.type })
+                } else {
+                    added_vt_packs = added_vt_packs.filter(f => f.id != e.vt_id);
+                }
+                checkForIncompatibilities();
+                updatePackCount();
+            }, current_ids.includes(e.vt_id), true);
+            entry.onclick = () => {
+                toggle.toggle();
+            }
+            entry.appendChild(vtIcon);
+            entry.appendChild(vtInfo);
+            entry.appendChild(vtToggle);
+            if (!categoryElements[e.breadcrumb]) {
+                let temp = document.createElement("div");
+                temp.className = "vt-entries";
+                categoryElements[e.breadcrumb] = temp;
+            }
+            categoryElements[e.breadcrumb].appendChild(entry);
         }
+        let keys = Object.keys(categoryElements);
+        keys.forEach(key => {
+            let categories = key.split(" > ");
+            let details = new Details(categoryElements[key], categories.slice(0, -1).map(e => `<span class='breadcrumb-prefix'>${e}</span>`).join('<span class="breadcrumb-delimiter breadcrumb-prefix">-</span>') + (categories.length > 1 ? '<span class="breadcrumb-delimiter breadcrumb-prefix">-</span>' : "") + `<span>${categories[categories.length - 1]}</span>`);
+            let foundplace = false;
+            while (!foundplace) {
+                categories.splice(categories.length - 1);
+                let newKey = categories.join(" > ");
+                if (categoryElements[newKey]) {
+                    categoryElements[newKey].appendChild(details.element);
+                    foundplace = true;
+                }
+                if (newKey == "") {
+                    vanillaTweaksEntries.appendChild(details.element);
+                    foundplace = true;
+                }
+            }
+        });
+        vanillaTweaksWrapper.appendChild(vanillaTweaksEntries);
+        vanillaTweaksWrapper.appendChild(buttonWrapper);
         checkForIncompatibilities();
+    }
+}
+
+class Details {
+    constructor(element, title) {
+        let detailsWrapper = document.createElement("div");
+        detailsWrapper.className = "details";
+        let detailstop = document.createElement("button");
+        detailstop.className = "details-top";
+        let detailTitle = document.createElement("span");
+        detailTitle.className = "details-top-text";
+        detailTitle.innerHTML = title;
+        let detailChevron = document.createElement("span");
+        detailChevron.className = "details-top-chevron";
+        detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+        detailstop.appendChild(detailTitle);
+        detailstop.appendChild(detailChevron);
+        let detailContent = document.createElement("div");
+        detailContent.className = "details-content";
+        detailsWrapper.appendChild(detailstop);
+        detailsWrapper.appendChild(detailContent);
+        detailContent.appendChild(element);
+        this.element = detailsWrapper;
+        this.isOpen = false;
+        detailstop.onclick = async () => {
+            this.toggle();
+        }
+    }
+    toggle() {
+        if (this.isOpen) {
+            this.close();
+        } else {
+            this.open();
+        }
+    }
+    open() {
+        this.element.classList.add("open");
+        this.isOpen = true;
+    }
+    close() {
+        this.element.classList.remove("open");
+        this.isOpen = false;
     }
 }
 
@@ -10677,7 +10867,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
         return false;
     }
 
-    return {id};
+    return { id };
 }
 
 async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate, data_pack_world) {
@@ -12511,7 +12701,6 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
             }
         }
     }
-    console.log(results);
     return results;
 }
 
@@ -12707,33 +12896,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
             }
         }
     } else if (content.source == "vanilla_tweaks") {
-        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instanceInfo.vanilla_version, instanceInfo.instance_id);
-
-        let oldFileName = content.file_name;
-
-        content.setFileName(file_name);
-
-        if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + file_name));
-            if (!new_file_name) {
-                displayError(translate("app.error.failure_to_disable"));
-                content.setDisabled(false);
-                return false;
-            }
-            content.setFileName(new_file_name);
-        }
-
-        if (oldFileName != content.file_name) {
-            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
-            if (!success) {
-                displayError(translate("app.content.update.old_file_fail", "%f", oldFileName));
-                content.setFileName(oldFileName);
-                let success2 = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, file_name);
-                if (!success2) {
-                    displayError(translate("app.content.update.new_file_fail", "%f", initialContent.file_name));
-                }
-            }
-        }
+        await window.electronAPI.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instanceInfo.vanilla_version, instanceInfo.instance_id, content.file_name);
     }
 }
 
