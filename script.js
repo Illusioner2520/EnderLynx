@@ -8541,6 +8541,13 @@ window.electronAPI.onProgressUpdate((title, progress, task, id, status, cancelFu
     ]);
 });
 
+window.electronAPI.onContentInstallUpdate((content_id, percent) => {
+    if (percent >= 100) percent = 0;
+    if (global_discover_content_states[content_id]) global_discover_content_states[content_id].forEach(e => {
+        e.style.setProperty("--percent-preview", percent + "%");
+    });
+});
+
 window.electronAPI.onOpenFileShare((p) => {
     openShareDialogForFile(p);
 });
@@ -9583,6 +9590,8 @@ class Dialog {
     }
 }
 
+let global_discover_content_states;
+
 function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     for (let i = 0; i < navButtons.length; i++) {
         navButtons[i].removeSelected();
@@ -9590,6 +9599,7 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     discoverButton.setSelected();
     added_vt_packs = [];
     let discover_content_states = {};
+    global_discover_content_states = {};
     content.innerHTML = "";
     let titleTop = document.createElement("div");
     titleTop.className = "title-top";
@@ -9762,8 +9772,10 @@ class ContentSearchEntry {
                 "state": alreadyInstalled ? "installed" : "default",
                 "buttons": [installButton]
             }
+            global_discover_content_states[source_id] = [installButton];
         } else if (states) {
             states[source_id].buttons.push(installButton);
+            global_discover_content_states[source_id].push(installButton);
         }
         if (states && states[source_id].state == "installed") {
             installButton.onclick = () => { };
@@ -10802,7 +10814,6 @@ async function installContent(source, project_id, instance_id, project_type, tit
             "id": e.id,
             "dependencies": dependency_list
         }));
-        console.log(version_json);
     }
     let initialContent = {};
     if (instance.getContent().map(e => e.source_id).includes(project_id)) {
@@ -10872,11 +10883,14 @@ async function installContent(source, project_id, instance_id, project_type, tit
 
 async function installSpecificVersion(version_info, source, instance, project_type, title, author, icon_url, project_id, isUpdate, data_pack_world) {
     if (project_type == "server") {
-        let initialContent = await addContent(instance_id, project_type, project_id, title, icon_url);
+        let initialContent = await addContent(instance_id, project_type, project_id, title, icon_url, project_id);
         return initialContent;
     }
     let instance_id = instance.instance_id;
-    let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename, data_pack_world);
+    let content = instance.getContent();
+    let modrinth_ids = content.filter(e => e.source == "modrinth").map(e => e.source_info);
+    let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => Number(e.source_info));
+    let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename, data_pack_world, project_id);
     if (isUpdate) return initialContent;
     let version = version_info.version_number ? version_info.version_number : "";
     let version_id = version_info.id;
@@ -10889,6 +10903,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
     if (dependencies && source == "modrinth" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
+            if (modrinth_ids.includes(dependency.project_id)) continue;
             let res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}`);
             let res_json = await res.json();
             let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}/members`);
@@ -10906,7 +10921,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
     } else if (dependencies && source == "curseforge" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
-            console.log(dependency.name);
+            if (curseforge_ids.includes(Number(dependency.id)));
             let project_type = "mod";
             if (dependency.categoryClass.slug == "texture-packs") project_type = "resourcepack";
             if (dependency.categoryClass.slug == "shaders") project_type = "shader";
@@ -10928,8 +10943,8 @@ function toTitleCase(str) {
     });
 }
 
-async function addContent(instance_id, project_type, project_url, filename, data_pack_world) {
-    return await window.electronAPI.addContent(instance_id, project_type, project_url, filename, data_pack_world);
+async function addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id) {
+    return await window.electronAPI.addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id);
 }
 
 class LoadingContainer {
@@ -11555,7 +11570,10 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             }
         }, states);
     }
-    if (states) states[content_id].buttons.push(installButton);
+    if (states) {
+        states[content_id].buttons.push(installButton);
+        global_discover_content_states[content_id].push(installButton);
+    }
     let threeDots = document.createElement("button");
     threeDots.classList.add("content-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -11942,6 +11960,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                     e.classList.add("disabled");
                                     e.onclick = () => { };
                                 });
+                                global_discover_content_states[content_id].push(installButton);
                             }
                             let theContent = null;
                             for (let i = 0; i < contentList.length; i++) {
@@ -11965,6 +11984,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                 installedVersionIndex = i;
                                 showVersions();
                             }
+                            global_discover_content_states[content_id] = global_discover_content_states[content_id].filter(e => e != installButton);
                         }
                         if (installedVersion && installedVersionIndex > i) {
                             installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
@@ -11977,6 +11997,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         } else {
                             installButton.onclick = () => {
                                 if (currentlyInstalling) return;
+                                global_discover_content_states[content_id].push(installButton);
                                 currentlyInstalling = true;
                                 installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
                                 installButton.classList.add("disabled");
@@ -11988,6 +12009,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                         installedVersionIndex = i;
                                         showVersions();
                                     }
+                                    global_discover_content_states[content_id] = global_discover_content_states[content_id].filter(e => e != installButton);
                                 }, states);
                             }
                         }
@@ -13177,7 +13199,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 }, "curseforge", new Instance(instance_id), project_type, title, author, icon, project_id)
             }
         } else if (project_type == "server") {
-            success = await addContent(instance_id, project_type, project_id, title, icon);
+            success = await addContent(instance_id, project_type, project_id, title, icon, project_id);
         } else {
             success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
         }
@@ -13326,7 +13348,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                         }, "curseforge", instance, project_type, title, author, icon, project_id)
                     }
                 } else if (project_type == "server") {
-                    success = await addContent(instance_id, project_type, project_id, title, icon);
+                    success = await addContent(instance_id, project_type, project_id, title, icon, project_id);
                 } else {
                     success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
                 }
@@ -13408,7 +13430,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                         }, "curseforge", instances[i], project_type, title, author, icon, project_id)
                     }
                 } else if (project_type == "server") {
-                    success = await addContent(instances[i].instance_id, project_type, project_id, title, icon);
+                    success = await addContent(instances[i].instance_id, project_type, project_id, title, icon, project_id);
                 } else {
                     success = await installContent(source, project_id, instances[i].instance_id, project_type, title, author, icon);
                 }

@@ -676,6 +676,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
             });
         });
     },
+    onContentInstallUpdate: (callback) => {
+        ipcRenderer.on('content-install-update', (_, content_id, percent) => {
+            callback(content_id, percent);
+        });
+    },
     onOpenFileShare: (callback) => {
         ipcRenderer.on('open-file-share', (_event, file_path) => {
             callback(file_path);
@@ -918,8 +923,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         return false;
     },
-    addContent: async (instance_id, project_type, project_url, filename, data_pack_world) => {
-        return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, filename, data_pack_world);
+    addContent: async (instance_id, project_type, project_url, filename, data_pack_world, content_id) => {
+        return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, filename, data_pack_world, content_id);
     },
     downloadModrinthPack: async (instance_id, url, title) => {
         return await ipcRenderer.invoke('download-modrinth-pack', instance_id, url, title);

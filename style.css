@@ -2306,13 +2306,19 @@ dialog[open]::backdrop {
     margin-left: auto;
 }
 
+@property --button-bg-color {
+    syntax: "<color>";
+    inherits: false;
+    initial-value: transparent;
+}
+
 .discover-item-install {
     background-color: transparent;
     border-radius: 10px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
-    transition: background-color .25s, scale .1s;
+    transition: --button-bg-color .25s, scale .1s;
     display: flex;
     gap: 8px;
     align-items: center;
@@ -2324,6 +2330,10 @@ dialog[open]::backdrop {
     border-width: 2px;
     color: color-mix(in srgb, var(--accent-color), var(--text-color));
     margin-top: auto;
+    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --button-bg-color: transparent;
+    --percent-preview: 0%;
+    background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
 }
 
 .discover-item-install:active {
@@ -2331,7 +2341,7 @@ dialog[open]::backdrop {
 }
 
 .discover-item-install:hover {
-    background-color: var(--color-1t);
+    --button-bg-color: var(--color-1t);
 }
 
 .discover-item-install.disabled {
@@ -3993,12 +4003,16 @@ dialog[open]::backdrop {
     font-weight: bold;
     align-items: center;
     cursor: pointer;
-    transition: background-color .25s, scale .1s;
+    transition: --button-bg-color .25s, scale .1s;
     border-style: solid;
     border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     border-width: 2px;
     color: color-mix(in srgb, var(--accent-color), var(--text-color));
     margin-left: auto;
+    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --button-bg-color: transparent;
+    --percent-preview: 0%;
+    background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
 }
 
 .content-top-install-button:not(.disabled):active {
@@ -4006,7 +4020,7 @@ dialog[open]::backdrop {
 }
 
 .content-top-install-button:not(.disabled):hover {
-    background-color: var(--color-1t);
+    --button-bg-color: var(--color-1t);
 }
 
 .content-top-install-button.disabled {
@@ -4403,12 +4417,11 @@ dialog[open]::backdrop {
 }
 
 .version-file-install {
-    background-color: transparent;
     border-radius: 10px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
-    transition: background-color .25s, scale .1s;
+    transition: --button-bg-color .25s, scale .1s;
     display: flex;
     gap: 8px;
     align-items: center;
@@ -4420,6 +4433,10 @@ dialog[open]::backdrop {
     color: color-mix(in srgb, var(--accent-color), var(--text-color));
     align-self: center;
     margin-left: auto;
+    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --button-bg-color: transparent;
+    --percent-preview: 0%;
+    background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
 }
 
 .version-file-install:active {
@@ -4427,7 +4444,7 @@ dialog[open]::backdrop {
 }
 
 .version-file-install:hover {
-    background-color: var(--color-1t);
+    --button-bg-color: var(--color-1t);
 }
 
 .version-file-install.disabled {
@@ -4440,7 +4457,7 @@ dialog[open]::backdrop {
 }
 
 .version-file-install.disabled:hover {
-    background-color: transparent;
+    --button-bg-color: transparent;
 }
 
 .version-file-text {

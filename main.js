@@ -2176,8 +2176,8 @@ async function downloadVanillaTweaksResourcePacks(packs, version, instance_id, f
     }
 }
 
-ipcMain.handle('add-content', async (_, instance_id, project_type, project_url, filename, data_pack_world) => {
-    return await addContent(instance_id, project_type, project_url, filename, data_pack_world);
+ipcMain.handle('add-content', async (_, instance_id, project_type, project_url, filename, data_pack_world, content_id) => {
+    return await addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id);
 });
 
 ipcMain.handle('add-server', async (_, instance_id, ip, name) => {
@@ -2195,7 +2195,7 @@ async function getServerImage(ip) {
     return info.favicon;
 }
 
-async function addContent(instance_id, project_type, project_url, filename, data_pack_world) {
+async function addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id) {
     if (project_type == "server") {
         let v = await addServer(instance_id, project_url, filename, data_pack_world);
         return v;
@@ -2222,7 +2222,9 @@ async function addContent(instance_id, project_type, project_url, filename, data
         stop_installing_dependencies = true;
     }
 
-    await urlToFile(project_url, install_path);
+    await urlToFile(project_url, install_path, { onProgress: (p) => {
+        win.webContents.send('content-install-update', content_id, p);
+    }});
 
     if (project_type === "world") {
         const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
