@@ -1,6 +1,8 @@
 let lang = null;
 document.getElementsByTagName("title")[0].innerHTML = sanitize(translate("app.name"));
 
+history.scrollRestoration = "manual"
+
 class SQL {
     constructor(sql) {
         this.sql = sql;
