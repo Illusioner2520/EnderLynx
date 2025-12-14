@@ -9596,7 +9596,7 @@ class Dialog {
     }
 }
 
-let global_discover_content_states;
+let global_discover_content_states = {};
 
 function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     for (let i = 0; i < navButtons.length; i++) {
@@ -9778,11 +9778,11 @@ class ContentSearchEntry {
                 "state": alreadyInstalled ? "installed" : "default",
                 "buttons": [installButton]
             }
-            global_discover_content_states[source_id] = [installButton];
         } else if (states) {
             states[source_id].buttons.push(installButton);
-            global_discover_content_states[source_id].push(installButton);
         }
+        if (global_discover_content_states[source_id]) global_discover_content_states[source_id].push(installButton);
+        else global_discover_content_states[source_id] = [installButton];
         if (states && states[source_id].state == "installed") {
             installButton.onclick = () => { };
             installButton.classList.add("disabled");
@@ -11373,6 +11373,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             team_members = await team_members_pre_json.json();
             let versions_pre_json = await fetch(`https://api.modrinth.com/v2/project/${content_id}/version`);
             versions = await versions_pre_json.json();
+            content_id = mr_content.id;
         } catch (e) {
             loading.errorOut(e, () => {
                 displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true);
@@ -11578,8 +11579,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     }
     if (states) {
         states[content_id].buttons.push(installButton);
-        global_discover_content_states[content_id].push(installButton);
     }
+    if (global_discover_content_states[content_id]) global_discover_content_states[content_id].push(installButton);
+    else global_discover_content_states[content_id] = [installButton];
     let threeDots = document.createElement("button");
     threeDots.classList.add("content-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -11966,8 +11968,9 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                     e.classList.add("disabled");
                                     e.onclick = () => { };
                                 });
-                                global_discover_content_states[content_id].push(installButton);
                             }
+                            if (global_discover_content_states[content_id]) global_discover_content_states[content_id].push(installButton);
+                            else global_discover_content_states[content_id] = [installButton];
                             let theContent = null;
                             for (let i = 0; i < contentList.length; i++) {
                                 if (contentList[i].source_info == content.id || (content.convert_version_ids_to_numbers && Number(contentList[i].source_info) == Number(content.id))) {
