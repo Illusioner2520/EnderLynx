@@ -8543,6 +8543,12 @@ window.electronAPI.onProgressUpdate((title, progress, task, id, status, cancelFu
 
 window.electronAPI.onContentInstallUpdate((content_id, percent) => {
     if (percent >= 100) percent = 0;
+    if (!global_discover_content_states[content_id]) {
+        content_id = Number(content_id);
+    }
+    if (!global_discover_content_states[content_id]) {
+        content_id = content_id.toString();
+    }
     if (global_discover_content_states[content_id]) global_discover_content_states[content_id].forEach(e => {
         e.style.setProperty("--percent-preview", percent + "%");
     });
@@ -12638,6 +12644,10 @@ async function openShareDialog(title, url, text) {
 }
 
 async function checkForContentUpdates(source, project_id, version_ids, loaders, game_versions, type) {
+    console.log(type);
+    console.log(version_ids);
+    console.log(loaders);
+    console.log(game_versions);
     let results = [];
     if (source == "modrinth") {
         let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version`);
@@ -12711,10 +12721,10 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
                     for (let j = 0; j < version_json.length; j++) {
                         if ((version_json[j].game_versions.includes(game_versions[i]) && (type != "mod" || version_json[j].loaders.includes(loaders[i])))) {
                             if (Number(version_json[j].id) == Number(version_ids[i])) {
-                                results[i] = false;
+                                if (results[i] == undefined) results[i] = false;
                                 continue ids;
                             }
-                            results[i] = version_json[i].id;
+                            if (results[i] == undefined) results[i] = version_json[i].id;
                             continue ids;
                         }
                     }
@@ -13403,6 +13413,11 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             installButton.className = "install-grid-install";
             installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
             installButton.onclick = async () => {
+                if (global_discover_content_states[project_id]) {
+                    global_discover_content_states[project_id].push(installButton);
+                } else {
+                    global_discover_content_states[project_id] = [installButton];
+                }
                 let success;
                 installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                 installButton.classList.add("disabled");
@@ -13439,9 +13454,15 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 } else {
                     installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
                 }
+                global_discover_content_states[project_id] = global_discover_content_states[project_id].filter(e => e != installButton);
             }
 
             let updateToSpecificVersion = async (version_id) => {
+                if (global_discover_content_states[project_id]) {
+                    global_discover_content_states[project_id].push(installButton);
+                } else {
+                    global_discover_content_states[project_id] = [installButton];
+                }
                 let instanceInfo = instances[i];
                 let contentList = instanceInfo.getContent();
                 installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
@@ -13456,11 +13477,13 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 if (!theContent) return;
                 await updateContent(instanceInfo, theContent, version_id);
                 installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                global_discover_content_states[project_id] = global_discover_content_states[project_id].filter(e => e != installButton);
             }
 
             if (!override_version && updatesIndex != -1 && updates[updatesIndex]) {
                 installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
                 installButton.onclick = () => {
+                    console.log(updates[updatesIndex]);
                     updateToSpecificVersion(updates[updatesIndex]);
                 }
             } else if (override_version && contentForThisInstance[0] && (source == "curseforge" ? Number(contentForThisInstance[0].version_id) != Number(override_version.id) : contentForThisInstance[0].version_id != override_version.id)) {

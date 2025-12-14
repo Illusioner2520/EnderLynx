@@ -2225,6 +2225,8 @@ async function addContent(instance_id, project_type, project_url, filename, data
     await urlToFile(project_url, install_path, { onProgress: (p) => {
         win.webContents.send('content-install-update', content_id, p);
     }});
+    
+    win.webContents.send('content-install-update', content_id, 100);
 
     if (project_type === "world") {
         const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);

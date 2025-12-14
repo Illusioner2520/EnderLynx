@@ -5332,7 +5332,6 @@ div:has(> .dialog-wrapper-hidden.shown) {
 }
 
 .install-grid-install {
-    background-color: transparent;
     border-radius: 10px;
     padding: 8px;
     width: max-content;
@@ -5348,6 +5347,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
     border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     border-width: 2px;
     color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --button-bg-color: transparent;
+    --percent-preview: 0%;
+    background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
 }
 
 .install-grid-install:active {
@@ -5355,7 +5358,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 }
 
 .install-grid-install:hover {
-    background-color: var(--color-1t);
+    --button-bg-color: var(--color-1t);
 }
 
 .install-grid-install.disabled {
