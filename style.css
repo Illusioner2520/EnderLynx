@@ -4315,6 +4315,10 @@ dialog[open]::backdrop {
     grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto auto;
 }
 
+.version-files-wrapper:not(:has(.version-file-changelog)) {
+    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto;
+}
+
 .version-file {
     display: grid;
     grid-template-columns: subgrid;
@@ -4327,6 +4331,10 @@ dialog[open]::backdrop {
     align-content: center;
 }
 
+.version-files-wrapper:not(:has(.version-file-changelog)) .version-file {
+    grid-column: span 7;
+}
+
 .version-file-top {
     display: grid;
     grid-template-columns: subgrid;
@@ -4334,6 +4342,10 @@ dialog[open]::backdrop {
     padding: 10px;
     grid-column: span 8;
     align-content: center;
+}
+
+.version-files-wrapper:not(:has(.version-file-changelog)) .version-file-top {
+    grid-column: span 7;
 }
 
 .version-file-channel {
