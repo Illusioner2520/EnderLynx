@@ -774,6 +774,11 @@ let defaultSkins = [{
     "name": translate("app.skins.copper_welder"),
     "model": "wide",
     "texture_key": "514b10ff7bc50dd01b5438632815b9e27cfe54064d1a28ef6014f3309d278b38"
+},
+{
+    "name": translate("app.skins.zombie_horse_onesie"),
+    "model": "wide",
+    "texture_key": "f0feb1b31b6c8fd9f2d405de335c760a6c41aebb22c39ad059beb8b20c6fbe62"
 }]
 
 class Data {
