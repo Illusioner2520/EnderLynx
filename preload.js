@@ -2011,8 +2011,13 @@ async function getSkinFromUsername(username) {
 }
 
 async function downloadSkin(url) {
-    const response = await axios.get(url, { responseType: "arraybuffer" });
-    const imageBuffer = Buffer.from(response.data);
+    let imageBuffer;
+    if (url.startsWith("data:")) {
+        imageBuffer = Buffer.from(url.split(",")[1], "base64");
+    } else {
+        const response = await axios.get(url, { responseType: "arraybuffer" });
+        imageBuffer = Buffer.from(response.data);
+    }
 
     const { data, info } = await sharp(imageBuffer)
         .ensureAlpha()
