@@ -2948,14 +2948,19 @@ dialog[open]::backdrop {
     position: relative;
 }
 
-.my-account-option-list {
+.my-account-option-list-skin {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+.my-account-option-list-cape {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
 }
 
 .my-account-option {
-    padding: 8px;
+    padding-top: 8px;
     border-radius: 8px;
     cursor: pointer;
     align-items: center;
@@ -3039,12 +3044,26 @@ dialog[open]::backdrop {
     box-shadow: 0px 0px 10px black;
 }
 
-.option-image {
+.option-image-skin {
     margin-block: auto;
     font-size: 3rem;
     color: var(--subtle-text-color);
     image-rendering: pixelated;
-    width: 48px;
+    justify-self: center;
+    width: 64px;
+}
+
+.option-image-skin.dinnerbone {
+    transform: rotateZ(180deg);
+}
+
+.option-image-cape {
+    margin-block: auto;
+    font-size: 4rem;
+    color: var(--subtle-text-color);
+    image-rendering: pixelated;
+    justify-self: center;
+    width: 64px;
 }
 
 .info {
@@ -4616,6 +4635,8 @@ dialog {
     text-overflow: ellipsis;
     text-align: center;
     width: 100%;
+    background-color: var(--dialog-backdrop);
+    padding: 8px;
 }
 
 .label-wrapper {
