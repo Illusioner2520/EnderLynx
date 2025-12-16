@@ -2104,7 +2104,7 @@ class ContentList {
                     }
                     for (let i = 0; i < this.items.length; i++) {
                         let c = this.items[i];
-                        if (c.checkbox.checked && this.isCheckboxVisible(c.element)) {
+                        if (c.checkbox.checked && this.isCheckboxVisible(c.checkbox)) {
                             e.func(c.checkbox.parentElement, c.content_info);
                         }
                     }
