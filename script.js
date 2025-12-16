@@ -278,6 +278,7 @@ class Content {
 
         this.id_or_instanceId = id_or_instanceId;
         this.fileName = fileName;
+        if (!content_watches[this.id]) content_watches[this.id] = {};
     }
 
     refresh() {
@@ -295,6 +296,9 @@ class Content {
     setDisabled(disabled) {
         db.prepare("UPDATE content SET disabled = ? WHERE id = ?").run(Number(disabled), this.id);
         this.disabled = disabled;
+        if (content_watches[this.id].onchangedisabled) {
+            content_watches[this.id].onchangedisabled(disabled);
+        }
     }
     setImage(image) {
         db.prepare("UPDATE content SET image = ? WHERE id = ?").run(image, this.id);
@@ -332,9 +336,15 @@ class Content {
     delete() {
         db.prepare("DELETE FROM content WHERE id = ?").run(this.id);
     }
+
+    watchForChange(name, func) {
+        if (!content_watches[this.id]) content_watches[this.id] = {};
+        content_watches[this.id]["onchange" + name] = func;
+    }
 }
 
 let instance_watches = {};
+let content_watches = {}
 
 class Instance {
     constructor(instance_id) {
@@ -2257,6 +2267,9 @@ class ContentList {
                         infoElement2Desc.innerHTML = sanitize(infoElement2Desc.innerHTML + ".disabled");
                     }
                 }, !contentInfo.disabled);
+                contentInfo.pass_to_checkbox.watchForChange("disabled", (v) => {
+                    toggle.setValueWithoutTrigger(!v);
+                });
                 contentEle.appendChild(toggleElement);
             }
             if (checkboxElement) {
@@ -12785,7 +12798,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
             }
             content.setDisabled(true);
             content.setFileName(new_file_name);
-            if (!alreadyDisabled) displayError(translate("app.content.update.failed", "%c", content.name));
+            displayError(translate("app.content.update.failed", "%c", content.name));
             return false;
         }
 
