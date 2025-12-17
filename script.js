@@ -1332,6 +1332,11 @@ class PageContent {
             currentTab = "discover";
             return;
         }
+        if (this.title == "wardrobe") {
+            showWardrobeContent();
+            currentTab = "wardrobe";
+            return;
+        }
         content.innerHTML = "";
         content.appendChild(this.func());
         if (this.title == "instances") {
@@ -4231,16 +4236,19 @@ if (data.getDefault("hide_ip") == "true") {
 let skinViewer;
 let refreshWardrobe;
 
-function showWardrobeContent(e) {
+function showWardrobeContent() {
+    content.innerHTML = "";
     if (!data.getDefaultProfile()) {
         let ele = document.createElement("div");
+        content.appendChild(ele);
         ele.style.padding = "8px";
         let signInWarning = new NoResultsFound(translate("app.wardrobe.sign_in"));
         ele.appendChild(signInWarning.element);
-        return ele;
+        return;
     }
     if (skinViewer) skinViewer.dispose();
     let ele = document.createElement("div");
+    content.appendChild(ele);
     ele.className = "my-account-grid";
     let skinRenderContainer = document.createElement("div");
     skinRenderContainer.className = "skin-render-container";
@@ -4279,9 +4287,11 @@ function showWardrobeContent(e) {
     skinRenderContainer.appendChild(pauseButton);
     let optionsContainer = document.createElement("div");
     optionsContainer.className = "my-account-options";
+    let activeScreen = document.createElement("div");
     ele.appendChild(optionsContainer);
     let skinOptions = document.createElement("div");
     skinOptions.className = "my-account-option-box";
+    activeScreen.appendChild(skinOptions);
     let fileDrop = document.createElement("div");
     fileDrop.dataset.action = "skin-import";
     fileDrop.className = "small-drop-overlay drop-overlay";
@@ -4292,18 +4302,45 @@ function showWardrobeContent(e) {
     skinOptions.appendChild(fileDrop);
     let capeOptions = document.createElement("div");
     capeOptions.className = "my-account-option-box";
-    let skinTitle = document.createElement("h1");
-    skinTitle.innerHTML = translate("app.wardrobe.skins");
-    let capeTitle = document.createElement("h1");
-    capeTitle.innerHTML = translate("app.wardrobe.capes");
     let skinList = document.createElement("div");
     let capeList = document.createElement("div");
     skinList.className = 'my-account-option-list-skin';
     capeList.className = 'my-account-option-list-cape';
-    skinOptions.appendChild(skinTitle);
-    capeOptions.appendChild(capeTitle);
     skinOptions.appendChild(skinList);
     capeOptions.appendChild(capeList);
+    let detailsWrapper = document.createElement("div");
+    detailsWrapper.className = "details";
+    skinOptions.appendChild(detailsWrapper);
+    let defaultSkinList = document.createElement("div");
+    defaultSkinList.className = "my-account-option-list-skin";
+    let detailstop = document.createElement("button");
+    detailstop.className = "details-top";
+    let detailTitle = document.createElement("span");
+    detailTitle.className = "details-top-text";
+    detailTitle.innerHTML = translate("app.wardrobe.defaults");
+    let detailChevron = document.createElement("span");
+    detailChevron.className = "details-top-chevron";
+    detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+    detailstop.appendChild(detailTitle);
+    detailstop.appendChild(detailChevron);
+    let detailContent = document.createElement("div");
+    detailContent.className = "details-content";
+    detailsWrapper.appendChild(detailstop);
+    detailsWrapper.appendChild(detailContent);
+    detailContent.appendChild(defaultSkinList);
+    let showDefSkins = () => { }
+    let hideDefSkins = () => {
+        detailsWrapper.classList.remove("open");
+    }
+    let isShow = true;
+    detailstop.onclick = async () => {
+        if (isShow) {
+            await showDefSkins();
+        } else {
+            hideDefSkins();
+        }
+        isShow = !isShow;
+    }
     let showContent = () => {
         let default_profile = data.getDefaultProfile();
         let activeSkin = default_profile.getActiveSkin();
@@ -4320,28 +4357,8 @@ function showWardrobeContent(e) {
             let skinEntry = new SkinEntry(e, true, skinViewer, default_profile, showContent, activeSkin);
             skinList.appendChild(skinEntry.element);
         });
-        let defaultSkinList = document.createElement("div");
-        defaultSkinList.className = "my-account-option-list-skin";
-        let detailsWrapper = document.createElement("div");
-        detailsWrapper.className = "details";
-        skinOptions.appendChild(detailsWrapper);
-        let detailstop = document.createElement("button");
-        detailstop.className = "details-top";
-        let detailTitle = document.createElement("span");
-        detailTitle.className = "details-top-text";
-        detailTitle.innerHTML = translate("app.wardrobe.defaults");
-        let detailChevron = document.createElement("span");
-        detailChevron.className = "details-top-chevron";
-        detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-        detailstop.appendChild(detailTitle);
-        detailstop.appendChild(detailChevron);
-        let detailContent = document.createElement("div");
-        detailContent.className = "details-content";
-        detailsWrapper.appendChild(detailstop);
-        detailsWrapper.appendChild(detailContent);
-        detailContent.appendChild(defaultSkinList);
 
-        let showDefSkins = async () => {
+        showDefSkins = async () => {
             detailChevron.innerHTML = '<i class="spinner"></i>';
             let eles = document.querySelectorAll(".my-account-option.default-skin");
             if (eles.length == 0) {
@@ -4354,18 +4371,7 @@ function showWardrobeContent(e) {
             detailsWrapper.classList.add("open");
             detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
         }
-        let hideDefSkins = () => {
-            detailsWrapper.classList.remove("open");
-        }
-        let isShow = true;
-        detailstop.onclick = async () => {
-            if (isShow) {
-                await showDefSkins();
-            } else {
-                hideDefSkins();
-            }
-            isShow = !isShow;
-        }
+
         let capes = default_profile.getCapes();
         capes.forEach((e) => {
             let capeEle = document.createElement("button");
@@ -4453,6 +4459,7 @@ function showWardrobeContent(e) {
     optionsContainer.appendChild(info);
     let skinButtonContainer = document.createElement("div");
     skinButtonContainer.className = "skin-button-container";
+    optionsContainer.appendChild(skinButtonContainer);
     let refreshButton = document.createElement("button");
     refreshButton.className = "skin-button";
     let refreshButtonIcon = document.createElement("i");
@@ -4603,9 +4610,28 @@ function showWardrobeContent(e) {
         });
     }
     skinButtonContainer.appendChild(importButton);
-    optionsContainer.appendChild(skinButtonContainer);
-    optionsContainer.appendChild(skinOptions);
-    optionsContainer.appendChild(capeOptions);
+
+    let tabElement = document.createElement("div");
+    optionsContainer.appendChild(tabElement);
+    let wardrobeTabs = new TabContent(tabElement, [
+        {
+            "name": translate("app.wardrobe.skins"),
+            "value": "skins",
+            "func": () => {
+                capeOptions.remove();
+                activeScreen.appendChild(skinOptions);
+            }
+        },
+        {
+            "name": translate("app.wardrobe.capes"),
+            "value": "capes",
+            "func": () => {
+                skinOptions.remove();
+                activeScreen.appendChild(capeOptions);
+            }
+        }
+    ]);
+    optionsContainer.appendChild(activeScreen);
     return ele;
 }
 
@@ -14184,7 +14210,7 @@ try {
         case "0.0.5":
         case "0.0.6":
         case "0.0.7":
-            if (data.getDefault("default_page") == "my_account") data.setDefault("default_page", "discover");
+            if (data.getDefault("default_page") == "my_account") data.setDefault("default_page", "wardrobe");
             db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
             db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
             db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
