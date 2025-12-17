@@ -215,6 +215,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     nodeversion: process.versions.node,
     chromeversion: process.versions.chrome,
     v8version: process.versions.v8,
+    localIPs: () => {
+        const nets = os.networkInterfaces();
+        let ipAddressv4 = 'N/A';
+        let ipAddressv6 = 'N/A';
+        for (const name of Object.keys(nets)) {
+            for (const net of nets[name]) {
+                if (net.family == 'IPv4' && !net.internal && ipAddressv4 == 'N/A') {
+                    ipAddressv4 = net.address;
+                } else if (net.family == 'IPv6' && !net.internal && ipAddressv6 == 'N/A') {
+                    ipAddressv6 = net.address;
+                }
+            }
+            if (ipAddressv4 !== 'N/A' && ipAddressv6 !== 'N/A') break;
+        }
+        return { IPv4: ipAddressv4, IPv6: ipAddressv6 }
+    },
     cpuUsage: process.getCPUUsage,
     memUsage: process.getProcessMemoryInfo,
     getAppMetrics: async () => {
@@ -2040,7 +2056,7 @@ async function downloadSkin(url) {
 
 async function pathToDataUrl(file_path) {
     if (!file_path) return null;
-    
+
     try {
         if (fs.existsSync(file_path)) {
             const buffer = fs.readFileSync(file_path);

@@ -3254,6 +3254,7 @@ settingsButtonEle.onclick = () => {
     app_info.style.display = "flex";
     app_info.style.flexDirection = "column";
     app_info.style.gap = "4px";
+    let ips = window.electronAPI.localIPs();
     let info_to_show = [{
         "name": translate("app.settings.info.enderlynx"),
         "value": window.electronAPI.version
@@ -3281,6 +3282,12 @@ settingsButtonEle.onclick = () => {
     }, {
         "name": translate("app.settings.info.v8"),
         "value": window.electronAPI.v8version
+    }, {
+        "name": translate("app.settings.info.local_ip_address.ipv4"),
+        "value": ips.IPv4
+    }, {
+        "name": translate("app.settings.info.local_ip_address.ipv6"),
+        "value": ips.IPv6
     }, {
         "name": translate("app.settings.info.ram"),
         "value": async () => { return ((await window.electronAPI.memUsage()).private / 1024).toFixed(2) + " MB" },

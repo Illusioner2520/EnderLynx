@@ -212,6 +212,8 @@
     "app.settings.info.node": "Node Version",
     "app.settings.info.chromium": "Chromium Version",
     "app.settings.info.v8": "V8 Version",
+    "app.settings.info.local_ip_address.ipv4": "Local IP Address (IPv4)",
+    "app.settings.info.local_ip_address.ipv6": "Local IP Address (IPv6)",
     "app.settings.info.ram": "RAM Usage",
     "app.settings.info.bug": "Report a Bug",
     "app.settings.info.feature": "Request a Feature",
