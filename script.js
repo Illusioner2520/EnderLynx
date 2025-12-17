@@ -6205,6 +6205,10 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         if (r.error) {
             instanceInfo.setFailed(true);
         } else {
+            if (instanceInfo.java_version != r.java_version) {
+                instanceInfo.setJavaPath(r.java_installation);
+                instanceInfo.setJavaVersion(r.java_version);
+            }
             if (info.update_content) {
                 let content = instanceInfo.getContent();
                 let processId = Math.random();
