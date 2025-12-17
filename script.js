@@ -4287,6 +4287,12 @@ function showWardrobeContent() {
     skinRenderContainer.appendChild(pauseButton);
     let optionsContainer = document.createElement("div");
     optionsContainer.className = "my-account-options";
+    let title = document.createElement("div");
+    title.classList.add("title-top");
+    let h1 = document.createElement("h1");
+    h1.innerHTML = translate("app.page.wardrobe");
+    title.appendChild(h1);
+    optionsContainer.appendChild(title);
     let activeScreen = document.createElement("div");
     ele.appendChild(optionsContainer);
     let skinOptions = document.createElement("div");
