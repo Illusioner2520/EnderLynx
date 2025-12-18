@@ -21,8 +21,8 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.3",
     "@electron-forge/plugin-fuses": "^7.8.3",
     "@electron/fuses": "^1.8.0",
-    "electron": "^36.9.5",
-    "electron-rebuild": "^3.2.9"
+    "@electron/rebuild": "^3.7.2",
+    "electron": "^39.2.7"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
@@ -34,7 +34,7 @@
     "markdown-it": "^14.1.0",
     "msmc": "^5.0.5",
     "p-limit": "^7.1.1",
-    "png-to-ico": "^2.1.8",
+    "png-to-ico": "^3.0.1",
     "prismarine-nbt": "^2.7.0",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.2",
