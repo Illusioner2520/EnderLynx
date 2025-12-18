@@ -10474,8 +10474,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     installButtonClick(project_type, "curseforge", [], e.favicon, e.name, "", [], e.serverConnection, instance_id, button, null, undefined, undefined, states);
                 }, e.tags.map(e => e.name), e, null, "curseforge", e.serverConnection, instance_id, version, loader, false, false, project_type, !e.latestPing.successful, states);
             } else {
-                entry = new ContentSearchEntry(e.name, e.author.username, e.summary, e.downloads, e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                    installButtonClick(project_type, "curseforge", [], e.thumbnailUrl ? e.thumbnailUrl : e.avatarUrl, e.name, i.author.username, [], e.id, instance_id, button, null, undefined, undefined, states);
+                entry = new ContentSearchEntry(e.name, e.authors[0].name, e.summary, e.downloadCount, e.logo?.thumbnailUrl ? e.logo.thumbnailUrl : e.logo.url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
+                    installButtonClick(project_type, "curseforge", [], e.logo?.thumbnailUrl ? e.logo.thumbnailUrl : e.logo.url, e.name, e.authors[0].name, [], e.id, instance_id, button, null, undefined, undefined, states);
                 }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type, undefined, states);
             }
             element.appendChild(entry.element);

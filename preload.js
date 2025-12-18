@@ -903,14 +903,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
             cfServerInfo[page].info = json;
             return json;
         }
-        let sort = 1;
+        let sort = 2;
         if (sortBy == "downloads") sort = 6;
-        if (sortBy == "newest") sort = 5;
+        if (sortBy == "newest") sort = 11;
         if (sortBy == "updated") sort = 3;
+        let sortOrder = "desc";
         let gv = "";
         if (version) gv = "&gameVersion=" + version;
         let gf = "";
-        if (loader && project_type == "mod") gf = "&gameFlavors[0]=" + ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
+        if (loader && (project_type == "mod" || project_type == "modpack")) gf = "&modLoaderType=" + ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(loader);
         let ci = "";
         let id = 0;
         if (project_type == "mod") id = 6;
@@ -920,9 +921,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (project_type == "world") id = 17;
         if (project_type == "datapack") id = 6945;
         if (project_type) ci = "&classId=" + id;
-        let url = `https://www.curseforge.com/api/v1/mods/search?gameId=432&index=${page - 1}&filterText=${query}${gv}&pageSize=${pageSize}&sortField=${sort}${gf}${ci}`;
+        let url = `https://api.curse.tools/v1/cf/mods/search?gameId=432&index=${(page - 1) * pageSize}&searchFilter=${query}${gv}&pageSize=${pageSize}&sortField=${sort}&sortOrder=${sortOrder}${gf}${ci}`;
         let res = await fetch(url);
-        return await res.json();
+        let json = await res.json();
+        if (json.pagination.totalCount > 10000) json.pagination.totalCount = 10000;
+        return json;
     },
     deleteContent: async (instance_id, project_type, filename) => {
         let install_path = "";
