@@ -182,7 +182,12 @@ class Skin {
         this.active_uuid = skin.active_uuid;
         this.skin_url = skin.skin_url;
         this.default_skin = Boolean(skin.default_skin);
+        this.favorited = Boolean(skin.favorited);
         this.texture_key = skin.texture_key;
+        this.last_used = new Date(skin.last_used);
+        this.preview = skin.preview;
+        this.preview_model = skin.preview_model;
+        this.head = skin.head;
     }
 
     setModel(model) {
@@ -199,6 +204,42 @@ class Skin {
         db.prepare("DELETE FROM skins WHERE id = ?").run(this.id);
     }
 
+    setLastUsed(last_used) {
+        db.prepare("UPDATE skins SET last_used = ? WHERE id = ?").run(last_used ? last_used.toISOString() : null, this.id);
+        this.last_used = last_used;
+    }
+
+    setFavorited(favorited) {
+        db.prepare("UPDATE skins SET favorited = ? WHERE id = ?").run(Number(favorited), this.id);
+        this.favorited = favorited;
+    }
+
+    getPreview(callback) {
+        if (this.preview && this.model == this.preview_model) {
+            callback(this.preview);
+            return;
+        }
+        renderSkinToDataUrl(this.skin_url, (v) => {
+            db.prepare("UPDATE skins SET preview = ? WHERE id = ?").run(v, this.id);
+            db.prepare("UPDATE skins SET preview_model = ? WHERE id = ?").run(this.model, this.id);
+            this.preview = v;
+            this.preview_model = this.model;
+            callback(v);
+        }, this.model);
+    }
+
+    getHead(callback) {
+        if (this.head) {
+            callback(this.head);
+            return;
+        }
+        skinToHead(this.skin_url, (v) => {
+            db.prepare("UPDATE skins SET head = ? WHERE id = ?").run(v, this.id);
+            this.head = v;
+            callback(v);
+        });
+    }
+
     setActive(uuid) {
         let old = db.prepare("SELECT * FROM skins WHERE active_uuid LIKE ?").all(`%;${uuid};%`);
         old.forEach((e) => {
@@ -212,6 +253,7 @@ class Skin {
         }
         list.splice(1, 0, uuid);
         db.prepare("UPDATE skins SET active_uuid = ? WHERE id = ?").run(list.join(";"), this.id);
+        this.setLastUsed(new Date());
     }
     removeActive(uuid) {
         let current = new Skin(this.id);
@@ -924,13 +966,13 @@ class Data {
         return skins.map(e => new Skin(e.id));
     }
 
-    addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck) {
+    addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used) {
         let skins = this.getSkins();
         let previousSkinIds = skins.map(e => e.skin_id);
         if (previousSkinIds.includes(skin_id) && !overrideCheck) {
             return new Skin(skins[previousSkinIds.indexOf(skin_id)].id);
         }
-        let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin) VALUES (?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false));
+        let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin, last_used) VALUES (?,?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false), last_used ? last_used.toISOString() : null);
         return new Skin(result.lastInsertRowid);
     }
 }
@@ -1251,7 +1293,7 @@ function getPlayerHead(profile, callback) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
         return;
     }
-    skinToHead(skin.skin_url, callback);
+    skin.getHead(callback);
 }
 
 class NavigationButton {
@@ -1340,7 +1382,7 @@ class PageContent {
         content.innerHTML = "";
         content.appendChild(this.func());
         if (this.title == "instances") {
-            groupInstances(data.getDefault("default_group"));
+            groupInstances(data.getDefault("default_group"), true);
         }
         currentTab = this.title;
         resetDiscordStatus();
@@ -4233,6 +4275,42 @@ if (data.getDefault("hide_ip") == "true") {
     document.body.classList.add("hide_ip");
 }
 
+function animateGridReorder(querySelector) {
+    const cards = [...document.querySelectorAll(querySelector)];
+
+    const first = new Map();
+    cards.forEach(card => {
+        first.set(card.dataset.id, card.getBoundingClientRect());
+    });
+
+    requestAnimationFrame(() => {
+        const cards = [...document.querySelectorAll(querySelector)];
+        const last = new Map();
+        cards.forEach(card => {
+            last.set(card.dataset.id, card.getBoundingClientRect());
+        });
+
+        cards.forEach(card => {
+            const f = first.get(card.dataset.id);
+            const l = last.get(card.dataset.id);
+            if (!f || !l) return;
+
+            const dx = f.left - l.left;
+            const dy = f.top - l.top;
+
+            if (dx || dy) {
+                card.style.transform = `translate(${dx}px, ${dy}px)`;
+                card.style.transition = 'none';
+
+                requestAnimationFrame(() => {
+                    card.style.transform = '';
+                    card.style.transition = '';
+                });
+            }
+        });
+    });
+}
+
 let skinViewer;
 let refreshWardrobe;
 
@@ -4306,6 +4384,35 @@ function showWardrobeContent() {
     fileDropInner.innerHTML = translate("app.import.skin.drop");
     fileDrop.appendChild(fileDropInner);
     skinOptions.appendChild(fileDrop);
+    let searchAndFilter = document.createElement("div");
+    searchAndFilter.className = "search-and-filter-v2";
+    let searchElement = document.createElement("div");
+    searchElement.style.flexGrow = "2";
+    let searchbar = new SearchBar(searchElement, () => {
+        filterSkins(true);
+    }, () => { })
+    searchAndFilter.appendChild(searchElement);
+    let dropdownElement = document.createElement("div");
+    dropdownElement.style.minWidth = "200px";
+    let sortdropdown = new Dropdown("Sort by", [
+        {
+            "name": "Favorites First",
+            "value": "favorites_first"
+        },
+        {
+            "name": "Name",
+            "value": "name"
+        },
+        {
+            "name": "Last Used",
+            "value": "last_used"
+        }
+    ], dropdownElement, "favorites_first", () => {
+        filterSkins();
+    })
+    searchAndFilter.appendChild(searchElement);
+    searchAndFilter.appendChild(dropdownElement);
+    skinOptions.appendChild(searchAndFilter);
     let capeOptions = document.createElement("div");
     capeOptions.className = "my-account-option-box";
     let skinList = document.createElement("div");
@@ -4314,6 +4421,94 @@ function showWardrobeContent() {
     capeList.className = 'my-account-option-list-cape';
     skinOptions.appendChild(skinList);
     capeOptions.appendChild(capeList);
+
+    let default_profile = data.getDefaultProfile();
+    let activeCape = default_profile.getActiveCape();
+
+    let capes = default_profile.getCapes();
+    capes.sort((a, b) => {
+        if (a.cape_name > b.cape_name) return 1;
+        if (a.cape_name < b.cape_name) return -1;
+        return 0;
+    });
+    capes.forEach((e) => {
+        let capeEle = document.createElement("button");
+        let equipCape = async () => {
+            loader.style.display = "block";
+            capeImg.style.display = "none";
+            let currentEle = capeEle;
+            let success = await applyCape(default_profile, e);
+            if (success) {
+                let oldEle = document.querySelector(".my-account-option.cape.selected");
+                oldEle.classList.remove("selected");
+                currentEle.classList.add("selected");
+                e.setActive();
+                skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
+                activeCape = e;
+            }
+            loader.style.display = "none";
+            capeImg.style.display = "block";
+        }
+        capeEle.className = "my-account-option";
+        capeEle.title = e.cape_name;
+        capeEle.classList.add("cape");
+        let capeImg = document.createElement("img");
+        extractImageRegionToDataURL(processRelativePath(`./minecraft/capes/${e.cape_id}.png`), 1, 1, 10, 16, (e) => {
+            if (e) capeImg.src = e;
+        });
+        capeImg.classList.add("option-image-cape");
+        let loader = document.createElement("div");
+        loader.className = "loading-container-spinner";
+        loader.style.display = "none";
+        let capeName = document.createElement("div");
+        capeName.className = "cape-name";
+        capeEle.appendChild(capeImg);
+        capeEle.appendChild(loader);
+        capeEle.appendChild(capeName);
+        capeName.innerHTML = sanitize(e.cape_name);
+        capeList.appendChild(capeEle);
+        if (e.active) {
+            capeEle.classList.add("selected");
+        }
+        capeEle.onclick = equipCape;
+    });
+    let capeEle = document.createElement("button");
+    capeEle.className = "my-account-option";
+    capeEle.classList.add("cape");
+    capeEle.title = translate("app.wardrobe.no_cape");
+    let capeImg = document.createElement("div");
+    capeImg.classList.add("option-image-cape");
+    capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
+    let loader = document.createElement("div");
+    loader.className = "loading-container-spinner";
+    loader.style.display = "none";
+    let capeName = document.createElement("div");
+    capeName.className = "cape-name";
+    capeEle.appendChild(capeImg);
+    capeEle.appendChild(loader);
+    capeEle.appendChild(capeName);
+    capeName.innerHTML = translate("app.wardrobe.no_cape");
+    capeList.appendChild(capeEle);
+    if (!activeCape) {
+        capeEle.classList.add("selected");
+    }
+    capeEle.onclick = async (event) => {
+        loader.style.display = "block";
+        capeImg.style.display = "none";
+        let currentEle = event.currentTarget;
+        let success = await applyCape(default_profile, null);
+        if (success) {
+            let oldEle = document.querySelector(".my-account-option.cape.selected");
+            oldEle.classList.remove("selected");
+            currentEle.classList.add("selected");
+            default_profile.removeActiveCape();
+            skinViewer.loadCape(null);
+            activeCape = null;
+        }
+        loader.style.display = "none";
+        capeImg.style.display = "block";
+    }
+
     let detailsWrapper = document.createElement("div");
     detailsWrapper.className = "details";
     skinOptions.appendChild(detailsWrapper);
@@ -4347,8 +4542,44 @@ function showWardrobeContent() {
         }
         isShow = !isShow;
     }
-    let showContent = () => {
-        let default_profile = data.getDefaultProfile();
+    let skinEntries = [];
+    let filterSkins = (noAnimate) => {
+        if (!noAnimate) animateGridReorder(".skin");
+        let search = searchbar.value.toLowerCase().trim();
+        let sort = sortdropdown.value;
+        skinEntries.forEach(e => e.element.remove());
+        let filteredEntries = skinEntries.filter(e => e.skin.name.toLowerCase().includes(search));
+        filteredEntries.sort((a, b) => {
+            if (sort == "last_used") {
+                let c = a.skin.last_used;
+                let d = b.skin.last_used;
+                c = c.getTime();
+                d = d.getTime();
+                if (isNaN(c)) c = 0;
+                if (isNaN(d)) d = 0;
+                return d - c;
+            }
+            let av = a.skin.name.toLowerCase();
+            let bv = b.skin.name.toLowerCase();
+            if (av > bv) return 1;
+            if (av < bv) return -1;
+            return 0;
+        });
+        if (sort == "favorites_first") {
+            filteredEntries.sort((a, b) => {
+                if (a.skin.favorited && b.skin.favorited) return 0;
+                if (a.skin.favorited) return -1;
+                if (b.skin.favorited) return 1;
+                return 0;
+            });
+        }
+        filteredEntries.forEach(e => {
+            skinList.appendChild(e.element);
+        });
+    }
+    let showContent = (noAnimate) => {
+        if (!noAnimate) animateGridReorder(".skin");
+        skinEntries = [];
         let activeSkin = default_profile.getActiveSkin();
         skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
             model: activeSkin?.model == "slim" ? "slim" : "default",
@@ -4356,11 +4587,10 @@ function showWardrobeContent() {
         let activeCape = default_profile.getActiveCape();
         skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
         skinList.innerHTML = '';
-        capeList.innerHTML = '';
-        if (document.getElementsByClassName("details")[0]) document.getElementsByClassName("details")[0].remove();
         let skins = data.getSkinsNoDefaults();
         skins.forEach((e) => {
-            let skinEntry = new SkinEntry(e, true, skinViewer, default_profile, showContent, activeSkin);
+            let skinEntry = new SkinEntry(e, true, skinViewer, default_profile, showContent, filterSkins);
+            skinEntries.push(skinEntry);
             skinList.appendChild(skinEntry.element);
         });
 
@@ -4370,94 +4600,16 @@ function showWardrobeContent() {
             if (eles.length == 0) {
                 let defaultSkins = await data.getDefaultSkins();
                 defaultSkins.forEach(e => {
-                    let skinEntry = new SkinEntry(e, false, skinViewer, default_profile, showContent, activeSkin);
+                    let skinEntry = new SkinEntry(e, false, skinViewer, default_profile, showContent, filterSkins);
                     defaultSkinList.appendChild(skinEntry.element);
                 });
             }
             detailsWrapper.classList.add("open");
             detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
         }
-
-        let capes = default_profile.getCapes();
-        capes.forEach((e) => {
-            let capeEle = document.createElement("button");
-            let equipCape = async () => {
-                loader.style.display = "block";
-                capeImg.style.display = "none";
-                let currentEle = capeEle;
-                let success = await applyCape(default_profile, e);
-                if (success) {
-                    let oldEle = document.querySelector(".my-account-option.cape.selected");
-                    oldEle.classList.remove("selected");
-                    currentEle.classList.add("selected");
-                    e.setActive();
-                    skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
-                    activeCape = e;
-                }
-                loader.style.display = "none";
-                capeImg.style.display = "block";
-            }
-            capeEle.className = "my-account-option";
-            capeEle.title = e.cape_name;
-            capeEle.classList.add("cape");
-            let capeImg = document.createElement("img");
-            extractImageRegionToDataURL(processRelativePath(`./minecraft/capes/${e.cape_id}.png`), 1, 1, 10, 16, (e) => {
-                if (e) capeImg.src = e;
-            });
-            capeImg.classList.add("option-image-cape");
-            let loader = document.createElement("div");
-            loader.className = "loading-container-spinner";
-            loader.style.display = "none";
-            let capeName = document.createElement("div");
-            capeName.className = "cape-name";
-            capeEle.appendChild(capeImg);
-            capeEle.appendChild(loader);
-            capeEle.appendChild(capeName);
-            capeName.innerHTML = sanitize(e.cape_name);
-            capeList.appendChild(capeEle);
-            if (e.active) {
-                capeEle.classList.add("selected");
-            }
-            capeEle.onclick = equipCape;
-        });
-        let capeEle = document.createElement("button");
-        capeEle.className = "my-account-option";
-        capeEle.classList.add("cape");
-        capeEle.title = translate("app.wardrobe.no_cape");
-        let capeImg = document.createElement("div");
-        capeImg.classList.add("option-image-cape");
-        capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
-        let loader = document.createElement("div");
-        loader.className = "loading-container-spinner";
-        loader.style.display = "none";
-        let capeName = document.createElement("div");
-        capeName.className = "cape-name";
-        capeEle.appendChild(capeImg);
-        capeEle.appendChild(loader);
-        capeEle.appendChild(capeName);
-        capeName.innerHTML = translate("app.wardrobe.no_cape");
-        capeList.appendChild(capeEle);
-        if (!activeCape) {
-            capeEle.classList.add("selected");
-        }
-        capeEle.onclick = async (event) => {
-            loader.style.display = "block";
-            capeImg.style.display = "none";
-            let currentEle = event.currentTarget;
-            let success = await applyCape(default_profile, null);
-            if (success) {
-                let oldEle = document.querySelector(".my-account-option.cape.selected");
-                oldEle.classList.remove("selected");
-                currentEle.classList.add("selected");
-                default_profile.removeActiveCape();
-                skinViewer.loadCape(null);
-                activeCape = null;
-            }
-            loader.style.display = "none";
-            capeImg.style.display = "block";
-        }
+        filterSkins(true);
     }
-    showContent();
+    showContent(true);
     refreshWardrobe = showContent;
     let info = document.createElement("div");
     info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.wardrobe.notice");
@@ -4642,7 +4794,8 @@ function showWardrobeContent() {
 }
 
 class SkinEntry {
-    constructor(e, allowEditing, skinViewer, default_profile, showContent, activeSkin) {
+    constructor(e, allowEditing, skinViewer, default_profile, showContent, filterSkins) {
+        this.skin = e;
         let skinEle = document.createElement("div");
         let equipSkin = async () => {
             loader.style.display = "block";
@@ -4657,7 +4810,6 @@ class SkinEntry {
                 skinViewer.loadSkin(e.skin_url, {
                     model: e.model == "wide" ? "default" : "slim"
                 });
-                activeSkin = e;
             }
             loader.style.display = "none";
             skinImg.style.display = "block";
@@ -4700,7 +4852,7 @@ class SkinEntry {
                         e.setName(info.name);
                         if (!info.name) e.setName(translate("app.wardrobe.unnamed"));
                         e.setModel(info.model);
-                        showContent();
+                        showContent(true);
                     });
                 }
             } : null,
@@ -4794,7 +4946,7 @@ class SkinEntry {
                         return;
                     }
                     e.delete();
-                    skinEle.remove();
+                    showContent();
                 }
             } : null
         ].filter(e => e));
@@ -4810,12 +4962,38 @@ class SkinEntry {
         let skinMore = document.createElement("button");
         skinMore.className = "skin-more";
         skinMore.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        let skinFavorite = document.createElement("button");
+        skinFavorite.className = "skin-favorite";
+        let skinFavoriteIcon = document.createElement("i");
+        skinFavoriteIcon.classList.add("fa-star");
+        skinFavoriteIcon.classList.add(`fa-${e.favorited ? "solid" : "regular"}`);
+        skinFavorite.appendChild(skinFavoriteIcon);
+        if (e.favorited) skinFavorite.classList.add("starred");
+        skinFavorite.onclick = (ev) => {
+            ev.stopPropagation();
+            e.setFavorited(!e.favorited);
+            if (e.favorited) {
+                skinFavorite.classList.add("starred");
+                skinFavoriteIcon.classList.add("staranimation");
+                skinFavoriteIcon.classList.remove("fa-regular");
+                skinFavoriteIcon.classList.add("fa-solid");
+            } else {
+                skinFavorite.classList.remove("starred");
+                skinFavoriteIcon.classList.remove("fa-solid");
+                skinFavoriteIcon.classList.add("fa-regular");
+            }
+            skinFavoriteIcon.onanimationend = () => {
+                skinFavoriteIcon.classList.remove("staranimation");
+            }
+            if (filterSkins) filterSkins();
+        }
         let moreMenu = new MoreMenu(skinMore, buttons, true, 2);
+        if (allowEditing) skinEle.appendChild(skinFavorite);
         skinEle.appendChild(skinMore);
         let skinImg = document.createElement("img");
-        renderSkinToDataUrl(e.skin_url, (v) => {
+        e.getPreview((v) => {
             skinImg.src = v;
-        }, e.model);
+        })
         skinImg.classList.add("option-image-skin");
         let loader = document.createElement("div");
         loader.className = "loading-container-spinner";
@@ -4824,6 +5002,7 @@ class SkinEntry {
         skinEle.appendChild(skinImg);
         skinEle.appendChild(loader);
         skinEle.appendChild(skinName);
+        skinEle.dataset.id = e.id;
         skinName.innerHTML = sanitize(e.name);
         skinName.className = "skin-name";
         if (e.name.toLowerCase() == "dinnerbone" || e.name.toLowerCase() == "grumm" || e.name.toLowerCase() == "dinnerbone's skin" || e.name.toLowerCase() == "grumm's skin") {
@@ -4878,13 +5057,13 @@ async function importSkin(info, callback) {
             } else {
                 model = "wide";
             }
-            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true, null);
             callback();
         };
         tempImg.src = info.skin;
         return;
     }
-    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true);
+    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true, null);
     callback();
 }
 
@@ -5047,15 +5226,13 @@ function sortInstances(how) {
                 if (av < bv) return -1 * multiply;
                 return 0;
             });
-            // Use DocumentFragment to minimize reflows
-            let frag = document.createDocumentFragment();
-            children.forEach(e => frag.appendChild(e));
-            groups[i].appendChild(frag);
+            children.forEach(e => groups[i].appendChild(e));
         }
     }
 }
 
-function groupInstances(how) {
+function groupInstances(how, noAnimate) {
+    if (!noAnimate) animateGridReorder(".instance-item");
     if (!document.getElementsByClassName("group-list")[0]) return;
     data.setDefault("default_group", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
@@ -5080,6 +5257,12 @@ function groupInstances(how) {
             if (aIndex === -1) return -1;
             if (bIndex === -1) return 1;
             return bIndex - aIndex;
+        });
+    } else if (how == "pinned") {
+        groups.sort((a, b) => {
+            if (a === "" && b !== "") return -1;
+            if (a !== "" && b === "") return 1;
+            return b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" });
         });
     } else {
         groups.sort((a, b) => {
@@ -5148,9 +5331,17 @@ function showInstanceContent(e) {
     { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
     { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
     { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
-    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.getDefault("default_sort"), sortInstances);
+    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.getDefault("default_sort"), () => {
+        groupInstances(groupBy.getSelected);
+    });
     let group = document.createElement('div');
-    let groupBy = new Dropdown(translate("app.instances.group.by"), [{ "name": translate("app.instances.group.none"), "value": "none" }, { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" }, { "name": translate("app.instances.group.loader"), "value": "loader" }, { "name": translate("app.instances.group.game_version"), "value": "game_version" }], group, data.getDefault("default_group"), groupInstances);
+    let groupBy = new Dropdown(translate("app.instances.group.by"), [
+        { "name": translate("app.instances.group.none"), "value": "none" },
+        { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" },
+        { "name": translate("app.instances.group.pinned"), "value": "pinned" },
+        { "name": translate("app.instances.group.loader"), "value": "loader" },
+        { "name": translate("app.instances.group.game_version"), "value": "game_version" }
+    ], group, data.getDefault("default_group"), groupInstances);
     searchAndFilter.appendChild(search);
     searchAndFilter.appendChild(sort);
     searchAndFilter.appendChild(group);
@@ -5184,11 +5375,13 @@ function showInstanceContent(e) {
         instanceElement.setAttribute("data-game-version", instances[i].vanilla_version);
         instanceElement.setAttribute("data-custom-groups", instances[i].group);
         instanceElement.setAttribute("data-loader", instances[i].loader);
+        instanceElement.setAttribute("data-pinned", instances[i].pinned ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
         instanceElement.setAttribute("data-none", "");
         instanceElement.onclick = (e) => {
             showSpecificInstanceContent(new Instance(instances[i].instance_id));
         }
         instanceElement.classList.add("instance-item");
+        instanceElement.dataset.id = instances[i].instance_id;
         if (running) instanceElement.classList.add("running");
         let instanceImage = document.createElement("img");
         instanceImage.classList.add("instance-image");
@@ -5207,7 +5400,7 @@ function showInstanceContent(e) {
         instances[i].watchForChange("name", (t) => {
             instanceName.innerHTML = sanitize(t);
             instanceElement.setAttribute("data-name", t);
-            sortInstances(data.getDefault("default_sort"));
+            groupInstances(data.getDefault("default_group"));
         });
         instanceName.classList.add("instance-name");
         instanceName.innerHTML = sanitize(instances[i].name);
@@ -5289,6 +5482,8 @@ function showInstanceContent(e) {
                     instances[i].pinned ? unpinInstance(instances[i]) : pinInstance(instances[i]);
                     e.setTitle(instances[i].pinned ? translate("app.instances.unpin") : translate("app.instances.pin"));
                     e.setIcon(instances[i].pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    instanceElement.setAttribute("data-pinned", instances[i].pinned ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+                    groupInstances(groupBy.getSelected);
                 }
             },
             {
@@ -5322,6 +5517,7 @@ function showInstanceContent(e) {
                         }
                     ], [], async (v) => {
                         instances[i].delete();
+                        animateGridReorder(".instance-item");
                         instanceContent.displayContent();
                         if (v[0].value) {
                             try {
@@ -11187,7 +11383,7 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     try {
         for (const e of skin_and_cape_data.skins) {
             let hash = await window.electronAPI.downloadSkin(e.url);
-            let skin = data.addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false);
+            let skin = data.addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date());
             if (e.state == "ACTIVE") skin.setActive(skin_and_cape_data.uuid);
             else skin.removeActive(skin_and_cape_data.uuid);
         }
@@ -14225,6 +14421,19 @@ try {
         case "0.1.0":
         case "0.1.1":
             db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
+        case "0.2.0":
+        case "0.3.0":
+        case "0.4.0":
+        case "0.4.1":
+        case "0.4.2":
+        case "0.4.3":
+        case "0.4.4":
+        case "0.5.0":
+            db.prepare("ALTER TABLE skins ADD favorited INTEGER").run();
+            db.prepare("ALTER TABLE skins ADD last_used TEXT").run();
+            db.prepare("ALTER TABLE skins ADD preview TEXT").run();
+            db.prepare("ALTER TABLE skins ADD preview_model TEXT").run();
+            db.prepare("ALTER TABLE skins ADD head TEXT").run();
     }
 } catch (e) { }
 
