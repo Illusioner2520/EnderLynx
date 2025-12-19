@@ -12219,7 +12219,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         installButton.className = "version-file-install"
                         let updateToSpecificVersion = async () => {
                             if (currentlyInstalling) return;
-                            currentlyInstalling = true;
+                            if (instance_id & content.project_type != "world" && content.project_type != "datapack") currentlyInstalling = true;
                             if (content.project_type == "modpack") {
                                 contentInfo.close();
                                 runModpackUpdate(new Instance(instance_id), content.source, e.original_version_info);
@@ -12276,12 +12276,12 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             installButton.onclick = () => {
                                 if (currentlyInstalling) return;
                                 global_discover_content_states[content_id].push(installButton);
-                                currentlyInstalling = true;
-                                installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-                                installButton.classList.add("disabled");
-                                installButton.onclick = () => { };
+                                if (instance_id & content.project_type != "world" && content.project_type != "datapack") currentlyInstalling = true;
+                                if (content.project_type != "modpack") installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                                if (content.project_type != "modpack") installButton.classList.add("disabled");
+                                if (content.project_type != "modpack") installButton.onclick = () => { };
                                 installButtonClick(content.project_type, content.source, e.loaders, content.icon_url, content.title, content.author, e.game_versions, content_id, instance_id, installButton, contentInfo, e.original_version_info, () => {
-                                    installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
+                                    if (content.project_type != "modpack") installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                                     if (instance_id) {
                                         installedVersion = e.id;
                                         installedVersionIndex = i;
