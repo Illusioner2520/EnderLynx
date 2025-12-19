@@ -16,9 +16,11 @@ const os = require('os');
 const ws = require("windows-shortcuts");
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
-const pngToIco = require('png-to-ico');
+const pngToIcoModule = require('png-to-ico');
 const QRCode = require('qrcode');
 const readline = require('readline');
+
+const pngToIco = pngToIcoModule.default;
 
 let cfServerInfo = {};
 
@@ -1502,10 +1504,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         try {
             await convertToIco(iconSource, iconPath);
-        } catch (e) { }
+        } catch (e) {
+            console.error(e);
+        }
 
         if (!fs.existsSync(iconPath)) {
-            iconPath = path.resolve(__dirname, "icon.ico");
+            let enderlynxiconpath = path.resolve(userPath, "icons", "enderlynx.ico");
+            if (!fs.existsSync(enderlynxiconpath)) {
+                fs.copyFileSync(path.resolve(__dirname, "icon.ico"), enderlynxiconpath);
+            }
+            iconPath = enderlynxiconpath;
         }
 
         return new Promise((resolve) => {
@@ -1802,28 +1810,14 @@ async function convertToIco(input, outputPath) {
         throw new Error('Invalid input: must be a data URL, image URL, or file path');
     }
 
-    const isWebP = imageBuffer.toString('ascii', 0, 4) === 'RIFF' &&
-        imageBuffer.toString('ascii', 8, 12) === 'WEBP';
-
-    if (isWebP) {
-        const { data, info } = await sharp(imageBuffer)
-            .ensureAlpha()
-            .png()
-            .toBuffer({ resolveWithObject: true });
-
-        console.log(info);
-
-        console.log(`Sharp decoded WebP details: Width=${info.width}, Height=${info.height}, Channels=${info.channels}, Format=${info.format}`);
-
-        if (info.channels !== 4) {
-            console.warn(`Sharp did not output 4 channels (RGBA), but ${info.channels}. This might be an issue.`);
-        }
-
-        imageBuffer = data;
-    }
-    const resized = await sharp(imageBuffer).resize(256, 256, {
-        kernel: sharp.kernel.nearest
-    }).png().toBuffer();
+    const resized = await sharp(imageBuffer, { failOnError: false })
+        .ensureAlpha()
+        .resize(256, 256, {
+            fit: 'contain',
+            kernel: sharp.kernel.nearest
+        })
+        .png()
+        .toBuffer();
 
     const icoBuffer = await pngToIco(resized);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
