@@ -11937,6 +11937,11 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         installButton.classList.add("disabled");
         installButton.onclick = () => { };
     }
+    if (locked) {
+        installButton.classList.add("disabled");
+        installButton.onclick = () => { };
+        installButton.setAttribute("title", translate("app.discover.locked.tooltip"));
+    }
 
     let tabsElement = document.createElement("div");
     contentWrapper.appendChild(tabsElement);
