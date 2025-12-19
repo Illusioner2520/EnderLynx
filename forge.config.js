@@ -24,7 +24,8 @@ module.exports = {
       /forge\.config\.js$/,
       /package-lock\.json$/,
       /updater\.js$/,
-      /README\.md$/
+      /README\.md$/,
+      /LICENSE$/
     ]
   },
   rebuildConfig: {},
