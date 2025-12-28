@@ -8844,6 +8844,40 @@ window.electronAPI.onLaunchInstance(async (launch_info) => {
     }
 });
 
+window.electronAPI.onInstallInstance(async (install_info) => {
+    if (!install_info.id) return;
+    if (!install_info.source) return;
+    let info = {};
+    if (install_info.source == "modrinth") {
+        let temp = await (await fetch(`https://api.modrinth.com/v2/project/${install_info.id}`)).json();
+        let members = await (await fetch(`https://api.modrinth.com/v2/project/${install_info.id}/members`)).json();
+        info = {
+            "project_type": temp.project_type,
+            "source": "modrinth",
+            "loaders": temp.loaders,
+            "icon": temp.icon_url,
+            "name": temp.title,
+            "author": members.map(e => e.user.username).join(", "),
+            "game_versions": temp.game_versions,
+            "project_id": temp.id
+        }
+    } else if (install_info.source == "curseforge") {
+        let temp = await (await fetch(`https://api.curse.tools/v1/cf/mods/${install_info.id}`)).json();
+        let types = {6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader", 17: "world", 6945: "datapack"};
+        info = {
+            "project_type": types[temp.data.classId],
+            "source": "curseforge",
+            "loaders": [],
+            "icon": temp.data?.logo?.thumbnailUrl ? temp.data.logo.thumbnailUrl : (temp.data?.logo?.url ? temp.data.logo.url : ""),
+            "name": temp.data.name,
+            "author": temp.data.authors.map(e => e.name).join(", "),
+            "game_versions": [],
+            "project_id": temp.data.id
+        }
+    }
+    importInstanceFromContentProvider(info);
+});
+
 class MultiSelect {
     constructor(element, list) {
         this.onchange = () => { };
@@ -10474,8 +10508,8 @@ async function getContent(element, instance_id, source, query, loader, version, 
                     installButtonClick(project_type, "curseforge", [], e.favicon, e.name, "", [], e.serverConnection, instance_id, button, null, undefined, undefined, states);
                 }, e.tags.map(e => e.name), e, null, "curseforge", e.serverConnection, instance_id, version, loader, false, false, project_type, !e.latestPing.successful, states);
             } else {
-                entry = new ContentSearchEntry(e.name, e.authors[0].name, e.summary, e.downloadCount, e.logo?.thumbnailUrl ? e.logo.thumbnailUrl : e.logo.url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
-                    installButtonClick(project_type, "curseforge", [], e.logo?.thumbnailUrl ? e.logo.thumbnailUrl : e.logo.url, e.name, e.authors[0].name, [], e.id, instance_id, button, null, undefined, undefined, states);
+                entry = new ContentSearchEntry(e.name, e.authors.map(e => e.name).join(", "), e.summary, e.downloadCount, e.logo?.thumbnailUrl ? e.logo.thumbnailUrl : e.logo.url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
+                    installButtonClick(project_type, "curseforge", [], e.logo?.thumbnailUrl ? e.logo.thumbnailUrl : e.logo.url, e.name, e.authors.map(e => e.name).join(", "), [], e.id, instance_id, button, null, undefined, undefined, states);
                 }, e.categories.map(e => e.name), e, null, "curseforge", e.id, instance_id, version, loader, content_ids.includes(e.id + ".0"), false, project_type, undefined, states);
             }
             element.appendChild(entry.element);
@@ -11179,11 +11213,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
             let get_author_res = await fetch(`https://api.modrinth.com/v2/project/${dependency.project_id}/members`);
             let get_author_res_json = await get_author_res.json();
             let author = "";
-            get_author_res_json.forEach(e => {
-                if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
-                    author = e.user.username;
-                }
-            })
+            author = get_author_res_json.map(e => e.user.username).join(", ");
             if (dependency.dependency_type == "required") {
                 await installContent(source, dependency.project_id, instance_id, res_json.project_type, res_json.title, author, res_json.icon_url);
             }
@@ -11645,12 +11675,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             return;
         }
         content = mr_content;
-        content.author = "";
-        team_members.forEach(e => {
-            if (e.role == "Owner" || e.role == "Lead developer" || e.role == "Project Lead") {
-                content.author = e.user.username;
-            }
-        });
+        content.author = team_members.map(e => e.user.username).join(", ");
         content.urls = {};
         content.urls.source = mr_content.source_url;
         content.urls.issues = mr_content.issues_url;
@@ -11735,7 +11760,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "downloads": cf_content.data.downloadCount,
             "source": "curseforge",
             "updated": cf_content.data.dateModified,
-            "author": cf_content.data.authors[0].name,
+            "author": cf_content.data.map(e => e.name).join(", "),
             "loaders": [],
             "game_versions": [],
             "id": cf_content.data.id,
@@ -14040,7 +14065,6 @@ let importInstance = (info, file_path) => {
         let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
         showSpecificInstanceContent(instance);
         let packInfo = await window.electronAPI.processPackFile(file_path, instance_id, info.name);
-        console.log(packInfo);
         if (packInfo.error) {
             instance.setFailed(true);
             instance.setInstalling(false);
@@ -14068,6 +14092,10 @@ let importInstance = (info, file_path) => {
             instance.setMcInstalled(true);
         }
     });
+}
+
+let importInstanceFromContentProvider = (info) => {
+    installButtonClick(info.project_type, info.source, info.loaders, info.icon, info.name, info.author, info.game_versions, info.project_id, undefined, document.createElement("button"), undefined, undefined, () => {}, undefined);
 }
 
 window.electronAPI.onOpenFile(importInstance);

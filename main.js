@@ -815,8 +815,8 @@ ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_conten
             let res_json_2 = await res_2.json();
             res_json_2.forEach(e => {
                 if (Array.isArray(e)) {
-                    let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                    let author = authors.length ? authors[0] : "";
+                    let authors = e.map(m => m.user?.username || m.user?.name || "");
+                    let author = authors.join(", ");
                     if (!team_to_project_ids[e[0].team_id]) return;
                     team_to_project_ids[e[0].team_id].forEach(f => {
                         content.forEach(item => {
@@ -1017,7 +1017,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
                 if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
                     item.name = e.name;
                     item.image = e.logo.thumbnailUrl;
-                    item.author = e.authors[0].name;
+                    item.author = e.authors.map(e => e.name).join(", ");
                 }
             });
         });
@@ -1185,8 +1185,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         let res_json_2 = await res_2.json();
         res_json_2.forEach(e => {
             if (Array.isArray(e)) {
-                let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                let author = authors.length ? authors[0] : "";
+                let authors = e.map(m => m.user?.username || m.user?.name || "");
+                let author = authors.join(", ");
                 if (!team_to_project_ids[e[0].team_id]) return;
                 team_to_project_ids[e[0].team_id].forEach(f => {
                     content.forEach(item => {
@@ -1407,8 +1407,8 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                 const res_json = await res.json();
                 res_json.forEach(e => {
                     if (Array.isArray(e)) {
-                        let authors = e.filter(m => ["Owner", "Lead developer", "Project Lead"].includes(m.role)).map(m => m.user?.username || m.user?.name || "");
-                        let author = authors.length ? authors[0] : "";
+                        let authors = e.map(m => m.user?.username || m.user?.name || "");
+                        let author = authors.join(", ");
                         if (!mr_team_to_project_ids[e[0].team_id]) return;
                         mr_team_to_project_ids[e[0].team_id].forEach(projectId => {
                             content.forEach(item => {
@@ -1439,7 +1439,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
                             if (item.source === "curseforge" && item.source_id == e.id + ".0") {
                                 item.name = e.name;
                                 item.image = e.logo.thumbnailUrl;
-                                item.author = e.authors[0].name;
+                                item.author = e.authors.map(e => e.name).join(", ");
                             }
                         });
                     });
@@ -1619,7 +1619,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
                     if (Number(item.source_id) == Number(e.id)) {
                         item.name = e.name;
                         item.image = e.logo.thumbnailUrl;
-                        item.author = e.authors[0].name;
+                        item.author = e.authors.map(e => e.name).join(", ");
                     }
                 });
             });

@@ -29,16 +29,20 @@ let userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataP
 
 let enableDevMode = false;
 let launchInstanceCallback = () => { };
+let installInstanceCallback = () => { }
 let instance_id_to_launch = "";
 let world_type_to_launch = "";
 let world_id_to_launch = "";
 let startingPage = null;
+let installInfo = {};
 
 function processArgs(args) {
-
     const instanceArg = args.find(arg => arg.startsWith('--instance='));
     const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
     const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
+
+    const installArg = args.find(arg => arg.startsWith("--install="));
+    const installSourceArg = args.find(arg => arg.startsWith("--source="));
 
     enableDevMode = args.includes("--dev");
 
@@ -49,15 +53,31 @@ function processArgs(args) {
     argsFromUrl = argsFromUrl.map(decodeURIComponent);
 
     if (instanceArg) {
-        if (instanceArg) instance_id_to_launch = instanceArg.split('=').toSpliced(0, 1).join('=');
-        if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').toSpliced(0, 1).join('=');
-        if (worldIdArg) world_id_to_launch = worldIdArg.split('=').toSpliced(0, 1).join('=');
+        if (instanceArg) instance_id_to_launch = instanceArg.split('=').slice(1).join('=');
+        if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').slice(1).join('=');
+        if (worldIdArg) world_id_to_launch = worldIdArg.split('=').slice(1).join('=');
     }
 
     if (argsFromUrl[0] == "launch") {
         if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
         if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
         if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
+    }
+
+    if (installArg) {
+        let id = installArg.split("=").slice(1).join('=');
+        installInfo = {
+            id,
+            source: installSourceArg ? installSourceArg.split("=").slice(1).join("=") : (isNaN(Number(id)) ? "modrinth" : "curseforge")
+        }
+    }
+
+    if (argsFromUrl[0] == "install") {
+        let id = argsFromUrl[1];
+        installInfo = {
+            id,
+            source: argsFromUrl[2] ? argsFromUrl[2] : (isNaN(Number(id)) ? "modrinth" : "curseforge")
+        }
     }
 
     startingPage = args.find(arg => arg.startsWith('--page='));
@@ -73,6 +93,10 @@ function processArgs(args) {
             world_type: world_type_to_launch,
             world_id: world_id_to_launch
         });
+    }
+
+    if (installInstanceCallback) {
+        installInstanceCallback(installInfo);
     }
 }
 
@@ -720,6 +744,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
             world_type: world_type_to_launch,
             world_id: world_id_to_launch
         });
+    },
+    onInstallInstance: async (callback) => {
+        installInstanceCallback = callback;
+        if (installInfo) callback(installInfo);
     },
     getVanillaVersions: async () => {
         let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
