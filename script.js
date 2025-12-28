@@ -5803,7 +5803,7 @@ function showCreateInstanceDialog() {
     });
 }
 
-function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log) {
+function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log, make_button_loading) {
     if (!dont_add_to_log) {
         page_log = page_log.slice(0, page_index + 1).concat([() => {
             showSpecificInstanceContent(instanceInfo, default_tab, true);
@@ -5986,6 +5986,12 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log)
         }
     }
     calculatePlayButtonState(instanceInfo.mc_installed, instanceInfo.failed, running);
+    if (make_button_loading) {
+        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+        playButton.classList.remove("instance-top-play-button");
+        playButton.classList.add("instance-top-loading-button");
+        playButton.onclick = () => { };
+    }
     instanceInfo.watchForChange("mc_installed", (v) => {
         calculatePlayButtonState(v, instanceInfo.refresh().failed);
     });
@@ -8830,7 +8836,7 @@ window.electronAPI.onLaunchInstance(async (launch_info) => {
     if (!launch_info.instance_id) return;
     try {
         let instance = new Instance(launch_info.instance_id);
-        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content", undefined, true);
         if (launch_info.world_type == "singleplayer") {
             await playSingleplayerWorld(instance, launch_info.world_id);
         } else if (launch_info.world_type == "multiplayer") {
