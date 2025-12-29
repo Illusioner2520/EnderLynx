@@ -11766,7 +11766,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "downloads": cf_content.data.downloadCount,
             "source": "curseforge",
             "updated": cf_content.data.dateModified,
-            "author": cf_content.data.map(e => e.name).join(", "),
+            "author": cf_content.data.authors.map(e => e.name).join(", "),
             "loaders": [],
             "game_versions": [],
             "id": cf_content.data.id,
@@ -11774,7 +11774,21 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 "source": cf_content.data.links.sourceUrl,
                 "wiki": cf_content.data.links.wikiUrl,
                 "issues": cf_content.data.links.issuesUrl,
-                "browser": cf_content.data.links.websiteUrl
+                "browser": cf_content.data.links.websiteUrl,
+                "mastodon": cf_content.data.socialLinks?.filter(e => e.type == 1)[0]?.url,
+                "discord": cf_content.data.socialLinks?.filter(e => e.type == 2)[0]?.url,
+                "website": cf_content.data.socialLinks?.filter(e => e.type == 3)[0]?.url,
+                "facebook": cf_content.data.socialLinks?.filter(e => e.type == 4)[0]?.url,
+                "twitter": cf_content.data.socialLinks?.filter(e => e.type == 5)[0]?.url,
+                "instagram": cf_content.data.socialLinks?.filter(e => e.type == 6)[0]?.url,
+                "patreon": cf_content.data.socialLinks?.filter(e => e.type == 7)[0]?.url,
+                "twitch": cf_content.data.socialLinks?.filter(e => e.type == 8)[0]?.url,
+                "reddit": cf_content.data.socialLinks?.filter(e => e.type == 9)[0]?.url,
+                "youtube": cf_content.data.socialLinks?.filter(e => e.type == 10)[0]?.url,
+                "tiktok": cf_content.data.socialLinks?.filter(e => e.type == 11)[0]?.url,
+                "pinterest": cf_content.data.socialLinks?.filter(e => e.type == 12)[0]?.url,
+                "github": cf_content.data.socialLinks?.filter(e => e.type == 13)[0]?.url,
+                "bluesky": cf_content.data.socialLinks?.filter(e => e.type == 14)[0]?.url
             },
             "description": description.data,
             "versions": versions.map(e => ({
@@ -11881,6 +11895,15 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     threeDots.classList.add("content-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
     let links = [];
+    if (content.urls.website) {
+        links.push({
+            "icon": '<i class="fa-solid fa-globe"></i>',
+            "title": translate("app.discover.view.website"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.website);
+            }
+        })
+    }
     if (content.urls.source) {
         links.push({
             "icon": '<i class="fa-solid fa-code"></i>',
@@ -11919,10 +11942,109 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     }
     if (content.urls.twitter) {
         links.push({
-            "icon": '<i class="fa-brands fa-twitter"></i>',
+            "icon": '<i class="fa-brands fa-x-twitter"></i>',
             "title": translate("app.discover.view.twitter"),
             "func": (e) => {
                 window.electronAPI.openInBrowser(content.urls.twitter);
+            }
+        })
+    }
+    if (content.urls.bluesky) {
+        links.push({
+            "icon": '<i class="fa-brands fa-bluesky"></i>',
+            "title": translate("app.discover.view.bluesky"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.bluesky);
+            }
+        })
+    }
+    if (content.urls.mastodon) {
+        links.push({
+            "icon": '<i class="fa-brands fa-mastodon"></i>',
+            "title": translate("app.discover.view.mastodon"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.mastodon);
+            }
+        })
+    }
+    if (content.urls.instagram) {
+        links.push({
+            "icon": '<i class="fa-brands fa-instagram"></i>',
+            "title": translate("app.discover.view.instagram"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.instagram);
+            }
+        })
+    }
+    if (content.urls.youtube) {
+        links.push({
+            "icon": '<i class="fa-brands fa-youtube"></i>',
+            "title": translate("app.discover.view.youtube"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.youtube);
+            }
+        })
+    }
+    if (content.urls.reddit) {
+        links.push({
+            "icon": '<i class="fa-brands fa-reddit"></i>',
+            "title": translate("app.discover.view.reddit"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.reddit);
+            }
+        })
+    }
+    if (content.urls.facebook) {
+        links.push({
+            "icon": '<i class="fa-brands fa-facebook"></i>',
+            "title": translate("app.discover.view.facebook"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.facebook);
+            }
+        })
+    }
+    if (content.urls.twitch) {
+        links.push({
+            "icon": '<i class="fa-brands fa-twitch"></i>',
+            "title": translate("app.discover.view.twitch"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.twitch);
+            }
+        })
+    }
+    if (content.urls.tiktok) {
+        links.push({
+            "icon": '<i class="fa-brands fa-tiktok"></i>',
+            "title": translate("app.discover.view.tiktok"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.tiktok);
+            }
+        })
+    }
+    if (content.urls.pinterest) {
+        links.push({
+            "icon": '<i class="fa-brands fa-pinterest"></i>',
+            "title": translate("app.discover.view.pinterest"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.pinterest);
+            }
+        })
+    }
+    if (content.urls.github) {
+        links.push({
+            "icon": '<i class="fa-brands fa-github"></i>',
+            "title": translate("app.discover.view.github"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.github);
+            }
+        })
+    }
+    if (content.urls.patreon) {
+        links.push({
+            "icon": '<i class="fa-brands fa-patreon"></i>',
+            "title": translate("app.discover.view.patreon"),
+            "func": (e) => {
+                window.electronAPI.openInBrowser(content.urls.patreon);
             }
         })
     }
