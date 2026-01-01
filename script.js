@@ -4161,6 +4161,7 @@ async function showHomeContent(oldEle) {
     discoverModsWrapper.appendChild(discoverModsContainer);
 
     let updateHomeModpacksList = (e) => {
+        if (!e || !e.length) return;
         discoverModsContainer.innerHTML = '';
         discoverModsWrapper.style.display = "grid";
         e.hits.forEach(e => {
@@ -4195,7 +4196,7 @@ async function showHomeContent(oldEle) {
         home_modpacks = await window.electronAPI.getRandomModpacks();
         updateHomeModpacksList(home_modpacks);
     }
-    if (!home_modpacks.hits) {
+    if (!home_modpacks || !home_modpacks.hits) {
         getRandomModpacks();
     } else {
         updateHomeModpacksList(home_modpacks);
