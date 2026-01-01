@@ -10400,12 +10400,12 @@ async function getContent(element, instance_id, source, query, loader, version, 
         let paginationBottom = new Pagination(page, pages, (new_page) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
         });
+        element.appendChild(paginationTop.element);
         if (!apiresult.hits || !apiresult.hits.length) {
             let noresults = new NoResultsFound();
             element.appendChild(noresults.element);
             return;
         }
-        element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.hits.length; i++) {
             let e = apiresult.hits[i];
             let entry = new ContentSearchEntry(e.title, e.author, e.description, e.downloads, e.icon_url, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (i, button) => {
@@ -10501,12 +10501,12 @@ async function getContent(element, instance_id, source, query, loader, version, 
         let paginationBottom = new Pagination(page, pages, (new_page) => {
             getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
         });
+        element.appendChild(paginationTop.element);
         if (!apiresult.data || !apiresult.data.length) {
             let noresults = new NoResultsFound();
             element.appendChild(noresults.element);
             return;
         }
-        element.appendChild(paginationTop.element);
         for (let i = 0; i < apiresult.data.length; i++) {
             let e = apiresult.data[i];
             let entry;
