@@ -4,7 +4,6 @@ const path = require('path');
 const { JavaSearch } = require('./java_scan.js');
 const { spawn, exec } = require('child_process');
 const nbt = require('prismarine-nbt');
-const { Auth } = require('msmc');
 const AdmZip = require('adm-zip');
 const https = require('https');
 const Database = require('better-sqlite3');
@@ -540,23 +539,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         openFolder(folder);
     },
     triggerMicrosoftLogin: async () => {
-        let date = new Date();
-        date.setHours(date.getHours() + 1);
-        const authManager = new Auth("select_account");
-        const xboxManager = await authManager.launch("raw");
-        const token = await xboxManager.getMinecraft();
-        return {
-            "access_token": token.mcToken,
-            "uuid": token.profile.id,
-            "refresh_token": token.parent.msToken.refresh_token,
-            "capes": token.profile.capes,
-            "skins": token.profile.skins,
-            "name": token.profile.name,
-            "is_demo": token.profile.demo ?? false,
-            "xuid": token.xuid,
-            "client_id": getUUID(),
-            "expires": date
-        }
+        return await ipcRenderer.invoke('trigger-microsoft-login');
     },
     getInstanceLogs: (instance_id) => {
         let patha = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
@@ -1892,33 +1875,8 @@ function folderExists(folderPath) {
     }
 }
 
-function getUUID() {
-    var result = "";
-    for (var i = 0; i <= 4; i++) {
-        result += (Math.floor(Math.random() * 16777216) + 1048576).toString(16);
-        if (i < 4) result += "-";
-    }
-    return result;
-}
-
 async function getNewAccessToken(refresh_token) {
-    let date = new Date();
-    date.setHours(date.getHours() + 1);
-    const authManager = new Auth("select_account");
-    const xboxManager = await authManager.refresh(refresh_token);
-    const token = await xboxManager.getMinecraft();
-    return {
-        "access_token": token.mcToken,
-        "uuid": token.profile.id,
-        "refresh_token": token.parent.msToken.refresh_token,
-        "capes": token.profile.capes,
-        "skins": token.profile.skins,
-        "name": token.profile.name,
-        "is_demo": token.profile.demo,
-        "xuid": token.xuid,
-        "client_id": getUUID(),
-        "expires": date
-    }
+    return ipcRenderer.invoke('get-new-access-token', refresh_token);
 }
 
 async function importWorld(file_path, instance_id, worldName) {

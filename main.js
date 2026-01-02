@@ -18,6 +18,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { version } = require('./package.json');
+const { ref } = require('process');
 
 app.userAgentFallback = `EnderLynx/${version}`;
 
@@ -2222,10 +2223,12 @@ async function addContent(instance_id, project_type, project_url, filename, data
         stop_installing_dependencies = true;
     }
 
-    await urlToFile(project_url, install_path, { onProgress: (p) => {
-        win.webContents.send('content-install-update', content_id, p);
-    }});
-    
+    await urlToFile(project_url, install_path, {
+        onProgress: (p) => {
+            win.webContents.send('content-install-update', content_id, p);
+        }
+    });
+
     win.webContents.send('content-install-update', content_id, 100);
 
     if (project_type === "world") {
@@ -2854,3 +2857,33 @@ async function downloadUpdate(download_url, new_version, checksum) {
         throw err;
     }
 }
+
+ipcMain.handle('trigger-microsoft-login', async () => {
+    let date = new Date();
+    date.setHours(date.getHours() + 1);
+    const authManager = new Auth("select_account");
+    const xboxManager = await authManager.launch("electron", {
+        width: 500,
+        height: 600,
+        resizable: true,
+        icon: path.join(__dirname, 'icon.ico'),
+        suppress: true
+    });
+    const token = await xboxManager.getMinecraft();
+    return {
+        "access_token": token.mcToken,
+        "uuid": token.profile.id,
+        "refresh_token": token.parent.msToken.refresh_token,
+        "capes": token.profile.capes,
+        "skins": token.profile.skins,
+        "name": token.profile.name,
+        "is_demo": token.profile.demo ?? false,
+        "xuid": token.xuid,
+        "client_id": getUUID(),
+        "expires": date
+    }
+});
+
+ipcMain.handle('get-new-access-token', async (refresh_token) => {
+    return await getNewAccessToken(refresh_token);
+});

@@ -3735,7 +3735,7 @@ async function toggleMicrosoftSignIn() {
             accountSwitcher.reloadHeads();
         }
     } catch (e) {
-        if (e == "error.gui.closed") return;
+        if (e.message.includes("error.gui.closed")) return;
         displayError(translate("app.login_error"));
     }
 }
