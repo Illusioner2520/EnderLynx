@@ -4161,7 +4161,7 @@ async function showHomeContent(oldEle) {
     discoverModsWrapper.appendChild(discoverModsContainer);
 
     let updateHomeModpacksList = (e) => {
-        if (!e || !e.length) return;
+        if (!e || !e.hits || !e.hits.length) return;
         discoverModsContainer.innerHTML = '';
         discoverModsWrapper.style.display = "grid";
         e.hits.forEach(e => {
