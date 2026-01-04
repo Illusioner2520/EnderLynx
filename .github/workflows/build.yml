@@ -10,6 +10,7 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
 
@@ -53,7 +54,7 @@ jobs:
             libgtk-3-dev \
             libnss3 \
             libxss1 \
-            libasound2 \
+            libasound2t64 \
             libatk-bridge2.0-0 \
             libdrm2 \
             libgbm1 \
