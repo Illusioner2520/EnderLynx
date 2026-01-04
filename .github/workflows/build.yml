@@ -27,7 +27,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm i
+        
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: npm install electron-installer-debian electron-installer-redhat -D
 
       - name: Install modclean
         run: npm install -g modclean
@@ -63,20 +67,16 @@ jobs:
             libatk-bridge2.0-0 \
             libdrm2 \
             libgbm1 \
-            libxkbcommon0
+            libxkbcommon0 \
+            fakeroot \
+            rpm
 
       - name: Run build script Windows
         if: runner.os == 'Windows'
         run: npm run build:windows
 
-      - name: Run build script Linux
-        if: runner.os == 'Linux'
-        run: |
-          npm install electron-installer-debian electron-installer-redhat -D
-          npm run build:unix
-
-      - name: Run build script Mac
-        if: runner.os == 'macOS'
+      - name: Run build script Unix
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: npm run build:unix
 
       - name: Rename Windows installer with release tag
