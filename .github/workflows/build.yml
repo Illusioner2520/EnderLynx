@@ -28,10 +28,6 @@ jobs:
 
       - name: Install dependencies
         run: npm i
-        
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: npm install electron-installer-debian electron-installer-redhat -D
 
       - name: Install modclean
         run: npm install -g modclean
@@ -69,6 +65,7 @@ jobs:
             libgbm1 \
             libxkbcommon0 \
             fakeroot \
+            dpkg \
             rpm
 
       - name: Run build script Windows

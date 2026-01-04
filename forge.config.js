@@ -69,13 +69,30 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          maintainer: 'Illusioner'
+          name: 'enderlynx',
+          productName: "EnderLynx",
+          genericName: "Minecraft Launcher",
+          maintainer: 'Illusioner',
+          section: 'games',
+          icon: 'icon.png',
+          categories: ['Game'],
+          mimeType: ['application/zip']
         }
       },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          name: 'EnderLynx',
+          productName: "EnderLynx",
+          genericName: "Minecraft Launcher",
+          license: "MIT",
+          icon: "icon.png",
+          categories: ['Game'],
+          mimeType: ['application/zip']
+        }
+      },
     },
     {
       name: '@electron-forge/maker-zip',
@@ -85,7 +102,9 @@ module.exports = {
     // macOS
     ...(isMac ? [{
       name: '@electron-forge/maker-dmg',
-      config: {},
+      config: {
+        name: 'EnderLynx'
+      },
     },
     {
       name: '@electron-forge/maker-zip',
