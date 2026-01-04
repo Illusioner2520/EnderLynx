@@ -3,6 +3,10 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const path = require('path');
 const fs = require('fs');
 
+const isLinux = process.platform === 'linux';
+const isWindows = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+
 module.exports = {
   packagerConfig: {
     asar: {
@@ -55,13 +59,13 @@ module.exports = {
   rebuildConfig: {},
   makers: [
     // Windows
-    {
+    ...(isWindows ? [{
       name: '@electron-forge/maker-zip',
       platforms: ['win32'],
-    },
+    }] : []),
 
     // Linux
-    {
+    ...(isLinux ? [{
       name: '@electron-forge/maker-deb',
       config: {},
     },
@@ -72,17 +76,17 @@ module.exports = {
     {
       name: '@electron-forge/maker-zip',
       platforms: ['linux'],
-    },
+    }] : []),
 
     // macOS
-    {
+    ...(isMac ? [{
       name: '@electron-forge/maker-dmg',
       config: {},
     },
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
-    }
+    }] : [])
   ],
   plugins: [
     {
