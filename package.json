@@ -8,8 +8,8 @@
     "installer": "makensis installer/installer.nsi",
     "updater:windows": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
     "updater:unix": "cd updater && cargo build --release && cd .. && cp updater/target/release/updater updater",
-    "build:windows": "npm run updater:windows && npm run make && npm run installer",
-    "build:unix": "npm run updater:unix && npm run make"
+    "build:windows": "electron-rebuild && npm run updater:windows && npm run make && npm run installer",
+    "build:unix": "electron-rebuild && npm run updater:unix && npm run make"
   },
   "author": "Illusioner",
   "license": "MIT",

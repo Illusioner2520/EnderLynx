@@ -29,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install required Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          npm install electron-installer-debian -D
+          npm install electron-installer-redhat -D
+
       - name: Install modclean
         run: npm install -g modclean
 
