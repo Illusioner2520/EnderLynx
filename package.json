@@ -1,13 +1,13 @@
 {
   "name": "EnderLynx",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
     "make": "electron-forge make",
     "installer": "makensis installer/installer.nsi",
     "updater:windows": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
-    "updater:unix": "cd updater && cargo build --release && cd .. && cp updater\\target\\release\\updater updater",
+    "updater:unix": "cd updater && cargo build --release && cd .. && cp updater/target/release/updater updater",
     "build:windows": "npm run updater:windows && npm run make && npm run installer",
     "build:unix": "npm run updater:unix && npm run make"
   },
