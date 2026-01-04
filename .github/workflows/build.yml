@@ -29,12 +29,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install required Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          npm install electron-installer-debian -D
-          npm install electron-installer-redhat -D
-
       - name: Install modclean
         run: npm install -g modclean
 
@@ -71,14 +65,19 @@ jobs:
             libgbm1 \
             libxkbcommon0
 
-      - name: Run build script
+      - name: Run build script Windows
+        if: runner.os == 'Windows'
+        run: npm run build:windows
+
+      - name: Run build script Linux
+        if: runner.os == 'Linux'
         run: |
-          if [[ "${RUNNER_OS}" == "Windows" ]]; then
-            npm run build:windows
-          else
-            npm run build:unix
-          fi
-        shell: bash
+          npm install electron-installer-debian electron-installer-redhat -D
+          npm run build:unix
+
+      - name: Run build script Mac
+        if: runner.os == 'macOS'
+        run: npm run build:unix
 
       - name: Rename Windows installer with release tag
         if: runner.os == 'Windows'

@@ -67,7 +67,11 @@ module.exports = {
     // Linux
     ...(isLinux ? [{
       name: '@electron-forge/maker-deb',
-      config: {},
+      config: {
+        options: {
+          maintainer: 'Illusioner'
+        }
+      },
     },
     {
       name: '@electron-forge/maker-rpm',
