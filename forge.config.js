@@ -1,11 +1,15 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const path = require('path');
+const fs = require('fs');
 
 module.exports = {
   packagerConfig: {
     asar: {
-      unpack: '**/node_modules/@img/**'
+      unpack: [
+        '**/node_modules/@img/**',
+        '**/node_modules/create-desktop-shortcuts/src/*.vbs'
+      ]
     },
     icon: path.resolve(__dirname, 'icon'),
     ignore: [
@@ -28,11 +32,56 @@ module.exports = {
       /LICENSE$/
     ]
   },
+  hooks: {
+    postPackage: async () => {
+      // Delete non-English locale files
+      const localesDir = path.join(__dirname, 'out', '*', 'locales');
+
+      try {
+        require('glob').sync(localesDir).forEach(dir => {
+          if (fs.existsSync(dir)) {
+            fs.readdirSync(dir).forEach(file => {
+              if (file != "en-US.pak") {
+                fs.unlinkSync(path.join(dir, file));
+              }
+            });
+          }
+        });
+      } catch (error) {
+        console.warn('Could not delete locales:', error.message);
+      }
+    }
+  },
   rebuildConfig: {},
   makers: [
+    // Windows
     {
       name: '@electron-forge/maker-zip',
+      platforms: ['win32'],
+    },
+
+    // Linux
+    {
+      name: '@electron-forge/maker-deb',
       config: {},
+    },
+    {
+      name: '@electron-forge/maker-rpm',
+      config: {},
+    },
+    {
+      name: '@electron-forge/maker-zip',
+      platforms: ['linux'],
+    },
+
+    // macOS
+    {
+      name: '@electron-forge/maker-dmg',
+      config: {},
+    },
+    {
+      name: '@electron-forge/maker-zip',
+      platforms: ['darwin'],
     }
   ],
   plugins: [

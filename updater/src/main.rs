@@ -25,7 +25,7 @@ fn wait_for_process_exit(pid: &str) {
             if status == 0 || code != active { break; }
         }
 
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(unix)]
         {
             if nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid as i32), None).is_err() {
                 break;

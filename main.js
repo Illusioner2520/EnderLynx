@@ -18,7 +18,6 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { version } = require('./package.json');
-const { ref } = require('process');
 
 app.userAgentFallback = `EnderLynx/${version}`;
 

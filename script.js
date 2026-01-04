@@ -3226,7 +3226,7 @@ settingsButtonEle.onclick = () => {
     let java_installations = [{
         "type": "notice",
         "tab": "java",
-        "content": translate("app.settings.java.description")
+        "content": translate("app.settings.java.description." + window.electronAPI.ostype())
     }];
     let java_stuff = window.electronAPI.getJavaInstallations();
     java_stuff.sort((a, b) => b.version - a.version);
@@ -6296,7 +6296,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             "id": "java_path",
             "default": instanceInfo.java_path,
             "tab": "java",
-            "desc": translate("app.instances.settings.java_installation.description").replace("%v", instanceInfo.java_version),
+            "desc": translate("app.instances.settings.java_installation.description." + window.electronAPI.ostype()).replace("%v", instanceInfo.java_version),
             "buttons": [
                 {
                     "name": translate("app.instances.settings.java_installation.detect"),

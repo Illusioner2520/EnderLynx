@@ -3,6 +3,7 @@ const path = require("path");
 const { promisify } = require("util");
 const { execFile } = require("child_process");
 const WinReg = require("winreg");
+const os = require('os');
 
 const execFileAsync = promisify(execFile);
 
@@ -20,13 +21,19 @@ const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\Microsoft\\JDK",
 ];
 
-const COMMON_JAVA_DIRS = [
+const COMMON_JAVA_DIRS_WINDOWS = [
     "C:\\Program Files\\Java",
     "C:\\Program Files (x86)\\Java",
     "C:\\Program Files\\Eclipse Adoptium",
     "C:\\Program Files (x86)\\Eclipse Adoptium",
     path.resolve(userPath,"java")
 ];
+
+const COMMON_JAVA_DIRS_UNIX = [
+    "/usr/local/java",
+    "/usr/lib/jvm",
+    path.resolve(userPath,"java")
+]
 
 async function getJavaVersion(javawPath) {
     try {
@@ -72,8 +79,11 @@ function getJavaFromRegistry(root, arch) {
 async function findJavaInstallations(v) {
     const jrePaths = new Set();
 
+    let platform = os.platform();
+    let platformString = platform == "win32" ? "windows" : (platform == "darwin" ? "macos" : "linux");
+
     // From PATH
-    const pathDirs = (process.env.PATH || "").split(";");
+    const pathDirs = (process.env.PATH || "").split(platformString == "windows" ? ";" : ":");
     for (const dir of pathDirs) {
         if (dir.toLowerCase().includes("java")) {
             jrePaths.add(dir);
@@ -86,20 +96,20 @@ async function findJavaInstallations(v) {
     }
 
     // From known install locations
-    for (const javaDir of COMMON_JAVA_DIRS) {
+    for (const javaDir of platformString == "windows" ? COMMON_JAVA_DIRS_WINDOWS : COMMON_JAVA_DIRS_UNIX) {
         if (fs.existsSync(javaDir)) {
             const subdirs = fs.readdirSync(javaDir, { withFileTypes: true });
             for (const dirent of subdirs) {
                 if (dirent.isDirectory()) {
                     const fullPath = path.join(javaDir, dirent.name, "bin");
-                    if (fs.existsSync(path.join(fullPath, "javaw.exe"))) {
+                    if (fs.existsSync(path.join(fullPath, platformString == "windows" ? "javaw.exe" : "java"))) {
                         jrePaths.add(fullPath);
                     }
                     const subdirs2 = fs.readdirSync(path.join(javaDir, dirent.name), { withFileTypes: true });
                     for (const dirent2 of subdirs2) {
                         if (dirent2.isDirectory()) {
                             const fullPath = path.join(javaDir, dirent.name, dirent2.name, "bin");
-                            if (fs.existsSync(path.join(fullPath, "javaw.exe"))) {
+                            if (fs.existsSync(path.join(fullPath, platformString == "windows" ? "javaw.exe" : "java"))) {
                                 jrePaths.add(fullPath);
                             }
                         }
@@ -109,17 +119,19 @@ async function findJavaInstallations(v) {
         }
     }
 
-    // From registry (both 32-bit and 64-bit views)
-    const [reg32, reg64] = await Promise.all([
-        getJavaFromRegistry(WinReg.HKLM, "x86"),
-        getJavaFromRegistry(WinReg.HKLM, "x64"),
-    ]);
-    for (const p of [...reg32, ...reg64]) jrePaths.add(p);
+    if (platformString == "windows") {
+        // From registry (both 32-bit and 64-bit views)
+        const [reg32, reg64] = await Promise.all([
+            getJavaFromRegistry(WinReg.HKLM, "x86"),
+            getJavaFromRegistry(WinReg.HKLM, "x64"),
+        ]);
+        for (const p of [...reg32, ...reg64]) jrePaths.add(p);
+    }
 
     // Validate all collected paths
     const javaResults = [];
     for (const binPath of jrePaths) {
-        const javaw = path.join(binPath, "javaw.exe");
+        const javaw = path.join(binPath, platformString == "windows" ? "javaw.exe" : "java");
         if (fs.existsSync(javaw)) {
             const version = await getJavaVersion(javaw);
             if (version) {

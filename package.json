@@ -4,10 +4,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
-    "package": "electron-forge package",
+    "make": "electron-forge make",
     "installer": "makensis installer/installer.nsi",
-    "updater": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
-    "build": "npm run updater && npm run package && forfiles /p out\\EnderLynx-win32-x64\\locales /m *.* /c \"cmd /c if /I not @file == \\\"en-US.pak\\\" del @file\" && npm run installer"
+    "updater:windows": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
+    "updater:unix": "cd updater && cargo build --release && cd .. && cp updater\\target\\release\\updater updater",
+    "build:windows": "npm run updater:windows && npm run make && npm run installer",
+    "build:unix": "npm run updater:unix && npm run make"
   },
   "author": "Illusioner",
   "license": "MIT",
@@ -15,6 +17,7 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.8.3",
     "@electron-forge/maker-deb": "^7.8.3",
+    "@electron-forge/maker-dmg": "^7.10.2",
     "@electron-forge/maker-rpm": "^7.8.3",
     "@electron-forge/maker-squirrel": "^7.8.3",
     "@electron-forge/maker-zip": "^7.8.3",
@@ -28,6 +31,7 @@
     "adm-zip": "^0.5.16",
     "axios": "^1.10.0",
     "better-sqlite3": "^12.0.0",
+    "create-desktop-shortcuts": "^1.11.1",
     "discord-rpc": "^4.0.1",
     "electron-window-state": "^5.0.3",
     "form-data": "^4.0.3",
@@ -41,7 +45,6 @@
     "skinview3d": "^3.4.1",
     "string-argv": "^0.3.2",
     "toml": "^3.0.0",
-    "windows-shortcuts": "^0.1.6",
     "winreg": "^1.2.5"
   }
 }

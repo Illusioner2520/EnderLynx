@@ -1,0 +1,89 @@
+name: Build & Attach Release Artifacts
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install modclean
+        run: npm install -g modclean
+
+      - name: Run modclean
+        run: modclean --run
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        run: choco install nsis -y
+
+      - name: Install Linux system deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential \
+            libgtk-3-dev \
+            libnss3 \
+            libxss1 \
+            libasound2 \
+            libatk-bridge2.0-0 \
+            libdrm2 \
+            libgbm1 \
+            libxkbcommon0
+
+      - name: Run build script
+        run: |
+          if [[ "${RUNNER_OS}" == "Windows" ]]; then
+            npm run build:windows
+          else
+            npm run build:unix
+          fi
+        shell: bash
+
+      - name: Rename Windows installer with release tag
+        if: runner.os == 'Windows'
+        run: |
+          $RELEASE_TAG = "${{ github.ref_name }}"
+          $RELEASE_TAG = $RELEASE_TAG.TrimStart('v')
+          Rename-Item -Path "installer/EnderLynxInstaller.exe" -NewName "EnderLynx-win32-x64-$RELEASE_TAG.exe"
+        shell: powershell
+
+      - name: Upload artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/*.exe
+            out/make/**/*.zip
+            out/make/**/*.dmg
+            out/make/**/*.deb
+            out/make/**/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

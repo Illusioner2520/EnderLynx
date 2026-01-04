@@ -12,7 +12,7 @@ const FormData = require('form-data');
 const sharp = require("sharp");
 const crypto = require('crypto');
 const os = require('os');
-const ws = require("windows-shortcuts");
+const createDesktopShortcut = require("create-desktop-shortcuts");
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
 const pngToIcoModule = require('png-to-ico');
@@ -236,6 +236,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     osrelease: () => os.release(),
     osarch: () => os.arch(),
     osversion: () => os.version?.() || `${os.type()} ${os.release()}`,
+    ostype: () => {
+        let type = "unix";
+        if (os.platform() == "win32") type = "windows";
+        return type;
+    },
     electronversion: process.versions.electron,
     nodeversion: process.versions.node,
     chromeversion: process.versions.chrome,
@@ -1321,7 +1326,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             title: "Select Java Executable",
             defaultPath: startDir,
             properties: ['openFile'],
-            filters: [{ name: 'Executables', extensions: ['exe'] }]
+            filters: os.platform() == "win32" ? [{ name: 'Executables', extensions: ['exe'] }] : []
         });
         if (result.canceled || !result.filePaths || !result.filePaths[0]) {
             return null;
@@ -1475,13 +1480,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     createDesktopShortcut: async (instance_id, instance_name, iconSource, worldType, worldId) => {
         const desktopPath = await ipcRenderer.invoke('get-desktop');
         let safeName = instance_name.replace(/[<>:"/\\|?*]/g, '_');
-        let shortcutPath = path.join(desktopPath, `${safeName} - EnderLynx.lnk`);
+        let shortcutExt = "desktop";
+        if (os.platform() == 'win32') shortcutExt = "lnk";
+        let iconExt = "png";
+        if (os.platform() == 'win32') iconExt = "ico";
+        let shortcutPath = path.join(desktopPath, `${safeName} - EnderLynx.${shortcutExt}`);
 
         let base_shortcut = safeName + " - EnderLynx";
         let count_shortcut = 1;
 
+        let name = `${safeName} - EnderLynx`;
+
         while (fs.existsSync(shortcutPath)) {
-            shortcutPath = path.join(desktopPath, `${base_shortcut} (${count_shortcut}).lnk`);
+            shortcutPath = path.join(desktopPath, `${base_shortcut} (${count_shortcut}).${shortcutExt}`);
+            name = `${base_shortcut} (${count_shortcut})`;
             count_shortcut++;
         }
 
@@ -1506,45 +1518,77 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let base_path_name = instance_id;
         let current_count = 1;
 
-        let iconPath = path.resolve(userPath, "icons", instance_id + '.ico');
+        let iconPath = path.resolve(userPath, "icons", instance_id + '.' + iconExt);
 
         while (fs.existsSync(iconPath)) {
-            iconPath = path.resolve(userPath, "icons", base_path_name + "_" + current_count + ".ico");
+            iconPath = path.resolve(userPath, "icons", base_path_name + "_" + current_count + "." + iconExt);
             current_count++;
         }
 
         try {
-            await convertToIco(iconSource, iconPath);
+            if (os.platform() == 'win32') {
+                await convertToIco(iconSource, iconPath);
+            } else {
+                await convertToPng(iconSource, iconPath);
+            }
         } catch (e) {
             console.error(e);
         }
 
         if (!fs.existsSync(iconPath)) {
-            let enderlynxiconpath = path.resolve(userPath, "icons", "enderlynx.ico");
+            let enderlynxiconpath = path.resolve(userPath, "icons", "enderlynx." + iconExt);
             if (!fs.existsSync(enderlynxiconpath)) {
-                fs.copyFileSync(path.resolve(__dirname, "icon.ico"), enderlynxiconpath);
+                fs.copyFileSync(path.resolve(__dirname, "icon." + iconExt), enderlynxiconpath);
             }
             iconPath = enderlynxiconpath;
         }
 
         return new Promise((resolve) => {
-            ws.create(shortcutPath, {
-                target,
-                args,
-                workingDir,
-                runStyle: 1,
-                desc: `Launch Minecraft instance "${instance_name}"`,
-                icon: iconPath
-            }, (err) => {
-                console.log(err);
-                if (err) {
-                    resolve(false);
-                    return false;
-                } else {
-                    resolve(true);
-                    return true;
+            console.log("VBScriptPath: " + path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcut", "src", "windows.vbs"));
+            createDesktopShortcut({
+                windows: {
+                    filePath: target,
+                    outputPath: desktopPath,
+                    name,
+                    comment: `Launch Minecraft instance "${instance_name}"`,
+                    icon: iconPath,
+                    arguments: args,
+                    VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
+                },
+                linux: {
+                    filePath: target,
+                    outputPath: desktopPath,
+                    name,
+                    description: `Launch Minecraft instance "${instance_name}"`,
+                    icon: iconPath,
+                    arguments: args,
+                    type: 'Application'
+                },
+                osx: {
+                    filePath: target,
+                    outputPath: desktopPath,
+                    name
                 }
             });
+            resolve(true);
+
+            // ws.create(shortcutPath, {
+            //     target,
+            //     args,
+            //     workingDir,
+            //     runStyle: 1,
+            //     desc: `Launch Minecraft instance "${instance_name}"`,
+            //     icon: iconPath
+            // }, (err) => {
+            //     console.log(err);
+            //     if (err) {
+            //         resolve(false);
+            //         return false;
+            //     } else {
+            //         resolve(true);
+            //         return true;
+            //     }
+            // });
         });
     },
     shareLogs: async (logs) => {
@@ -1834,6 +1878,35 @@ async function convertToIco(input, outputPath) {
     const icoBuffer = await pngToIco(resized);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true })
     fs.writeFileSync(outputPath, icoBuffer);
+}
+
+async function convertToPng(input, outputPath) {
+    let imageBuffer;
+
+    if (input.startsWith('data:image/')) {
+        const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
+        imageBuffer = Buffer.from(base64Data, 'base64');
+    } else if (input.startsWith('http://') || input.startsWith('https://')) {
+        const response = await axios.get(input, { responseType: 'arraybuffer' });
+        imageBuffer = Buffer.from(response.data);
+    } else if (fs.existsSync(input)) {
+        imageBuffer = fs.readFileSync(input);
+    } else {
+        throw new Error('Invalid input: must be a data URL, image URL, or file path');
+    }
+
+    const pngBuffer = await sharp(imageBuffer, { failOnError: false })
+        .ensureAlpha()
+        .resize(256, 256, {
+            fit: 'contain',
+            kernel: sharp.kernel.nearest,
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .png()
+        .toBuffer();
+
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+    fs.writeFileSync(outputPath, pngBuffer);
 }
 
 async function getWorld(levelDatPath) {
@@ -2126,6 +2199,7 @@ function openFolder(folderPath) {
 
 async function checkForUpdates() {
     try {
+        let nameStart = `EnderLynx-${os.platform()}-${os.arch()}`
         let latest = await fetch("https://api.github.com/repos/Illusioner2520/EnderLynx/releases/latest");
         let latest_json = await latest.json();
         let recent_release_version = latest_json.tag_name.replace("v", "");
@@ -2135,7 +2209,7 @@ async function checkForUpdates() {
             let checksum = "";
             for (let i = 0; i < latest_json.assets.length; i++) {
                 let asset = latest_json.assets[i];
-                if (asset.content_type == "application/x-zip-compressed") {
+                if (asset.name.startsWith(nameStart) && asset.content_type == "application/x-zip-compressed") {
                     download_url = asset.browser_download_url;
                     file_size = asset.size;
                     checksum = asset.digest;

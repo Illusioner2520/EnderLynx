@@ -54,6 +54,18 @@ ipcMain.handle('launch-retry', (_, retryId) => {
 class Minecraft {
     constructor(instance_id) {
         this.instance_id = instance_id;
+        const platform = os.platform();
+        const getPlatformString = () => {
+            if (platform === 'win32') return 'windows';
+            if (platform === 'darwin') return 'osx';
+            return 'linux';
+        };
+        const arch = os.arch();
+        this.arch = arch;
+        this.platform = platform;
+        this.platformString = getPlatformString();
+        this.classPathDelimiter = ";";
+        if (this.platformString == "linux" || this.platformString == "osx") this.classPathDelimiter = ":";
     }
     async installFabric(mcversion, fabricversion, isRepair) {
         let processId = generateNewProcessId();
@@ -78,7 +90,7 @@ class Minecraft {
                 if (!fs.existsSync(lib_path) || isRepair) {
                     await urlToFile(`https://maven.fabricmc.net/${lib_path_rel}`, lib_path, { signal });
                 }
-                this.libs += lib_path + ";";
+                this.libs += lib_path + this.classPathDelimiter;
                 let libName = data.libraries[i].name.split(":");
                 libName.splice(libName.length - 1, 1);
                 this.libNames.push(libName.join(":"));
@@ -115,7 +127,7 @@ class Minecraft {
                 if (!fs.existsSync(lib_path) || isRepair) {
                     await urlToFile(data.libraries[i].url + mavenPathToRelPath(data.libraries[i].name), lib_path, { signal });
                 }
-                this.libs += lib_path + ";";
+                this.libs += lib_path + this.classPathDelimiter;
                 let libName = data.libraries[i].name.split(":");
                 libName.splice(libName.length - 1, 1);
                 this.libNames.push(libName.join(":"));
@@ -175,7 +187,7 @@ class Minecraft {
             this.modded_args_game = version_json?.arguments?.game ? version_json.arguments.game : [];
             this.modded_args_jvm = version_json?.arguments?.jvm ? version_json.arguments.jvm.map(e => {
                 e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
-                e = e.replaceAll("${classpath_separator}", ";");
+                e = e.replaceAll("${classpath_separator}", this.classPathDelimiter);
                 e = e.replaceAll("${version_name}", `${mcversion}-forge-${forgeversion}`);
                 return e;
             }) : [];
@@ -203,14 +215,6 @@ class Minecraft {
             const upperBound = "14.23.5.2851";
 
             if (compareVersions(forgeversion, lowerBound) >= 0 && compareVersions(forgeversion, upperBound) <= 0) {
-                const platform = os.platform();
-                const getPlatformString = () => {
-                    if (platform === 'win32') return 'windows';
-                    if (platform === 'darwin') return 'osx';
-                    return 'linux';
-                };
-                const arch = os.arch();
-                let platformString = getPlatformString();
                 let forge_library_path = install_profile_json.install.filePath;
                 let name_items = install_profile_json.install.path.split(":");
                 let package_ = name_items[0];
@@ -224,7 +228,7 @@ class Minecraft {
                     zip.extractEntryTo(forge_library_path, installation_path, true, true);
                 }
 
-                this.libs += installation_path_w_file + ";";
+                this.libs += installation_path_w_file + this.classPathDelimiter;
 
                 for (let i = 0; i < install_profile_json.versionInfo.libraries.length; i++) {
                     signal.throwIfAborted();
@@ -237,19 +241,19 @@ class Minecraft {
                             if (entry.rules) {
                                 for (let r = 0; r < entry.rules.length; r++) {
                                     let rule = entry.rules[r];
-                                    if (rule.action === "allow" && rule?.os?.name && rule.os.name !== platformString) {
+                                    if (rule.action === "allow" && rule?.os?.name && rule.os.name !== this.platformString) {
                                         skip = true;
                                         break;
                                     }
-                                    if (rule.action === "disallow" && rule?.os?.name && rule.os.name === platformString) {
+                                    if (rule.action === "disallow" && rule?.os?.name && rule.os.name === this.platformString) {
                                         skip = true;
                                         break;
                                     }
-                                    if (rule.action === "allow" && rule?.os?.arch && rule.os.arch !== arch) {
+                                    if (rule.action === "allow" && rule?.os?.arch && rule.os.arch !== this.arch) {
                                         skip = true;
                                         break;
                                     }
-                                    if (rule.action === "disallow" && rule?.os?.arch && rule.os.arch === arch) {
+                                    if (rule.action === "disallow" && rule?.os?.arch && rule.os.arch === this.arch) {
                                         skip = true;
                                         break;
                                     }
@@ -260,8 +264,8 @@ class Minecraft {
                             }
 
                             // determine classifier for current platform and arch
-                            let simpleArch = (arch === "arm" || arch === "ia32" || arch === "mips" || arch === "ppc") ? "32" : "64";
-                            let nativeClassifier = entry.natives[platformString];
+                            let simpleArch = (this.arch === "arm" || this.arch === "ia32" || this.arch === "mips" || this.arch === "ppc") ? "32" : "64";
+                            let nativeClassifier = entry.natives[this.platformString];
                             if (!nativeClassifier) {
                                 continue;
                             }
@@ -280,7 +284,7 @@ class Minecraft {
                                 }
                             }
 
-                            this.libs += lib_path + ";";
+                            this.libs += lib_path + this.classPathDelimiter;
                             let libName = entry.name.split(":");
                             libName.splice(libName.length - 1, 1);
                             this.libNames.push(libName.join(":"));
@@ -329,7 +333,7 @@ class Minecraft {
                         if (!fs.existsSync(lib_path) || isRepair) {
                             await urlToFile(`${entry.url}${lib_path_rel}`, lib_path, { signal });
                         }
-                        this.libs += lib_path + ";";
+                        this.libs += lib_path + this.classPathDelimiter;
                         let libName = entry.name.split(":");
                         libName.splice(libName.length - 1, 1);
                         this.libNames.push(libName.join(":"));
@@ -339,7 +343,7 @@ class Minecraft {
                         if (!fs.existsSync(lib_path) || isRepair) {
                             await urlToFile(`https://maven.creeperhost.net/${lib_path_rel}`, lib_path, { signal });
                         }
-                        this.libs += lib_path + ";";
+                        this.libs += lib_path + this.classPathDelimiter;
                         let libName = entry.name.split(":");
                         libName.splice(libName.length - 1, 1);
                         this.libNames.push(libName.join(":"));
@@ -374,7 +378,7 @@ class Minecraft {
                         libName.splice(libName.length - 1, 1);
                         libName = libName.join(":");
                         if (!this.libNames?.includes(libName) && e.include_in_classpath) {
-                            paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
+                            paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + this.classPathDelimiter;
                         }
                         this.libNames.push(libName);
                     }
@@ -435,7 +439,7 @@ class Minecraft {
                         let cp_w_libs = "";
                         cp.forEach(c => {
                             let lib_path = mavenPathToFilePath(c);
-                            cp_w_libs += lib_path + ";";
+                            cp_w_libs += lib_path + this.classPathDelimiter;
                         });
                         let main_class = getMainClass(mavenPathToFilePath(processor.jar));
                         let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
@@ -475,7 +479,7 @@ class Minecraft {
                 let libs = version_json.libraries;
                 let lib_paths = libs.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
                 this.libs = [...(new Set(this.libs))];
-                this.libs = lib_paths.join(";") + ";";
+                this.libs = lib_paths.join(this.classPathDelimiter) + this.classPathDelimiter;
                 this.libNames = libs.map(e => {
                     let libName = e.name.split(":");
                     libName.splice(libName.length - 1, 1);
@@ -544,7 +548,7 @@ class Minecraft {
             this.modded_args_game = version_json?.arguments?.game ? version_json.arguments.game : [];
             this.modded_args_jvm = version_json?.arguments?.jvm ? version_json.arguments.jvm.map(e => {
                 e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
-                e = e.replaceAll("${classpath_separator}", ";");
+                e = e.replaceAll("${classpath_separator}", this.classPathDelimiter);
                 e = e.replaceAll("${version_name}", `${mcversion}-neoforge-${neoforgeversion}`);
                 return e;
             }) : [];
@@ -580,7 +584,7 @@ class Minecraft {
                     libName.splice(libName.length - 1, 1);
                     libName = libName.join(":");
                     if (!this.libNames?.includes(libName) && e.include_in_classpath) {
-                        paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
+                        paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + this.classPathDelimiter;
                     }
                     this.libNames.push(libName);
                 }
@@ -640,7 +644,7 @@ class Minecraft {
                     let cp_w_libs = "";
                     cp.forEach(c => {
                         let lib_path = mavenPathToFilePath(c);
-                        cp_w_libs += lib_path + ";";
+                        cp_w_libs += lib_path + this.classPathDelimiter;
                     });
                     let main_class = getMainClass(mavenPathToFilePath(processor.jar));
                     let args = ["-cp", cp_w_libs, main_class].concat(processor.args.map(e => {
@@ -679,7 +683,7 @@ class Minecraft {
             let libs = version_json.libraries;
             let lib_paths = libs.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
             this.libs = [...(new Set(this.libs))];
-            this.libs = lib_paths.join(";") + ";";
+            this.libs = lib_paths.join(this.classPathDelimiter) + this.classPathDelimiter;
             this.libNames = libs.map(e => {
                 let libName = e.name.split(":");
                 libName.splice(libName.length - 1, 1);
@@ -699,14 +703,6 @@ class Minecraft {
         javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-Dlog4j.configurationFile=" + pathToFileURL(path.resolve(userPath, "log_config.xml")).href].concat(javaArgs);
         this.libs = "";
         this.libNames = [];
-        const platform = os.platform();
-        const getPlatformString = () => {
-            if (platform === 'win32') return 'windows';
-            if (platform === 'darwin') return 'osx';
-            return 'linux';
-        };
-        const arch = os.arch();
-        let platformString = getPlatformString();
         if (loader == "fabric") {
             if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/fabric/${version}/${loaderVersion}/fabric-${version}-${loaderVersion}.json`))) {
                 await this.installFabric(version, loaderVersion);
@@ -717,7 +713,7 @@ class Minecraft {
                 this.modded_args_game = fabric_json.arguments.game;
                 this.modded_args_jvm = fabric_json.arguments.jvm;
                 for (let i = 0; i < fabric_json.libraries.length; i++) {
-                    this.libs += mavenPathToFilePath(fabric_json.libraries[i].name) + ";";
+                    this.libs += mavenPathToFilePath(fabric_json.libraries[i].name) + this.classPathDelimiter;
                     let libName = fabric_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
@@ -733,7 +729,7 @@ class Minecraft {
                 if (quilt_json.arguments?.game) this.modded_args_game = quilt_json.arguments.game;
                 if (quilt_json.arguments?.jvm) this.modded_args_jvm = quilt_json.arguments.jvm;
                 for (let i = 0; i < quilt_json.libraries.length; i++) {
-                    this.libs += mavenPathToFilePath(quilt_json.libraries[i].name) + ";";
+                    this.libs += mavenPathToFilePath(quilt_json.libraries[i].name) + this.classPathDelimiter;
                     let libName = quilt_json.libraries[i].name.split(":");
                     libName.splice(libName.length - 1, 1);
                     this.libNames.push(libName.join(":"));
@@ -770,19 +766,19 @@ class Minecraft {
                     installation_path = path.resolve(userPath, "minecraft/meta/libraries", installation_path);
                     let installation_path_w_file = path.resolve(installation_path, forge_library_path);
 
-                    this.libs += installation_path_w_file + ";";
+                    this.libs += installation_path_w_file + this.classPathDelimiter;
 
                     for (let i = 0; i < install_profile_json.versionInfo.libraries.length; i++) {
                         let entry = install_profile_json.versionInfo.libraries[i];
                         if (entry.name == install_profile_json.install.path) {
                             // hi
                         } else if (entry.url && !entry.url.includes("https://libraries.minecraft.net/")) {
-                            this.libs += mavenPathToFilePath(entry.name) + ";";
+                            this.libs += mavenPathToFilePath(entry.name) + this.classPathDelimiter;
                             let libName = entry.name.split(":");
                             libName.splice(libName.length - 1, 1);
                             this.libNames.push(libName.join(":"));
                         } else if (!entry.url) {
-                            this.libs += mavenPathToFilePath(entry.name) + ";";
+                            this.libs += mavenPathToFilePath(entry.name) + this.classPathDelimiter;
                             let libName = entry.name.split(":");
                             libName.splice(libName.length - 1, 1);
                             this.libNames.push(libName.join(":"));
@@ -799,7 +795,7 @@ class Minecraft {
                     let libraries = forge_version_info.libraries;
                     let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
                     this.libs = [...(new Set(this.libs))];
-                    this.libs = lib_paths.join(";") + ";";
+                    this.libs = lib_paths.join(this.classPathDelimiter) + this.classPathDelimiter;
                     this.libNames = libraries.map(e => {
                         let libName = e.name.split(":");
                         libName.splice(libName.length - 1, 1);
@@ -810,7 +806,7 @@ class Minecraft {
                     this.modded_args_game = forge_version_info?.arguments?.game ? forge_version_info.arguments.game : [];
                     this.modded_args_jvm = forge_version_info?.arguments?.jvm ? forge_version_info.arguments.jvm.map(e => {
                         e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
-                        e = e.replaceAll("${classpath_separator}", ";");
+                        e = e.replaceAll("${classpath_separator}", this.classPathDelimiter);
                         e = e.replaceAll("${version_name}", `${version}-forge-${loaderVersion}`);
                         return e;
                     }) : [];
@@ -829,7 +825,7 @@ class Minecraft {
                 let libraries = neo_forge_version_info.libraries;
                 let lib_paths = libraries.map(e => path.resolve(userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
                 this.libs = [...(new Set(this.libs))];
-                this.libs = lib_paths.join(";") + ";";
+                this.libs = lib_paths.join(this.classPathDelimiter) + this.classPathDelimiter;
                 this.libNames = libraries.map(e => {
                     let libName = e.name.split(":");
                     libName.splice(libName.length - 1, 1);
@@ -840,7 +836,7 @@ class Minecraft {
                 this.modded_args_game = neo_forge_version_info?.arguments?.game ? neo_forge_version_info.arguments.game : [];
                 this.modded_args_jvm = neo_forge_version_info?.arguments?.jvm ? neo_forge_version_info.arguments.jvm.map(e => {
                     e = e.replaceAll("${library_directory}", path.resolve(userPath, `minecraft/meta/libraries`));
-                    e = e.replaceAll("${classpath_separator}", ";");
+                    e = e.replaceAll("${classpath_separator}", this.classPathDelimiter);
                     e = e.replaceAll("${version_name}", `${version}-neoforge-${loaderVersion}`);
                     return e;
                 }) : [];
@@ -857,10 +853,10 @@ class Minecraft {
             if (version_json.libraries[i].rules) {
                 rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
                     let rule = version_json.libraries[i].rules[j];
-                    if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
+                    if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != this.platformString) {
                         continue libs;
                     }
-                    if (rule.action == "disallow" && rule?.os?.name == platformString) {
+                    if (rule.action == "disallow" && rule?.os?.name == this.platformString) {
                         continue libs;
                     }
                 }
@@ -871,10 +867,10 @@ class Minecraft {
             libName = libName.join(":");
             if (!this.libNames?.includes(libName)) {
                 if (e.downloads.artifact) {
-                    paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + ";";
+                    paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`) + this.classPathDelimiter;
                 }
-                if (e.downloads.natives && e.downloads.natives[platformString]) {
-                    paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.classifiers[e.downloads.natives[platformString]].path}`) + ";";
+                if (e.downloads.natives && e.downloads.natives[this.platformString]) {
+                    paths += path.resolve(userPath, `minecraft/meta/libraries/${e.downloads.classifiers[e.downloads.natives[this.platformString]].path}`) + this.classPathDelimiter;
                 }
             }
         };
@@ -976,16 +972,16 @@ class Minecraft {
                 if (e.value && e.rules) {
                     rules: for (let j = 0; j < e.rules.length; j++) {
                         let rule = e.rules[j];
-                        if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
+                        if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != this.platformString) {
                             continue args;
                         }
-                        if (rule.action == "allow" && rule?.os?.arch && rule?.os?.arch != arch) {
+                        if (rule.action == "allow" && rule?.os?.arch && rule?.os?.arch != this.arch) {
                             continue args;
                         }
-                        if (rule.action == "disallow" && rule?.os?.name == platformString) {
+                        if (rule.action == "disallow" && rule?.os?.name == this.platformString) {
                             continue args;
                         }
-                        if (rule.action == "disallow" && rule?.os?.arch == arch) {
+                        if (rule.action == "disallow" && rule?.os?.arch == this.arch) {
                             continue args;
                         }
                     }
@@ -1024,12 +1020,12 @@ class Minecraft {
             if (this.legacy_modded_arguments) {
                 this.args = this.legacy_modded_arguments.split(" ");
             }
-            if (platformString == "windows") {
+            if (this.platformString == "windows") {
                 args.push("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump");
-            } else if (platformString == "osx") {
+            } else if (this.platformString == "osx") {
                 args.push("-XstartOnFirstThread");
             }
-            if (arch == "x86") {
+            if (this.arch == "x86") {
                 args.push("-Xss1M");
             }
             args.push("-Dlog4j2.formatMsgNoLookups=true");
@@ -1206,13 +1202,6 @@ class Minecraft {
                 this.java_version = version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8;
             }
             if (!isRepair || whatToRepair?.includes("minecraft")) {
-                const platform = os.platform();
-                const getPlatformString = () => {
-                    if (platform === 'win32') return 'windows';
-                    if (platform === 'darwin') return 'osx';
-                    return 'linux';
-                };
-                const arch = os.arch();
                 if (version_json?.arguments?.game) {
                     this.args = version_json.arguments;
                 } else if (version_json?.minecraftArguments) {
@@ -1221,8 +1210,7 @@ class Minecraft {
                 if (loader == "vanilla") this.main_class = version_json.mainClass;
                 this.version_type = version_json.type;
                 this.assets_index = version_json.assets;
-                let platformString = getPlatformString();
-                let simpleArch = (arch == "arm" || arch == "ia32" || arch == "mips" || arch == "ppc") ? "32" : "64";
+                let simpleArch = (this.arch == "arm" || this.arch == "ia32" || this.arch == "mips" || this.arch == "ppc") ? "32" : "64";
                 signal.throwIfAborted();
                 win.webContents.send('progress-update', "Downloading Minecraft", 60, "Starting library download...", processId, "good", cancelId, true);
                 libs: for (let i = 0; i < version_json.libraries.length; i++) {
@@ -1231,10 +1219,10 @@ class Minecraft {
                     if (version_json.libraries[i].rules) {
                         rules: for (let j = 0; j < version_json.libraries[i].rules.length; j++) {
                             let rule = version_json.libraries[i].rules[j];
-                            if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != platformString) {
+                            if (rule.action == "allow" && rule?.os?.name && rule?.os?.name != this.platformString) {
                                 continue libs;
                             }
-                            if (rule.action == "disallow" && rule?.os?.name == platformString) {
+                            if (rule.action == "disallow" && rule?.os?.name == this.platformString) {
                                 continue libs;
                             }
                         }
@@ -1248,23 +1236,23 @@ class Minecraft {
                         libName.splice(libName.length - 1, 1);
                         libName = libName.join(":");
                         if (!this.libNames?.includes(libName)) {
-                            paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`) + ";";
+                            paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.artifact.path}`) + this.classPathDelimiter;
                         }
                         this.libNames.push(libName);
                     }
                     signal.throwIfAborted();
-                    if (version_json.libraries[i].natives && version_json.libraries[i].natives[platformString]) {
-                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`)) || isRepair) {
-                            await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`), { signal });
+                    if (version_json.libraries[i].natives && version_json.libraries[i].natives[this.platformString]) {
+                        if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[this.platformString].replace("${arch}", simpleArch)].path}`)) || isRepair) {
+                            await urlToFile(version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[this.platformString].replace("${arch}", simpleArch)].url, path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[this.platformString].replace("${arch}", simpleArch)].path}`), { signal });
                         }
                         let libName = version_json.libraries[i].name.split(":");
                         libName.splice(libName.length - 1, 1);
                         libName = libName.join(":");
                         if (!this.libNames?.includes(libName)) {
-                            paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`) + ";";
+                            paths += path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[this.platformString].replace("${arch}", simpleArch)].path}`) + this.classPathDelimiter;
                         }
                         this.libNames.push(libName);
-                        await extractJar(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[platformString].replace("${arch}", simpleArch)].path}`), path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
+                        await extractJar(path.resolve(userPath, `minecraft/meta/libraries/${version_json.libraries[i].downloads.classifiers[version_json.libraries[i].natives[this.platformString].replace("${arch}", simpleArch)].path}`), path.resolve(userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
                     }
                 }
                 this.libs += paths;
@@ -1330,7 +1318,8 @@ class Java {
                 if (platform === 'darwin') return 'macos';
                 return 'linux';
             };
-            const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${getPlatformString()}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
+            let platformString = getPlatformString();
+            const versionApi = `https://api.azul.com/metadata/v1/zulu/packages/?java_version=${version}&os=${platformString}&arch=${arch}&archive_type=zip&java_package_type=jre&javafx_bundled=false&latest=true`;
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 5, "Fetching java version info...", processId, "good", cancelId, true);
             const res = await fetch(versionApi);
@@ -1376,6 +1365,24 @@ class Java {
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 98, "Remembering version...", processId, "good", cancelId, true);
             this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/javaw.exe`);
+            if (platformString == "linux") {
+                this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/java`);
+                let command = `chmod u+x "${this.versions["java-" + version]}"`;
+                await new Promise((resolve) => {
+                    exec(command, (error, stdout, stderr) => {
+                        resolve();
+                    })
+                });
+            }
+            if (platformString == "macos") {
+                this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/zulu-${version}.jre/Contents/Home/bin/java`);
+                let command = `chmod u+x "${this.versions["java-" + version]}"`;
+                await new Promise((resolve) => {
+                    exec(command, (error, stdout, stderr) => {
+                        resolve();
+                    })
+                });
+            }
             fs.writeFileSync(path.resolve(userPath, "java/versions.json"), JSON.stringify(this.versions), 'utf-8');
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 100, "Done", processId, "done", cancelId, true);
