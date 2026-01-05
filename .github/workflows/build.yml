@@ -121,18 +121,18 @@ jobs:
       - name: Rename Linux artifacts
         if: runner.os == 'Linux'
         run: |
-          RELEASE_TAG="${GITHUB_REF_NAME#v}"
-          find ./out/make -type f -name '*.zip' -exec mv {} "EnderLynx-linux-x64-${RELEASE_TAG}.zip"
-          find ./out/make -type f -name '*.deb' -exec mv {} "EnderLynx-linux-x64-${RELEASE_TAG}.deb"
-          find ./out/make -type f -name '*.rpm' -exec mv {} "EnderLynx-linux-x64-${RELEASE_TAG}.rpm"
+          RELEASE_TAG="${GITHUB_REF_NAME#v}";
+          find ./out/make -type f -name '*.zip' -exec mv {} "EnderLynx-linux-x64-${RELEASE_TAG}.zip" \;
+          find ./out/make -type f -name '*.deb' -exec mv {} "EnderLynx-linux-x64-${RELEASE_TAG}.deb" \;
+          find ./out/make -type f -name '*.rpm' -exec mv {} "EnderLynx-linux-x64-${RELEASE_TAG}.rpm" \;
         shell: bash
 
       - name: Rename Mac artifacts
         if: runner.os == 'macOS'
         run: |
-          RELEASE_TAG="${GITHUB_REF_NAME#v}"
-          find ./out/make -type f -name '*.zip' -exec mv {} "EnderLynx-macos-universal-${RELEASE_TAG}.zip"
-          find ./out/make -type f -name '*.dmg' -exec mv {} "EnderLynx-macos-universal-${RELEASE_TAG}.dmg"
+          RELEASE_TAG="${GITHUB_REF_NAME#v}";
+          find ./out/make -type f -name '*.zip' -exec mv {} "EnderLynx-macos-universal-${RELEASE_TAG}.zip" \;
+          find ./out/make -type f -name '*.dmg' -exec mv {} "EnderLynx-macos-universal-${RELEASE_TAG}.dmg" \;
         shell: bash
 
       - name: Upload artifacts to GitHub Release
