@@ -2199,7 +2199,10 @@ function openFolder(folderPath) {
 
 async function checkForUpdates() {
     try {
-        let nameStart = `EnderLynx-${os.platform()}-${os.arch()}`
+        let platformString = "linux-x64";
+        if (os.platform() == 'darwin') platformString = "macos-universal";
+        if (os.platform() == 'win32') platformString = "windows-x64";
+        let nameStart = `EnderLynx-${platformString}`
         let latest = await fetch("https://api.github.com/repos/Illusioner2520/EnderLynx/releases/latest");
         let latest_json = await latest.json();
         let recent_release_version = latest_json.tag_name.replace("v", "");
