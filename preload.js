@@ -1516,7 +1516,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
             if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
         }
 
-        if (!iconSource) iconSource = "resources/icons/icon.ico";
+        if (!iconSource) {
+            iconSource = "resources/icons/icon." + iconExt;
+        }
 
         let base_path_name = instance_id;
         let current_count = 1;
