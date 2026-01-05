@@ -2212,7 +2212,7 @@ async function checkForUpdates() {
             let checksum = "";
             for (let i = 0; i < latest_json.assets.length; i++) {
                 let asset = latest_json.assets[i];
-                if (asset.name.startsWith(nameStart) && asset.content_type == "application/x-zip-compressed") {
+                if (asset.name.startsWith(nameStart) && (asset.content_type == "application/zip" || asset.content_type == "application/x-zip-compressed")) {
                     download_url = asset.browser_download_url;
                     file_size = asset.size;
                     checksum = asset.digest;
