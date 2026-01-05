@@ -18,6 +18,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { version } = require('./package.json');
+const os = require('os');
 
 app.userAgentFallback = `EnderLynx/${version}`;
 
@@ -75,9 +76,13 @@ const createWindow = () => {
         defaultWidth: 1000,
         defaultHeight: 600,
     });
+    let iconExt = "png";
+    if (os.platform() == 'win32') iconExt = "ico";
+    if (os.platform() == 'darwin') iconExt = "icns";
     win = new BrowserWindow({
         x: state.x,
         y: state.y,
+        title: "EnderLynx",
         width: state.width,
         height: state.height,
         minWidth: 1000,
@@ -91,7 +96,7 @@ const createWindow = () => {
             additionalArguments: additionalArguments
         },
         backgroundColor: "#0a0a0a",
-        icon: path.join(__dirname, 'icon.ico')
+        icon: path.join(__dirname, 'resources/icons/icon.' + iconExt)
     });
     win.loadFile('index.html');
 
@@ -2789,7 +2794,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', `Downloading Update`, 0, "Beginning download...", processId, "good", cancelId);
-        const tempDir = path.resolve(user_path, "temp", new_version);
+        let tempDir = path.resolve(user_path, "temp", new_version);
         fs.mkdirSync(tempDir, { recursive: true });
 
         const zipPath = path.join(tempDir, "update.zip");
@@ -2841,8 +2846,12 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         win.webContents.send('progress-update', `Downloading Update`, 100, "Done!", processId, "done", cancelId);
 
-        const updaterPath = path.join(user_path, "updater", "updater.exe");
-        const sourceDir = path.resolve(tempDir);
+        let updaterPath = path.join(user_path, "updater", "updater.exe");
+        if (os.platform() != 'win32') updaterPath = path.join(user_path, "updater", "updater");
+        let sourceDir = path.resolve(tempDir);
+        if (os.platform() != 'win32' && os.platform() != 'darwin') {
+            sourceDir = path.join(sourceDir, fs.readdirSync(sourceDir)[0]);
+        }
         const targetDir = process.execPath.replace(/\\[^\\]+$/, "");
         const exeToLaunch = process.execPath;
         const oldPid = process.pid.toString();

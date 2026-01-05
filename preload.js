@@ -114,12 +114,15 @@ if (!fs.existsSync(path.resolve(userPath, "log_config.xml"))) {
         fs.writeFileSync(path.resolve(userPath, "log_config.xml"), "");
     }
 }
-const srcConfigPath = path.resolve(__dirname, "updater.exe");
+let srcConfigPath = path.resolve(__dirname, "updater.exe");
+if (os.platform() != 'win32') srcConfigPath = path.resolve(__dirname, "updater");
 fs.mkdirSync(path.resolve(userPath, "updater"), { recursive: true })
 let updaterData;
 try {
     updaterData = fs.readFileSync(srcConfigPath);
-    fs.writeFileSync(path.resolve(userPath, "updater", "updater.exe"), updaterData);
+    let updaterName = "updater.exe";
+    if (os.platform() != 'win32') updaterName = "updater";
+    fs.writeFileSync(path.resolve(userPath, "updater", updaterName), updaterData);
 } catch (e) {
 
 }

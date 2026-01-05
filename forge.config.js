@@ -18,7 +18,7 @@ module.exports = {
         '**/node_modules/create-desktop-shortcuts/src/*.vbs'
       ]
     },
-    icon: path.resolve(__dirname, 'icon'),
+    icon: path.resolve(__dirname, 'resources/icons/icon'),
     ignore: [
       /^\/java($|\/)/,
       /^\/minecraft($|\/)/,
@@ -77,7 +77,7 @@ module.exports = {
           genericName: "Minecraft Launcher",
           maintainer: 'Illusioner',
           section: 'games',
-          icon: 'icon.png',
+          icon: './resources/icons/icon.png',
           categories: ['Game'],
           mimeType: ['application/zip']
         }
@@ -91,7 +91,7 @@ module.exports = {
           productName: "EnderLynx",
           genericName: "Minecraft Launcher",
           license: "MIT",
-          icon: "icon.png",
+          icon: "./resources/icons/icon.png",
           categories: ['Game'],
           mimeType: ['application/zip']
         }
@@ -107,7 +107,8 @@ module.exports = {
       name: '@electron-forge/maker-dmg',
       config: {
         name: 'EnderLynx',
-        format: 'ULFO'
+        format: 'ULFO',
+        icon: "./resources/icons/icon.icns"
       },
     },
     {
