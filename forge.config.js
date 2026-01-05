@@ -9,6 +9,9 @@ const isMac = process.platform === 'darwin';
 
 module.exports = {
   packagerConfig: {
+    osxUniversal: {
+      x64ArchFiles: '**/*'
+    },
     asar: {
       unpack: [
         '**/node_modules/@img/**',
@@ -103,7 +106,8 @@ module.exports = {
     ...(isMac ? [{
       name: '@electron-forge/maker-dmg',
       config: {
-        name: 'EnderLynx'
+        name: 'EnderLynx',
+        format: 'ULFO'
       },
     },
     {
