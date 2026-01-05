@@ -4,7 +4,7 @@ EnderLynx is a Minecraft launcher that is currently a work in progress. We are c
 
 ## Requirements
 
-Currently, EnderLynx only supports Windows 64-bit. Unfortunately, you will not be able to run the program if this is not your system. As for space required on the disk, the app itself requires less than 512 MB, however any installed instances (especially large modpacks) can significantly increase the amount of space required.
+Currently, EnderLynx only supports Windows 64-bit. We are currently in the process of expanding to Linux and MacOS. As for space required on the disk, the app itself requires less than 512 MB, however any installed instances (especially large modpacks) can significantly increase the amount of space required.
 
 ## Features
 
@@ -20,13 +20,14 @@ Currently, EnderLynx only supports Windows 64-bit. Unfortunately, you will not b
  - 🧑 Change your skin and cape in the launcher
    - 🧑‍🦰 Includes all default skins and skins from official skin packs
    - ↩️ Import skins from a file, username or URL
+   - ⭐ Favorite skins to come back to them later
  - 🔗 Share instances through a new .elpack file format
  - 📁 Add instances from a CurseForge .zip, Modrinth .mrpack or a CurseForge profile code
  - 🔔 Includes the most recent Minecraft news on the home page
  - ❓ Includes a random assortment of modpacks to discover on the home page
  - 🎁 Manage mods, resource packs and shaders, including the ability to disable.
-   - 📈 Update content, including when an instance's version is edited
- - 🍫 Jump directly in to a world if the version supports it
+   - 📈 Update content, including when an instance's game version is edited
+ - 🍫 Jump directly into a world if the version supports it
  - ⌚ View your most recently played worlds and instances to jump back in
  - 📌 Pin your instances or worlds to the home screen
  - ✂️ Add a desktop shortcut for instances or worlds to jump back in without opening the launcher
@@ -34,27 +35,26 @@ Currently, EnderLynx only supports Windows 64-bit. Unfortunately, you will not b
    - 🌏 Add worlds and servers from CurseForge
    - 🗺️ Import worlds from other launchers
    - 📦 Add data packs from Modrinth and CurseForge to any singleplayer world
- - 🪵 View the logs for an instance in real time
+ - 🪵 View the logs for an instance in real time (and past logs)
  - 🤔 Set default options that are applied to any newly created instance
  - 🖼️ View the screenshots for any instance
- - 🔧 Repair instances
+ - 🔧 Easily Repair instances (and select which parts to repair)
  - 📚 Organize your instance list with custom groups
  - ⏲️ Keeps track of your play time per instance
  - 🔵 Multiple accent colors to choose from
  - 🍵 Automatic downloads of Java
-   - ☕ Change the Java Installation the Launcher uses
+   - ☕ Change the Java Installation the launcher uses
    - 🐏 Change the amount of RAM each instance can use
- - ⬆️ Update from inside of the App
- - 📂 Change where the app stores all of its information
+ - ⬆️ Update from inside of the App (We use manual updates to give you more control)
  - ✅ Many other helpful features and more to come!
 
 ## Technologies
 
-EnderLynx is built using [Electron](https://www.electronjs.org/) and packaged by [Electron Forge](https://www.electronforge.io/). It uses [NSIS](https://nsis.sourceforge.io/Main_Page) for its installer.
+EnderLynx is built using [Electron](https://www.electronjs.org/) and packaged by [Electron Forge](https://www.electronforge.io/). It uses [NSIS](https://nsis.sourceforge.io/Main_Page) for its installer on Windows. The updater uses [Rust](https://rust-lang.org/) to achieve its small file size.
 
 ## License
 
-Copyright (c) 2025 EnderLynx
+Copyright (c) 2025-2026 EnderLynx
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -65,3 +65,20 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Contributions
 
 If you would like, you can create a pull request and submit code to be contributed. I apologize for my unorganized code.
+Running the developer version without building can be done by running `npm run start`
+
+## Building
+
+Output files will be in the `out/make` folder.
+The Windows installer will be at `installer/EnderLynxInstaller.exe`
+
+### Windows
+
+Make sure that you have Node, Rust and NSIS installed such that it can run `npm`, `cargo` and `makensis`
+Run: `npm run build:windows`
+
+### Unix
+
+Make sure that you have Node and Rust installed such that it can run `npm` and `cargo`
+Note for Linux: make sure you have `fakeroot` and `dpkg` installed to make the `.deb` and `rpm` installed to make the `.rpm`
+Run: `npm run build:unix`
