@@ -9070,7 +9070,7 @@ class MultipleFileSelect {
     buildTree(paths) {
         const root = {};
         for (const path of paths) {
-            const parts = path.split("//");
+            const parts = path.split(/\/\/|\/|\\/);
             let node = root;
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
