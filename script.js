@@ -3190,12 +3190,12 @@ settingsButtonEle.onclick = () => {
             }
         ], [
             {
-                "type": "confirm",
-                "content": translate("app.settings.def_opts.import.confirm")
-            },
-            {
                 "type": "cancel",
                 "content": translate("app.settings.def_opts.import.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.settings.def_opts.import.confirm")
             }
         ], [], (v) => {
             let info = {};
@@ -3221,6 +3221,44 @@ settingsButtonEle.onclick = () => {
     }
     exportButton.className = "bug-button";
     def_opts_buttons.appendChild(exportButton);
+
+    let addButton = document.createElement("button");
+    addButton.innerHTML = '<i class="fa-solid fa-plus"></i> ' + translate("app.settings.def_opts.add");
+    addButton.onclick = () => {
+        let addDialog = new Dialog();
+        addDialog.showDialog(translate("app.settings.def_opts.add.title"), "form", [
+            {
+                "type": "text",
+                "name": translate("app.settings.def_opts.add.key"),
+                "id": "key"
+            },
+            {
+                "type": "text",
+                "name": translate("app.settings.def_opts.add.value"),
+                "desc": translate("app.settings.def_opts.add.value.description"),
+                "id": "value"
+            }
+        ], [
+            {
+                "type": "cancel",
+                "content": translate("app.settings.def_opts.add.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.settings.def_opts.add.confirm")
+            }
+        ], [], (v) => {
+            let info = {};
+            v.forEach(e => info[e.id] = e.value);
+            let defaultOptions = new DefaultOptions();
+            if (info.key != "version") {
+                defaultOptions.setDefault(info.key, info.value);
+            }
+            generateUIForOptions(db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version"));
+        })
+    }
+    addButton.className = "bug-button";
+    def_opts_buttons.appendChild(addButton);
 
     let dialog = new Dialog();
     let java_installations = [{
