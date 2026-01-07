@@ -79,7 +79,7 @@ module.exports = {
           section: 'games',
           icon: './resources/icons/icon.png',
           categories: ['Game'],
-          mimeType: ['application/zip']
+          mimeType: ['application/zip', 'application/x-zip-compressed']
         }
       },
     },
@@ -93,7 +93,7 @@ module.exports = {
           license: "MIT",
           icon: "./resources/icons/icon.png",
           categories: ['Game'],
-          mimeType: ['application/zip']
+          mimeType: ['application/zip', 'application/x-zip-compressed']
         }
       },
     },
