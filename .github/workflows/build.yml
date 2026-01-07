@@ -32,8 +32,9 @@ jobs:
       - name: Prune dependencies Windows
         if: runner.os == 'Windows'
         run: |
-          Get-ChildItem -Path '.\node_modules' -Recurse -File -Include '*.md', '*.markdown', '*.ts', 'license', 'license*.txt', '*notice*.txt', '*.npmignore', '*.gitkeep', '*.editorconfig', '*.eslintrc', '*.jshintrc', '.travis.yml', '.zuul.yml', '*.sln', '*.mit', '*.bsd', '*.apache2', 'funding.yml', '*.gitmodules', 'gitpod.yml', 'dependabot.yml', '*.gitignore' | Remove-Item -Force
+          Get-ChildItem -Path '.\node_modules' -Recurse -File -Include '*.md', '*.markdown', '*.ts', 'license', 'license*.txt', '*notice*.txt', '*.npmignore', '*.gitkeep', '*.editorconfig', '*.eslintrc', '*.jshintrc', '.travis.yml', '.zuul.yml', '*.sln', '*.mit', '*.bsd', '*.apache2', 'funding.yml', '*.gitmodules', 'gitpod.yml', 'dependabot.yml', '*.gitignore', '*.map', '*.cts', '*.mts', 'tsconfig.json', '*.iml', '*.eslintrc.yml', '*.flow', '*.flowconfig', 'makefile', 'mocha.opts', '*.gitattributes' | Remove-Item -Force
           Get-ChildItem -Path '.\node_modules' -Directory -Recurse -Force -Filter '.github' | Remove-Item -Recurse -Force
+          Get-ChildItem -Path '.\node_modules' -Directory -Recurse -Force -Filter '.vscode' | Remove-Item -Recurse -Force
           Get-ChildItem -Path '.\node_modules' -Directory -Recurse -Force | Sort-Object FullName -Descending | Where-Object { -not (Get-ChildItem $_.FullName -Force -ErrorAction SilentlyContinue) } | Remove-Item -Force -ErrorAction SilentlyContinue
         shell: powershell
 
@@ -63,8 +64,20 @@ jobs:
             -o -iname "gitpod.yml" \
             -o -iname "dependabot.yml" \
             -o -iname "*.gitignore" \
+            -o -iname "*.map" \
+            -o -iname "*.cts" \
+            -o -iname "*.mts" \
+            -o -iname "tsconfig.json" \
+            -o -iname "*.iml" \
+            -o -iname "*.eslintrc.yml" \
+            -o -iname "*.flow" \
+            -o -iname "*.flowconfig" \
+            -o -iname "makefile" \
+            -o -iname "mocha.opts" \
+            -o -iname "*.gitattributes" \
           \) -delete
           find "./node_modules" -type d -name ".github" -prune -exec rm -rf {} +
+          find "./node_modules" -type d -name ".vscode" -prune -exec rm -rf {} +
           find "./node_modules" -type d -empty -delete
         shell: bash
 
