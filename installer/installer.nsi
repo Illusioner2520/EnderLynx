@@ -6,8 +6,8 @@ InstallDir "$LOCALAPPDATA\EnderLynx"
 InstallDirRegKey HKCU "Software\EnderLynx" "InstallDir"
 RequestExecutionLevel user
 
-Icon "../icon.ico"
-UninstallIcon "../icon.ico"
+Icon "../resources/icons/icon.ico"
+UninstallIcon "../resources/icons/icon.ico"
 
 Var CheckboxDesktop
 Var CheckboxStartMenu
@@ -16,8 +16,8 @@ Var DoDesktop
 Var DoStartMenu
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "../icon.ico"
-!define MUI_UNICON "../icon.ico"
+!define MUI_ICON "../resources/icons/icon.ico"
+!define MUI_UNICON "../resources/icons/icon.ico"
 
 !insertmacro MUI_PAGE_DIRECTORY
 Page Custom OptionsPage LeaveOptionsPage
