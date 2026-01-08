@@ -1730,7 +1730,7 @@ async function downloadMinecraft(instance_id, loader, vanilla_version, loader_ve
         } else if (loader == "quilt") {
             await mc.installQuilt(vanilla_version, loader_version);
         }
-        return { "java_installation": r.java_installation.replaceAll("\\", "/"), "java_version": r.java_version };
+        return { java_installation: r.java_installation.replaceAll("\\", "/"), java_version: r.java_version, java_args: r.java_args };
     } catch (err) {
         return { "error": true };
     }

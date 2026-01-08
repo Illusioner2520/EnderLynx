@@ -198,19 +198,6 @@ class Minecraft {
 
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}`), { recursive: true });
 
-            let compareVersions = (v1, v2) => {
-                const a = v1.split('-')[0].split('.').map(Number);
-                const b = v2.split('-')[0].split('.').map(Number);
-                const length = Math.max(a.length, b.length);
-
-                for (let i = 0; i < length; i++) {
-                    const num1 = a[i] || 0;
-                    const num2 = b[i] || 0;
-                    if (num1 < num2) return -1;
-                    if (num1 > num2) return 1;
-                }
-                return 0;
-            }
             const lowerBound = "7.8.0.684";
             const upperBound = "14.23.5.2851";
 
@@ -739,19 +726,6 @@ class Minecraft {
             if (!fs.existsSync(path.resolve(userPath, `minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`))) {
                 await this.installForge(version, loaderVersion);
             } else {
-                let compareVersions = (v1, v2) => {
-                    const a = v1.split('-')[0].split('.').map(Number);
-                    const b = v2.split('-')[0].split('.').map(Number);
-                    const length = Math.max(a.length, b.length);
-
-                    for (let i = 0; i < length; i++) {
-                        const num1 = a[i] || 0;
-                        const num2 = b[i] || 0;
-                        if (num1 < num2) return -1;
-                        if (num1 > num2) return 1;
-                    }
-                    return 0;
-                }
                 const lowerBound = "7.8.0.684";
                 const upperBound = "14.23.5.2851";
 
@@ -1147,6 +1121,31 @@ class Minecraft {
                 console.error("Invalid version");
                 return;
             }
+            let java_args = [];
+            if (version_json.arguments['default-user-jvm']) {
+                let args = version_json.arguments['default-user-jvm'];
+                // skip the first entry (which is RAM allocation)
+                for (let i = 1; i < args.length; i++) {
+                    let rules = args[i].rules;
+                    let useTheseArgs = false;
+                    r: for (let j = 0; j < rules.length; j++) {
+                        if (rules[j].os) {
+                            if (rules[j].os.name && rules[j].os.name != this.platformString) continue r;
+                            if (rules[j].os.arch && rules[j].os.arch != this.arch) continue r;
+                            if (rules[j].os.versionRange) {
+                                let currentVersion = os.release();
+                                if (rules[j].os.versionRange.max && compareVersions(currentVersion, rules[j].os.versionRange.max) > 0) continue r;
+                                if (rules[j].os.versionRange.min && compareVersions(currentVersion, rules[j].os.versionRange.min) < 0) continue r;
+                            }
+                            useTheseArgs = rules[j].action == "allow";
+                        }
+                    }
+                    if (!useTheseArgs) continue;
+                    java_args = java_args.concat(args[i].value);
+                }
+            }
+            java_args = quoteArgs(java_args);
+            if (!java_args) java_args = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M";
             signal.throwIfAborted();
             if (!isRepair || whatToRepair.includes("minecraft")) {
                 fs.writeFileSync(path.resolve(userPath, `minecraft/meta/versions/${version}/${version}.json`), JSON.stringify(version_json));
@@ -1259,7 +1258,7 @@ class Minecraft {
             }
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Minecraft", 100, "Done", processId, "done", cancelId, true);
-            return { "java_installation": this.java_installation, "java_version": this.java_version };
+            return { java_installation: this.java_installation, java_version: this.java_version, java_args };
         } catch (err) {
             win.webContents.send('progress-update', "Downloading Minecraft", 100, err, processId, "error", cancelId, true);
             throw err;
@@ -1736,6 +1735,29 @@ function getMainClass(jar_path) {
         console.error('Failed to read manifest:', err);
         return null;
     }
+}
+
+function compareVersions(v1, v2) {
+    const a = v1.split('-')[0].split('.').map(Number);
+    const b = v2.split('-')[0].split('.').map(Number);
+    const length = Math.max(a.length, b.length);
+
+    for (let i = 0; i < length; i++) {
+        const num1 = a[i] || 0;
+        const num2 = b[i] || 0;
+        if (num1 < num2) return -1;
+        if (num1 > num2) return 1;
+    }
+    return 0;
+}
+
+function quoteArgs(args) {
+    return args.map(arg => {
+        if (/^[A-Za-z0-9_\/.:=+\-]+$/.test(arg)) {
+            return arg;
+        }
+        return `"${arg.replace(/(["\\])/g, "\\$1")}"`;
+    }).join(" ");
 }
 
 module.exports = {
