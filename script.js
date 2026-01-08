@@ -9119,7 +9119,7 @@ class MultipleFileSelect {
     /** Recursive render — only called once */
     renderTree(node, container, parentPath = "") {
         for (const key of Object.keys(node)) {
-            const fullPath = parentPath ? parentPath + "//" + key : key;
+            const fullPath = parentPath ? parentPath + "/" + key : key;
             const isFile = node[key].isFile;
             const children = node[key].children;
 
@@ -9215,14 +9215,14 @@ class MultipleFileSelect {
     selectAll(path, node) {
         this.selected.add(path);
         for (const key of Object.keys(node.children)) {
-            this.selectAll(path + "//" + key, node.children[key]);
+            this.selectAll(path + "/" + key, node.children[key]);
         }
     }
 
     deselectAll(path, node) {
         this.selected.delete(path);
         for (const key of Object.keys(node.children)) {
-            this.deselectAll(path + "//" + key, node.children[key]);
+            this.deselectAll(path + "/" + key, node.children[key]);
         }
     }
 
@@ -9245,7 +9245,7 @@ class MultipleFileSelect {
 
     /** Find a node by path */
     getNode(path) {
-        const parts = path.split("//");
+        const parts = path.split("/");
         let node = { children: this.tree };
         for (const part of parts) {
             if (!node.children) return null;
@@ -9268,7 +9268,7 @@ class MultipleFileSelect {
         let indeterminateCount = 0;
         let childCount = 0;
         for (const key of Object.keys(node.children)) {
-            const childPath = path + "//" + key;
+            const childPath = path + "/" + key;
             const childNode = node.children[key];
             const { checked, indeterminate } = this.getNodeSelectionState(childPath, childNode);
             if (checked) checkedCount++;
@@ -14274,8 +14274,8 @@ function openInstanceShareDialog(instanceInfo) {
     let contentMap = {};
     content.forEach(e => {
         let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-        let content_file = content_folder + "//" + e.file_name;
-        let replace = content_folder + "//" + parseMinecraftFormatting(e.name);
+        let content_file = content_folder + "/" + e.file_name;
+        let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
         contentSpecific.push(replace);
         contentMap[replace] = e;
         let index = options.indexOf(content_file);
@@ -14429,30 +14429,30 @@ function openInstanceShareDialog(instanceInfo) {
         yesContentSpecific = yesContentSpecific.filter(e => {
             if (e.source != "player_install") return true;
             let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-            let content_file = content_folder + "//" + e.file_name;
+            let content_file = content_folder + "/" + e.file_name;
             nonContentSpecific.push(content_file);
             return false;
         });
         if (info.out == "elpack") {
-            createElPack(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")), info.version);
+            createElPack(instanceInfo, yesContentSpecific, nonContentSpecific, info.version);
         } else if (info.out == "mrpack") {
             yesContentSpecific = yesContentSpecific.filter(e => {
                 if (e.source == "modrinth") return true;
                 let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-                let content_file = content_folder + "//" + e.file_name;
+                let content_file = content_folder + "/" + e.file_name;
                 nonContentSpecific.push(content_file);
                 return false;
             });
-            createMrPack(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")), info.version);
+            createMrPack(instanceInfo, yesContentSpecific, nonContentSpecific, info.version);
         } else if (info.out == "cf_zip") {
             yesContentSpecific = yesContentSpecific.filter(e => {
                 if (e.source == "curseforge") return true;
                 let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-                let content_file = content_folder + "//" + e.file_name;
+                let content_file = content_folder + "/" + e.file_name;
                 nonContentSpecific.push(content_file);
                 return false;
             });
-            createCfZip(instanceInfo, yesContentSpecific, nonContentSpecific.map(e => e.replaceAll("//", "/")), info.version);
+            createCfZip(instanceInfo, yesContentSpecific, nonContentSpecific, info.version);
         }
     });
 }

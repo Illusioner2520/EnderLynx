@@ -288,14 +288,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
             let results = [];
             const entries = fs.readdirSync(absDir, { withFileTypes: true });
             if (entries.length == 0) {
-                results.push(relDir.replace(/\\/g, "//"));
+                results.push(relDir.replace(/\\/g, "/"));
             }
             for (const entry of entries) {
                 const relPath = path.join(relDir, entry.name);
                 if (entry.isDirectory()) {
                     results = results.concat(getAllFilesRecursive(baseDir, relPath));
                 } else {
-                    results.push(relPath.replace(/\\/g, "//"));
+                    results.push(relPath.replace(/\\/g, "/"));
                 }
             }
             return results;
