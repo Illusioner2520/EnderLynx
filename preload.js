@@ -542,10 +542,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMultiplayerWorlds,
     openFolder,
     showFileInFolder,
-    openFolderFromFile: (file_path) => {
-        const folder = path.dirname(file_path);
-        openFolder(folder);
-    },
     triggerMicrosoftLogin: async () => {
         return await ipcRenderer.invoke('trigger-microsoft-login');
     },

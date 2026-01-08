@@ -8125,8 +8125,8 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
             {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.screenshots.open_in_folder"),
-                "func": (e) => {
-                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`));
+                "func": () => {
+                    window.electronAPI.showFileInFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/screenshots/${e.file_name}`));
                 }
             },
             {
@@ -8298,7 +8298,7 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
     screenshotAction1.className = "screenshot-action";
     screenshotAction1.innerHTML = '<i class="fa-solid fa-folder"></i>' + translate("app.screenshots.open_in_folder");
     screenshotAction1.onclick = () => {
-        window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/screenshots`));
+        window.electronAPI.showFileInFolder(processRelativePath(file));
     };
     if (instanceInfo) {
         screenshotActions.appendChild(screenshotAction1);
@@ -12970,7 +12970,7 @@ function openShareDialogForFile(file_path) {
         {
             "icon": '<i class="fa-solid fa-folder"></i>',
             "func": () => {
-                window.electronAPI.openFolderFromFile(file_path);
+                window.electronAPI.showFileInFolder(file_path);
             },
             "tooltip": translate("app.share.folder")
         }
