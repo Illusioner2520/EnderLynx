@@ -2867,6 +2867,9 @@ async function downloadUpdate(download_url, new_version, checksum) {
 }
 
 ipcMain.handle('trigger-microsoft-login', async () => {
+    let iconExt = "png";
+    if (os.platform() == 'win32') iconExt = "ico";
+    if (os.platform() == 'darwin') iconExt = "icns";
     let date = new Date();
     date.setHours(date.getHours() + 1);
     const authManager = new Auth("select_account");
@@ -2874,7 +2877,7 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         width: 500,
         height: 600,
         resizable: true,
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: path.join(__dirname, 'resources/icons/icon.' + iconExt),
         suppress: true
     });
     const token = await xboxManager.getMinecraft();
