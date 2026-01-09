@@ -167,7 +167,7 @@ class DefaultOptions {
                 content += e.key + ":" + e.value + "\n"
             }
         });
-        return { "content": content, "version": Number((dataVersion ? dataVersion : (v?.value ? v?.value : "100"))), "keys": r.map(e => e.key), "values": r.map(e => e.value).map(e => dataVersion < 1444 && keyToNum[e] ? keyToNum[e] : e) };
+        return { "content": content, "version": Number((dataVersion ? dataVersion : (v?.value ? v?.value : "100"))), "keys": r.map(e => e.key), "values": r.map(e => e.value).map(e => (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && keyToNum[e]) ? keyToNum[e] : e) };
     }
 }
 
