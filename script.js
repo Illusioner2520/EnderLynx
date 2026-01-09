@@ -1614,13 +1614,36 @@ function clearMoreMenus() {
     });
 }
 
+let ignoreNextPointerUp = false;
+
 class ContextMenu {
     constructor() {
         let element = document.createElement("div");
         element.classList.add("context-menu");
-        element.setAttribute("popover", "");
+        element.setAttribute("popover", "manual");
         document.body.appendChild(element);
         this.element = element;
+
+        document.body.addEventListener("pointerup", (e) => {
+            if (!this.element.matches(':popover-open')) return;
+            const t = e.target;
+            if (this.element.contains(t)) return;
+            if (ignoreNextPointerUp) {
+                ignoreNextPointerUp = true;
+                return;
+            }
+            this.element.hidePopover();
+        });
+
+        document.body.addEventListener("pointerdown", (e) => {
+            ignoreNextPointerUp = false;
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key == "Escape") {
+                this.element.hidePopover();
+            }
+        });
     }
     showContextMenu(buttons, x, y) {
         this.element.style.left = x + "px";
@@ -1636,7 +1659,6 @@ class ContextMenu {
         this.element.style.translate = xTranslate + " " + yTranslate;
         this.element.style.top = y + "px";
         this.element.innerHTML = "";
-        this.element.hidePopover();
         for (let i = 0; i < buttons.buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("context-menu-button");
@@ -1653,6 +1675,7 @@ class ContextMenu {
             this.element.appendChild(buttonElement);
         }
         this.element.showPopover();
+        ignoreNextPointerUp = true;
     }
     hideContextMenu() {
         this.element.hidePopover();
@@ -1855,7 +1878,7 @@ class SearchDropdown extends Dropdown {
         this.dropdownList.classList.remove("dropdown-list");
         this.dropdownList.classList.add('dropdown-list-dialog');
         this.dropdownList.popover = "manual";
-        document.addEventListener('pointerdown', (e) => {
+        document.addEventListener('pointerup', (e) => {
             if (!this.dropdownList.matches(':popover-open')) return;
             const t = e.target;
             if (this.dropdownList.contains(t)) return;
