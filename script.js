@@ -7592,7 +7592,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         const visibleCount = Math.ceil(containerHeight / itemHeight) + buffer * 2;
         const endIdx = Math.min(startIdx + visibleCount, totalItems);
 
-        visible.style.transform = `translateY(${startIdx * itemHeight}px)`;
+        visible.style.translate = `0px ${startIdx * itemHeight}px`;
         visible.innerHTML = '';
         for (let i = startIdx; i < endIdx; i++) {
             visible.appendChild(showLogs[i].element);
