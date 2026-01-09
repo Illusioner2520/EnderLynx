@@ -1690,6 +1690,11 @@ body.compact .download-log-wrapper {
     bottom: 176px;
 }
 
+body.compact.sidebar-right .download-log-wrapper {
+    left: unset;
+    right: 10px;
+}
+
 body:not(.compact) .download-log-toggle {
     display: none;
 }
