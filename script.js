@@ -4021,11 +4021,12 @@ async function showHomeContent(oldEle) {
             });
         }
         let playButton = document.createElement("button");
-        let formatPlayButton = (running) => {
-            playButton.setAttribute("title", running ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
-            playButton.className = running ? "home-stop-button" : "home-play-button";
-            playButton.innerHTML = running ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.onclick = running ? async () => {
+        let formatPlayButton = (isRunning) => {
+            running = isRunning;
+            playButton.setAttribute("title", isRunning ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
+            playButton.className = isRunning ? "home-stop-button" : "home-play-button";
+            playButton.innerHTML = isRunning ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.onclick = isRunning ? async () => {
                 playButton.classList.add("home-loading-button");
                 playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
                 await stopInstance(instanceInfo);
@@ -4047,7 +4048,7 @@ async function showHomeContent(oldEle) {
                 "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
                 "func": running ? async (e) => {
                     await stopInstance(instanceInfo);
-                    homeContent.displayContent();
+                    formatPlayButton(false);
                 } : async (e) => {
                     playButton.className = "home-loading-button";
                     playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
