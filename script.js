@@ -3817,8 +3817,8 @@ async function showHomeContent(oldEle) {
     let pinnedWorlds = await getPinnedWorlds();
     let pinnedInstances = getPinnedInstances();
     pinnedInstances.forEach(e => e.actuallyPinned = true);
-    let lastPlayedWorlds = await getRecentlyPlayedWorlds();
-    let lastPlayedInstances = getRecentlyPlayedInstances();
+    let lastPlayedWorlds = await getRecentlyPlayedWorlds(pinnedWorlds.map(e => (e.id ? e.id : e.ip) + ":" + e.instance_id));
+    let lastPlayedInstances = getRecentlyPlayedInstances(pinnedInstances.map(e => e.instance_id));
     pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     let pinnedWorldTitle = document.createElement("h2");
@@ -4016,23 +4016,28 @@ async function showHomeContent(oldEle) {
         if (running) {
             window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
                 if (currentTab != "home") return;
-                homeContent.displayContent();
+                formatPlayButton(false);
                 live.findLive();
             });
         }
         let playButton = document.createElement("button");
-        playButton.setAttribute("title", running ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
-        playButton.className = running ? "home-stop-button" : "home-play-button";
-        playButton.innerHTML = running ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-        playButton.onclick = running ? () => {
-            stopInstance(instanceInfo);
-            homeContent.displayContent();
-        } : async () => {
-            playButton.className = "home-loading-button";
-            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-            await playInstance(instanceInfo);
-            showSpecificInstanceContent(instanceInfo.refresh());
+        let formatPlayButton = (running) => {
+            playButton.setAttribute("title", running ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
+            playButton.className = running ? "home-stop-button" : "home-play-button";
+            playButton.innerHTML = running ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.onclick = running ? async () => {
+                playButton.classList.add("home-loading-button");
+                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
+                await stopInstance(instanceInfo);
+                formatPlayButton(false);
+            } : async () => {
+                playButton.className = "home-loading-button";
+                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
+                await playInstance(instanceInfo);
+                showSpecificInstanceContent(instanceInfo.refresh());
+            }
         }
+        formatPlayButton(running);
         let morebutton = document.createElement("button");
         morebutton.className = "home-list-more";
         morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -11581,7 +11586,7 @@ function duplicateInstance(instanceInfo) {
     })
 }
 
-async function getRecentlyPlayedWorlds() {
+async function getRecentlyPlayedWorlds(ignore_world_ids) {
     let all_servers = await window.electronAPI.getAllServers(data.getInstances().map(e => e.instance_id));
     all_servers = all_servers.map(server => ({
         ...server,
@@ -11589,12 +11594,14 @@ async function getRecentlyPlayedWorlds() {
     }))
     let last_played_worlds = await window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
     let all = last_played_worlds.concat(all_servers);
+    all = all.filter(e => !ignore_world_ids.includes((e.id ? e.id : e.ip) + ":" + e.instance_id))
     all.sort((a, b) => b.last_played - a.last_played);
     return all.slice(0, 5);
 }
 
-function getRecentlyPlayedInstances() {
+function getRecentlyPlayedInstances(ignore_instance_ids = []) {
     let instances = db.prepare("SELECT * FROM instances").all();
+    instances = instances.filter(e => !ignore_instance_ids.includes(e.instance_id));
     instances.sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
     return instances.slice(0, 5).map(e => new Instance(e.instance_id));
 }

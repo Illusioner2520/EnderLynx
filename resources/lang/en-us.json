@@ -282,6 +282,7 @@
     "app.home.tooltip.world": "Play World",
     "app.home.tooltip.instance": "Play Instance",
     "app.home.loading": "Loading",
+    "app.home.stopping": "Stopping",
     "app.instance.view": "View Instance",
     "app.worlds.unpin": "Unpin World",
     "app.worlds.pin": "Pin World",
