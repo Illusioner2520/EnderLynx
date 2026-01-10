@@ -4455,11 +4455,34 @@ dialog[open]::backdrop {
     justify-content: center;
 }
 
+.version-file-chip-more {
+    font-size: .9rem;
+    background-color: var(--color-1t);
+    padding: 4px;
+    border-radius: 100px;
+    color: var(--subtle-text-color);
+    padding-inline: 8px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color .25s, scale .1s;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.version-file-chip-more:hover {
+    background-color: var(--color-2t);
+}
+
+.version-file-chip-more:active {
+    scale: .9;
+}
+
 .version-file-chip-wrapper {
     display: flex;
     gap: 4px;
     max-width: 100%;
-    overflow: hidden;
     flex-wrap: wrap;
     align-content: center;
 }

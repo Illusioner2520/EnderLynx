@@ -1638,7 +1638,7 @@ class ContextMenu {
         document.body.addEventListener("pointerdown", (e) => {
             ignoreNextPointerUp = false;
         });
-        
+
         document.addEventListener('keydown', (e) => {
             if (e.key == "Escape") {
                 this.element.hidePopover();
@@ -8506,11 +8506,11 @@ function formatTimeRelatively(timeString) {
     let date = new Date(timeString);
     let diff = today.getTime() - date.getTime();
     const minute = 60 * 1000;
-    const hour   = 60 * minute;
-    const day    = 24 * hour;
-    const week   = 7 * day;
-    const month  = 30 * day;
-    const year   = 365 * day;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    const week = 7 * day;
+    const month = 30 * day;
+    const year = 365 * day;
     if (diff < 0) {
         return translate("app.date.future");
     }
@@ -8984,7 +8984,7 @@ window.electronAPI.onInstallInstance(async (install_info) => {
         }
     } else if (install_info.source == "curseforge") {
         let temp = await (await fetch(`https://api.curse.tools/v1/cf/mods/${install_info.id}`)).json();
-        let types = {6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader", 17: "world", 6945: "datapack"};
+        let types = { 6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader", 17: "world", 6945: "datapack" };
         info = {
             "project_type": types[temp.data.classId],
             "source": "curseforge",
@@ -12444,15 +12444,47 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         nameInfo.appendChild(nameDesc);
                         versionEle.appendChild(nameInfo);
 
+                        if (!minecraftVersions || !minecraftVersions.length) {
+                            e.game_versions.reverse();
+                        } else {
+                            const order = new Map(minecraftVersions.map((v, i) => [v, i]));
+                            e.game_versions.sort((a, b) => {
+                                const aIndex = order.has(a) ? order.get(a) : -1;
+                                const bIndex = order.has(b) ? order.get(b) : -1;
+
+                                return bIndex - aIndex;
+                            });
+                        }
+
                         //Game Version
                         let tagWrapper = document.createElement("div");
                         tagWrapper.className = "version-file-chip-wrapper";
-                        e.game_versions.forEach(i => {
+                        let tagWrapperForDialog = document.createElement("div");
+                        tagWrapperForDialog.className = "version-file-chip-wrapper";
+                        e.game_versions.forEach((i, count) => {
                             let tag = document.createElement("div");
                             tag.className = "version-file-chip";
-                            tag.innerHTML = i;
-                            tagWrapper.appendChild(tag);
+                            tag.textContent = i;
+                            if (count < 10) tagWrapper.appendChild(tag);
+                            let clone = tag.cloneNode();
+                            clone.textContent = i;
+                            tagWrapperForDialog.appendChild(clone);
                         });
+                        if (e.game_versions.length > 10) {
+                            let tag = document.createElement("button");
+                            tag.className = "version-file-chip-more";
+                            tag.textContent = translate("app.discover.files.versions.more");
+                            tag.onclick = () => {
+                                let dialog = new Dialog();
+                                dialog.showDialog(translate(`app.discover.files.${content.combine_versions_and_loaders ? "versions_loaders" : "versions"}.title`, "%t", e.name), "notice", tagWrapperForDialog, [
+                                    {
+                                        "type": "cancel",
+                                        "content": translate("app.discover.files.versions.done")
+                                    }
+                                ],[], () => {});
+                            }
+                            tagWrapper.appendChild(tag);
+                        }
                         versionEle.appendChild(tagWrapper);
                         if (content.combine_versions_and_loaders) {
                             tagWrapper.style.gridColumn = "span 2";
@@ -12465,7 +12497,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             e.loaders.forEach(i => {
                                 let tag = document.createElement("div");
                                 tag.className = "version-file-chip";
-                                tag.innerHTML = translate("app.loader." + i);
+                                tag.textContent = translate("app.loader." + i);
                                 tagWrapper2.appendChild(tag);
                             });
                             versionEle.appendChild(tagWrapper2);
@@ -12474,13 +12506,13 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                         //Published
                         let published = document.createElement("div");
                         published.className = "version-file-text";
-                        published.innerHTML = formatDate(e.date_published);
+                        published.textContent = formatDate(e.date_published);
                         versionEle.appendChild(published);
 
                         //Downloads
                         let downloads = document.createElement("div");
                         downloads.className = "version-file-text";
-                        downloads.innerHTML = formatNumber(e.downloads);
+                        downloads.textContent = formatNumber(e.downloads);
                         versionEle.appendChild(downloads);
 
                         // Install Button
@@ -14346,7 +14378,7 @@ let importInstance = (info, file_path) => {
 }
 
 let importInstanceFromContentProvider = (info) => {
-    installButtonClick(info.project_type, info.source, info.loaders, info.icon, info.name, info.author, info.game_versions, info.project_id, undefined, document.createElement("button"), undefined, undefined, () => {}, undefined);
+    installButtonClick(info.project_type, info.source, info.loaders, info.icon, info.name, info.author, info.game_versions, info.project_id, undefined, document.createElement("button"), undefined, undefined, () => { }, undefined);
 }
 
 window.electronAPI.onOpenFile(importInstance);
