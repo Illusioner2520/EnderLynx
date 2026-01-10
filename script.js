@@ -11721,10 +11721,10 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     if (!disableAddToHistory) {
         if (contentInfo.open) {
             contentInfoHistory = contentInfoHistory.slice(0, contentInfoIndex + 1);
-            contentInfoHistory.push({ "content_source": content_source, "content_id": content_id, "info_data": infoData, "project_type": pt });
+            contentInfoHistory.push({ "content_source": content_source, "content_id": content_id, "info_data": infoData, "project_type": pt, "loader": loader });
             contentInfoIndex++;
         } else {
-            contentInfoHistory = [{ "content_source": content_source, "content_id": content_id, "info_data": infoData, "project_type": pt }];
+            contentInfoHistory = [{ "content_source": content_source, "content_id": content_id, "info_data": infoData, "project_type": pt, "loader": loader }];
             contentInfoIndex = 0;
         }
     }
@@ -11752,7 +11752,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonBack.onclick = () => {
             contentInfoIndex--;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type, states);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, contentInfoHistory[contentInfoIndex].loader, locked, true, null, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type, states);
         }
     }
     contentNav.appendChild(buttonBack);
@@ -11764,7 +11764,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     } else {
         buttonForward.onclick = () => {
             contentInfoIndex++;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, loader, locked, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type, states);
+            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, contentInfoHistory[contentInfoIndex].loader, locked, true, contentInfoHistory[contentInfoIndex].info_data, contentInfoHistory[contentInfoIndex].project_type, states);
         }
     }
     contentNav.appendChild(buttonForward);
@@ -11794,7 +11794,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             content_id = mr_content.id;
         } catch (e) {
             loading.errorOut(e, () => {
-                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true);
+                displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, true, content_list_to_update, infoData, pt, states);
             });
             return;
         }
@@ -12311,7 +12311,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     [{
                         "name": translate("app.discover.loader.all"),
                         "value": "all"
-                    }].concat(allLoaders.map(e => ({ "name": loaders[e] ? loaders[e] : e, "value": e }))),
+                    }].concat(allLoaders.map(e => ({ "name": translate("app.loader." + e), "value": e }))),
                     mcLoaderFilter, loader ? loader : "all", (v) => {
                         filterVersions(versionDropdown.value, v, channelDropdown.value, 1);
                     })
@@ -12465,7 +12465,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             e.loaders.forEach(i => {
                                 let tag = document.createElement("div");
                                 tag.className = "version-file-chip";
-                                tag.innerHTML = loaders[i] ? loaders[i] : i;
+                                tag.innerHTML = translate("app.loader." + i);
                                 tagWrapper2.appendChild(tag);
                             });
                             versionEle.appendChild(tagWrapper2);
@@ -12839,12 +12839,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                             el.setAttribute('title', url);
                             el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader, locked);
+                                displayContentInfo("modrinth", pageId, instance_id, vanilla_version, pageType == "datapack" ? "datapack" : (loader == "datapack" ? "" : loader), locked);
                             });
                             el.addEventListener('keydown', (e) => {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
-                                    displayContentInfo("modrinth", pageId, instance_id, vanilla_version, loader, locked);
+                                    displayContentInfo("modrinth", pageId, instance_id, vanilla_version, pageType == "datapack" ? "datapack" : (loader == "datapack" ? "" : loader), locked);
                                 }
                             });
                             el.oncontextmenu = (e) => {
@@ -12870,12 +12870,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                             el.setAttribute('title', url);
                             el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader, locked);
+                                displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader == "datapack" ? "" : loader, locked);
                             });
                             el.addEventListener('keydown', (e) => {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
-                                    displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader, locked);
+                                    displayContentInfo("curseforge", pageId + ":" + map[pageType], instance_id, vanilla_version, loader == "datapack" ? "" : loader, locked);
                                 }
                             });
                             el.oncontextmenu = (e) => {
@@ -13508,6 +13508,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 "content": translate("app.discover.plugin.confirm")
             }
         ], [], () => { });
+        button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
         return;
     }
     if (project_type == "datapack" || (content_loaders.length == 1 && content_loaders[0] == "datapack")) {
