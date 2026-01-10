@@ -1587,18 +1587,23 @@ class MoreMenu {
         this.triggerElement = ele;
         ele.setAttribute("popovertarget", id);
         element.id = id;
-        for (let i = 0; i < buttons.buttons.length; i++) {
+        this.buttons = buttons;
+        this.refreshButtons();
+    }
+    refreshButtons() {
+        this.element.innerHTML = "";
+        for (let i = 0; i < this.buttons.buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("context-menu-button");
-            let icon = typeof buttons.buttons[i].icon === "function" ? buttons.buttons[i].icon() : buttons.buttons[i].icon;
-            let title = typeof buttons.buttons[i].title === "function" ? buttons.buttons[i].title() : buttons.buttons[i].title;
+            let icon = typeof this.buttons.buttons[i].icon === "function" ? this.buttons.buttons[i].icon() : this.buttons.buttons[i].icon;
+            let title = typeof this.buttons.buttons[i].title === "function" ? this.buttons.buttons[i].title() : this.buttons.buttons[i].title;
             buttonElement.innerHTML = icon + sanitize(title);
-            if (buttons.buttons[i].danger) {
+            if (this.buttons.buttons[i].danger) {
                 buttonElement.classList.add("danger");
             }
             buttonElement.onclick = (e) => {
                 this.element.hidePopover();
-                buttons.buttons[i].func(new MenuOption(buttonElement, buttons.buttons[i].title, buttons.buttons[i].icon));
+                this.buttons.buttons[i].func(new MenuOption(buttonElement, this.buttons.buttons[i].title, this.buttons.buttons[i].icon));
             }
             this.element.appendChild(buttonElement);
         }
@@ -2559,20 +2564,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
             ? '<i class="fa-solid fa-eye"></i>'
             : '<i class="fa-solid fa-eye-slash"></i>';
     }
-    moreDropdown.element.innerHTML = "";
-    for (let i = 0; i < theActionList.buttons.length; i++) {
-        let buttonElement = document.createElement("button");
-        buttonElement.classList.add("context-menu-button");
-        buttonElement.innerHTML = theActionList.buttons[i].icon + sanitize(theActionList.buttons[i].title);
-        if (theActionList.buttons[i].danger) {
-            buttonElement.classList.add("danger");
-        }
-        buttonElement.onclick = (e) => {
-            moreDropdown.element.hidePopover();
-            theActionList.buttons[i].func(new MenuOption(buttonElement, theActionList.buttons[i].title, theActionList.buttons[i].icon));
-        }
-        moreDropdown.element.appendChild(buttonElement);
-    }
+    moreDropdown.refreshButtons();
     return true;
 }
 
@@ -4046,6 +4038,7 @@ async function showHomeContent(oldEle) {
                 live.findLive();
             });
         }
+        let more;
         let playButton = document.createElement("button");
         let formatPlayButton = (isRunning) => {
             running = isRunning;
@@ -4063,6 +4056,7 @@ async function showHomeContent(oldEle) {
                 await playInstance(instanceInfo);
                 showSpecificInstanceContent(instanceInfo.refresh());
             }
+            if (more) more.refreshButtons();
         }
         formatPlayButton(running);
         let morebutton = document.createElement("button");
@@ -4070,16 +4064,18 @@ async function showHomeContent(oldEle) {
         morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
         let buttons = new ContextMenuButtons([
             {
-                "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-                "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-                "func": running ? async (e) => {
-                    await stopInstance(instanceInfo);
-                    formatPlayButton(false);
-                } : async (e) => {
-                    playButton.className = "home-loading-button";
-                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                    await playInstance(instanceInfo);
-                    showSpecificInstanceContent(instanceInfo.refresh());
+                "icon": () => running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
+                "title": () => running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
+                "func": async (e) => {
+                    if (running) {
+                        await stopInstance(instanceInfo);
+                        formatPlayButton(false);
+                    } else {
+                        playButton.className = "home-loading-button";
+                        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
+                        await playInstance(instanceInfo);
+                        showSpecificInstanceContent(instanceInfo.refresh());
+                    }
                 }
             },
             {
@@ -4172,7 +4168,7 @@ async function showHomeContent(oldEle) {
                 "danger": true
             }
         ].filter(e => e))
-        new MoreMenu(morebutton, buttons);
+        more = new MoreMenu(morebutton, buttons);
         item.oncontextmenu = (e) => {
             contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
