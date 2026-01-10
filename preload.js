@@ -383,7 +383,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
                                 ip: server.ip?.value || "",
                                 icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
                                 pinned: true,
-                                instance_id: world.instance_id
+                                instance_id: world.instance_id,
+                                last_played: getServerLastPlayed(world.instance_id, server.ip?.value || "")
                             });
                         }
                     } catch (e) {
@@ -2287,4 +2288,10 @@ function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
     if (r?.value) return Number(r.value);
     return 10;
+}
+
+function getServerLastPlayed(instance_id, ip) {
+    if (!ip.includes(":")) ip += ":25565";
+    let result = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instance_id, ip);
+    return result ? new Date(result.date) : new Date(null);
 }

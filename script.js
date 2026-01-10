@@ -3855,14 +3855,31 @@ async function showHomeContent(oldEle) {
         itemTitle.innerHTML = parseMinecraftFormatting(e.name);
         let itemDesc = document.createElement("div");
         itemDesc.className = "instance-desc";
-        itemDesc.innerHTML = e.type == "singleplayer" ? (translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (e.commands ? " - " + translate("app.worlds.description.commands") : "") + (e.flat ? " - " + translate("app.worlds.description.flat") : "")) : e.ip;
+        let itemDesc1 = document.createElement("span");
+        itemDesc1.className = "instance-desc";
+        itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
+        console.log(howLongAgo(e.last_played));
+        if (howLongAgo(e.last_played) < 3600000) {
+            setInterval(() => {
+                itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
+            }, 60000);
+        } else if (howLongAgo(e.last_played) < 86400000) {
+            setInterval(() => {
+                itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
+            }, 3600000);
+        }
+        let itemDesc2 = document.createElement("span");
+        itemDesc2.className = "instance-desc";
+        itemDesc2.innerHTML = (e.type == "singleplayer" ? (translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "")) : e.ip);
         if (e.type == "multiplayer") {
-            itemDesc.style.width = "fit-content";
-            itemDesc.classList.add("hidden-text");
-            itemDesc.onclick = () => {
-                itemDesc.classList.add("shown");
+            itemDesc2.style.width = "fit-content";
+            itemDesc2.classList.add("hidden-text");
+            itemDesc2.onclick = () => {
+                itemDesc2.classList.add("shown");
             }
         }
+        itemDesc.appendChild(itemDesc1);
+        itemDesc.appendChild(itemDesc2);
         itemInfo.appendChild(itemTitle);
         itemInfo.appendChild(itemDesc);
         item.appendChild(itemInfo);
@@ -4006,7 +4023,16 @@ async function showHomeContent(oldEle) {
         itemTitle.innerHTML = e.name;
         let itemDesc = document.createElement("div");
         itemDesc.className = "instance-desc";
-        itemDesc.innerHTML = loaders[e.loader] + " " + e.vanilla_version;
+        itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+        if (howLongAgo(e.last_played) < 3600000) {
+            setInterval(() => {
+                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            }, 60000);
+        } else if (howLongAgo(e.last_played) < 86400000) {
+            setInterval(() => {
+                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            }, 3600000);
+        }
         itemInfo.appendChild(itemTitle);
         itemInfo.appendChild(itemDesc);
         item.appendChild(itemInfo);
@@ -8469,39 +8495,65 @@ function formatDate(dateString, year_to_show_never_played_before) {
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
 }
 
+function howLongAgo(timeString) {
+    let today = new Date();
+    let date = new Date(timeString);
+    return today.getTime() - date.getTime();
+}
+
 function formatTimeRelatively(timeString) {
     let today = new Date();
     let date = new Date(timeString);
     let diff = today.getTime() - date.getTime();
-    if (diff < 60000) {
-        let value = Math.floor(diff / 1000);
-        if (value == 1) return translate("app.date.seconds.singular", "%t", 1);
-        return translate("app.date.seconds", "%t", value);
-    } else if (diff < 3600000) {
-        let value = Math.floor(diff / 60000);
+    const minute = 60 * 1000;
+    const hour   = 60 * minute;
+    const day    = 24 * hour;
+    const week   = 7 * day;
+    const month  = 30 * day;
+    const year   = 365 * day;
+    if (diff < 0) {
+        return translate("app.date.future");
+    }
+    if (diff < minute) {
+        return translate("app.date.just_now");
+    }
+    if (diff < hour) {
+        let value = Math.floor(diff / minute);
         if (value == 1) return translate("app.date.minutes.singular", "%t", 1);
         return translate("app.date.minutes", "%t", value);
-    } else if (diff < 86400000) {
-        let value = Math.floor(diff / 3600000);
+    }
+    if (diff < day) {
+        let value = Math.floor(diff / hour);
         if (value == 1) return translate("app.date.hours.singular", "%t", 1);
         return translate("app.date.hours", "%t", value);
-    } else if (diff < 604800000) {
-        let value = Math.floor(diff / 86400000);
+    }
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (
+        date.getFullYear() === yesterday.getFullYear() &&
+        date.getMonth() === yesterday.getMonth() &&
+        date.getDate() === yesterday.getDate()
+    ) {
+        return translate("app.date.yesterday");
+    }
+    if (diff < week) {
+        let value = Math.floor(diff / day);
         if (value == 1) return translate("app.date.days.singular", "%t", 1);
         return translate("app.date.days", "%t", value);
-    } else if (diff < 2628000000) {
-        let value = Math.round(diff / 604800000);
+    }
+    if (diff < month) {
+        let value = Math.round(diff / week);
         if (value == 1) return translate("app.date.weeks.singular", "%t", 1);
         return translate("app.date.weeks", "%t", value);
-    } else if (diff < 31540000000) {
-        let value = Math.round(diff / 2628000000);
+    }
+    if (diff < year) {
+        let value = Math.round(diff / month);
         if (value == 1) return translate("app.date.months.singular", "%t", 1);
         return translate("app.date.months", "%t", value);
-    } else {
-        let value = Math.round(diff / 31540000000);
-        if (value == 1) return translate("app.date.years.singular", "%t", 1);
-        return translate("app.date.years", "%t", value)
     }
+    let value = Math.round(diff / year);
+    if (value == 1) return translate("app.date.years.singular", "%t", 1);
+    return translate("app.date.years", "%t", value)
 }
 
 function formatDateAndTime(dateString) {
