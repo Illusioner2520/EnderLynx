@@ -2880,6 +2880,9 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         icon: path.join(__dirname, 'resources/icons/icon.' + iconExt),
         parent: win,
         modal: true,
+        alwaysOnTop: true,
+        backgroundColor: "#0a0a0a",
+        center: true,
         suppress: true
     });
     const token = await xboxManager.getMinecraft();
