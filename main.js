@@ -2878,6 +2878,8 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         height: 600,
         resizable: true,
         icon: path.join(__dirname, 'resources/icons/icon.' + iconExt),
+        parent: win,
+        modal: true,
         suppress: true
     });
     const token = await xboxManager.getMinecraft();
