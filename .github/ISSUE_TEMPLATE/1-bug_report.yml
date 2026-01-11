@@ -17,6 +17,15 @@ body:
       description: Find this in ⚙️ Settings -> App Info -> EnderLynx Version
     validations:
       required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: What operating system(s) are you using?
+      multiple: true
+      options:
+        - Windows
+        - Linux
+        - MacOS
   - type: textarea
     id: description
     attributes:
