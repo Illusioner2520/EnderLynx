@@ -2852,7 +2852,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
         if (os.platform() != 'win32' && os.platform() != 'darwin') {
             sourceDir = path.join(sourceDir, fs.readdirSync(sourceDir)[0]);
         }
-        const targetDir = process.execPath.replace(/\\[^\\]+$/, "");
+        const targetDir = path.dirname(process.execPath);
         const exeToLaunch = process.execPath;
         const oldPid = process.pid.toString();
 

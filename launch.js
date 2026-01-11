@@ -1366,21 +1366,11 @@ class Java {
             this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/javaw.exe`);
             if (platformString == "linux") {
                 this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/java`);
-                let command = `chmod u+x "${this.versions["java-" + version]}"`;
-                await new Promise((resolve) => {
-                    exec(command, (error, stdout, stderr) => {
-                        resolve();
-                    })
-                });
+                fs.chmodSync(this.versions["java-" + version], 0o755);
             }
             if (platformString == "macos") {
                 this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/zulu-${version}.jre/Contents/Home/bin/java`);
-                let command = `chmod u+x "${this.versions["java-" + version]}"`;
-                await new Promise((resolve) => {
-                    exec(command, (error, stdout, stderr) => {
-                        resolve();
-                    })
-                });
+                fs.chmodSync(this.versions["java-" + version], 0o755);
             }
             fs.writeFileSync(path.resolve(userPath, "java/versions.json"), JSON.stringify(this.versions), 'utf-8');
             signal.throwIfAborted();

@@ -14184,7 +14184,7 @@ async function checkForUpdates(isManual) {
             if (isManual) displaySuccess(translate("app.settings.updates.none_found"));
         } else {
             let dialog = new Dialog;
-            dialog.showDialog(translate("app.settings.updates.found.title"), "notice", translate("app.settings.updates.found.description", "%v", result.new_version, "%s", result.file_size), [
+            dialog.showDialog(translate("app.settings.updates.found.title"), "notice", translate("app.settings.updates.found.description." + result.os, "%v", result.new_version, "%s", result.file_size), [
                 {
                     "type": "cancel",
                     "content": translate("app.settings.updates.found.cancel")
@@ -14194,6 +14194,10 @@ async function checkForUpdates(isManual) {
                     "content": translate("app.settings.updates.found.confirm")
                 }
             ], [], async () => {
+                if (result.os == "unix") {
+                    window.electronAPI.openInBrowser(result.browser_url);
+                    return;
+                }
                 try {
                     await window.electronAPI.downloadUpdate(result.download_url, result.new_version, result.checksum);
                 } catch (e) {

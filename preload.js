@@ -123,6 +123,9 @@ try {
     let updaterName = "updater.exe";
     if (os.platform() != 'win32') updaterName = "updater";
     fs.writeFileSync(path.resolve(userPath, "updater", updaterName), updaterData);
+    if (os.platform() != 'win32'){
+        fs.chmodSync(path.resolve(userPath, "updater", updaterName), 0o755);
+    }
 } catch (e) {
 
 }
@@ -2204,6 +2207,8 @@ async function checkForUpdates() {
         let platformString = "linux-x64";
         if (os.platform() == 'darwin') platformString = "macos-universal";
         if (os.platform() == 'win32') platformString = "windows-x64";
+        let platform = "unix";
+        if (os.platform() == 'win32') platform = "windows";
         let nameStart = `EnderLynx-${platformString}`
         let latest = await fetch("https://api.github.com/repos/Illusioner2520/EnderLynx/releases/latest");
         let latest_json = await latest.json();
@@ -2233,7 +2238,9 @@ async function checkForUpdates() {
                 "download_url": download_url,
                 "checksum": checksum,
                 "file_size": Math.round(file_size / 1048576) + "MB",
-                "changelog": latest_json.body
+                "changelog": latest_json.body,
+                "os": platform,
+                "browser_url": latest_json.html_url
             });
         } else {
             return ({
