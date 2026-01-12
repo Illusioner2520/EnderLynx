@@ -4078,7 +4078,7 @@ async function showHomeContent(oldEle) {
                     }
                 }
             },
-            {
+            instanceInfo.locked ? null : {
                 "icon": '<i class="fa-solid fa-plus"></i>',
                 "title": translate("app.button.content.add"),
                 "func": (e) => {
@@ -5522,7 +5522,7 @@ function showInstanceContent(e) {
                     instanceContent.displayContent();
                 }
             },
-            {
+            instances[i].locked ? null : {
                 "icon": '<i class="fa-solid fa-plus"></i>',
                 "title": translate("app.button.content.add"),
                 "func": (e) => {
@@ -5612,7 +5612,7 @@ function showInstanceContent(e) {
                 },
                 "danger": true
             }
-        ]);
+        ].filter(e => e));
         instanceElement.oncontextmenu = (e) => {
             contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
@@ -6087,7 +6087,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
     threeDots.classList.add("instance-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
     let buttons = new ContextMenuButtons([
-        {
+        instanceInfo.locked ? null : {
             "icon": '<i class="fa-solid fa-plus"></i>',
             "title": translate("app.button.content.add"),
             "func": (e) => {
@@ -6181,7 +6181,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             },
             "danger": true
         }
-    ]);
+    ].filter(e => e));
     let moreMenu = new MoreMenu(threeDots, buttons);
     topBar.appendChild(playButton);
     topBar.appendChild(threeDots);
