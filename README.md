@@ -45,7 +45,7 @@ Currently, EnderLynx only supports Windows 64-bit. We are currently in the proce
  - 🍵 Automatic downloads of Java
    - ☕ Change the Java Installation the launcher uses
    - 🐏 Change the amount of RAM each instance can use
- - ⬆️ Update from inside of the App (We use manual updates to give you more control)
+ - ⬆️ Update from inside of the App (Only on Windows) (We use manual updates to give you more control)
  - ✅ Many other helpful features and more to come!
 
 ## Technologies
