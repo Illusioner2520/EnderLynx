@@ -2517,6 +2517,7 @@ async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
         let completed = 0;
 
         for (const entry of entries) {
+            if (entry.name == "logs") continue;
             signal.throwIfAborted();
             const srcPath = path.join(src, entry.name);
             const destPath = path.join(dest, entry.name);

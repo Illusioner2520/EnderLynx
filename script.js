@@ -11612,6 +11612,16 @@ function duplicateInstance(instanceInfo) {
                 false,
                 true
             );
+            newInstance.setJavaArgs(instanceInfo.java_args);
+            newInstance.setJavaPath(instanceInfo.java_path);
+            newInstance.setJavaVersion(instanceInfo.java_version);
+            newInstance.setAllocatedRam(instanceInfo.allocated_ram);
+            newInstance.setEnvVars(instanceInfo.env_vars);
+            newInstance.setPostExitHook(instanceInfo.post_exit_hook);
+            newInstance.setPreLaunchHook(instanceInfo.pre_launch_hook);
+            newInstance.setWrapper(instanceInfo.wrapper);
+            newInstance.setWindowHeight(instanceInfo.window_height);
+            newInstance.setWindowWidth(instanceInfo.window_width);
             newInstance.setInstalledVersion(instanceInfo.installed_version);
             for (let c of oldContent) {
                 newInstance.addContent(
