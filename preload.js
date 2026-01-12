@@ -924,7 +924,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
             cfServerInfo[page].info = json;
             return json;
         }
-        let sort = 2;
+        let sort = 1;
         if (sortBy == "downloads") sort = 6;
         if (sortBy == "newest") sort = 11;
         if (sortBy == "updated") sort = 3;
