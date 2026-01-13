@@ -100,6 +100,20 @@ const createWindow = () => {
     });
     win.loadFile('index.html');
 
+    const ses = win.webContents.session;
+
+    ses.webRequest.onBeforeSendHeaders((details, callback) => {
+        if (
+            details.url.startsWith("https://www.youtube.com/") ||
+            details.url.startsWith("https://www.youtube-nocookie.com/") ||
+            details.url.startsWith("https://googleads.g.doubleclick.net/")
+        ) {
+            details.requestHeaders["Referer"] = "https://illusioner.me/";
+        }
+
+        callback({ requestHeaders: details.requestHeaders });
+    });
+
     win.webContents.on('did-finish-load', () => {
         if (openedFile) {
             win.webContents.send('open-file', openedFile);
