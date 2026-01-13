@@ -1124,8 +1124,7 @@ class Minecraft {
             let java_args = [];
             if (version_json.arguments['default-user-jvm']) {
                 let args = version_json.arguments['default-user-jvm'];
-                // skip the first entry (which is RAM allocation)
-                for (let i = 1; i < args.length; i++) {
+                for (let i = 0; i < args.length; i++) {
                     let rules = args[i].rules;
                     let useTheseArgs = false;
                     r: for (let j = 0; j < rules.length; j++) {
@@ -1138,12 +1137,15 @@ class Minecraft {
                                 if (rules[j].os.versionRange.min && compareVersions(currentVersion, rules[j].os.versionRange.min) < 0) continue r;
                             }
                             useTheseArgs = rules[j].action == "allow";
+                        } else {
+                            useTheseArgs = true;
                         }
                     }
                     if (!useTheseArgs) continue;
                     java_args = java_args.concat(args[i].value);
                 }
             }
+            java_args = java_args.filter(e => !e.startsWith("-Xms") && !e.startsWith("-Xmx"));
             java_args = quoteArgs(java_args);
             if (!java_args) java_args = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M";
             signal.throwIfAborted();
