@@ -6535,6 +6535,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                 instanceInfo.setJavaPath(r.java_installation);
                 instanceInfo.setJavaVersion(r.java_version);
             }
+            instanceInfo.setJavaArgs(r.java_args);
             if (info.update_content) {
                 let content = instanceInfo.getContent();
                 let processId = Math.random();
