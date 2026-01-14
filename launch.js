@@ -1125,8 +1125,8 @@ class Minecraft {
             if (version_json.arguments['default-user-jvm']) {
                 let args = version_json.arguments['default-user-jvm'];
                 for (let i = 0; i < args.length; i++) {
-                    let rules = args[i].rules;
-                    let useTheseArgs = false;
+                    let rules = args[i].rules ?? [];
+                    let useTheseArgs = rules.length == 0;
                     r: for (let j = 0; j < rules.length; j++) {
                         if (rules[j].os) {
                             if (rules[j].os.name && rules[j].os.name != this.platformString) continue r;
