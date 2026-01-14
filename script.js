@@ -7742,9 +7742,9 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         render();
     }
     if (log_info.length > 9) {
-        let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+        let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
     } else {
-        let dropdownInfo = new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+        let dropdownInfo = new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
     }
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
