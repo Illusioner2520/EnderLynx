@@ -559,14 +559,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
             let parsedDate = new Date(dateStr);
             return ({
                 "date": isNaN(parsedDate.getTime()) ? e : parsedDate.toString(),
-                "file_path": path.resolve(patha, e)
+                "file_name": e
             });
         });
     },
-    getLog: (log_path) => {
+    getLog: (instance_id, file_name) => {
+        let log_path = path.resolve(userPath, "minecraft/instances", instance_id, "logs", file_name);
         return fs.readFileSync(log_path, { encoding: 'utf8', flag: 'r' });
     },
-    deleteLogs: (log_path) => {
+    deleteLogs: (instance_id, file_name) => {
+        let log_path = path.resolve(userPath, "minecraft/instances", instance_id, "logs", file_name);
         try {
             fs.unlinkSync(log_path);
             return true;
@@ -991,6 +993,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
                 return {
                     file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
+                    real_file_name: file,
                     file_path: path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots/` + file).replace(/\\/g, '/')
                 }
             });
@@ -1017,7 +1020,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    deleteScreenshot: (file_path) => {
+    deleteScreenshot: (instance_id, file_name) => {
+        let file_path = path.resolve(userPath, "minecraft/instances", instance_id, "screenshots", file_name);
         try {
             fs.unlinkSync(file_path);
             return true;
@@ -1025,7 +1029,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    disableFile: (file_path) => {
+    disableFile: (instance_id, type, file_name) => {
+        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, type, file_name);
         try {
             const disabledPath = file_path.endsWith('.disabled') ? file_path : file_path + '.disabled';
             fs.renameSync(file_path, disabledPath);
@@ -1034,7 +1039,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return false;
         }
     },
-    enableFile: (file_path) => {
+    enableFile: (instance_id, type, file_name) => {
+        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, type, file_name);
         try {
             if (file_path.endsWith('.disabled')) {
                 const enabledPath = file_path.slice(0, -9);
@@ -1105,9 +1111,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 throw new Error("Unable to update access token.");
             }
         }
-
-        console.log(skin_url);
-        console.log(variant);
 
         const res = await axios.post(
             'https://api.minecraftservices.com/minecraft/profile/skins',
@@ -1790,9 +1793,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
             "most_recent_log": most_recent_log
         });
     },
-    getDirName: () => {
-        return path.resolve(userPath);
-    },
     saveToDisk: async (file_path) => {
         let result = await ipcRenderer.invoke('show-save-dialog', {
             title: 'Save file',
@@ -1865,6 +1865,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
         data = data.replaceAll("__ACCENT__", strokeColor);
         return data;
+    },
+    openWorldFolder: (instance_id, world_id) => {
+        openFolder(path.resolve(userPath, "minecraft", "instances", instance_id, "saves", world_id));
+    },
+    openInstanceFolder: (instance_id) => {
+        openFolder(path.resolve(userPath, "minecraft", "instances", instance_id))
+    },
+    getCapePath: (cape_id) => {
+        return path.resolve(userPath, "minecraft", "capes", `${cape_id}.png`);
+    },
+    showContentInFolder: (instance_id, type, file_name) => {
+        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, type, file_name);
+        showFileInFolder(file_path);
+    },
+    showScreenshotInFolder: (instance_id, file_name) => {
+        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, "screenshots", file_name);
+        showFileInFolder(file_path);
     }
 });
 
@@ -2064,15 +2081,19 @@ async function importContent(file_path, content_type, instance_id) {
 }
 
 async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
+    zip_path = path.resolve(userPath, "minecraft", "instances", instance_id, zip_path);
     return await ipcRenderer.invoke('process-cf-zip-without-id', instance_id, zip_path, cf_id, title, getMaxConcurrentDownloads());
 }
 async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
+    mrpack_path = path.resolve(userPath, "minecraft", "instances", instance_id, mrpack_path);
     return await ipcRenderer.invoke('process-mr-pack', instance_id, mrpack_path, loader, title, getMaxConcurrentDownloads());
 }
 async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
+    elpack_path = path.resolve(userPath, "minecraft", "instances", instance_id, elpack_path);
     return await ipcRenderer.invoke('process-el-pack', instance_id, elpack_path, loader, title, getMaxConcurrentDownloads());
 }
 async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
+    zip_path = path.resolve(userPath, "minecraft", "instances", instance_id, zip_path);
     return await ipcRenderer.invoke('process-cf-zip', instance_id, zip_path, cf_id, title, getMaxConcurrentDownloads());
 }
 

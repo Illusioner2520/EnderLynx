@@ -2525,9 +2525,8 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
     for (let i = 0; i < content.length; i++) {
         let e = content[i];
         if (e.file_name == contentInfo.secondary_column.desc()) {
-            let file_path = processRelativePath(`./minecraft/instances/${contentInfo.instance_info.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + e.file_name);
             if (e.disabled) {
-                let new_file_name = window.electronAPI.enableFile(file_path);
+                let new_file_name = window.electronAPI.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_enable"));
                     return;
@@ -2537,8 +2536,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
                 contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
             } else {
-                console.log("disabling file: " + file_path);
-                let new_file_name = window.electronAPI.disableFile(file_path);
+                let new_file_name = window.electronAPI.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_disable"));
                     return;
@@ -3911,7 +3909,7 @@ async function showHomeContent(oldEle) {
                 "title": translate("app.worlds.open"),
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "func": () => {
-                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/saves/${e.id}`))
+                    window.electronAPI.openWorldFolder(instanceInfo.instance_id, e.id);
                 }
             } : null,
             {
@@ -4090,7 +4088,7 @@ async function showHomeContent(oldEle) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}`));
+                    window.electronAPI.openInstanceFolder(instanceInfo.instance_id);
                 }
             },
             {
@@ -4525,7 +4523,7 @@ function showWardrobeContent() {
                 oldEle.classList.remove("selected");
                 currentEle.classList.add("selected");
                 e.setActive();
-                skinViewer.loadCape(processRelativePath(`./minecraft/capes/${e.cape_id}.png`));
+                skinViewer.loadCape(window.electronAPI.getCapePath(e.cape_id));
                 activeCape = e;
             }
             loader.style.display = "none";
@@ -4535,7 +4533,7 @@ function showWardrobeContent() {
         capeEle.title = e.cape_name;
         capeEle.classList.add("cape");
         let capeImg = document.createElement("img");
-        extractImageRegionToDataURL(processRelativePath(`./minecraft/capes/${e.cape_id}.png`), 1, 1, 10, 16, (e) => {
+        extractImageRegionToDataURL(window.electronAPI.getCapePath(e.cape_id), 1, 1, 10, 16, (e) => {
             if (e) capeImg.src = e;
         });
         capeImg.classList.add("option-image-cape");
@@ -4667,7 +4665,7 @@ function showWardrobeContent() {
             model: activeSkin?.model == "slim" ? "slim" : "default",
         });
         let activeCape = default_profile.getActiveCape();
-        skinViewer.loadCape(activeCape ? processRelativePath(`./minecraft/capes/${activeCape.cape_id}.png`) : null);
+        skinViewer.loadCape(activeCape ? window.electronAPI.getCapePath(activeCape.cape_id) : null);
         skinList.innerHTML = '';
         let skins = data.getSkinsNoDefaults();
         skins.forEach((e) => {
@@ -5533,7 +5531,7 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instances[i].instance_id}`));
+                    window.electronAPI.openInstanceFolder(instances[i].instance_id);
                 }
             },
             {
@@ -6105,7 +6103,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             "icon": '<i class="fa-solid fa-folder"></i>',
             "title": translate("app.button.instances.open_folder"),
             "func": (e) => {
-                window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}`));
+                window.electronAPI.openInstanceFolder(instanceInfo.instance_id);
             }
         },
         {
@@ -6866,7 +6864,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                             "title": translate("app.content.open"),
                             "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                             "func": () => {
-                                window.electronAPI.showFileInFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/${e.file_name}`))
+                                window.electronAPI.showContentInFolder(instanceInfo.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                             }
                         },
                         e.source == "modrinth" ? {
@@ -7376,7 +7374,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "title": translate("app.worlds.open"),
                             "icon": '<i class="fa-solid fa-folder"></i>',
                             "func": () => {
-                                window.electronAPI.openFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/saves/${worlds[i].id}`))
+                                window.electronAPI.openWorldFolder(instanceInfo.instance_id, worlds[i].id);
                             }
                         },
                         {
@@ -7722,7 +7720,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         } else {
             deleteButton.style.display = "flex";
             currentLog = e;
-            let logInfo = window.electronAPI.getLog(e);
+            let logInfo = window.electronAPI.getLog(instanceInfo.instance_id, e);
             logInfo = logInfo.split("\n");
             logs = [];
             logInfo.forEach((e) => {
@@ -7743,9 +7741,9 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         render();
     }
     if (log_info.length > 9) {
-        let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+        let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
     } else {
-        let dropdownInfo = new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_path }))), typeDropdown, "live_log", onChangeLogDropdown);
+        let dropdownInfo = new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
     }
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
@@ -7806,7 +7804,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                 "content": translate("app.logs.delete.confirm")
             }
         ], [], async () => {
-            let success = await window.electronAPI.deleteLogs(currentLog);
+            let success = await window.electronAPI.deleteLogs(instanceInfo.instance_id, currentLog);
             if (success) {
                 displaySuccess(translate("app.logs.delete.success"));
                 setInstanceTabContentLogs(instanceInfo, element);
@@ -8172,14 +8170,14 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
         screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
         let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
         screenshotElement.onclick = () => {
-            displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, instanceInfo, element, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
+            displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, e.file_name, instanceInfo, element, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
         }
         let buttons = new ContextMenuButtons([
             {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.screenshots.open_in_folder"),
                 "func": () => {
-                    window.electronAPI.showFileInFolder(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/screenshots/${e.file_name}`));
+                    window.electronAPI.showScreenshotInFolder(instanceInfo.instance_id, e.real_file_name);
                 }
             },
             {
@@ -8212,7 +8210,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.screenshots.delete"),
                 "func": () => {
-                    let success = window.electronAPI.deleteScreenshot(e.file_path);
+                    let success = window.electronAPI.deleteScreenshot(instanceInfo.instance_id, e.file_name);
                     if (success) {
                         displaySuccess(translate("app.screenshots.delete.success"));
                     } else {
@@ -8235,7 +8233,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
     }
 }
 
-function displayScreenshot(name, desc, file, instanceInfo, element, list, currentIndex, word = translate("app.screenshot")) {
+function displayScreenshot(name, desc, file, file_name, instanceInfo, element, list, currentIndex, word = translate("app.screenshot")) {
     let index = currentIndex;
     let buttonLeft = document.createElement("button");
     buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
@@ -8271,7 +8269,7 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
         }
         if (instanceInfo) {
             screenshotAction5.onclick = () => {
-                let success = window.electronAPI.deleteScreenshot(file);
+                let success = window.electronAPI.deleteScreenshot(instanceInfo.instance_id, file_name);
                 if (success) {
                     screenshotPreview.close();
                     displaySuccess(translate("app.screenshots.custom.delete.success", "%w", word));
@@ -8351,7 +8349,7 @@ function displayScreenshot(name, desc, file, instanceInfo, element, list, curren
     screenshotAction1.className = "screenshot-action";
     screenshotAction1.innerHTML = '<i class="fa-solid fa-folder"></i>' + translate("app.screenshots.open_in_folder");
     screenshotAction1.onclick = () => {
-        window.electronAPI.showFileInFolder(processRelativePath(file));
+        window.electronAPI.showFileInFolder(file);
     };
     if (instanceInfo) {
         screenshotActions.appendChild(screenshotAction1);
@@ -12748,7 +12746,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     screenshotElement.style.backgroundImage = `url("${e.url}")`;
                     let screenshotInformation = content.gallery.map(e => ({ "name": e.title ?? translate("app.discover.gallery.untitled"), "file": e.raw_url, "desc": e.description }));
                     screenshotElement.onclick = () => {
-                        displayScreenshot(e.title ?? translate("app.discover.gallery.untitled"), e.description, e.raw_url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), translate("app.discover.gallery.image"));
+                        displayScreenshot(e.title ?? translate("app.discover.gallery.untitled"), e.description, e.raw_url, null, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.raw_url), translate("app.discover.gallery.image"));
                     }
                     let buttons = new ContextMenuButtons([
                         {
@@ -13346,7 +13344,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name));
+            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -13368,7 +13366,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setVersionId(newVersionId);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name));
+            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -13469,7 +13467,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + content.file_name));
+            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -13489,7 +13487,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setVersionId(newVersionId);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/${content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks"}/` + initialContent.file_name));
+            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -13716,12 +13714,12 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             }
             let mr_pack_info = {};
             if (source == "modrinth") {
-                mr_pack_info = await window.electronAPI.processMrPack(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.mrpack`), info.loader, title);
+                mr_pack_info = await window.electronAPI.processMrPack(instance_id, "pack.mrpack", info.loader, title);
                 let default_options = new DefaultOptions();
                 let v = window.electronAPI.setOptionsTXT(instance.instance_id, default_options.getOptionsTXT(), false);
                 instance.setAttemptedOptionsTxtVersion(v);
             } else if (source == "curseforge") {
-                mr_pack_info = await window.electronAPI.processCfZip(instance_id, processRelativePath(`./minecraft/instances/${instance_id}/pack.zip`), project_id, title);
+                mr_pack_info = await window.electronAPI.processCfZip(instance_id, "pack.zip", project_id, title);
                 if (mr_pack_info.error) {
                     instance.setFailed(true);
                     instance.setInstalling(false);
@@ -14111,14 +14109,14 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     }
     let mr_pack_info = {};
     if (source == "modrinth") {
-        mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/pack.mrpack`), instanceInfo.loader, instanceInfo.name);
+        mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, "pack.mrpack", instanceInfo.loader, instanceInfo.name);
         if (mr_pack_info.error) {
             instanceInfo.setFailed(true);
             instanceInfo.setInstalling(false);
             return;
         }
     } else if (source == "curseforge") {
-        mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, processRelativePath(`./minecraft/instances/${instanceInfo.instance_id}/pack.zip`), instanceInfo.install_id, instanceInfo.name);
+        mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, "pack.zip", instanceInfo.install_id, instanceInfo.name);
         if (mr_pack_info.error) {
             instanceInfo.setFailed(true);
             instanceInfo.setInstalling(false);
@@ -14184,10 +14182,6 @@ window.onoffline = () => {
 [...document.body.children].forEach(e => {
     e.style.display = "";
 });
-
-function processRelativePath(path) {
-    return path.replace("./", window.electronAPI.getDirName() + "/").replaceAll("\\", "/");
-}
 
 async function checkForUpdates(isManual) {
     try {
