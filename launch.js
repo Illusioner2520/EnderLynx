@@ -10,6 +10,7 @@ const { pathToFileURL } = require('url');
 const { version } = require('./package.json');
 const pLimit = require('p-limit').default;
 const { ipcMain } = require('electron');
+const stringArgv = require('string-argv').default;
 
 let launchername = "EnderLynx";
 let launcherversion = version;
@@ -859,7 +860,7 @@ class Minecraft {
         if (version_json?.arguments?.game) {
             this.args = version_json.arguments;
         } else if (version_json?.minecraftArguments) {
-            this.args = version_json.minecraftArguments.split(" ");
+            this.args = stringArgv(version_json.minecraftArguments);
         }
         if (loader == "vanilla") this.main_class = version_json.mainClass;
         this.version_type = version_json.type;
@@ -992,7 +993,7 @@ class Minecraft {
             args = args.concat(extraArgs);
         } else {
             if (this.legacy_modded_arguments) {
-                this.args = this.legacy_modded_arguments.split(" ");
+                this.args = stringArgv(this.legacy_modded_arguments);
             }
             if (this.platformString == "windows") {
                 args.push("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump");
@@ -1206,7 +1207,7 @@ class Minecraft {
                 if (version_json?.arguments?.game) {
                     this.args = version_json.arguments;
                 } else if (version_json?.minecraftArguments) {
-                    this.args = version_json.minecraftArguments.split(" ");
+                    this.args = stringArgv(version_json.minecraftArguments);
                 }
                 if (loader == "vanilla") this.main_class = version_json.mainClass;
                 this.version_type = version_json.type;
