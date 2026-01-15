@@ -4251,7 +4251,7 @@ async function showHomeContent(oldEle) {
             }
             let img = document.createElement("img");
             img.className = "home-discover-image";
-            img.src = e.icon_url ? e.icon_url : e.title;
+            img.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
             item.appendChild(img);
             let itemInfo = document.createElement("div");
             itemInfo.className = "home-discover-info";
