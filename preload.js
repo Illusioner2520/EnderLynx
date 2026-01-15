@@ -123,7 +123,7 @@ try {
     let updaterName = "updater.exe";
     if (os.platform() != 'win32') updaterName = "updater";
     fs.writeFileSync(path.resolve(userPath, "updater", updaterName), updaterData);
-    if (os.platform() != 'win32'){
+    if (os.platform() != 'win32') {
         fs.chmodSync(path.resolve(userPath, "updater", updaterName), 0o755);
     }
 } catch (e) {
@@ -1852,8 +1852,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     addServer: async (instance_id, ip, name) => {
         return await ipcRenderer.invoke('add-server', instance_id, ip, name);
+    },
+    getDefaultImage: (code) => {
+        let data = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
+        let hash = code ? hashString(code) : 0;
+        let hue = hash % 360;
+        let saturation = 70;
+        let lightness = 60;
+        let strokeColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        if (code === undefined) {
+            strokeColor = `#777`;
+        }
+        data = data.replaceAll("__ACCENT__", strokeColor);
+        return data;
     }
 });
+
+function hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
 
 async function convertToIco(input, outputPath) {
     let imageBuffer;

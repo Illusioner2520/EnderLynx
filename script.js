@@ -2287,7 +2287,7 @@ class ContentList {
             }
             let imageElement = document.createElement("img");
             imageElement.className = "content-list-image";
-            imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : "default.png");
+            imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : getDefaultImage(contentInfo.primary_column.title));
             imageElement.loading = "lazy";
             contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
@@ -3838,7 +3838,7 @@ async function showHomeContent(oldEle) {
         item.style.cursor = "auto";
         let icon = document.createElement("img");
         icon.className = "instance-image";
-        icon.src = fixPathForImage(e.icon ? e.icon : "default.png");
+        icon.src = fixPathForImage(e.icon ? e.icon : getDefaultImage(e.type == "singleplayer" ? e.id : e.ip));
         item.appendChild(icon);
         let itemInfo = document.createElement("div");
         itemInfo.className = "instance-info";
@@ -3935,9 +3935,9 @@ async function showHomeContent(oldEle) {
                 "title": translate("app.worlds.desktop_shortcut"),
                 "func": () => {
                     if (e.type == "singleplayer") {
-                        addDesktopShortcutWorld(instanceInfo, e.name, "singleplayer", e.id, e.icon ?? "default.png");
+                        addDesktopShortcutWorld(instanceInfo, e.name, "singleplayer", e.id, e.icon ?? getDefaultImage(e.id));
                     } else {
-                        addDesktopShortcutWorld(instanceInfo, e.name, "multiplayer", e.ip, e.icon ?? "default.png");
+                        addDesktopShortcutWorld(instanceInfo, e.name, "multiplayer", e.ip, e.icon ?? getDefaultImage(e.ip));
                     }
                 }
             } : null,
@@ -4006,7 +4006,7 @@ async function showHomeContent(oldEle) {
         }
         let icon = document.createElement("img");
         icon.className = "instance-image";
-        icon.src = e.image ? e.image : "default.png";
+        icon.src = e.image ? e.image : getDefaultImage(e.instance_id);
         item.appendChild(icon);
         let itemInfo = document.createElement("div");
         itemInfo.className = "instance-info";
@@ -4253,7 +4253,7 @@ async function showHomeContent(oldEle) {
             }
             let img = document.createElement("img");
             img.className = "home-discover-image";
-            img.src = e.icon_url ? e.icon_url : "default.png";
+            img.src = e.icon_url ? e.icon_url : e.title;
             item.appendChild(img);
             let itemInfo = document.createElement("div");
             itemInfo.className = "home-discover-info";
@@ -5470,10 +5470,10 @@ function showInstanceContent(e) {
         if (instances[i].image) {
             instanceImage.src = instances[i].image;
         } else {
-            instanceImage.src = "default.png";
+            instanceImage.src = getDefaultImage(instances[i].instance_id);
         }
         instances[i].watchForChange("image", (i) => {
-            instanceImage.src = i ? i : "default.png";
+            instanceImage.src = i ? i : getDefaultImage(instances[i].instance_id);
         });
         instanceElement.appendChild(instanceImage);
         let instanceInfoEle = document.createElement("div");
@@ -5915,10 +5915,10 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
     if (instanceInfo.image) {
         instImg.src = instanceInfo.image;
     } else {
-        instImg.src = "default.png";
+        instImg.src = getDefaultImage(instanceInfo.instance_id);
     }
     instanceInfo.watchForChange("image", (i) => {
-        instImg.src = i ? i : "default.png";
+        instImg.src = i ? i : getDefaultImage(instanceInfo.instance_id);
     })
     topBar.appendChild(instImg);
     let instTopInfo = document.createElement("div");
@@ -6253,7 +6253,8 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             "name": translate("app.instances.settings.icon"),
             "id": "icon",
             "default": instanceInfo.image,
-            "tab": "general"
+            "tab": "general",
+            "image_code": instanceInfo.instance_id
         },
         {
             "type": "text",
@@ -7339,7 +7340,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                     "desc": () => translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "") + (worlds[i].flat ? " - " + translate("app.worlds.description.flat") : "")
                 },
                 "type": "singleplayer",
-                "image": worlds[i].icon ?? "default.png",
+                "image": worlds[i].icon ?? getDefaultImage(worlds[i].id),
                 "onremove": (ele) => {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
@@ -7397,7 +7398,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-desktop"></i>',
                             "title": translate("app.worlds.desktop_shortcut"),
                             "func": (e) => {
-                                addDesktopShortcutWorld(instanceInfo, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? "default.png");
+                                addDesktopShortcutWorld(instanceInfo, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? getDefaultImage(worlds[i].id));
                             }
                         } : null,
                         {
@@ -7446,7 +7447,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                     "desc_hidden": true
                 },
                 "type": "multiplayer",
-                "image": worldsMultiplayer[i].icon ?? "default.png",
+                "image": worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip),
                 "onremove": (ele) => {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
@@ -7497,7 +7498,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-desktop"></i>',
                             "title": translate("app.worlds.desktop_shortcut"),
                             "func": (e) => {
-                                addDesktopShortcutWorld(instanceInfo, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? "default.png");
+                                addDesktopShortcutWorld(instanceInfo, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip));
                             }
                         } : null,
                         {
@@ -9079,11 +9080,11 @@ class VersionList {
 }
 
 class ImageUpload {
-    constructor(element, defaultImage) {
+    constructor(element, defaultImage, defaultImageCode) {
         element.className = "image-upload-wrapper";
         let preview = document.createElement("img");
         preview.className = "image-preview";
-        preview.src = defaultImage ? defaultImage : "default.png"
+        preview.src = defaultImage ? defaultImage : getDefaultImage(defaultImageCode);
         this.previewElement = preview;
         element.appendChild(preview);
         let containButtons = document.createElement("div");
@@ -9137,7 +9138,7 @@ class ImageUpload {
         }
         removeButton.onclick = () => {
             this.value = "";
-            this.previewElement.src = "default.png";
+            this.previewElement.src = getDefaultImage(defaultImageCode);
         }
     }
 }
@@ -9734,7 +9735,7 @@ class Dialog {
                     label.className = "dialog-label";
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
-                    let imageUpload = new ImageUpload(element, info[i].default);
+                    let imageUpload = new ImageUpload(element, info[i].default, info[i].image_code);
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);
                     this.values.push({ "id": info[i].id, "element": imageUpload });
@@ -10134,7 +10135,7 @@ class ContentSearchEntry {
         this.element = element;
         if (id) element.id = id;
         let image = document.createElement("img");
-        image.src = imageURL ? imageURL : "default.png";
+        image.src = imageURL ? imageURL : getDefaultImage(title);
         image.className = "discover-item-image";
         image.loading = "lazy";
         element.appendChild(image);
@@ -10994,7 +10995,7 @@ class VanillaTweaksSelector {
                     installGridInstance.className = "install-grid-instance";
 
                     let image = document.createElement("img");
-                    image.src = instances[i].image ? instances[i].image : "default.png";
+                    image.src = instances[i].image ? instances[i].image : getDefaultImage(instances[i].instance_id);
                     image.className = "instance-image";
 
                     let info = document.createElement("div");
@@ -11107,7 +11108,7 @@ class VanillaTweaksSelector {
             }
             let vtIcon = document.createElement("img");
             vtIcon.className = "vt-icon";
-            vtIcon.src = e.icon_url ? e.icon_url : "default.png";
+            vtIcon.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
             let vtInfo = document.createElement("div");
             vtInfo.className = "vt-info";
             let vtTitle = document.createElement("div");
@@ -11956,7 +11957,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
     topBar.classList.add("content-top");
     let contentImage = document.createElement("img");
     contentImage.classList.add("content-top-image");
-    contentImage.src = content.icon_url ? content.icon_url : "default.png";
+    contentImage.src = content.icon_url ? content.icon_url : getDefaultImage(content.title);
     topBar.appendChild(contentImage);
     let contentTopInfo = document.createElement("div");
     contentTopInfo.classList.add("content-top-info");
@@ -12488,7 +12489,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                         "type": "cancel",
                                         "content": translate("app.discover.files.versions.done")
                                     }
-                                ],[], () => {});
+                                ], [], () => { });
                             }
                             tagWrapper.appendChild(tag);
                         }
@@ -12689,7 +12690,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                     if (e.user.bio) author.setAttribute("title", e.user.bio);
                     let authorImg = document.createElement("img");
                     authorImg.className = "author-image";
-                    authorImg.src = e.user.avatar_url ? e.user.avatar_url : "default.png";
+                    authorImg.src = e.user.avatar_url ? e.user.avatar_url : getDefaultImage(e.user.username);
                     let authorInfo = document.createElement("div");
                     authorInfo.className = "author-info";
                     let authorTitle = document.createElement("div");
@@ -13974,7 +13975,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             installGridInstance.className = "install-grid-instance";
 
             let image = document.createElement("img");
-            image.src = instances[i].image ? instances[i].image : "default.png";
+            image.src = instances[i].image ? instances[i].image : getDefaultImage(instances[i].instance_id);
             image.className = "instance-image";
 
             let info = document.createElement("div");
@@ -14729,6 +14730,11 @@ document.body.ondrop = (e) => {
         });
     }
 };
+
+function getDefaultImage(code) {
+    let data = window.electronAPI.getDefaultImage(code);
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
+}
 
 try {
     switch (data.getDefault("saved_version")) {

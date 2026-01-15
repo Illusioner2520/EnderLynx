@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 6 6" fill="none">
+<rect width="6" height="6" fill="__ACCENT__" opacity="0.2"/>
+<path d="M 4.732 4 v -2 l -1.732 -1 l -1.732 1 v 2 l 1.732 1 l 1.732 -1 z" stroke="__ACCENT__" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 3 3 v 2" stroke="__ACCENT__" stroke-width="0.3"/>
+<path d="M 3 3 l 1.732 -1" stroke="__ACCENT__" stroke-width="0.3"/>
+<path d="M 3 3 l -1.732 -1" stroke="__ACCENT__" stroke-width="0.3"/>
+</svg>
