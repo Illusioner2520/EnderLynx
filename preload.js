@@ -489,8 +489,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return `Error reading file: ${err.message}`;
         }
     },
-    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
-        return await ipcRenderer.invoke('play-minecraft', loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
+    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
+        return await ipcRenderer.invoke('play-minecraft', loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
     },
     getJavaInstallation: async (v) => {
         return await ipcRenderer.invoke('get-java-installation', v);

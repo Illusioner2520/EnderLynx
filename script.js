@@ -8494,7 +8494,7 @@ async function playInstance(instInfo, quickPlay = null) {
     instInfo.setLastPlayed(new Date());
     let pid;
     try {
-        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, !navigator.onLine, data.getDefault("global_env_vars"), data.getDefault("global_pre_launch_hook"), data.getDefault("global_post_launch_hook"), data.getDefault("global_wrapper"), data.getDefault("global_post_exit_hook"), instInfo.name);
+        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, data.getDefault("global_env_vars"), data.getDefault("global_pre_launch_hook"), data.getDefault("global_post_launch_hook"), data.getDefault("global_wrapper"), data.getDefault("global_post_exit_hook"), instInfo.name);
         if (!pid) return;
         console.log(pid);
         console.log(pid.minecraft.pid);

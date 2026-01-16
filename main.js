@@ -1029,8 +1029,6 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
             cfData = [];
         }
 
-        console.log(cfData);
-
         cfData.forEach(e => {
             content.forEach(item => {
                 if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
@@ -1231,7 +1229,6 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             if (loader == "fabric") loader = "fabric-loader";
             if (loader == "quilt") loader = "quilt-loader";
         }
-        console.log(content);
         signal.throwIfAborted();
         win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
         return ({
@@ -1660,11 +1657,11 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
     }
 }
 
-ipcMain.handle('play-minecraft', async (_, loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
-    return await playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
+ipcMain.handle('play-minecraft', async (_, loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
+    return await playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
 });
 
-async function playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) {
+async function playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) {
     if (!player_info) throw new Error("Please sign in to your Microsoft account to play Minecraft.");
 
     let date = new Date();
@@ -1673,7 +1670,7 @@ async function playMinecraft(loader, version, loaderVersion, instance_id, player
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            if (!offline) throw new Error("Unable to update access token.");
+            win.webContents.send('display-error', "Unable to update access token. Launching Minecraft in offline mode.");
         }
     }
     let mc = new Minecraft(instance_id, name);

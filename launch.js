@@ -1194,7 +1194,7 @@ class Minecraft {
                 return;
             }
             let java_args = [];
-            if (version_json.arguments['default-user-jvm']) {
+            if (version_json.arguments && version_json.arguments['default-user-jvm']) {
                 let args = version_json.arguments['default-user-jvm'];
                 for (let i = 0; i < args.length; i++) {
                     let rules = args[i].rules ?? [];
