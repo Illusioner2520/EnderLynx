@@ -53,8 +53,9 @@ ipcMain.handle('launch-retry', (_, retryId) => {
 });
 
 class Minecraft {
-    constructor(instance_id) {
+    constructor(instance_id, instance_name) {
         this.instance_id = instance_id;
+        this.instance_name = instance_name;
         const platform = os.platform();
         const getPlatformString = () => {
             if (platform === 'win32') return 'windows';
@@ -686,7 +687,7 @@ class Minecraft {
             throw err;
         }
     }
-    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit) {
+    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit) {
         if (!javaArgs || !javaArgs.length) javaArgs = ["-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"];
         javaArgs = ["-Xms" + allocatedRam + "M", "-Xmx" + allocatedRam + "M", "-Dlog4j.configurationFile=" + pathToFileURL(path.resolve(userPath, "log_config.xml")).href].concat(javaArgs);
         this.libs = "";
@@ -1046,26 +1047,87 @@ class Minecraft {
         let fd = fs.openSync(LOG_PATH, 'w');
         fs.closeSync(fd);
         let child;
-        if (preLaunch) {
-            execSync(preLaunch, { stdio: "inherit" });
+        let launcherEnvVars = {
+            MC_INSTANCE_ID: this.instance_id,
+            MC_INSTANCE_NAME: this.instance_name,
+            MC_LOADER: loader,
+            MC_GAME_VERSION: version,
+            MC_LOADER_VERSION: loaderVersion,
+            MC_USERNAME: username,
+            MC_UUID: uuid,
+            MC_ALLOCATED_RAM_MB: allocatedRam.toString(),
+            MC_ALLOCATED_RAM_GB: (allocatedRam / 1024).toString(),
+            MC_LAUNCHER_NAME: launchername,
+            MC_LAUNCHER_VERSION: launcherversion,
+            MC_GAME_DIR: path.resolve(userPath, "minecraft", "instances", this.instance_id),
+            MC_MODS_DIR: path.resolve(userPath, "minecraft", "instances", this.instance_id, "mods"),
+            MC_RESOURCE_PACKS_DIR: path.resolve(userPath, "minecraft", "instances", this.instance_id, "resourcepacks"),
+            MC_SHADERS_DIR: path.resolve(userPath, "minecraft", "instances", this.instance_id, "shaderpacks"),
+            MC_LOGS_DIR: path.resolve(userPath, "minecraft", "instances", this.instance_id, "logs"),
+            MC_WORLDS_DIR: path.resolve(userPath, "minecraft", "instances", this.instance_id, "saves"),
+            MC_ASSETS_DIR: path.resolve(userPath, "minecraft", "meta", "assets"),
+            MC_NATIVES_DIR: path.resolve(userPath, "minecraft", "meta", "natives", this.instance_id + "-" + version),
+            MC_LIBRARIES_DIR: path.resolve(userPath, "minecraft", "meta", "libraries"),
+            MC_JAVA_PATH: this.java_installation,
+            MC_JAVA_VERSION: this.java_version,
+            MC_OS: process.platform,
+            MC_ARCH: process.arch
         }
-        if (wrapper && wrapper.length) {
-            let fullCommand = wrapper.concat([this.java_installation]).concat(args);
+        let executeLaunchHook = async (hook, phase, extraEnvVars) => {
+            return new Promise((resolve, reject) => {
+                const child = exec(hook, {
+                    windowsHide: true,
+                    env: {
+                        ...process.env,
+                        ...envVars,
+                        ...launcherEnvVars,
+                        ...extraEnvVars,
+                        MC_HOOK_PHASE: phase
+                    }
+                });
+
+                child.stdout?.on("data", (data) => {
+                    console.log("[Launcher Hook] ", data.toString());
+                });
+
+                child.stderr?.on("data", (data) => {
+                    console.error("[Launcher Hook] ", data.toString());
+                });
+
+                child.on("error", reject);
+
+                child.on("close", (code) => {
+                    if (code === 0) resolve();
+                    else reject(new Error("Launcher Hook exited with code " + code));
+                });
+            });
+        }
+        if (globalPreLaunch) {
+            await executeLaunchHook(globalPreLaunch, "prelaunch")
+        }
+        if (preLaunch) {
+            await executeLaunchHook(preLaunch, "prelaunch");
+        }
+        if ((wrapper && wrapper.length) || (globalWrapper && globalWrapper.length)) {
+            if (!wrapper) wrapper = [];
+            if (!globalWrapper) globalWrapper = [];
+            let fullCommand = globalWrapper.concat(wrapper).concat([this.java_installation]).concat(args);
             child = spawn(fullCommand[0], fullCommand.slice(1), {
                 env: {
                     ...process.env,
-                    ...envVars
+                    ...envVars,
+                    ...launcherEnvVars
                 },
                 cwd: path.resolve(userPath, `minecraft/instances/${this.instance_id}`),
                 detached: true,
-                stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')],
-                shell: true
+                stdio: ['ignore', fs.openSync(LOG_PATH, 'a'), fs.openSync(LOG_PATH, 'a')]
             });
         } else {
             child = spawn(this.java_installation, args, {
                 env: {
                     ...process.env,
-                    ...envVars
+                    ...envVars,
+                    ...launcherEnvVars
                 },
                 cwd: path.resolve(userPath, `minecraft/instances/${this.instance_id}`),
                 detached: true,
@@ -1082,12 +1144,21 @@ class Minecraft {
         });
 
         child.on("exit", (code) => {
+            if (globalPostExit) {
+                executeLaunchHook(globalPostExit, "postexit", { MC_EXIT_CODE: code });
+            }
             if (postExit) {
-                execSync(postExit, { stdio: "inherit" });
+                executeLaunchHook(postExit, "postexit", { MC_EXIT_CODE: code });
             }
         });
 
         child.unref();
+        if (globalPostLaunch) {
+            await executeLaunchHook(globalPostLaunch, "postlaunch", { MC_PID: child.pid, MC_LOG_FILE: LOG_PATH })
+        }
+        if (postLaunch) {
+            await executeLaunchHook(postLaunch, "postlaunch", { MC_PID: child.pid, MC_LOG_FILE: LOG_PATH });
+        }
         return { "pid": child.pid, "log": LOG_PATH, "java_path": this.java_installation, "java_version": this.java_version };
     }
     async downloadGame(loader, version, isRepair, whatToRepair) {

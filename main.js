@@ -1660,11 +1660,11 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
     }
 }
 
-ipcMain.handle('play-minecraft', async (_, loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit, offline) => {
-    return await playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit, offline);
+ipcMain.handle('play-minecraft', async (_, loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
+    return await playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
 });
 
-async function playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, wrapper, postExit, offline) {
+async function playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, offline, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) {
     if (!player_info) throw new Error("Please sign in to your Microsoft account to play Minecraft.");
 
     let date = new Date();
@@ -1676,14 +1676,14 @@ async function playMinecraft(loader, version, loaderVersion, instance_id, player
             if (!offline) throw new Error("Unable to update access token.");
         }
     }
-    let mc = new Minecraft(instance_id);
+    let mc = new Minecraft(instance_id, name);
     try {
         return {
             "minecraft": await mc.launchGame(loader, version, loaderVersion, player_info.name, player_info.uuid, {
                 "accessToken": player_info.access_token,
                 "xuid": player_info.xuid,
                 "clientId": player_info.client_id
-            }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), parseEnvString(envVars), preLaunch, parseJavaArgs(wrapper), postExit), "player_info": player_info
+            }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), {...parseEnvString(globalEnvVars), ...parseEnvString(envVars)}, preLaunch, postLaunch, parseJavaArgs(wrapper), postExit, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit), "player_info": player_info
         };
     } catch (err) {
         console.error(err);
@@ -1765,7 +1765,7 @@ async function repairMinecraft(instance_id, loader, vanilla_version, loader_vers
                 await mc.installQuilt(vanilla_version, loader_version, true);
             }
         }
-        return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version };
+        return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version, "java_args": r.java_args };
     } catch (err) {
         return { "error": true }
     }

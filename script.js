@@ -421,11 +421,14 @@ class Instance {
         this.java_args = content.java_args;
         this.env_vars = content.env_vars;
         this.pre_launch_hook = content.pre_launch_hook;
+        this.post_launch_hook = content.post_launch_hook;
         this.wrapper = content.wrapper;
         this.post_exit_hook = content.post_exit_hook;
         this.installed_version = content.installed_version;
         this.last_analyzed_log = content.last_analyzed_log;
         this.failed = Boolean(content.failed);
+        this.uses_custom_java_args = content.uses_custom_java_args;
+        this.provided_java_args = content.provided_java_args;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
     get pinned() {
@@ -465,6 +468,13 @@ class Instance {
         this.pre_launch_hook = pre_launch_hook;
         if (instance_watches[this.instance_id].onchangepre_launch_hook) {
             instance_watches[this.instance_id].onchangepre_launch_hook(pre_launch_hook);
+        }
+    }
+    setPostLaunchHook(post_launch_hook) {
+        db.prepare("UPDATE instances SET post_launch_hook = ? WHERE id = ?").run(post_launch_hook, this.id);
+        this.post_launch_hook = post_launch_hook;
+        if (instance_watches[this.instance_id].onchangepost_launch_hook) {
+            instance_watches[this.instance_id].onchangepost_launch_hook(post_launch_hook);
         }
     }
     setWrapper(wrapper) {
@@ -605,10 +615,19 @@ class Instance {
         if (instance_watches[this.instance_id].onchangemc_installed) instance_watches[this.instance_id].onchangemc_installed(mc_installed);
     }
     setFailed(failed) {
-        console.log(failed);
         db.prepare("UPDATE instances SET failed = ? WHERE id = ?").run(Number(failed), this.id);
         this.failed = failed;
         if (instance_watches[this.instance_id].onchangefailed) instance_watches[this.instance_id].onchangefailed(failed);
+    }
+    setUsesCustomJavaArgs(uses_custom_java_args) {
+        db.prepare("UPDATE instances SET uses_custom_java_args = ? WHERE id = ?").run(Number(uses_custom_java_args), this.id);
+        this.uses_custom_java_args = uses_custom_java_args;
+        if (instance_watches[this.instance_id].onchangeuses_custom_java_args) instance_watches[this.instance_id].onchangeuses_custom_java_args(uses_custom_java_args);
+    }
+    setProvidedJavaArgs(provided_java_args) {
+        db.prepare("UPDATE instances SET provided_java_args = ? WHERE id = ?").run(provided_java_args, this.id);
+        this.provided_java_args = provided_java_args;
+        if (instance_watches[this.instance_id].onchangeprovided_java_args) instance_watches[this.instance_id].onchangeprovided_java_args(provided_java_args);
     }
 
     watchForChange(name, func) {
@@ -884,10 +903,6 @@ class Data {
         let v = window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true);
         let instance = new Instance(instance_id);
         instance.setAttemptedOptionsTxtVersion(v);
-        instance.setEnvVars(data.getDefault("default_env_vars"));
-        instance.setPreLaunchHook(data.getDefault("default_pre_launch_hook"));
-        instance.setWrapper(data.getDefault("default_wrapper"));
-        instance.setPostExitHook(data.getDefault("default_post_exit_hook"));
         return instance;
     }
 
@@ -923,7 +938,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "default_env_vars": "", "default_pre_launch_hook": "", "default_wrapper": "", "default_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true" };
+            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -932,9 +947,7 @@ class Data {
     }
 
     setDefault(type, value) {
-        if (!this.getDefault(type)) {
-            return null;
-        }
+        this.getDefault(type);
         db.prepare("UPDATE defaults SET value = ? WHERE default_type = ?").run(value, type);
     }
 
@@ -3432,7 +3445,7 @@ settingsButtonEle.onclick = () => {
     }
     updatesButton.onclick = updateButtonClick;
     app_info.appendChild(updatesButton);
-    dialog.showDialog("Settings", "form", [
+    dialog.showDialog(translate("app.settings"), "form", [
         {
             "type": "dropdown",
             "name": translate("app.settings.theme"),
@@ -3602,6 +3615,18 @@ settingsButtonEle.onclick = () => {
             "tab": "defaults"
         },
         {
+            "type": "slider",
+            "name": translate("app.settings.defaults.ram"),
+            "desc": translate("app.settings.defaults.ram.description"),
+            "tab": "defaults",
+            "id": "default_ram",
+            "default": Number(data.getDefault("default_ram")),
+            "min": 512,
+            "max": window.electronAPI.getTotalRAM(),
+            "increment": 64,
+            "unit": translate("app.settings.defaults.ram.unit")
+        },
+        {
             "type": "number",
             "name": translate("app.settings.defaults.width"),
             "desc": translate("app.settings.defaults.width.description"),
@@ -3618,44 +3643,39 @@ settingsButtonEle.onclick = () => {
             "default": Number(data.getDefault("default_height"))
         },
         {
-            "type": "slider",
-            "name": translate("app.settings.defaults.ram"),
-            "desc": translate("app.settings.defaults.ram.description"),
-            "tab": "defaults",
-            "id": "default_ram",
-            "default": Number(data.getDefault("default_ram")),
-            "min": 512,
-            "max": window.electronAPI.getTotalRAM(),
-            "increment": 64,
-            "unit": translate("app.settings.defaults.ram.unit")
+            "type": "text",
+            "name": translate("app.settings.globals.custom_env_vars"),
+            "tab": "globals",
+            "id": "global_env_vars",
+            "default": data.getDefault("global_env_vars")
         },
         {
             "type": "text",
-            "name": translate("app.settings.defaults.custom_env_vars"),
-            "tab": "defaults",
-            "id": "default_env_vars",
-            "default": data.getDefault("default_env_vars")
+            "name": translate("app.settings.globals.pre_launch_hook"),
+            "tab": "globals",
+            "id": "global_pre_launch_hook",
+            "default": data.getDefault("global_pre_launch_hook")
         },
         {
             "type": "text",
-            "name": translate("app.settings.defaults.pre_launch_hook"),
-            "tab": "defaults",
-            "id": "default_pre_launch_hook",
-            "default": data.getDefault("default_pre_launch_hook")
+            "name": translate("app.settings.globals.post_launch_hook"),
+            "tab": "globals",
+            "id": "global_post_launch_hook",
+            "default": data.getDefault("global_post_launch_hook")
         },
         {
             "type": "text",
-            "name": translate("app.settings.defaults.wrapper"),
-            "tab": "defaults",
-            "id": "default_wrapper",
-            "default": data.getDefault("default_wrapper")
+            "name": translate("app.settings.globals.wrapper"),
+            "tab": "globals",
+            "id": "global_wrapper",
+            "default": data.getDefault("global_wrapper")
         },
         {
             "type": "text",
-            "name": translate("app.settings.defaults.post_exit_hook"),
-            "tab": "defaults",
-            "id": "default_post_exit_hook",
-            "default": data.getDefault("default_post_exit_hook")
+            "name": translate("app.settings.globals.post_exit_hook"),
+            "tab": "globals",
+            "id": "global_post_exit_hook",
+            "default": data.getDefault("global_post_exit_hook")
         },
         {
             "type": "notice",
@@ -3696,6 +3716,10 @@ settingsButtonEle.onclick = () => {
             "value": "defaults"
         },
         {
+            "name": translate("app.settings.tab.globals"),
+            "value": "globals"
+        },
+        {
             "name": translate("app.settings.tab.options"),
             "value": "options"
         },
@@ -3723,6 +3747,11 @@ settingsButtonEle.onclick = () => {
         data.setDefault("potato_mode", (info.potato_mode).toString());
         data.setDefault("hide_ip", (info.hide_ip).toString());
         data.setDefault("link_with_modrinth", (info.modrinth_link).toString());
+        data.setDefault("global_pre_launch_hook", info.global_pre_launch_hook);
+        data.setDefault("global_post_launch_hook", info.global_post_launch_hook);
+        data.setDefault("global_wrapper", info.global_wrapper);
+        data.setDefault("global_post_exit_hook", info.global_post_exit_hook);
+        data.setDefault("global_env_vars", info.global_env_vars);
         if (info.potato_mode) {
             document.body.classList.add("potato");
         } else {
@@ -3746,7 +3775,7 @@ settingsButtonEle.onclick = () => {
             }
         });
         window.electronAPI.changeFolder(window.electronAPI.userPath, info.folder_location);
-    });
+    }, () => {}, undefined, 800);
 }
 
 let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
@@ -5809,6 +5838,7 @@ function showCreateInstanceDialog() {
                 instance.setJavaPath(r.java_installation);
                 instance.setJavaVersion(r.java_version);
                 instance.setJavaArgs(r.java_args);
+                instance.setProvidedJavaArgs(r.java_args);
                 instance.setMcInstalled(true);
             }
         } else if (info.selected_tab == "file") {
@@ -5844,6 +5874,7 @@ function showCreateInstanceDialog() {
                 instance.setJavaPath(r.java_installation);
                 instance.setJavaVersion(r.java_version);
                 instance.setJavaArgs(r.java_args);
+                instance.setProvidedJavaArgs(r.java_args);
                 instance.setMcInstalled(true);
             }
         } else if (info.selected_tab == "launcher") {
@@ -5880,6 +5911,7 @@ function showCreateInstanceDialog() {
                 instance.setJavaPath(r.java_installation);
                 instance.setJavaVersion(r.java_version);
                 instance.setJavaArgs(r.java_args);
+                instance.setProvidedJavaArgs(r.java_args);
                 instance.setMcInstalled(true);
             }
         }
@@ -6245,6 +6277,7 @@ function getServerLastPlayed(instance_id, ip) {
 
 function showInstanceSettings(instanceInfo, tabsInfo) {
     let dialog = new Dialog();
+    let resettingJavaArgs = false;
     dialog.showDialog(translate("app.instances.settings.title"), "form", [
         {
             "type": "image-upload",
@@ -6454,20 +6487,37 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             "id": "java_args",
             "name": translate("app.instances.settings.custom_args"),
             "default": instanceInfo.java_args,
-            "tab": "java"
+            "tab": "java",
+            "buttons": [
+                {
+                    "name": translate("app.instances.settings.java_args.reset"),
+                    "icon": '<i class="fa-solid fa-rotate-left"></i>',
+                    "func": (v, b, i) => {
+                        i.value = instanceInfo.provided_java_args;
+                        resettingJavaArgs = true;
+                    }
+                }
+            ]
         },
         {
             "type": "text",
             "id": "env_vars",
             "name": translate("app.instances.settings.custom_env_vars"),
             "default": instanceInfo.env_vars,
-            "tab": "java"
+            "tab": "launch_hooks"
         },
         {
             "type": "text",
             "id": "pre_launch_hook",
             "name": translate("app.instances.settings.pre_launch_hook"),
             "default": instanceInfo.pre_launch_hook,
+            "tab": "launch_hooks"
+        },
+        {
+            "type": "text",
+            "id": "post_launch_hook",
+            "name": translate("app.instances.settings.post_launch_hook"),
+            "default": instanceInfo.post_launch_hook,
             "tab": "launch_hooks"
         },
         {
@@ -6505,9 +6555,15 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         instanceInfo.setWindowHeight(info.height);
         instanceInfo.setAllocatedRam(info.allocated_ram);
         instanceInfo.setJavaPath(info.java_path);
-        instanceInfo.setJavaArgs(info.java_args);
+        if (resettingJavaArgs && info.java_args == instanceInfo.provided_java_args) {
+            instanceInfo.setUsesCustomJavaArgs(false);
+        } else if (info.java_args != instanceInfo.java_args) {
+            instanceInfo.setUsesCustomJavaArgs(true);
+            instanceInfo.setJavaArgs(info.java_args);
+        }
         instanceInfo.setEnvVars(info.env_vars);
         instanceInfo.setPreLaunchHook(info.pre_launch_hook);
+        instanceInfo.setPostLaunchHook(info.post_launch_hook);
         instanceInfo.setWrapper(info.wrapper);
         instanceInfo.setPostExitHook(info.post_exit_hook);
         if (info.modpack_version && (info.modpack_version != instanceInfo.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
@@ -6534,7 +6590,10 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                 instanceInfo.setJavaPath(r.java_installation);
                 instanceInfo.setJavaVersion(r.java_version);
             }
-            instanceInfo.setJavaArgs(r.java_args);
+            instanceInfo.setProvidedJavaArgs(r.java_args);
+            if (!instanceInfo.uses_custom_java_args) {
+                instanceInfo.setJavaArgs(r.java_args);
+            }
             if (info.update_content) {
                 let content = instanceInfo.getContent();
                 let processId = Math.random();
@@ -8435,7 +8494,7 @@ async function playInstance(instInfo, quickPlay = null) {
     instInfo.setLastPlayed(new Date());
     let pid;
     try {
-        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, !navigator.onLine);
+        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, !navigator.onLine, data.getDefault("global_env_vars"), data.getDefault("global_pre_launch_hook"), data.getDefault("global_post_launch_hook"), data.getDefault("global_wrapper"), data.getDefault("global_post_exit_hook"), instInfo.name);
         if (!pid) return;
         console.log(pid);
         console.log(pid.minecraft.pid);
@@ -9487,7 +9546,7 @@ class Dialog {
     closeDialog() {
         this.element.close();
     }
-    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen) {
+    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, max_width) {
         let element = document.createElement("dialog");
         element.className = "dialog";
         element.oncancel = (e) => {
@@ -9496,6 +9555,7 @@ class Dialog {
                 this.element.remove();
             }, 1000);
         }
+        if (max_width) element.style.maxWidth = max_width + "px";
         this.element = element;
         if (full_screen) element.classList.add("dialog-full");
         let dialogTop = document.createElement("div");
@@ -10977,6 +11037,7 @@ class VanillaTweaksSelector {
                             instance.setJavaPath(r.java_installation);
                             instance.setJavaVersion(r.java_version);
                             instance.setJavaArgs(r.java_args);
+                            instance.setProvidedJavaArgs(r.java_args);
                             instance.setMcInstalled(true);
                         }
                     });
@@ -11613,12 +11674,15 @@ function duplicateInstance(instanceInfo) {
                 true
             );
             newInstance.setJavaArgs(instanceInfo.java_args);
+            newInstance.setProvidedJavaArgs(instanceInfo.provided_java_args);
+            newInstance.setUsesCustomJavaArgs(instanceInfo.uses_custom_java_args);
             newInstance.setJavaPath(instanceInfo.java_path);
             newInstance.setJavaVersion(instanceInfo.java_version);
             newInstance.setAllocatedRam(instanceInfo.allocated_ram);
             newInstance.setEnvVars(instanceInfo.env_vars);
             newInstance.setPostExitHook(instanceInfo.post_exit_hook);
             newInstance.setPreLaunchHook(instanceInfo.pre_launch_hook);
+            newInstance.setPostLaunchHook(instanceInfo.post_launch_hook);
             newInstance.setWrapper(instanceInfo.wrapper);
             newInstance.setWindowHeight(instanceInfo.window_height);
             newInstance.setWindowWidth(instanceInfo.window_width);
@@ -13530,6 +13594,10 @@ async function repairInstance(instance, whatToRepair) {
         }
         instance.setMcInstalled(true);
     }
+    instance.setProvidedJavaArgs(r.java_args);
+    if (!instance.uses_custom_java_args) {
+        instance.setJavaArgs(r.java_args);
+    }
 }
 
 async function installButtonClick(project_type, source, content_loaders, icon, title, author, game_versions, project_id, instance_id, button, dialog_to_close, override_version, oncomplete = () => { }, states) {
@@ -13752,6 +13820,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 instance.setJavaPath(r.java_installation);
                 instance.setJavaVersion(r.java_version);
                 instance.setJavaArgs(r.java_args);
+                instance.setProvidedJavaArgs(r.java_args);
                 instance.setMcInstalled(true);
             }
         })
@@ -13953,6 +14022,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     instance.setJavaPath(r.java_installation);
                     instance.setJavaVersion(r.java_version);
                     instance.setJavaArgs(r.java_args);
+                    instance.setProvidedJavaArgs(r.java_args);
                     instance.setMcInstalled(true);
                 }
             });
@@ -14143,6 +14213,7 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
         instanceInfo.setJavaPath(r.java_installation);
         instanceInfo.setJavaVersion(r.java_version);
         instanceInfo.setJavaArgs(r.java_args);
+        instanceInfo.setProvidedJavaArgs(r.java_args);
         instanceInfo.setMcInstalled(true);
     }
 }
@@ -14378,6 +14449,7 @@ let importInstance = (info, file_path) => {
             instance.setJavaPath(r.java_installation);
             instance.setJavaVersion(r.java_version);
             instance.setJavaArgs(r.java_args);
+            instance.setProvidedJavaArgs(r.java_args);
             instance.setMcInstalled(true);
         }
     });
@@ -14761,6 +14833,17 @@ try {
             db.prepare("ALTER TABLE skins ADD preview TEXT").run();
             db.prepare("ALTER TABLE skins ADD preview_model TEXT").run();
             db.prepare("ALTER TABLE skins ADD head TEXT").run();
+        case "0.6.0":
+        case "0.6.1":
+        case "0.6.2":
+        case "0.6.3":
+        case "0.6.4":
+        case "0.6.5":
+            db.prepare("ALTER TABLE instances ADD post_launch_hook TEXT").run();
+            db.prepare("ALTER TABLE instances ADD uses_custom_java_args INTEGER").run();
+            db.prepare("ALTER TABLE instances ADD provided_java_args TEXT").run();
+            let instances = data.getInstances();
+            instances.forEach(e => e.setProvidedJavaArgs(e.java_args));
     }
 } catch (e) { }
 
