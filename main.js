@@ -2400,7 +2400,7 @@ async function addServer(instance_id, ip, title, image) {
 }
 
 ipcMain.handle('get-java-installation', async (_, v) => {
-    return await getJavaInstallation(v);
+    return await getJavaInstallation(v).replaceAll("\\", "/");
 })
 
 async function getJavaInstallation(v) {
