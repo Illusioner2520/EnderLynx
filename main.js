@@ -85,8 +85,8 @@ const createWindow = () => {
         title: "EnderLynx",
         width: state.width,
         height: state.height,
-        minWidth: 1000,
-        minHeight: 600,
+        minWidth: 500,
+        minHeight: 300,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,

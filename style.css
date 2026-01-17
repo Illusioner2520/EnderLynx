@@ -1110,7 +1110,6 @@ h1 {
     display: flex;
     padding: 4px;
     width: max-content;
-    max-width: 100%;
     position: relative;
 }
 
@@ -1123,6 +1122,7 @@ h1 {
     cursor: pointer;
     transition: background-color .25s, color .25s, scale .1s;
     z-index: 2;
+    flex-shrink: 0;
 }
 
 .tab-button:active {
@@ -2850,8 +2850,16 @@ dialog[open]::backdrop {
 .page-container {
     display: flex;
     align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pages {
+    display: flex;
+    align-items: center;
     justify-content: flex-end;
     gap: 8px;
+    margin-left: auto;
 }
 
 .page {

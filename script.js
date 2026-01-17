@@ -10284,10 +10284,8 @@ function formatNumber(num) {
 }
 
 function contentTabSelect(tab, ele, loader, version, instance_id, states) {
-    let tabsElement = document.createElement("div");
     ele.innerHTML = '';
     let sources = [];
-    ele.appendChild(tabsElement);
     if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "datapack") {
         sources.push({
             "name": translate("app.discover.modrinth"),
@@ -10350,6 +10348,9 @@ class Pagination {
         let element = document.createElement("div");
         element.className = "page-container";
         this.element = element;
+        let pagesElement = document.createElement("div");
+        pagesElement.className = "pages";
+        this.pagesElement = pagesElement;
         this.totalPages = totalPages;
         this.change_page_function = change_page_function;
         this.d1opt = d1opt;
@@ -10374,6 +10375,7 @@ class Pagination {
         this.currentPage = page;
         let element = this.element;
         this.element.innerHTML = "";
+        this.pagesElement.innerHTML = "";
         let leftArrow = document.createElement("button");
         leftArrow.className = "page";
         leftArrow.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
@@ -10404,21 +10406,18 @@ class Pagination {
             dropdownEle.style.width = "150px";
             new Dropdown(translate("app.discover.sort_by"), this.d1opt, dropdownEle, this.d1def, this.d1func);
             element.appendChild(dropdownEle);
-            if (!this.d2opt && !this.d3opt && !this.d4opt) dropdownEle.style.marginRight = "auto";
         }
         if (this.d2opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "75px";
             new Dropdown(translate("app.discover.view"), this.d2opt, dropdownEle, this.d2def, this.d2func);
             element.appendChild(dropdownEle);
-            if (!this.d3opt && !this.d4opt) dropdownEle.style.marginRight = "auto";
         }
         if (this.d3opt) {
             let dropdownEle = document.createElement("div");
             dropdownEle.style.width = "180px";
             new SearchDropdown(translate("app.discover.game_version"), this.d3opt, dropdownEle, this.d3def, this.d3func);
             element.appendChild(dropdownEle);
-            if (!this.d4opt) dropdownEle.style.marginRight = "auto";
         }
         if (this.d4opt) {
             let dropdownEle = document.createElement("div");
@@ -10427,10 +10426,10 @@ class Pagination {
             new Dropdown(translate("app.discover.loader"), this.d4opt, dropdownEle, this.d4def, this.d4func);
             element.appendChild(dropdownEle);
         }
-        element.appendChild(leftArrow);
+        this.pagesElement.appendChild(leftArrow);
         for (let i = 1; i <= this.totalPages; i++) {
             if (i == this.currentPage) {
-                element.appendChild(currentPageEle);
+                this.pagesElement.appendChild(currentPageEle);
             } else if (i == 1 || i == this.totalPages || i == this.currentPage + 1 || i == this.currentPage - 1 || this.totalPages <= 5) {
                 let pageElement = document.createElement("button");
                 pageElement.innerHTML = i;
@@ -10438,7 +10437,7 @@ class Pagination {
                 pageElement.onclick = () => {
                     this.change_page_function(i);
                 }
-                element.appendChild(pageElement);
+                this.pagesElement.appendChild(pageElement);
                 gap = 0;
             } else {
                 if (gap == 0) {
@@ -10465,12 +10464,13 @@ class Pagination {
                         pageInput.focus();
                     }
 
-                    element.appendChild(pageCollapseGroup);
+                    this.pagesElement.appendChild(pageCollapseGroup);
                 }
                 gap = 1;
             }
         }
-        element.appendChild(rightArrow);
+        this.pagesElement.appendChild(rightArrow);
+        element.appendChild(this.pagesElement);
     }
 }
 
