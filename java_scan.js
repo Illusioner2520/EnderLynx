@@ -13,11 +13,14 @@ const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDat
 const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\JavaSoft\\Java Runtime Environment",
     "SOFTWARE\\JavaSoft\\Java Development Kit",
+    "SOFTWARE\\Eclipse Adoptium\\JRE",
+    "SOFTWARE\\Eclipse Adoptium\\JDK",
+    "SOFTWARE\\Azul Systems\\Zulu",
+    "SOFTWARE\\Amazon Corretto\\JDK",
+    "SOFTWARE\\BellSoft\\Liberica",
+    "SOFTWARE\\RedHat\\OpenJDK"
     "SOFTWARE\\JavaSoft\\JRE",
     "SOFTWARE\\JavaSoft\\JDK",
-    "SOFTWARE\\Eclipse Foundation\\JDK",
-    "SOFTWARE\\Eclipse Adoptium\\JRE",
-    "SOFTWARE\\Eclipse Foundation\\JDK",
     "SOFTWARE\\Microsoft\\JDK",
 ];
 
@@ -45,7 +48,7 @@ async function getJavaVersion(javawPath) {
     }
 }
 
-function getJavaFromRegistry(root, arch) {
+function getJavaFromRegistry(hive, arch) {
     return new Promise((resolve) => {
         const foundPaths = new Set();
         let pending = JAVA_REGISTRY_PATHS.length;
@@ -53,7 +56,7 @@ function getJavaFromRegistry(root, arch) {
 
         JAVA_REGISTRY_PATHS.forEach((keyPath) => {
             const regKey = new WinReg({
-                hive: WinReg.HKLM,
+                hive,
                 key: `\\${keyPath}`,
                 arch,
             });
@@ -120,12 +123,13 @@ async function findJavaInstallations(v) {
     }
 
     if (platformString == "windows") {
-        // From registry (both 32-bit and 64-bit views)
-        const [reg32, reg64] = await Promise.all([
-            getJavaFromRegistry(WinReg.HKLM, "x86"),
-            getJavaFromRegistry(WinReg.HKLM, "x64"),
+        const [reg32, reg64, user32, user64] = await Promise.all([
+            getJavaFromRegistry(WinReg.HKLM, WinReg.ARCH_X86),
+            getJavaFromRegistry(WinReg.HKLM, WinReg.ARCH_X64),
+            getJavaFromRegistry(WinReg.HKCU, WinReg.ARCH_X86),
+            getJavaFromRegistry(WinReg.HKCU, WinReg.ARCH_X64),
         ]);
-        for (const p of [...reg32, ...reg64]) jrePaths.add(p);
+        for (const p of [...reg32, ...reg64, ...user32, ...user64]) jrePaths.add(p);
     }
 
     // Validate all collected paths
