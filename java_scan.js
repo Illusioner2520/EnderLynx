@@ -18,7 +18,7 @@ const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\Azul Systems\\Zulu",
     "SOFTWARE\\Amazon Corretto\\JDK",
     "SOFTWARE\\BellSoft\\Liberica",
-    "SOFTWARE\\RedHat\\OpenJDK"
+    "SOFTWARE\\RedHat\\OpenJDK",
     "SOFTWARE\\JavaSoft\\JRE",
     "SOFTWARE\\JavaSoft\\JDK",
     "SOFTWARE\\Microsoft\\JDK",
