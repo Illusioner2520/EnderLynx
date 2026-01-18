@@ -2302,6 +2302,11 @@ class ContentList {
             imageElement.className = "content-list-image";
             imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : getDefaultImage(contentInfo.primary_column.title));
             imageElement.loading = "lazy";
+            imageElement.onerror = () => {
+                if (navigator.onLine && contentInfo.onimagefail) {
+                    contentInfo.onimagefail(imageElement);
+                }
+            }
             contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
             infoElement1.className = "content-list-info";
@@ -6895,6 +6900,22 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                 "type": e.type,
                 "class": e.source,
                 "image": e.image,
+                "onimagefail": async (ele) => {
+                    if (e.source == "modrinth") {
+                        let newInfo = await fetch(`https://api.modrinth.com/v2/project/${e.source_info}`);
+                        let newInfoJSON = await newInfo.json();
+                        let newImage = newInfoJSON.icon_url;
+                        e.setImage(newImage);
+                        ele.src = fixPathForImage(newImage ? newImage: getDefaultImage(e.name));
+                    } else if (e.source == "curseforge") {
+                        let newInfo = await fetch(`https://api.curse.tools/v1/cf/mods/${e.source_info.replace(".0", "")}`);
+                        let newInfoJSON = await newInfo.json();
+                        let newImage = newInfoJSON.data?.logo?.thumbnailUrl;
+                        if (!newImage) newImage = newInfoJSON.data?.logo?.url;
+                        e.setImage(newImage);
+                        ele.src = fixPathForImage(newImage ? newImage: getDefaultImage(e.name));
+                    }
+                },
                 "onremove": (ele) => {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.content.delete.title"), "notice", translate("app.content.delete.notice").replace("%c", e.name), [
