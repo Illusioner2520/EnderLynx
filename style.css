@@ -5557,3 +5557,8 @@ div:has(> .dialog-wrapper-hidden.shown) {
     flex-direction: column;
     gap: 8px;
 }
+
+body.thin-scrollbars *,
+:root:has(body.thin-scrollbars) {
+    scrollbar-width: thin;
+}

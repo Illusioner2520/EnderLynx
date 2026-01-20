@@ -938,7 +938,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true" };
+            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -3462,7 +3462,6 @@ settingsButtonEle.onclick = () => {
             ],
             "default": data.getDefault("default_mode"),
             "onchange": (v) => {
-                data.setDefault("default_mode", v);
                 if (v == "light") {
                     document.body.classList.add("light");
                 } else {
@@ -3493,7 +3492,6 @@ settingsButtonEle.onclick = () => {
             ],
             "default": data.getDefault("default_accent_color"),
             "onchange": (v) => {
-                data.setDefault("default_accent_color", v);
                 accent_colors.forEach(e => {
                     document.body.classList.remove(e);
                 });
@@ -3511,7 +3509,6 @@ settingsButtonEle.onclick = () => {
             ],
             "default": data.getDefault("default_sidebar"),
             "onchange": (v) => {
-                data.setDefault("default_sidebar", v);
                 if (v == "compact") {
                     document.body.classList.add("compact");
                 } else {
@@ -3530,7 +3527,6 @@ settingsButtonEle.onclick = () => {
             ],
             "default": data.getDefault("default_sidebar_side"),
             "onchange": (v) => {
-                data.setDefault("default_sidebar_side", v);
                 if (v == "right") {
                     document.body.classList.add("sidebar-right");
                 } else {
@@ -3551,6 +3547,20 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.page.wardrobe"), "value": "wardrobe" }
             ],
             "default": data.getDefault("default_page")
+        },
+        {
+            "type": "toggle",
+            "name": translate("app.settings.thin_scrollbars"),
+            "tab": "appearance",
+            "id": "thin_scrollbars",
+            "default": data.getDefault("thin_scrollbars") == "true",
+            "onchange": (v) => {
+                if (v) {
+                    document.body.classList.add("thin-scrollbars");
+                } else {
+                    document.body.classList.remove("thin-scrollbars");
+                }
+            }
         },
         {
             "type": "toggle",
@@ -3757,10 +3767,39 @@ settingsButtonEle.onclick = () => {
         data.setDefault("global_wrapper", info.global_wrapper);
         data.setDefault("global_post_exit_hook", info.global_post_exit_hook);
         data.setDefault("global_env_vars", info.global_env_vars);
+        data.setDefault("default_mode", info.default_mode);
+        data.setDefault("default_accent_color", info.default_accent_color);
+        data.setDefault("default_sidebar", info.default_sidebar);
+        data.setDefault("default_sidebar_side", info.default_sidebar_side);
+        data.setDefault("thin_scrollbars", (info.thin_scrollbars).toString());
         if (info.potato_mode) {
             document.body.classList.add("potato");
         } else {
             document.body.classList.remove("potato");
+        }
+        if (info.thin_scrollbars) {
+            document.body.classList.add("thin-scrollbars");
+        } else {
+            document.body.classList.remove("thin-scrollbars");
+        }
+        if (info.default_mode == "light") {
+            document.body.classList.add("light");
+        } else {
+            document.body.classList.remove("light");
+        }
+        accent_colors.forEach(e => {
+            document.body.classList.remove(e);
+        });
+        document.body.classList.add(info.default_accent_color);
+        if (info.default_sidebar == "compact") {
+            document.body.classList.add("compact");
+        } else {
+            document.body.classList.remove("compact");
+        }
+        if (info.default_sidebar_side == "right") {
+            document.body.classList.add("sidebar-right");
+        } else {
+            document.body.classList.remove("sidebar-right");
         }
         if (info.hide_ip) {
             document.body.classList.add("hide_ip");
@@ -3780,7 +3819,37 @@ settingsButtonEle.onclick = () => {
             }
         });
         window.electronAPI.changeFolder(window.electronAPI.userPath, info.folder_location);
-    }, () => {}, undefined, 800);
+    }, () => {
+        let color_theme = data.getDefault("default_mode");
+        let accent_color = data.getDefault("default_accent_color");
+        let sidebar_mode = data.getDefault("default_sidebar");
+        let sidebar_side = data.getDefault("default_sidebar_side");
+        let thin_scrollbars = data.getDefault("thin_scrollbars");
+        if (thin_scrollbars) {
+            document.body.classList.add("thin-scrollbars");
+        } else {
+            document.body.classList.remove("thin-scrollbars");
+        }
+        if (color_theme == "light") {
+            document.body.classList.add("light");
+        } else {
+            document.body.classList.remove("light");
+        }
+        accent_colors.forEach(e => {
+            document.body.classList.remove(e);
+        });
+        document.body.classList.add(accent_color);
+        if (sidebar_mode == "compact") {
+            document.body.classList.add("compact");
+        } else {
+            document.body.classList.remove("compact");
+        }
+        if (sidebar_side == "right") {
+            document.body.classList.add("sidebar-right");
+        } else {
+            document.body.classList.remove("sidebar-right");
+        }
+    }, undefined, 800);
 }
 
 let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
@@ -4383,6 +4452,10 @@ if (data.getDefault("default_sidebar_side") == "right") {
 
 if (data.getDefault("potato_mode") == "true") {
     document.body.classList.add("potato");
+}
+
+if (data.getDefault("thin_scrollbars") == "true") {
+    document.body.classList.add("thin-scrollbars");
 }
 
 if (data.getDefault("hide_ip") == "true") {
@@ -6906,14 +6979,14 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         let newInfoJSON = await newInfo.json();
                         let newImage = newInfoJSON.icon_url;
                         e.setImage(newImage);
-                        ele.src = fixPathForImage(newImage ? newImage: getDefaultImage(e.name));
+                        ele.src = fixPathForImage(newImage ? newImage : getDefaultImage(e.name));
                     } else if (e.source == "curseforge") {
                         let newInfo = await fetch(`https://api.curse.tools/v1/cf/mods/${e.source_info.replace(".0", "")}`);
                         let newInfoJSON = await newInfo.json();
                         let newImage = newInfoJSON.data?.logo?.thumbnailUrl;
                         if (!newImage) newImage = newInfoJSON.data?.logo?.url;
                         e.setImage(newImage);
-                        ele.src = fixPathForImage(newImage ? newImage: getDefaultImage(e.name));
+                        ele.src = fixPathForImage(newImage ? newImage : getDefaultImage(e.name));
                     }
                 },
                 "onremove": (ele) => {
@@ -9774,6 +9847,9 @@ class Dialog {
                     labelDesc.className = "dialog-label-desc";
                     let toggleEle = document.createElement("button");
                     let toggle = new Toggle(toggleEle, () => { }, info[i].default ?? false);
+                    if (info[i].onchange) toggle.onchange = () => {
+                        info[i].onchange(toggle.toggled);
+                    }
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper-horizontal";
                     contents[tab].appendChild(wrapper);

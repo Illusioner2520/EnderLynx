@@ -281,6 +281,7 @@
     "app.settings.discord_rpc.description": "Manages whether your Discord can show 'EnderLynx' as your status. Note: This does not affect Rich Presence added by launched modpacks or instances.",
     "app.settings.potato_pc": "Potato PC Mode",
     "app.settings.potato_pc.description": "Toggle this on to disable graphically intensive effects in the launcher.",
+    "app.settings.thin_scrollbars": "Thin Scrollbars",
     "app.settings.hide_ips": "Hide IP Addresses",
     "app.settings.hide_ips.description": "Hide the IP Addresses in the world list. (Click to reveal them)",
     "app.settings.modrinth_link": "Link Player Installed Content to Modrinth",
