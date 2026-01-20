@@ -7017,6 +7017,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                             "title": translate("app.content.open"),
                             "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                             "func": () => {
+                                e = e.refresh();
                                 window.electronAPI.showContentInFolder(instanceInfo.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                             }
                         },
