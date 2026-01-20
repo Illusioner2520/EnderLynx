@@ -83,6 +83,7 @@ body {
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
     --sidebar: color-mix(in srgb, 7.8% var(--accent-color), transparent);
     color-scheme: dark;
+    overflow: hidden;
 }
 
 body.potato {
