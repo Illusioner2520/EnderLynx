@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils, BrowserWindow } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { JavaSearch } = require('./java_scan.js');

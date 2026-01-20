@@ -528,6 +528,7 @@ body.compact #playerSwitch .player-chevron {
     width: calc(100% - 301px);
     height: 100%;
     transition: top .25s, height .25s;
+    overflow: auto;
 }
 
 body.offline .content {
