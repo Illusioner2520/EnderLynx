@@ -147,6 +147,7 @@ button {
     border-width: 1px;
     z-index: 4;
     backdrop-filter: blur(15px);
+    overflow-y: auto;
 }
 
 body.sidebar-right .sidebar {
