@@ -528,7 +528,6 @@ body.compact #playerSwitch .player-chevron {
     width: calc(100% - 301px);
     height: 100%;
     transition: top .25s, height .25s;
-    overflow: auto;
 }
 
 body.offline .content {
@@ -570,6 +569,9 @@ body.compact.sidebar-right #offline-notice {
     padding: 10px;
     display: grid;
     gap: 10px;
+    max-width: 100%;
+    max-height: 100%;
+    overflow: auto;
 }
 
 h1 {
@@ -2943,6 +2945,9 @@ dialog[open]::backdrop {
     gap: 10px;
     grid-template-columns: 1fr 300px;
     min-height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    overflow: auto;
 }
 
 .my-account-options {
@@ -3615,6 +3620,9 @@ dialog[open]::backdrop {
     padding: 10px;
     gap: 10px;
     grid-template-columns: 1fr 1fr;
+    max-width: 100%;
+    max-height: 100%;
+    overflow: auto;
 }
 
 .home-column {
