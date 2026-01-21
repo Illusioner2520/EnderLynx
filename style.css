@@ -3836,7 +3836,7 @@ dialog[open]::backdrop {
     position: relative;
     overflow-x: auto;
     overflow-y: visible;
-    scrollbar-width: none;
+    scrollbar-width: none !important;
     -ms-overflow-style: none;
     scroll-timeline: --home-container x;
 }
