@@ -1708,7 +1708,17 @@ class NeoForge {
         for (let i = 0; i < data.length; i++) {
             let versionNumber = "";
             let split = data[i].split(".");
-            if (split[0] == "0") {
+            if (Number(split[0]) >= 26) {
+                let mcVersion = split[0] + '.' + split[1];
+                if (split[2] != "0") {
+                    mcVersion += "." + split[2];
+                }
+                let splitAgain = data[i].split('+');
+                if (splitAgain.length == 2) {
+                    mcVersion += '-' + splitAgain[1];
+                }
+                if (!versions.includes(mcVersion)) versions.push(mcVersion);
+            } else if (split[0] == "0") {
                 if (!versions.includes(split[1])) versions.push(split[1]);
             } else {
                 versionNumber += "1." + split[0];
@@ -1723,19 +1733,27 @@ class NeoForge {
     }
 
     static async getVersions(mcVersion) {
-        let start0 = "0";
-        let start1 = mcVersion;
-        let split = mcVersion.split(".");
-        if (split.length >= 2) {
-            start0 = split[1];
-            start1 = split[2] ?? "0";
+        let start = "";
+        let end = "";
+        let split2 = mcVersion.split("-");
+        let split = split2[0].split(".");
+        if (split.length >= 2 && split2.length == 1) {
+            if (Number(split[0]) >= 26) {
+                start = split[0] + "." + split[1] + "." + (split[2] ?? "0");
+            } else {
+                start = split[1] + "." + (split[2] ?? "0");
+            }
+        } else if (split2.length >= 2) {
+            start = split[0] + "." + split[1] + "." + (split[2] ?? "0");
+            end = split2.slice(1).join("-");
+        } else {
+            start = "0." + mcVersion;
         }
         const res = await fetch('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge');
         const data = (await res.json()).versions;
         let versions = [];
         for (let i = 0; i < data.length; i++) {
-            let split = data[i].split(".");
-            if (split[0] == start0 && split[1] == start1) {
+            if (data[i].startsWith(start) && data[i].endsWith(end)) {
                 versions.push(data[i]);
             }
         }
