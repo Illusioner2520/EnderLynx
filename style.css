@@ -689,6 +689,7 @@ h1 {
     width: 40px;
     image-rendering: pixelated;
     object-fit: contain;
+    background-color: var(--color-1);
 }
 
 .instance-name {
