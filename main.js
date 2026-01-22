@@ -511,7 +511,7 @@ ipcMain.handle('get-recently-played-worlds', async (_, instance_ids) => {
         allWorlds = allWorlds.concat(worlds);
     }
     allWorlds.sort((a, b) => (b.last_played || 0) - (a.last_played || 0));
-    return allWorlds.slice(0, 5);
+    return allWorlds;
 });
 
 ipcMain.handle('get-worlds', async (_, savesPath) => {
