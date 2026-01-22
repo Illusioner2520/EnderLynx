@@ -4096,7 +4096,6 @@ async function showHomeContent(oldEle) {
                             if (e.type == "singleplayer") {
                                 let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
                                 if (success) {
-                                    ele.remove();
                                     displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
                                 } else {
                                     displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
@@ -4104,7 +4103,6 @@ async function showHomeContent(oldEle) {
                             } else if (e.type == "multiplayer") {
                                 let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
                                 if (success) {
-                                    ele.remove();
                                     displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
                                 } else {
                                     displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
