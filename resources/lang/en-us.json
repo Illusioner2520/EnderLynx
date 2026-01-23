@@ -888,5 +888,7 @@
     "app.modpack.repair": "Reinstall Modpack",
     "app.vt.selected_pack_count": "%c Packs Selected",
     "app.vt.selected_pack_count.singular": "%c Pack Selected",
-    "app.vt.incompatible_selected_pack_count": "%c Incompatible Packs Selected"
+    "app.vt.incompatible_selected_pack_count": "%c Incompatible Packs Selected",
+    "app.welcome": "Welcome back, %n!",
+    "app.welcome_no_user": "Welcome to EnderLynx!"
 }

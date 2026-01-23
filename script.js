@@ -1231,6 +1231,9 @@ class MinecraftAccountSwitcher {
         if (currentTab == "wardrobe") {
             wardrobeContent.displayContent();
         }
+        if (currentTab == 'home' && changehomewelcome) {
+            changehomewelcome();
+        }
     }
     selectPlayer(newPlayerInfo) {
         this.default_player = newPlayerInfo;
@@ -1265,6 +1268,9 @@ class MinecraftAccountSwitcher {
         if (currentTab == "wardrobe") {
             wardrobeContent.displayContent();
         }
+        if (currentTab == "home" && changehomewelcome) {
+            changehomewelcome();
+        }
     }
     onPlayerClick(e) {
         this.selectPlayer(e);
@@ -1290,6 +1296,9 @@ class MinecraftAccountSwitcher {
         this.setPlayerInfo();
         if (currentTab == "wardrobe") {
             wardrobeContent.displayContent();
+        }
+        if (currentTab == "home" && changehomewelcome) {
+            changehomewelcome();
         }
     }
 }
@@ -3898,9 +3907,43 @@ function showHome() {
     return ele;
 }
 
+let changehomewelcome;
+
 async function showHomeContent(oldEle) {
     let ele = document.createElement("div");
+    content.appendChild(ele);
     ele.className = "home-element";
+    let welcomeElement = document.createElement("div");
+    welcomeElement.className = "welcome-container";
+    let innerWelcomeElement = document.createElement("div");
+    innerWelcomeElement.className = "welcome";
+    changehomewelcome = () => {
+        let profile = data.getDefaultProfile();
+        if (profile) {
+            innerWelcomeElement.textContent = translate("app.welcome", "%n", profile.name);
+        } else {
+            innerWelcomeElement.textContent = translate("app.welcome_no_user");
+        }
+    }
+    changehomewelcome();
+    welcomeElement.appendChild(innerWelcomeElement);
+    welcomeElement.style.visibility = "hidden";
+    ele.appendChild(welcomeElement);
+    for (let i = 0; i < 10; i++) {
+        let blobElement = document.createElement("div");
+        welcomeElement.appendChild(blobElement);
+        blobElement.className = "welcome-blob";
+        let height = Math.random() * 100 + 20;
+        let width = Math.random() * 200 + 20;
+        let top = Math.random() * (welcomeElement.offsetHeight + height) - height;
+        let left = Math.random() * (welcomeElement.offsetWidth + width) - width;
+        let rotate = Math.random() * 360;
+        blobElement.style.setProperty("--blob-height", height + "px");
+        blobElement.style.setProperty("--blob-width", width + "px");
+        blobElement.style.setProperty("--blob-top", top + "px");
+        blobElement.style.setProperty("--blob-left", left + "px");
+        blobElement.style.setProperty("--blob-rotate", rotate + "deg");
+    }
     let column1 = document.createElement("div");
     column1.className = "home-column";
     let column2 = document.createElement("div");
@@ -4475,8 +4518,8 @@ async function showHomeContent(oldEle) {
     }
 
     ele.appendChild(mcNewsWrapper);
+    welcomeElement.style.visibility = "visible";
 
-    content.appendChild(ele);
     oldEle.remove();
     return ele;
 }
