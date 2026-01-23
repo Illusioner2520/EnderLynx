@@ -4669,6 +4669,11 @@ function showWardrobeContent() {
         pauseButton.onclick = onPause;
     }
     pauseButton.onclick = onPause;
+    if (document.body.matches(".potato")) {
+        skinViewer.animation.paused = true;
+        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+        pauseButton.onclick = onResume;
+    }
     skinRenderContainer.appendChild(pauseButton);
     let optionsContainer = document.createElement("div");
     optionsContainer.className = "my-account-options";
@@ -5201,6 +5206,11 @@ class SkinEntry {
                         pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
                         pauseButton.onclick = onPause;
                     }
+                    if (document.body.matches(".potato")) {
+                        skinViewer.animation.paused = true;
+                        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+                        pauseButton.onclick = onResume;
+                    }
                     let onClose = () => {
                         if (skinViewer.animation) skinViewer.animation.paused = true;
                         if (skinViewer.controls) skinViewer.controls.enabled = false;
@@ -5247,7 +5257,7 @@ class SkinEntry {
                 "title": translate("app.wardrobe.skin.delete"),
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "danger": true,
-                "func": (a,b) => {
+                "func": (a, b) => {
                     if (e.active_uuid.replaceAll(";", "")) {
                         displayError(translate("app.wardrobe.skin.delete.in_use"));
                         return;
