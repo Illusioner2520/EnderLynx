@@ -392,11 +392,11 @@ body.compact .sidebar {
     white-space: nowrap;
 }
 
-.context-menu-button:hover {
+.context-menu-button:hover, .context-menu-button:focus-visible {
     background-color: var(--color-1t);
 }
 
-.context-menu-button.danger:hover {
+.context-menu-button.danger:hover, .context-menu-button.danger:focus-visible {
     /* background-color: color-mix(in srgb, 35% var(--danger-color), transparent); */
     background-color: var(--danger-color);
 }
@@ -405,7 +405,7 @@ body.compact .sidebar {
     transition: color .25s
 }
 
-.context-menu-button.danger:hover>i {
+.context-menu-button.danger:hover>i, .context-menu-button.danger:focus-visible>i {
     color: var(--text-color);
 }
 
