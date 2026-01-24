@@ -2937,7 +2937,7 @@ dialog[open]::backdrop {
 .skin-render-container {
     grid-column: 2;
     position: sticky;
-    top: 10px;
+    top: 0px;
     align-self: start;
 }
 
