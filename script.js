@@ -11129,8 +11129,8 @@ class VanillaTweaksSelector {
                         }
                     }
                 ].filter(e => e), [
-                    { "content": translate("app.instances.cancel"), "type": "cancel" },
-                    { "content": translate("app.instances.submit"), "type": "confirm" }
+                    { "content": translate("app.discover.datapacks.cancel"), "type": "cancel" },
+                    { "content": translate("app.discover.datapacks.submit"), "type": "confirm" }
                 ], [], async (e) => {
                     let info = {};
                     e.forEach(e => { info[e.id] = e.value });
@@ -13866,8 +13866,8 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 }
             }
         ].filter(e => e), [
-            { "content": translate("app.instances.cancel"), "type": "cancel" },
-            { "content": translate("app.instances.submit"), "type": "confirm" }
+            { "content": translate("app.discover.datapacks.cancel"), "type": "cancel" },
+            { "content": translate("app.discover.datapacks.submit"), "type": "confirm" }
         ], [], async (e) => {
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
