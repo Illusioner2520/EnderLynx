@@ -5751,8 +5751,9 @@ function showInstanceContent(e) {
                     await stopInstance(instances[i]);
                     instanceContent.displayContent();
                 } : async (e) => {
+                    showSpecificInstanceContent(instances[i].refresh(), undefined, undefined, true);
                     await playInstance(instances[i]);
-                    instanceContent.displayContent();
+                    showSpecificInstanceContent(instances[i].refresh());
                 }
             },
             instances[i].locked ? null : {
