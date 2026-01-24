@@ -54,7 +54,7 @@ EnderLynx is built using [Electron](https://www.electronjs.org/) and packaged by
 
 ## License
 
-Copyright (c) 2025-2026 EnderLynx
+Copyright (c) 2025-2026
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -64,21 +64,21 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## Contributions
 
-If you would like, you can create a pull request and submit code to be contributed. I apologize for my unorganized code.
+If you would like, you can create a pull request and submit code to be contributed. I apologize for my unorganized code.  
 Running the developer version without building can be done by running `npm run start`
 
 ## Building
 
-Output files will be in the `out/make` folder.
+Output files will be in the `out/make` folder.  
 The Windows installer will be at `installer/EnderLynxInstaller.exe`
 
 ### Windows
 
-Make sure that you have Node, Rust and NSIS installed such that it can run `npm`, `cargo` and `makensis`
+Make sure that you have Node, Rust and NSIS installed such that it can run `npm`, `cargo` and `makensis`  
 Run: `npm run build:windows`
 
 ### Unix
 
-Make sure that you have Node and Rust installed such that it can run `npm` and `cargo`
-Note for Linux: make sure you have `fakeroot` and `dpkg` installed to make the `.deb` and `rpm` installed to make the `.rpm`
+Make sure that you have Node and Rust installed such that it can run `npm` and `cargo`  
+Note for Linux: make sure you have `fakeroot` and `dpkg` installed to make the `.deb` and `rpm` installed to make the `.rpm`  
 Run: `npm run build:unix`
