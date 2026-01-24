@@ -1602,9 +1602,6 @@ class MoreMenu {
         element.style.setProperty("--menu-padding", menuPadding + "px")
         element.setAttribute("popover", "");
         document.body.appendChild(element);
-        ele.style.anchorName = "--" + id;
-        element.style.positionAnchor = "--" + id;
-        element.style.setProperty("--position-anchor", "--" + id);
         this.element = element;
         this.triggerElement = ele;
         ele.setAttribute("popovertarget", id);

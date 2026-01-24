@@ -171,7 +171,6 @@ body.compact .sidebar {
     gap: 8px;
     align-items: center;
     transition: background-color .25s, scale .1s;
-    anchor-name: --player-switch;
 }
 
 .player-switch:active {
@@ -294,7 +293,6 @@ body.compact .sidebar {
     padding: 8px;
     gap: 8px;
     overflow-y: hidden;
-    position-anchor: --player-switch;
     position: fixed;
     top: calc(anchor(bottom) + 10px);
     left: anchor(left);
@@ -1691,9 +1689,9 @@ body.compact .download-log-wrapper {
 body.compact .download-log-wrapper {
     width: 280px;
     position: fixed;
-    left: 10px;
+    left: calc(anchor(left) - 5px);
     box-shadow: 0 0 10px black;
-    bottom: 176px;
+    bottom: calc(anchor(top) + 10px);
 }
 
 body.compact.sidebar-right .download-log-wrapper {
