@@ -13154,6 +13154,7 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
             if (url[0] == "/") {
                 url = "https://www.curseforge.com" + url;
             }
+            if (url[0] == "#") return;
             try {
                 let url_obj = new URL(url);
                 if (url_obj.searchParams.get("remoteUrl")) {
