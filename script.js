@@ -1110,7 +1110,7 @@ class MinecraftAccountSwitcher {
             }
         }
         getPlayerHead(this.default_player, (e) => {
-            this.element.querySelector('.player-head').src = e;
+            this.element.querySelector('.player-head-menu').src = e;
         });
     }
     setPlayerInfo() {
@@ -1120,7 +1120,7 @@ class MinecraftAccountSwitcher {
             this.element.setAttribute("popovertarget", "player-dropdown");
             this.element.innerHTML = ``;
             let img = document.createElement("img");
-            img.className = "player-head";
+            img.className = "player-head-menu";
             getPlayerHead(default_player, (e) => img.src = e);
             this.element.appendChild(img);
             let pInfo = document.createElement("div");
@@ -1205,7 +1205,7 @@ class MinecraftAccountSwitcher {
             if (this.dropdownElement) this.dropdownElement.hidePopover();
             this.element.innerHTML = ``;
             let img = document.createElement("img");
-            img.className = "player-head";
+            img.className = "player-head-menu";
             getPlayerHead(null, (e) => img.src = e);
             this.element.appendChild(img);
             let pInfo = document.createElement("div");
@@ -1240,7 +1240,7 @@ class MinecraftAccountSwitcher {
         newPlayerInfo.setDefault();
         this.element.innerHTML = ``;
         let img = document.createElement("img");
-        img.className = "player-head";
+        img.className = "player-head-menu";
         getPlayerHead(newPlayerInfo, (e) => img.src = e);
         this.element.appendChild(img);
         let pInfo = document.createElement("div");

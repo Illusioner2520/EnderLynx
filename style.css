@@ -228,6 +228,18 @@ body.compact .sidebar {
     image-rendering: pixelated;
 }
 
+.player-head-menu {
+    border-radius: 5px;
+    aspect-ratio: 1;
+    height: 40px;
+    image-rendering: pixelated;
+}
+
+body.compact .player-head-menu {
+    height: unset;
+    width: 100%;
+}
+
 .player-name {
     font-size: 1rem;
     color: var(--text-color);
@@ -507,6 +519,11 @@ body.compact .sidebar {
     aspect-ratio: 1;
     font-size: 1.2rem;
     transition: background-color .25s;
+}
+
+body.compact .menu-icon {
+    height: unset;
+    width: 100%;
 }
 
 .menu-title {
@@ -1635,7 +1652,7 @@ i {
 }
 
 body.compact .live-indicator {
-    margin-inline: 22px;
+    margin-inline: auto;
 }
 
 body.compact .live-name,
