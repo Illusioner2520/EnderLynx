@@ -7043,9 +7043,9 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
         ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            document.body.style.cursor = "progress";
+            document.body.classList.add("loading");
             let success = await window.enderlynx.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
-            document.body.style.cursor = "";
+            document.body.classList.remove("loading");
             if (success) {
                 displaySuccess(translate("app.content.import.complete"));
             } else {
