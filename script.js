@@ -8,13 +8,13 @@ class SQL {
         this.sql = sql;
     }
     get(...params) {
-        return window.electronAPI.databaseGet(this.sql, ...params);
+        return window.enderlynx.databaseGet(this.sql, ...params);
     }
     run(...params) {
-        return window.electronAPI.databaseRun(this.sql, ...params);
+        return window.enderlynx.databaseRun(this.sql, ...params);
     }
     all(...params) {
-        return window.electronAPI.databaseAll(this.sql, ...params);
+        return window.enderlynx.databaseAll(this.sql, ...params);
     }
 }
 
@@ -212,6 +212,11 @@ class Skin {
     setFavorited(favorited) {
         db.prepare("UPDATE skins SET favorited = ? WHERE id = ?").run(Number(favorited), this.id);
         this.favorited = favorited;
+    }
+
+    setTextureKey(texture_key) {
+        db.prepare("UPDATE skins SET texture_key = ? WHERE id = ?").run(texture_key, this.id);
+        this.texture_key = texture_key;
     }
 
     getPreview(callback) {
@@ -547,7 +552,7 @@ class Instance {
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         if (do_not_set_options_txt) return;
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.electronAPI.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false);
+        let v = window.enderlynx.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false);
         this.setAttemptedOptionsTxtVersion(v);
     }
     setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
@@ -900,7 +905,7 @@ class Data {
     addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
         db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(data.getDefault("default_width")), Number(data.getDefault("default_height")), Number(data.getDefault("default_ram")));
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.electronAPI.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true);
+        let v = window.enderlynx.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true);
         let instance = new Instance(instance_id);
         instance.setAttemptedOptionsTxtVersion(v);
         return instance;
@@ -938,7 +943,7 @@ class Data {
     getDefault(type) {
         let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
         if (!default_) {
-            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.electronAPI.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false" };
+            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.enderlynx.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false" };
             let value = defaults[type];
             db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
             return value;
@@ -968,7 +973,7 @@ class Data {
             for (let i = 0; i < defaultSkins.length; i++) {
                 let e = defaultSkins[i];
                 if (!texture_keys.includes(e.texture_key)) {
-                    let info = await window.electronAPI.downloadSkin(e.url);
+                    let info = await window.enderlynx.downloadSkin(e.url);
                     db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, Number(true), "", e.texture_key);
                 }
             }
@@ -978,13 +983,15 @@ class Data {
         return skins.map(e => new Skin(e.id));
     }
 
-    addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used) {
+    addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
         let skins = this.getSkins();
         let previousSkinIds = skins.map(e => e.skin_id);
         if (previousSkinIds.includes(skin_id) && !overrideCheck) {
-            return new Skin(skins[previousSkinIds.indexOf(skin_id)].id);
+            let skin = new Skin(skins[previousSkinIds.indexOf(skin_id)].id);
+            if (texture_key) skin.setTextureKey(texture_key);
+            return skin;
         }
-        let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin, last_used) VALUES (?,?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false), last_used ? last_used.toISOString() : null);
+        let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin, last_used, texture_key) VALUES (?,?,?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false), last_used ? last_used.toISOString() : null, texture_key ? texture_key : null);
         return new Skin(result.lastInsertRowid);
     }
 }
@@ -1355,7 +1362,7 @@ let currentInstanceId = "";
 function resetDiscordStatus(bypassLock) {
     console.log("current tab", currentTab);
     if (!rpcLocked || bypassLock) {
-        window.electronAPI.setActivity({
+        window.enderlynx.setActivity({
             "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" || currentTab == "instance" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
             "state": translate("app.discord_rpc.not_playing"),
             startTimestamp: new Date(),
@@ -1477,7 +1484,7 @@ class LiveMinecraft {
         this.element.oncontextmenu = (e) => {
             contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
-        window.electronAPI.setActivity({
+        window.enderlynx.setActivity({
             "details": translate("app.discord_rpc.playing").replace("%i", instanceInfo.name),
             "state": translate("app.discord_rpc.description").replace("%l", loaders[instanceInfo.loader]).replace("%v", instanceInfo.vanilla_version),
             startTimestamp: new Date(),
@@ -1498,7 +1505,7 @@ class LiveMinecraft {
     }
     async findLive() {
         for (const instances of data.getInstances()) {
-            if (window.electronAPI.checkForProcess(instances.pid)) {
+            if (window.enderlynx.checkForProcess(instances.pid)) {
                 this.setLive(instances)
                 return;
             }
@@ -1663,7 +1670,7 @@ class ContextMenu {
             ignoreNextPointerUp = false;
         });
 
-        document.addEventListener('keydown', (e) => {
+        document.body.addEventListener('keydown', (e) => {
             if (e.key == "Escape") {
                 this.element.hidePopover();
             }
@@ -1902,18 +1909,24 @@ class SearchDropdown extends Dropdown {
         this.dropdownList.classList.remove("dropdown-list");
         this.dropdownList.classList.add('dropdown-list-dialog');
         this.dropdownList.popover = "manual";
-        document.addEventListener('pointerup', (e) => {
+        let closePointer = (e) => {
             if (!this.dropdownList.matches(':popover-open')) return;
             const t = e.target;
             if (this.dropdownList.contains(t)) return;
             if (t === dropdownSearchInput || dropdownSearchInput.contains(t)) return;
             this.dropdownList.hidePopover();
-        }, true);
-        document.addEventListener('keydown', (e) => {
+            document.body.removeEventListener('pointerup', closePointer);
+            document.body.removeEventListener('keydown', closeEscape);
+        }
+        let closeEscape = (e) => {
             if (e.key == "Escape") {
                 this.dropdownList.hidePopover();
+                document.body.removeEventListener('pointerup', closePointer);
+                document.body.removeEventListener('keydown', closeEscape);
             }
-        }, true);
+        }
+        document.body.addEventListener('pointerup', closePointer, true);
+        document.body.addEventListener('keydown', closeEscape, true);
     }
     filter() {
         let value = this.dropdownSearchInput.value.toLowerCase().trim();
@@ -2550,7 +2563,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
         let e = content[i];
         if (e.file_name == contentInfo.secondary_column.desc()) {
             if (e.disabled) {
-                let new_file_name = window.electronAPI.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                let new_file_name = window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_enable"));
                     return;
@@ -2560,7 +2573,7 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
                 contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
             } else {
-                let new_file_name = window.electronAPI.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                let new_file_name = window.enderlynx.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_disable"));
                     return;
@@ -3011,7 +3024,11 @@ let wardrobeButton = new NavigationButton(wardrobeButtonEle, translate("app.page
 settingsButtonEle.onclick = () => {
     let selectedKeySelect;
     let selectedKeySelectFunction;
-    document.body.addEventListener("keydown", (e) => {
+
+    document.body.removeEventListener("keydown", previousKeyDownEventListener);
+    document.body.removeEventListener("mousedown", previousMouseDownEventListener);
+
+    previousKeyDownEventListener = (e) => {
         if (selectedKeySelect) {
             e.preventDefault();
             e.stopPropagation();
@@ -3033,9 +3050,8 @@ settingsButtonEle.onclick = () => {
             displaySuccess(translate("app.options.updated_default"));
             if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
         }
-    });
-
-    document.body.addEventListener("mousedown", (e) => {
+    }
+    previousMouseDownEventListener = (e) => {
         if (selectedKeySelect) {
             e.preventDefault();
             e.stopPropagation();
@@ -3054,7 +3070,11 @@ settingsButtonEle.onclick = () => {
             displaySuccess(translate("app.options.updated_default"));
             if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
         }
-    });
+    }
+
+    document.body.addEventListener("keydown", previousKeyDownEventListener);
+    document.body.addEventListener("mousedown", previousMouseDownEventListener);
+
     let defaultOptions = new DefaultOptions();
     let values = db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version");
     let def_opts = document.createElement("div");
@@ -3218,7 +3238,7 @@ settingsButtonEle.onclick = () => {
                         "name": translate("app.settings.def_opts.import.browse"),
                         "icon": '<i class="fa-solid fa-folder"></i>',
                         "func": async (v, b, i) => {
-                            let newValue = await window.electronAPI.triggerFileImportBrowseWithOptions(v, 0, ["txt"], "options.txt");
+                            let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["txt"], "options.txt");
                             if (newValue) i.value = newValue;
                         }
                     }
@@ -3236,7 +3256,7 @@ settingsButtonEle.onclick = () => {
         ], [], (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            let options = window.electronAPI.getOptions(info.options_txt_location);
+            let options = window.enderlynx.getOptions(info.options_txt_location);
             db.prepare("DELETE FROM options_defaults WHERE key != ?").run("version");
             let defaultOptions = new DefaultOptions();
             options.forEach(e => {
@@ -3252,7 +3272,7 @@ settingsButtonEle.onclick = () => {
     let exportButton = document.createElement("button");
     exportButton.innerHTML = '<i class="fa-solid fa-file-export"></i> ' + translate("app.settings.def_opts.export");
     exportButton.onclick = () => {
-        let file_location = window.electronAPI.generateOptionsTXT(values);
+        let file_location = window.enderlynx.generateOptionsTXT(values);
         openShareDialogForFile(file_location);
     }
     exportButton.className = "bug-button";
@@ -3300,9 +3320,9 @@ settingsButtonEle.onclick = () => {
     let java_installations = [{
         "type": "notice",
         "tab": "java",
-        "content": translate("app.settings.java.description." + window.electronAPI.ostype())
+        "content": translate("app.settings.java.description." + window.enderlynx.ostype())
     }];
-    let java_stuff = window.electronAPI.getJavaInstallations();
+    let java_stuff = window.enderlynx.getJavaInstallations();
     java_stuff.sort((a, b) => b.version - a.version);
     java_stuff.forEach(e => {
         java_installations.push({
@@ -3318,7 +3338,7 @@ settingsButtonEle.onclick = () => {
                     "func": async (v, b, i) => {
                         b.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.detect.searching");
                         let dialog = new Dialog();
-                        let results = await window.electronAPI.detectJavaInstallations(e.version);
+                        let results = await window.enderlynx.detectJavaInstallations(e.version);
                         dialog.showDialog(translate("app.settings.java.select"), "form", [
                             {
                                 "type": "dropdown",
@@ -3341,7 +3361,7 @@ settingsButtonEle.onclick = () => {
                     "name": translate("app.settings.java.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "func": async (v, b, i) => {
-                        let newValue = await window.electronAPI.triggerFileBrowse(v);
+                        let newValue = await window.enderlynx.triggerFileBrowse(v);
                         if (newValue) i.value = newValue;
                     }
                 },
@@ -3353,7 +3373,7 @@ settingsButtonEle.onclick = () => {
                         b.setAttribute("data-num", num);
                         b.classList.remove("failed");
                         b.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.test.testing");
-                        let success = await window.electronAPI.testJavaInstallation(v);
+                        let success = await window.enderlynx.testJavaInstallation(v);
                         if (success) {
                             b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.settings.java.test.success");
                         } else {
@@ -3375,34 +3395,34 @@ settingsButtonEle.onclick = () => {
     app_info.style.display = "flex";
     app_info.style.flexDirection = "column";
     app_info.style.gap = "4px";
-    let ips = window.electronAPI.localIPs();
+    let ips = window.enderlynx.localIPs();
     let info_to_show = [{
         "name": translate("app.settings.info.enderlynx"),
-        "value": window.electronAPI.version
+        "value": window.enderlynx.version
     }, {
         "name": translate("app.settings.info.electron"),
-        "value": window.electronAPI.electronversion
+        "value": window.enderlynx.electronversion
     }, {
         "name": translate("app.settings.info.os.platform"),
-        "value": window.electronAPI.osplatform()
+        "value": window.enderlynx.osplatform()
     }, {
         "name": translate("app.settings.info.os.arch"),
-        "value": window.electronAPI.osarch()
+        "value": window.enderlynx.osarch()
     }, {
         "name": translate("app.settings.info.os.release"),
-        "value": window.electronAPI.osrelease()
+        "value": window.enderlynx.osrelease()
     }, {
         "name": translate("app.settings.info.os.version"),
-        "value": window.electronAPI.osversion()
+        "value": window.enderlynx.osversion()
     }, {
         "name": translate("app.settings.info.node"),
-        "value": window.electronAPI.nodeversion
+        "value": window.enderlynx.nodeversion
     }, {
         "name": translate("app.settings.info.chromium"),
-        "value": window.electronAPI.chromeversion
+        "value": window.enderlynx.chromeversion
     }, {
         "name": translate("app.settings.info.v8"),
-        "value": window.electronAPI.v8version
+        "value": window.enderlynx.v8version
     }, {
         "name": translate("app.settings.info.local_ip_address.ipv4"),
         "value": ips.IPv4
@@ -3411,7 +3431,7 @@ settingsButtonEle.onclick = () => {
         "value": ips.IPv6
     }, {
         "name": translate("app.settings.info.ram"),
-        "value": async () => { return ((await window.electronAPI.memUsage()).private / 1024).toFixed(2) + " MB" },
+        "value": async () => { return ((await window.enderlynx.memUsage()).private / 1024).toFixed(2) + " MB" },
         "update": 1000
     }]
     for (let i = 0; i < info_to_show.length; i++) {
@@ -3433,7 +3453,7 @@ settingsButtonEle.onclick = () => {
     let bugButton = document.createElement("button");
     bugButton.innerHTML = '<i class="fa-solid fa-bug"></i> ' + translate("app.settings.info.bug");
     bugButton.onclick = () => {
-        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=1-bug_report.yml&version=" + window.electronAPI.version);
+        window.enderlynx.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=1-bug_report.yml&version=" + window.enderlynx.version);
     }
     bugButton.className = "bug-button";
     app_info.appendChild(bugButton);
@@ -3441,7 +3461,7 @@ settingsButtonEle.onclick = () => {
     featureButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> ' + translate("app.settings.info.feature");
     featureButton.className = "bug-button";
     featureButton.onclick = () => {
-        window.electronAPI.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=2-feature_request.yml");
+        window.enderlynx.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=2-feature_request.yml");
     }
     app_info.appendChild(featureButton);
     let updatesButton = document.createElement("button");
@@ -3618,13 +3638,13 @@ settingsButtonEle.onclick = () => {
             "tab": "resources",
             "id": "folder_location",
             "desc": translate("app.settings.folder_location.description"),
-            "default": window.electronAPI.userPath,
+            "default": window.enderlynx.userPath,
             "buttons": [
                 {
                     "name": translate("app.settings.folder_location.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "func": async (v, b, i) => {
-                        let newValue = await window.electronAPI.triggerFolderBrowse(v);
+                        let newValue = await window.enderlynx.triggerFolderBrowse(v);
                         if (newValue) i.value = newValue;
                     }
                 }
@@ -3643,7 +3663,7 @@ settingsButtonEle.onclick = () => {
             "id": "default_ram",
             "default": Number(data.getDefault("default_ram")),
             "min": 512,
-            "max": window.electronAPI.getTotalRAM(),
+            "max": window.enderlynx.getTotalRAM(),
             "increment": 64,
             "unit": translate("app.settings.defaults.ram.unit")
         },
@@ -3816,15 +3836,15 @@ settingsButtonEle.onclick = () => {
             live.findLive();
             resetDiscordStatus();
         } else {
-            window.electronAPI.clearActivity();
+            window.enderlynx.clearActivity();
         }
         v.forEach(e => {
             if (e.id.startsWith("java_")) {
                 let version = e.id.replace("java_", "");
-                window.electronAPI.setJavaInstallation(version, e.value);
+                window.enderlynx.setJavaInstallation(version, e.value);
             }
         });
-        window.electronAPI.changeFolder(window.electronAPI.userPath, info.folder_location);
+        window.enderlynx.changeFolder(window.enderlynx.userPath, info.folder_location);
     }, () => {
         let color_theme = data.getDefault("default_mode");
         let accent_color = data.getDefault("default_accent_color");
@@ -3862,7 +3882,7 @@ let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
 
 async function toggleMicrosoftSignIn() {
     try {
-        let newData = await window.electronAPI.triggerMicrosoftLogin();
+        let newData = await window.enderlynx.triggerMicrosoftLogin();
         let players = data.getProfiles().map(e => e.uuid);
         if (!newData.access_token) throw new Error();
         if (!newData.refresh_token) throw new Error();
@@ -4080,7 +4100,7 @@ async function showHomeContent(oldEle) {
                     "title": translate("app.worlds.open"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "func": () => {
-                        window.electronAPI.openWorldFolder(instanceInfo.instance_id, e.id);
+                        window.enderlynx.openWorldFolder(instanceInfo.instance_id, e.id);
                     }
                 } : null,
                 {
@@ -4134,14 +4154,14 @@ async function showHomeContent(oldEle) {
                             }
                         ], [], async () => {
                             if (e.type == "singleplayer") {
-                                let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                                let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id);
                                 if (success) {
                                     displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
                                 } else {
                                     displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
                                 }
                             } else if (e.type == "multiplayer") {
-                                let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
+                                let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
                                 if (success) {
                                     displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
                                 } else {
@@ -4208,7 +4228,7 @@ async function showHomeContent(oldEle) {
             let running = checkForProcess(instanceInfo.pid);
             if (!running) instanceInfo.setPid(null);
             if (running) {
-                window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+                window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
                     if (currentTab != "home") return;
                     formatPlayButton(false);
                     live.findLive();
@@ -4266,7 +4286,7 @@ async function showHomeContent(oldEle) {
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "title": translate("app.button.instances.open_folder"),
                     "func": (e) => {
-                        window.electronAPI.openInstanceFolder(instanceInfo.instance_id);
+                        window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
                     }
                 },
                 {
@@ -4342,7 +4362,7 @@ async function showHomeContent(oldEle) {
                             updateHomeGrid();
                             if (v[0].value) {
                                 try {
-                                    await window.electronAPI.deleteInstanceFiles(instanceInfo.instance_id);
+                                    await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
                                 } catch (e) {
                                     displayError(translate("app.instances.delete.files.fail"));
                                 }
@@ -4413,7 +4433,7 @@ async function showHomeContent(oldEle) {
     discoverModsRefresh.onclick = async () => {
         discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i>' + translate("app.home.discover.refresh");
         try {
-            home_modpacks = await window.electronAPI.getRandomModpacks();
+            home_modpacks = await window.enderlynx.getRandomModpacks();
             if (!home_modpacks) throw new Error();
             updateHomeModpacksList(home_modpacks);
         } catch (e) {
@@ -4463,7 +4483,7 @@ async function showHomeContent(oldEle) {
         })
     }
     let getRandomModpacks = async () => {
-        home_modpacks = await window.electronAPI.getRandomModpacks();
+        home_modpacks = await window.enderlynx.getRandomModpacks();
         updateHomeModpacksList(home_modpacks);
     }
     if (!home_modpacks || !home_modpacks.hits) {
@@ -4491,7 +4511,7 @@ async function showHomeContent(oldEle) {
             article.className = "mc-news";
             article.style.backgroundImage = `url("https://minecraft.net${e.default_tile.image.imageURL}")`;
             article.onclick = () => {
-                window.electronAPI.openInBrowser("https://minecraft.net" + e.article_url);
+                window.enderlynx.openInBrowser("https://minecraft.net" + e.article_url);
             }
             article.title = e.default_tile.sub_header;
             let article_title = document.createElement("div");
@@ -4752,7 +4772,7 @@ function showWardrobeContent() {
                 oldEle.classList.remove("selected");
                 currentEle.classList.add("selected");
                 e.setActive();
-                skinViewer.loadCape(window.electronAPI.getCapePath(e.cape_id));
+                skinViewer.loadCape(window.enderlynx.getCapePath(e.cape_id));
                 activeCape = e;
             }
             loader.style.display = "none";
@@ -4762,7 +4782,7 @@ function showWardrobeContent() {
         capeEle.title = e.cape_name;
         capeEle.classList.add("cape");
         let capeImg = document.createElement("img");
-        extractImageRegionToDataURL(window.electronAPI.getCapePath(e.cape_id), 1, 1, 10, 16, (e) => {
+        extractImageRegionToDataURL(window.enderlynx.getCapePath(e.cape_id), 1, 1, 10, 16, (e) => {
             if (e) capeImg.src = e;
         });
         capeImg.classList.add("option-image-cape");
@@ -4894,7 +4914,7 @@ function showWardrobeContent() {
             model: activeSkin?.model == "slim" ? "slim" : "default",
         });
         let activeCape = default_profile.getActiveCape();
-        skinViewer.loadCape(activeCape ? window.electronAPI.getCapePath(activeCape.cape_id) : null);
+        skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
         skinList.innerHTML = '';
         let skins = data.getSkinsNoDefaults();
         skins.forEach((e) => {
@@ -4939,7 +4959,7 @@ function showWardrobeContent() {
         refreshButtonIcon.classList.add("spinning");
         let profile = data.getDefaultProfile();
         try {
-            let res = await window.electronAPI.getProfile(profile);
+            let res = await window.enderlynx.getProfile(profile);
             profile.setAccessToken(res.player_info.access_token);
             profile.setClientId(res.player_info.client_id);
             profile.setExpires(res.player_info.expires);
@@ -5054,7 +5074,7 @@ function showWardrobeContent() {
             e.forEach(e => { info[e.id] = e.value });
             if (info.selected_tab == "username") {
                 try {
-                    info.skin = (await window.electronAPI.getSkinFromUsername(info.username)).url;
+                    info.skin = (await window.enderlynx.getSkinFromUsername(info.username)).url;
                 } catch (e) {
                     displayError(translate("app.wardrobe.import.username.fail"));
                     return;
@@ -5063,7 +5083,7 @@ function showWardrobeContent() {
                 info.model = info.model_u;
             } else if (info.selected_tab == "url") {
                 try {
-                    info.skin = (await window.electronAPI.getSkinFromURL(info.url)).url;
+                    info.skin = (await window.enderlynx.getSkinFromURL(info.url)).url;
                 } catch (e) {
                     displayError(translate("app.wardrobe.import.url.fail"));
                     return;
@@ -5110,7 +5130,7 @@ class SkinEntry {
             loader.style.display = "block";
             skinImg.style.display = "none";
             let currentEle = skinEle;
-            let success = await applySkin(default_profile, e);
+            let success = e.texture_key ? (await applySkinFromURL(default_profile, e)) : (await applySkin(default_profile, e));
             if (success) {
                 let oldEle = document.querySelector(".my-account-option.skin.selected");
                 if (oldEle) oldEle.classList.remove("selected");
@@ -5372,13 +5392,13 @@ async function importSkin(info, callback) {
             } else {
                 model = "wide";
             }
-            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true, null);
+            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
             callback();
         };
         tempImg.src = info.skin;
         return;
     }
-    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.electronAPI.importSkin(info.skin), info.skin, true, null);
+    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
     callback();
 }
 
@@ -5675,7 +5695,7 @@ function showInstanceContent(e) {
         let running = checkForProcess(instances[i].pid);
         if (!running) instances[i].setPid(null);
         if (running) {
-            window.electronAPI.watchProcessForExit(instances[i].pid, () => {
+            window.enderlynx.watchProcessForExit(instances[i].pid, () => {
                 if (currentTab != "instances") return;
                 instanceContent.displayContent();
                 live.findLive();
@@ -5767,7 +5787,7 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.electronAPI.openInstanceFolder(instances[i].instance_id);
+                    window.enderlynx.openInstanceFolder(instances[i].instance_id);
                 }
             },
             {
@@ -5837,7 +5857,7 @@ function showInstanceContent(e) {
                         instanceContent.displayContent();
                         if (v[0].value) {
                             try {
-                                await window.electronAPI.deleteInstanceFiles(instances[i].instance_id);
+                                await window.enderlynx.deleteInstanceFiles(instances[i].instance_id);
                             } catch (e) {
                                 displayError(translate("app.instances.delete.files.fail"));
                             }
@@ -5938,7 +5958,7 @@ function showCreateInstanceDialog() {
                     "name": translate("app.instances.file.browse"),
                     "icon": '<i class="fa-solid fa-file"></i>',
                     "func": async (v, b, i) => {
-                        let newValue = await window.electronAPI.triggerFileImportBrowse(v, 0);
+                        let newValue = await window.enderlynx.triggerFileImportBrowse(v, 0);
                         if (newValue) i.value = newValue;
                     }
                 }/*,
@@ -5946,7 +5966,7 @@ function showCreateInstanceDialog() {
                         "name": "Browse Folders",
                         "icon": '<i class="fa-solid fa-folder"></i>',
                         "func": async (v, b, i) => {
-                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 1);
+                            let newValue = await window.enderlynx.triggerFileImportBrowse(v, 1);
                             if (newValue) i.value = newValue;
                         }
                     }*/
@@ -6020,17 +6040,17 @@ function showCreateInstanceDialog() {
                 displayError(translate("app.instances.no_name"));
                 return;
             }
-            let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+            let instance_id = window.enderlynx.getInstanceFolderName(info.name);
             let loader_version = "";
             try {
                 if (info.loader == "fabric") {
-                    loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                    loader_version = (await window.enderlynx.getFabricVersion(info.game_version))
                 } else if (info.loader == "forge") {
-                    loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                    loader_version = (await window.enderlynx.getForgeVersion(info.game_version))
                 } else if (info.loader == "neoforge") {
-                    loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                    loader_version = (await window.enderlynx.getNeoForgeVersion(info.game_version))
                 } else if (info.loader == "quilt") {
-                    loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                    loader_version = (await window.enderlynx.getQuiltVersion(info.game_version))
                 }
             } catch (e) {
                 displayError(translate("app.instances.failed_to_create"));
@@ -6038,7 +6058,7 @@ function showCreateInstanceDialog() {
             }
             let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
             showSpecificInstanceContent(instance);
-            let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+            let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
             if (r.error) {
                 instance.setFailed(true);
             } else {
@@ -6050,10 +6070,10 @@ function showCreateInstanceDialog() {
             }
         } else if (info.selected_tab == "file") {
             if (!info.name_if) info.name_if = "";
-            let instance_id = window.electronAPI.getInstanceFolderName(info.name_f);
+            let instance_id = window.enderlynx.getInstanceFolderName(info.name_f);
             let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
             showSpecificInstanceContent(instance);
-            let packInfo = await window.electronAPI.processPackFile(info.file, instance_id, info.name_f);
+            let packInfo = await window.enderlynx.processPackFile(info.file, instance_id, info.name_f);
             console.log(packInfo);
             if (packInfo.error) {
                 instance.setFailed(true);
@@ -6074,7 +6094,7 @@ function showCreateInstanceDialog() {
                 instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
             });
             instance.setInstalling(false);
-            let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+            let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
             if (r.error) {
                 instance.setFailed(true);
             } else {
@@ -6087,10 +6107,10 @@ function showCreateInstanceDialog() {
         } else if (info.selected_tab == "launcher") {
             // Import from launcher here
         } else if (info.selected_tab == "code") {
-            let instance_id = window.electronAPI.getInstanceFolderName(info.name_c);
+            let instance_id = window.enderlynx.getInstanceFolderName(info.name_c);
             let instance = data.addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
             showSpecificInstanceContent(instance);
-            let packInfo = await window.electronAPI.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
+            let packInfo = await window.enderlynx.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
             console.log(packInfo);
             if (!packInfo) {
                 displayError(translate("app.cf.code.error"));
@@ -6111,7 +6131,7 @@ function showCreateInstanceDialog() {
                 instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
             });
             instance.setInstalling(false);
-            let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+            let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
             if (r.error) {
                 instance.setFailed(true);
             } else {
@@ -6199,11 +6219,32 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
     }, 1000);
     let instTopLastPlayed = document.createElement("div");
     instTopLastPlayed.classList.add("instance-top-sub-info-specific");
-    instTopLastPlayed.setAttribute("title", translate("app.instances.last_played"));
-    instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatDate(instanceInfo.last_played, 2000))}`;
+    instTopLastPlayed.setAttribute("title", translate("app.instances.last_played", "%t", formatDate(instanceInfo.last_played, 2000)));
+    instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(instanceInfo.last_played))}`;
+    let lastPlayedInterval;
+    if (howLongAgo(instanceInfo.last_played) < 3600000) {
+        lastPlayedInterval = setInterval(() => {
+            instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(instanceInfo.last_played))}`;
+        }, 60000);
+    } else if (howLongAgo(instanceInfo.last_played) < 86400000) {
+        lastPlayedInterval = setInterval(() => {
+            instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(instanceInfo.last_played))}`;
+        }, 3600000);
+    }
     instanceInfo.watchForChange("last_played", (v) => {
-        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatDate(v, 2000))}`;
+        instTopLastPlayed.setAttribute("title", translate("app.instances.last_played", "%t", formatDate(v, 2000)));
+        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(v))}`;
         last_played = v;
+        clearInterval(lastPlayedInterval);
+        if (howLongAgo(v) < 3600000) {
+            lastPlayedInterval = setInterval(() => {
+                instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(v))}`;
+            }, 60000);
+        } else if (howLongAgo(v) < 86400000) {
+            lastPlayedInterval = setInterval(() => {
+                instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(v))}`;
+            }, 3600000);
+        }
     });
     instTopSubInfo.appendChild(instTopVersions);
     instTopSubInfo.appendChild(instTopPlaytime);
@@ -6224,8 +6265,8 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
         if (tabs.selected == 'logs') {
             setInstanceTabContentLogs(new Instance(instanceInfo.instance_id), tabsInfo);
         }
-        window.electronAPI.clearProcessWatches();
-        window.electronAPI.watchProcessForExit((new Instance(instanceInfo.instance_id)).pid, () => {
+        window.enderlynx.clearProcessWatches();
+        window.enderlynx.watchProcessForExit((new Instance(instanceInfo.instance_id)).pid, () => {
             playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
             playButton.classList.remove("instance-top-stop-button");
             playButton.classList.remove("instance-top-loading-button");
@@ -6255,7 +6296,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             playButton.classList.add("instance-top-stop-button");
             playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
             playButton.onclick = stopButtonClick
-            window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+            window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
                 playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
                 playButton.classList.remove("instance-top-stop-button");
                 playButton.classList.remove("instance-top-loading-button");
@@ -6296,7 +6337,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
             playButton.onclick = stopButtonClick
             playButton.title = "";
-            window.electronAPI.watchProcessForExit(instanceInfo.pid, () => {
+            window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
                 playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
                 playButton.classList.remove("instance-top-stop-button");
                 playButton.classList.add("instance-top-play-button");
@@ -6342,7 +6383,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             "icon": '<i class="fa-solid fa-folder"></i>',
             "title": translate("app.button.instances.open_folder"),
             "func": (e) => {
-                window.electronAPI.openInstanceFolder(instanceInfo.instance_id);
+                window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
             }
         },
         {
@@ -6409,7 +6450,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
                     instanceContent.displayContent();
                     if (v[0].value) {
                         try {
-                            await window.electronAPI.deleteInstanceFiles(instanceInfo.instance_id);
+                            await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
                         } catch (e) {
                             displayError(translate("app.instances.delete.files.fail"));
                         }
@@ -6459,7 +6500,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
     tabs.selectOptionAdvanced(default_tab ?? "content");
     let analyzeLogs = async () => {
         instanceInfo = instanceInfo.refresh();
-        let info = await window.electronAPI.analyzeLogs(instanceInfo.instance_id, instanceInfo.last_analyzed_log, running ? instanceInfo.current_log_file : "");
+        let info = await window.enderlynx.analyzeLogs(instanceInfo.instance_id, instanceInfo.last_analyzed_log, running ? instanceInfo.current_log_file : "");
         instanceInfo.setPlaytime(info.total_playtime + instanceInfo.playtime);
         if (info.most_recent_log) instanceInfo.setLastAnalyzedLog(info.most_recent_log);
         for (let i = 0; i < info.last_played_servers.length; i++) {
@@ -6608,7 +6649,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             "default": instanceInfo.allocated_ram ?? 4096,
             "tab": "java",
             "min": 512,
-            "max": window.electronAPI.getTotalRAM(),
+            "max": window.enderlynx.getTotalRAM(),
             "increment": 64,
             "unit": translate("app.instances.settings.ram.unit"),
             "desc": translate("app.instances.settings.ram.description")
@@ -6619,7 +6660,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             "id": "java_path",
             "default": instanceInfo.java_path,
             "tab": "java",
-            "desc": translate("app.instances.settings.java_installation.description." + window.electronAPI.ostype()).replace("%v", instanceInfo.java_version),
+            "desc": translate("app.instances.settings.java_installation.description." + window.enderlynx.ostype()).replace("%v", instanceInfo.java_version),
             "buttons": [
                 {
                     "name": translate("app.instances.settings.java_installation.detect"),
@@ -6627,7 +6668,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                     "func": async (v, b, i) => {
                         b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.detect.searching");
                         let dialog = new Dialog();
-                        let results = await window.electronAPI.detectJavaInstallations(instanceInfo.java_version);
+                        let results = await window.enderlynx.detectJavaInstallations(instanceInfo.java_version);
                         dialog.showDialog(translate("app.instances.settings.java_installation.detect.title"), "form", [
                             {
                                 "type": "dropdown",
@@ -6650,7 +6691,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                     "name": translate("app.instances.settings.java_installation.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "func": async (v, b, i) => {
-                        let newValue = await window.electronAPI.triggerFileBrowse(v);
+                        let newValue = await window.enderlynx.triggerFileBrowse(v);
                         if (newValue) i.value = newValue;
                     }
                 },
@@ -6662,7 +6703,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                         b.setAttribute("data-num", num);
                         b.classList.remove("failed");
                         b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
-                        let success = await window.electronAPI.testJavaInstallation(v);
+                        let success = await window.enderlynx.testJavaInstallation(v);
                         if (success) {
                             b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
                         } else {
@@ -6682,7 +6723,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                     "icon": '<i class="fa-solid fa-rotate-left"></i>',
                     "func": async (v, b, i) => {
                         b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.reset.resetting");
-                        let java_path = await window.electronAPI.getJavaInstallation(instanceInfo.java_version);
+                        let java_path = await window.enderlynx.getJavaInstallation(instanceInfo.java_version);
                         i.value = java_path;
                         b.innerHTML = '<i class="fa-solid fa-rotate-left"></i>' + translate("app.instances.settings.java_installation.test.reset")
                     }
@@ -6789,7 +6830,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
         instanceInfo.setVanillaVersion(info.game_version, true);
         instanceInfo.setLoaderVersion(info.loader_version);
         instanceInfo.setMcInstalled(false);
-        let r = await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
+        let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
         if (r.error) {
             instanceInfo.setFailed(true);
         } else {
@@ -6959,7 +7000,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         "name": translate("app.content.import.file_path.browse"),
                         "icon": '<i class="fa-solid fa-folder"></i>',
                         "func": async (v, b, i) => {
-                            let newValue = await window.electronAPI.triggerFileImportBrowseWithOptions(v, 0, ["zip", "jar", "disabled"], translate("app.content.import.file_path.browse.types"));
+                            let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["zip", "jar", "disabled"], translate("app.content.import.file_path.browse.types"));
                             if (newValue) i.value = newValue;
                             if (i.onchange) i.onchange();
                         }
@@ -7003,7 +7044,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
             document.body.style.cursor = "progress";
-            let success = await window.electronAPI.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
+            let success = await window.enderlynx.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
             document.body.style.cursor = "";
             if (success) {
                 displaySuccess(translate("app.content.import.complete"));
@@ -7130,7 +7171,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                             "content": translate("app.content.delete.confirm")
                         }
                     ], [], async () => {
-                        let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
+                        let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
                         if (success) {
                             displaySuccess(translate("app.content.delete.success").replace("%c", e.name));
                             e.delete();
@@ -7147,7 +7188,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                             "func": () => {
                                 e = e.refresh();
-                                window.electronAPI.showContentInFolder(instanceInfo.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                                window.enderlynx.showContentInFolder(instanceInfo.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                             }
                         },
                         e.source == "modrinth" ? {
@@ -7210,7 +7251,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                                         "content": translate("app.content.delete.confirm")
                                     }
                                 ], [], async () => {
-                                    let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
+                                    let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
                                     if (success) {
                                         displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                         e.delete();
@@ -7264,7 +7305,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         "icon": '<i class="fa-solid fa-trash-can"></i>',
                         "danger": true,
                         "func": async (ele, e) => {
-                            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
+                            let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
                             if (success) {
                                 displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                 e.delete();
@@ -7448,15 +7489,15 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                 "type": "text",
                 "id": "folder_path",
                 "name": translate("app.worlds.import.folder_path"),
-                "default": window.electronAPI.getInstanceFolderPath(),
+                "default": window.enderlynx.getInstanceFolderPath(),
                 "input_source": "launcher",
-                "source": window.electronAPI.getLauncherInstancePath,
+                "source": window.enderlynx.getLauncherInstancePath,
                 "buttons": [
                     {
                         "name": translate("app.worlds.import.folder_path.browse"),
                         "icon": '<i class="fa-solid fa-folder"></i>',
                         "func": async (v, b, i) => {
-                            let newValue = await window.electronAPI.triggerFileImportBrowse(v, 1);
+                            let newValue = await window.enderlynx.triggerFileImportBrowse(v, 1);
                             if (newValue) i.value = newValue;
                             if (i.onchange) i.onchange();
                         }
@@ -7468,7 +7509,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                 "name": translate("app.worlds.import.instance"),
                 "input_source": "folder_path",
                 "id": "instance",
-                "source": window.electronAPI.getLauncherInstances,
+                "source": window.enderlynx.getLauncherInstances,
                 "options": [],
                 "onchange": async (a, b, c) => {
                     let launcher = "";
@@ -7487,9 +7528,9 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                         }
                         if (b[i].id == "world") {
                             if (launcher == "vanilla") {
-                                b[i].element.setOptions((await window.electronAPI.getWorldsFromOtherLauncher(filePath)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                                b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(filePath)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
                             } else {
-                                b[i].element.setOptions((await window.electronAPI.getWorldsFromOtherLauncher(a)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                                b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(a)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
                             }
                         }
                     }
@@ -7516,13 +7557,13 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                 "type": "confirm",
                 "content": translate("app.worlds.import.confirm")
             }
-        ], [], (v) => {
+        ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
             for (let i = 0; i < info.world.length; i++) {
                 let world = info.world[i];
                 try {
-                    window.electronAPI.transferWorld(world, instanceInfo.instance_id, info.remove);
+                    await window.enderlynx.transferWorld(world, instanceInfo.instance_id, info.remove);
                 } catch (e) {
                     displayError(translate("app.worlds.import.error", "%m", e.message));
                 }
@@ -7565,7 +7606,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
         ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            await window.electronAPI.addServer(instanceInfo.instance_id, info.ip, info.name);
+            await window.enderlynx.addServer(instanceInfo.instance_id, info.ip, info.name);
             setInstanceTabContentWorlds(instanceInfo, element);
         })
     }
@@ -7634,7 +7675,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "content": translate("app.worlds.delete.confirm")
                         }
                     ], [], async () => {
-                        let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
+                        let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                         if (success) {
                             contentList.removeElement(ele);
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
@@ -7657,7 +7698,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "title": translate("app.worlds.open"),
                             "icon": '<i class="fa-solid fa-folder"></i>',
                             "func": () => {
-                                window.electronAPI.openWorldFolder(instanceInfo.instance_id, worlds[i].id);
+                                window.enderlynx.openWorldFolder(instanceInfo.instance_id, worlds[i].id);
                             }
                         },
                         {
@@ -7699,7 +7740,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                                         "content": translate("app.worlds.delete.confirm")
                                     }
                                 ], [], async () => {
-                                    let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, worlds[i].id);
+                                    let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, worlds[i].id);
                                     if (success) {
                                         contentList.removeElement(ele);
                                         displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
@@ -7741,7 +7782,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "content": translate("app.worlds.delete.confirm")
                         }
                     ], [], async () => {
-                        let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                        let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
                         if (success) {
                             contentList.removeElement(ele);
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
@@ -7799,7 +7840,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                                         "content": translate("app.worlds.delete.confirm")
                                     }
                                 ], [], async () => {
-                                    let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                                    let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
                                     if (success) {
                                         contentList.removeElement(ele);
                                         displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
@@ -7833,9 +7874,9 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                         for (let i = 0; i < es.length; i++) {
                             let e = es[i];
                             if (e.type == "singleplayer") {
-                                let success = await window.electronAPI.deleteWorld(instanceInfo.instance_id, e.id);
+                                let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id);
                                 if (success) {
-                                    eles[i].remove();
+                                    contentList.removeElement(eles[i]);
                                     displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
                                 } else {
                                     displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
@@ -7848,7 +7889,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             }
                         }
                         if (!ips.length) return;
-                        let success = await window.electronAPI.deleteServer(instanceInfo.instance_id, ips, indexes);
+                        let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, ips, indexes);
                         if (success) {
                             elesm.forEach(e => e.remove());
                             displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(names.join(", "))));
@@ -7892,7 +7933,17 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     element.appendChild(contentListWrap);
     clearMoreMenus();
 }
+
 function setInstanceTabContentLogs(instanceInfo, element) {
+    let loading = new LoadingContainer();
+    element.innerHTML = "";
+    element.appendChild(loading.element);
+    setTimeout(() => {
+        setInstanceTabContentLogsReal(instanceInfo, element);
+    }, 0);
+}
+
+async function setInstanceTabContentLogsReal(instanceInfo, element) {
     currentSubTab = "logs";
     let deleteButton = document.createElement("button");
     let searchAndFilter = document.createElement("div");
@@ -7905,7 +7956,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         render();
     }, null);
     let typeDropdown = document.createElement("div");
-    let log_info = window.electronAPI.getInstanceLogs(instanceInfo.instance_id);
+    let log_info = await window.enderlynx.getInstanceLogs(instanceInfo.instance_id);
     let logDisplay = document.createElement("div");
     let visible = document.createElement("div");
     visible.className = "logs-visible";
@@ -7943,7 +7994,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
             lineElement.classList.add("log-entry");
             logs.push({ "element": lineElement, "content": translate("app.logs.no_live") });
         } else {
-            let logInfo = window.electronAPI.getLog(log_path);
+            let logInfo = window.enderlynx.getLog(log_path);
             logInfo = logInfo.split("\n");
             logs = [];
             logInfo.forEach((e) => {
@@ -7966,7 +8017,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
             setTimeout(() => {
                 logDisplay.scrollTo(0, logDisplay.scrollHeight);
             }, 0);
-            window.electronAPI.watchFile(log_path, (log) => {
+            window.enderlynx.watchFile(log_path, (log) => {
                 let logInfo = log.split("\n");
                 let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
                 logInfo.forEach((e) => {
@@ -7994,7 +8045,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     logDisplay.onscroll = render;
     let onChangeLogDropdown = (e) => {
         try {
-            window.electronAPI.stopWatching(instanceInfo.current_log_file);
+            window.enderlynx.stopWatching(instanceInfo.current_log_file);
         } catch (e) { }
 
         if (e == "live_log") {
@@ -8003,7 +8054,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         } else {
             deleteButton.style.display = "flex";
             currentLog = e;
-            let logInfo = window.electronAPI.getLog(instanceInfo.instance_id, e);
+            let logInfo = window.enderlynx.getLog(instanceInfo.instance_id, e);
             logInfo = logInfo.split("\n");
             logs = [];
             logInfo.forEach((e) => {
@@ -8068,7 +8119,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
         let copyLogs = showLogs.map(e => e.content).join("\n");
         let url = "";
         try {
-            url = await window.electronAPI.shareLogs(copyLogs);
+            url = await window.enderlynx.shareLogs(copyLogs);
         } catch (e) {
             displayError(translate("app.logs.share.fail"));
             return;
@@ -8087,7 +8138,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                 "content": translate("app.logs.delete.confirm")
             }
         ], [], async () => {
-            let success = await window.electronAPI.deleteLogs(instanceInfo.instance_id, currentLog);
+            let success = await window.enderlynx.deleteLogs(instanceInfo.instance_id, currentLog);
             if (success) {
                 displaySuccess(translate("app.logs.delete.success"));
                 setInstanceTabContentLogs(instanceInfo, element);
@@ -8108,7 +8159,7 @@ function setInstanceTabContentLogs(instanceInfo, element) {
                 "content": translate("app.logs.delete_all.confirm")
             }
         ], [], async () => {
-            let success = await window.electronAPI.deleteAllLogs(instanceInfo.instance_id, instanceInfo.refresh().current_log_file);
+            let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id, instanceInfo.refresh().current_log_file);
             if (success) {
                 displaySuccess(translate("app.logs.delete_all.success"));
                 setInstanceTabContentLogs(instanceInfo, element);
@@ -8123,9 +8174,22 @@ function setInstanceTabContentLogs(instanceInfo, element) {
     logTop.appendChild(deleteAllButton);
     logDisplay.className = "logs-display";
 }
+
 function setInstanceTabContentOptions(instanceInfo, element) {
+    let loading = new LoadingContainer();
+    element.innerHTML = "";
+    element.appendChild(loading.element);
+    setTimeout(() => {
+        setInstanceTabContentOptionsReal(instanceInfo, element);
+    }, 0);
+}
+
+let previousKeyDownEventListener;
+let previousMouseDownEventListener;
+
+async function setInstanceTabContentOptionsReal(instanceInfo, element) {
     currentSubTab = "options";
-    let values = window.electronAPI.getInstanceOptions(instanceInfo.instance_id);
+    let values = await window.enderlynx.getInstanceOptions(instanceInfo.instance_id);
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
     let contentSearch = document.createElement("div");
@@ -8197,7 +8261,10 @@ function setInstanceTabContentOptions(instanceInfo, element) {
     let selectedKeySelect;
     let selectedKeySelectFunction;
 
-    document.body.addEventListener("keydown", (e) => {
+    document.body.removeEventListener("keydown", previousKeyDownEventListener);
+    document.body.removeEventListener("mousedown", previousMouseDownEventListener);
+
+    previousKeyDownEventListener = async (e) => {
         if (selectedKeySelect) {
             e.preventDefault();
             e.stopPropagation();
@@ -8219,8 +8286,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             let key = selectedKeySelect.getAttribute("data-key")
             selectedKeySelect = null;
             try {
-                console.log(key, keyCode ? keyCode : "key.keyboard.unknown");
-                window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, key, keyCode ? keyCode : "key.keyboard.unknown");
+                await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, key, keyCode ? keyCode : "key.keyboard.unknown");
                 displaySuccess(translate("app.options.updated"));
                 if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
             } catch (e) {
@@ -8229,9 +8295,9 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 tempSelected.value = oldValue;
             }
         }
-    });
+    }
 
-    document.body.addEventListener("mousedown", (e) => {
+    previousMouseDownEventListener = async (e) => {
         if (selectedKeySelect) {
             e.preventDefault();
             e.stopPropagation();
@@ -8250,7 +8316,7 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             let key = selectedKeySelect.getAttribute("data-key")
             selectedKeySelect = null;
             try {
-                window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, key, mouseKey);
+                await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, key, mouseKey);
                 displaySuccess(translate("app.options.updated"));
                 if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
             } catch (e) {
@@ -8259,7 +8325,11 @@ function setInstanceTabContentOptions(instanceInfo, element) {
                 tempSelected.value = oldValue;
             }
         }
-    });
+    }
+
+    document.body.addEventListener("keydown", previousKeyDownEventListener);
+    document.body.addEventListener("mousedown", previousMouseDownEventListener);
+
     let defaultOptions = new DefaultOptions(instanceInfo.vanilla_version);
     for (let i = 0; i < values.length; i++) {
         let e = values[i];
@@ -8304,9 +8374,9 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             inputElement = document.createElement("input");
             inputElement.className = "option-input";
             inputElement.value = e.value.slice(1, -1);
-            inputElement.onchange = () => {
+            inputElement.onchange = async () => {
                 try {
-                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, '"' + inputElement.value + '"');
+                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, '"' + inputElement.value + '"');
                     displaySuccess(translate("app.options.updated"));
                     values[i].value = '"' + inputElement.value + '"';
                     oldvalue = inputElement.value;
@@ -8323,9 +8393,9 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             inputElement.className = "option-input";
             inputElement.value = e.value;
             inputElement.type = "number";
-            inputElement.onchange = () => {
+            inputElement.onchange = async () => {
                 try {
-                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
+                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
                     displaySuccess(translate("app.options.updated"));
                     values[i].value = inputElement.value;
                     oldvalue = inputElement.value;
@@ -8340,9 +8410,9 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         } else if (type == "boolean") {
             let inputElement1 = document.createElement("div");
             inputElement1.className = "option-input";
-            inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
+            inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, async (v) => {
                 try {
-                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, v);
+                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, v);
                     displaySuccess(translate("app.options.updated"));
                     values[i].value = v;
                     oldvalue = v;
@@ -8358,9 +8428,9 @@ function setInstanceTabContentOptions(instanceInfo, element) {
             inputElement = document.createElement("input");
             inputElement.className = "option-input";
             inputElement.value = e.value;
-            inputElement.onchange = () => {
+            inputElement.onchange = async () => {
                 try {
-                    window.electronAPI.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
+                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
                     displaySuccess(translate("app.options.updated"));
                     values[i].value = inputElement.value;
                     oldvalue = inputElement.value;
@@ -8439,13 +8509,23 @@ function setInstanceTabContentOptions(instanceInfo, element) {
         optionList.appendChild(nofound.element);
     }
 }
+
 function setInstanceTabContentScreenshots(instanceInfo, element) {
+    let loading = new LoadingContainer();
+    element.innerHTML = "";
+    element.appendChild(loading.element);
+    setTimeout(() => {
+        setInstanceTabContentScreenshotsReal(instanceInfo, element);
+    }, 0);
+}
+
+async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
     currentSubTab = "screenshots";
     element.innerHTML = "";
     let galleryElement = document.createElement("div");
     galleryElement.className = "gallery";
     element.appendChild(galleryElement);
-    let screenshots = window.electronAPI.getScreenshots(instanceInfo.instance_id).reverse();
+    let screenshots = (await window.enderlynx.getScreenshots(instanceInfo.instance_id)).reverse();
     screenshots.forEach(e => {
         let screenshotElement = document.createElement("button");
         screenshotElement.className = "gallery-screenshot";
@@ -8460,21 +8540,21 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.screenshots.open_in_folder"),
                 "func": () => {
-                    window.electronAPI.showScreenshotInFolder(instanceInfo.instance_id, e.real_file_name);
+                    window.enderlynx.showScreenshotInFolder(instanceInfo.instance_id, e.real_file_name);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-image"></i>',
                 "title": translate("app.screenshots.open_photo"),
                 "func": () => {
-                    window.electronAPI.openFolder(e.file_path);
+                    window.enderlynx.openFolder(e.file_path);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": translate("app.screenshots.copy"),
                 "func": async () => {
-                    let success = await window.electronAPI.copyImageToClipboard(e.file_path);
+                    let success = await window.enderlynx.copyImageToClipboard(e.file_path);
                     if (success) {
                         displaySuccess(translate("app.screenshots.copy.success"));
                     } else {
@@ -8493,7 +8573,7 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.screenshots.delete"),
                 "func": () => {
-                    let success = window.electronAPI.deleteScreenshot(instanceInfo.instance_id, e.file_name);
+                    let success = window.enderlynx.deleteScreenshot(instanceInfo.instance_id, e.file_name);
                     if (success) {
                         displaySuccess(translate("app.screenshots.delete.success"));
                     } else {
@@ -8533,10 +8613,10 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
         screenshotDisplayW.appendChild(spinner);
         screenshotDisplayW.appendChild(error);
         screenshotAction2.onclick = () => {
-            window.electronAPI.openFolder(file);
+            window.enderlynx.openFolder(file);
         };
         screenshotAction3.onclick = async () => {
-            let success = await window.electronAPI.copyImageToClipboard(file);
+            let success = await window.enderlynx.copyImageToClipboard(file);
             if (success) {
                 displaySuccess(translate("app.screenshots.custom.copy.success", "%w", word));
             } else {
@@ -8552,7 +8632,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
         }
         if (instanceInfo) {
             screenshotAction5.onclick = () => {
-                let success = window.electronAPI.deleteScreenshot(instanceInfo.instance_id, file_name);
+                let success = window.enderlynx.deleteScreenshot(instanceInfo.instance_id, file_name);
                 if (success) {
                     screenshotPreview.close();
                     displaySuccess(translate("app.screenshots.custom.delete.success", "%w", word));
@@ -8632,7 +8712,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
     screenshotAction1.className = "screenshot-action";
     screenshotAction1.innerHTML = '<i class="fa-solid fa-folder"></i>' + translate("app.screenshots.open_in_folder");
     screenshotAction1.onclick = () => {
-        window.electronAPI.showFileInFolder(file);
+        window.enderlynx.showFileInFolder(file);
     };
     if (instanceInfo) {
         screenshotActions.appendChild(screenshotAction1);
@@ -8718,11 +8798,11 @@ async function playInstance(instInfo, quickPlay = null) {
     instInfo.setLastPlayed(new Date());
     let pid;
     try {
-        pid = await window.electronAPI.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, data.getDefault("global_env_vars"), data.getDefault("global_pre_launch_hook"), data.getDefault("global_post_launch_hook"), data.getDefault("global_wrapper"), data.getDefault("global_post_exit_hook"), instInfo.name);
+        pid = await window.enderlynx.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, data.getDefault("global_env_vars"), data.getDefault("global_pre_launch_hook"), data.getDefault("global_post_launch_hook"), data.getDefault("global_wrapper"), data.getDefault("global_post_exit_hook"), instInfo.name);
         if (!pid) return;
         console.log(pid);
         console.log(pid.minecraft.pid);
-        console.log(window.electronAPI.checkForProcess(pid.minecraft.pid));
+        console.log(window.enderlynx.checkForProcess(pid.minecraft.pid));
         instInfo.setPid(pid.minecraft.pid);
         instInfo.setCurrentLogFile(pid.minecraft.log);
         let default_player = data.getDefaultProfile();
@@ -8750,7 +8830,7 @@ async function playMultiplayerWorld(instInfo, world_id) {
 }
 
 async function stopInstance(instInfo) {
-    return await window.electronAPI.killProcess(instInfo.refresh().pid);
+    return await window.enderlynx.killProcess(instInfo.refresh().pid);
 }
 
 function formatTime(secs) {
@@ -8856,28 +8936,23 @@ function formatDateAndTime(dateString) {
 }
 
 function getLangFile(locale) {
-    let isDev = window.electronAPI.isDev;
-    if (!isDev) {
-        return JSON.parse(window.electronAPI.readFile(window.electronAPI.resourcePath, 'app.asar', 'resources', 'lang', `${locale}.json`));
-    } else {
-        return JSON.parse(window.electronAPI.readFile(`./resources/lang/${locale}.json`));
-    }
+    return JSON.parse(window.enderlynx.getLangFile(locale));
 }
 
 function checkForProcess(pid) {
-    return window.electronAPI.checkForProcess(pid);
+    return window.enderlynx.checkForProcess(pid);
 }
 
 async function getInstanceWorlds(instanceInfo) {
-    return await window.electronAPI.getSinglePlayerWorlds(instanceInfo.instance_id);
+    return await window.enderlynx.getSinglePlayerWorlds(instanceInfo.instance_id);
 }
 
 async function getInstanceWorldsMulti(instanceInfo) {
-    return await window.electronAPI.getMultiplayerWorlds(instanceInfo.instance_id);
+    return await window.enderlynx.getMultiplayerWorlds(instanceInfo.instance_id);
 }
 
 async function getInstanceContent(instanceInfo) {
-    return await window.electronAPI.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent(), data.getDefault("link_with_modrinth") == "true");
+    return await window.enderlynx.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent(), data.getDefault("link_with_modrinth") == "true");
 }
 
 function translate(key, ...params) {
@@ -9191,7 +9266,7 @@ class DownloadLog {
 
 let log = new DownloadLog(downloadLog);
 
-window.electronAPI.onProgressUpdate((title, progress, task, id, status, cancelFunction, retryFunction) => {
+window.enderlynx.onProgressUpdate((title, progress, task, id, status, cancelFunction, retryFunction) => {
     log.sendData([
         {
             "title": title,
@@ -9205,7 +9280,7 @@ window.electronAPI.onProgressUpdate((title, progress, task, id, status, cancelFu
     ]);
 });
 
-window.electronAPI.onContentInstallUpdate((content_id, percent) => {
+window.enderlynx.onContentInstallUpdate((content_id, percent) => {
     if (percent >= 100) percent = 0;
     if (!global_discover_content_states[content_id]) {
         content_id = Number(content_id);
@@ -9218,15 +9293,15 @@ window.electronAPI.onContentInstallUpdate((content_id, percent) => {
     });
 });
 
-window.electronAPI.onOpenFileShare((p) => {
+window.enderlynx.onOpenFileShare((p) => {
     openShareDialogForFile(p);
 });
 
-window.electronAPI.onErrorMessage((message) => {
+window.enderlynx.onErrorMessage((message) => {
     displayError(message);
 });
 
-window.electronAPI.onLaunchInstance(async (launch_info) => {
+window.enderlynx.onLaunchInstance(async (launch_info) => {
     if (!launch_info.instance_id) return;
     try {
         let instance = new Instance(launch_info.instance_id);
@@ -9244,7 +9319,7 @@ window.electronAPI.onLaunchInstance(async (launch_info) => {
     }
 });
 
-window.electronAPI.onInstallInstance(async (install_info) => {
+window.enderlynx.onInstallInstance(async (install_info) => {
     if (!install_info.id) return;
     if (!install_info.source) return;
     let info = {};
@@ -9302,22 +9377,22 @@ let version_cache = {};
 async function getVersions(loader, mcVersion) {
     if (loader == "fabric") {
         if (version_cache["fabric-" + mcVersion]) return version_cache["fabric-" + mcVersion];
-        let v = await window.electronAPI.getFabricLoaderVersions(mcVersion);
+        let v = await window.enderlynx.getFabricLoaderVersions(mcVersion);
         version_cache["fabric-" + mcVersion] = v;
         return v;
     } else if (loader == "forge") {
         if (version_cache["forge-" + mcVersion]) return version_cache["forge-" + mcVersion];
-        let v = await window.electronAPI.getForgeLoaderVersions(mcVersion);
+        let v = await window.enderlynx.getForgeLoaderVersions(mcVersion);
         version_cache["forge-" + mcVersion] = v;
         return v;
     } else if (loader == "neoforge") {
         if (version_cache["neoforge-" + mcVersion]) return version_cache["neoforge-" + mcVersion];
-        let v = await window.electronAPI.getNeoForgeLoaderVersions(mcVersion);
+        let v = await window.enderlynx.getNeoForgeLoaderVersions(mcVersion);
         version_cache["neoforge-" + mcVersion] = v;
         return v;
     } else if (loader == "quilt") {
         if (version_cache["quilt-" + mcVersion]) return version_cache["quilt-" + mcVersion];
-        let v = await window.electronAPI.getQuiltLoaderVersions(mcVersion);
+        let v = await window.enderlynx.getQuiltLoaderVersions(mcVersion);
         version_cache["quilt-" + mcVersion] = v;
         return v;
     } else {
@@ -9330,27 +9405,27 @@ class VersionList {
     static async getVersions(loader) {
         if (loader == "vanilla") {
             if (version_cache["vanilla"]) return version_cache["vanilla"];
-            let v = await window.electronAPI.getVanillaVersions();
+            let v = await window.enderlynx.getVanillaVersions();
             version_cache["vanilla"] = v;
             return v;
         } else if (loader == "fabric") {
             if (version_cache["fabric"]) return version_cache["fabric"];
-            let v = await window.electronAPI.getFabricVersions();
+            let v = await window.enderlynx.getFabricVersions();
             version_cache["fabric"] = v;
             return v;
         } else if (loader == "forge") {
             if (version_cache["forge"]) return version_cache["forge"];
-            let v = await window.electronAPI.getForgeVersions();
+            let v = await window.enderlynx.getForgeVersions();
             version_cache["forge"] = v;
             return v;
         } else if (loader == "neoforge") {
             if (version_cache["neoforge"]) return version_cache["neoforge"];
-            let v = await window.electronAPI.getNeoForgeVersions();
+            let v = await window.enderlynx.getNeoForgeVersions();
             version_cache["neoforge"] = v;
             return v;
         } else if (loader == "quilt") {
             if (version_cache["quilt"]) return version_cache["quilt"];
-            let v = await window.electronAPI.getQuiltVersions();
+            let v = await window.enderlynx.getQuiltVersions();
             version_cache["quilt"] = v;
             return v;
         }
@@ -10713,7 +10788,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
     if (source == "modrinth") {
         let apiresult;
         try {
-            apiresult = await window.electronAPI.modrinthSearch(query, loader, project_type, version, page, pageSize, sortBy);
+            apiresult = await window.enderlynx.modrinthSearch(query, loader, project_type, version, page, pageSize, sortBy);
             element.innerHTML = "";
         } catch (err) {
             loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
@@ -10814,7 +10889,7 @@ async function getContent(element, instance_id, source, query, loader, version, 
     } else if (source == "curseforge") {
         let apiresult;
         try {
-            apiresult = await window.electronAPI.curseforgeSearch(query, loader, project_type, version, page, pageSize, sortBy);
+            apiresult = await window.enderlynx.curseforgeSearch(query, loader, project_type, version, page, pageSize, sortBy);
             element.innerHTML = "";
         } catch (err) {
             loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
@@ -10950,7 +11025,7 @@ function displayVanillaTweaksEditor(instance_id, version, packs, file_name, cont
         }
     ], [], async () => {
         let instanceInfo = new Instance(instance_id);
-        let file = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, instanceInfo.vanilla_version, instanceInfo.instance_id, file_name);
+        let file = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, instanceInfo.vanilla_version, instanceInfo.instance_id, file_name);
         if (!file) {
             displayError(translate("app.discover.vt.fail"));
         } else {
@@ -11001,9 +11076,9 @@ class VanillaTweaksSelector {
         if (!this.vt_version) this.vt_version = "1.21";
         try {
             if (this.type == "resourcepack") {
-                result = await window.electronAPI.getVanillaTweaksResourcePacks(this.query, this.vt_version);
+                result = await window.enderlynx.getVanillaTweaksResourcePacks(this.query, this.vt_version);
             } else if (this.type == "datapack") {
-                result = await window.electronAPI.getVanillaTweaksDataPacks(this.query, this.vt_version);
+                result = await window.enderlynx.getVanillaTweaksDataPacks(this.query, this.vt_version);
             }
             this.element.innerHTML = "";
         } catch (err) {
@@ -11143,7 +11218,7 @@ class VanillaTweaksSelector {
                         submitButton.classList.add("disabled");
                         submitButton.onclick = () => { };
                     }
-                    let success = await window.electronAPI.downloadVanillaTweaksDataPacks(added_vt_packs, this.vt_version, instance, world);
+                    let success = await window.enderlynx.downloadVanillaTweaksDataPacks(added_vt_packs, this.vt_version, instance, world);
                     if (this.instance_id) {
                         if (success) {
                             submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
@@ -11161,7 +11236,7 @@ class VanillaTweaksSelector {
             } else if (this.instance_id) {
                 submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                 submitButton.onclick = () => { };
-                let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, this.instance_id);
+                let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, this.instance_id);
                 if (!file_name) {
                     displayError(translate("app.discover.vt.fail"));
                     return;
@@ -11233,17 +11308,17 @@ class VanillaTweaksSelector {
                             displayError(translate("app.instances.no_name"));
                             return;
                         }
-                        let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                        let instance_id = window.enderlynx.getInstanceFolderName(info.name);
                         let loader_version = "";
                         try {
                             if (info.loader == "fabric") {
-                                loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                                loader_version = (await window.enderlynx.getFabricVersion(info.game_version))
                             } else if (info.loader == "forge") {
-                                loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                                loader_version = (await window.enderlynx.getForgeVersion(info.game_version))
                             } else if (info.loader == "neoforge") {
-                                loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                                loader_version = (await window.enderlynx.getNeoForgeVersion(info.game_version))
                             } else if (info.loader == "quilt") {
-                                loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                                loader_version = (await window.enderlynx.getQuiltVersion(info.game_version))
                             }
                         } catch (e) {
                             displayError(translate("app.instances.failed_to_create"));
@@ -11252,12 +11327,12 @@ class VanillaTweaksSelector {
                         let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                         instance.setInstalling(true);
                         showSpecificInstanceContent(instance);
-                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
+                        let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
                         if (file_name) {
                             instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                         }
                         instance.setInstalling(false);
-                        let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+                        let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
                         if (r.error) {
                             instance.setFailed(true);
                         } else {
@@ -11309,7 +11384,7 @@ class VanillaTweaksSelector {
                         installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
                         installButton.classList.add("disabled");
                         installButton.onclick = () => { };
-                        let file_name = await window.electronAPI.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instances[i].instance_id);
+                        let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instances[i].instance_id);
                         if (!file_name) {
                             success = false;
                         } else {
@@ -11505,7 +11580,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
         version_json = await res.json();
     } else if (source == "curseforge") {
         let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instance.loader);
-        version_json = await window.electronAPI.getCurseforgePage(project_id, 1, project_type == "mod" ? game_flavor : -1);
+        version_json = await window.enderlynx.getCurseforgePage(project_id, 1, project_type == "mod" ? game_flavor : -1);
         let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
         let dependencies_json = await dependencies.json();
         let dependency_list = dependencies_json.data;
@@ -11548,7 +11623,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
                 return false;
             }
             let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instance.loader);
-            version_json = await window.electronAPI.getCurseforgePage(project_id, count, game_flavor);
+            version_json = await window.enderlynx.getCurseforgePage(project_id, count, game_flavor);
             let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
             let dependencies_json = await dependencies.json();
             let dependency_list = dependencies_json.data;
@@ -11650,7 +11725,7 @@ function toTitleCase(str) {
 }
 
 async function addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id) {
-    return await window.electronAPI.addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id);
+    return await window.enderlynx.addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id);
 }
 
 class LoadingContainer {
@@ -11718,7 +11793,7 @@ function sanitize(input) {
 }
 
 let defaultpage = data.getDefault("default_page");
-let other_default_page = window.electronAPI.isOtherStartingPage();
+let other_default_page = window.enderlynx.isOtherStartingPage();
 if (other_default_page) defaultpage = other_default_page;
 if (defaultpage == "home") {
     homeButton.setSelected();
@@ -11738,7 +11813,7 @@ if (defaultpage == "home") {
 
 async function applyCape(profile, cape) {
     try {
-        let res = await window.electronAPI.setCape(profile, cape ? cape.cape_id : null);
+        let res = await window.enderlynx.setCape(profile, cape ? cape.cape_id : null);
         profile.setAccessToken(res.player_info.access_token);
         profile.setClientId(res.player_info.client_id);
         profile.setExpires(res.player_info.expires);
@@ -11758,7 +11833,7 @@ async function applyCape(profile, cape) {
 
 async function applySkin(profile, skin) {
     try {
-        let res = await window.electronAPI.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
+        let res = await window.enderlynx.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
         profile.setAccessToken(res.player_info.access_token);
         profile.setClientId(res.player_info.client_id);
         profile.setExpires(res.player_info.expires);
@@ -11768,7 +11843,6 @@ async function applySkin(profile, skin) {
         profile.setXuid(res.player_info.xuid);
         profile.setIsDemo(res.player_info.is_demo);
         await updateSkinsAndCapes(res.skin_info);
-        console.log(res.skin_info.skins[0]);
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
         return true;
@@ -11780,7 +11854,7 @@ async function applySkin(profile, skin) {
 
 async function applySkinFromURL(profile, skin) {
     try {
-        let res = await window.electronAPI.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
+        let res = await window.enderlynx.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
         profile.setAccessToken(res.player_info.access_token);
         profile.setClientId(res.player_info.client_id);
         profile.setExpires(res.player_info.expires);
@@ -11790,7 +11864,6 @@ async function applySkinFromURL(profile, skin) {
         profile.setXuid(res.player_info.xuid);
         profile.setIsDemo(res.player_info.is_demo);
         await updateSkinsAndCapes(res.skin_info);
-        console.log(res.skin_info.skins[0]);
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
         return true;
@@ -11808,7 +11881,7 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     let profile = data.getProfileFromUUID(skin_and_cape_data.uuid);
     try {
         for (const e of skin_and_cape_data.capes) {
-            await window.electronAPI.downloadCape(e.url, e.id);
+            await window.enderlynx.downloadCape(e.url, e.id);
             let cape = profile.addCape(e.alias, e.id, e.url);
             if (e.state == "ACTIVE") cape.setActive();
             else cape.removeActive();
@@ -11818,8 +11891,8 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     }
     try {
         for (const e of skin_and_cape_data.skins) {
-            let hash = await window.electronAPI.downloadSkin(e.url);
-            let skin = data.addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date());
+            let hash = await window.enderlynx.downloadSkin(e.url);
+            let skin = data.addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date(), e.textureKey);
             if (e.state == "ACTIVE") skin.setActive(skin_and_cape_data.uuid);
             else skin.removeActive(skin_and_cape_data.uuid);
         }
@@ -11876,9 +11949,9 @@ function duplicateInstance(instanceInfo) {
     ], [], async (v) => {
         let info = {};
         v.forEach(e => info[e.id] = e.value);
-        let new_instance_id = window.electronAPI.getInstanceFolderName(info.name);
+        let new_instance_id = window.enderlynx.getInstanceFolderName(info.name);
         try {
-            let success = await window.electronAPI.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
+            let success = await window.enderlynx.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
             let oldContent = instanceInfo.getContent();
             if (!success) throw new Error();
             let newInstance = data.addInstance(
@@ -11937,12 +12010,12 @@ function duplicateInstance(instanceInfo) {
 }
 
 async function getRecentlyPlayedWorlds(ignore_world_ids = []) {
-    let all_servers = await window.electronAPI.getAllServers(data.getInstances().map(e => e.instance_id));
+    let all_servers = await window.enderlynx.getAllServers(data.getInstances().map(e => e.instance_id));
     all_servers = all_servers.map(server => ({
         ...server,
         "last_played": getServerLastPlayed(server.instance_id, server.ip)
     }))
-    let last_played_worlds = await window.electronAPI.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
+    let last_played_worlds = await window.enderlynx.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
     let all = last_played_worlds.concat(all_servers);
     all = all.filter(e => !ignore_world_ids.includes((e.id ? e.id : e.ip) + ":" + e.instance_id))
     all.sort((a, b) => b.last_played - a.last_played);
@@ -11968,7 +12041,7 @@ function getPinnedInstances() {
     }).filter(e => e);
 }
 async function getPinnedWorlds() {
-    return (await window.electronAPI.getPinnedWorlds());
+    return (await window.enderlynx.getPinnedWorlds());
 }
 function pinInstance(instanceInfo) {
     db.prepare("INSERT INTO pins (type, instance_id) VALUES (?, ?)").run("instance", instanceInfo.instance_id);
@@ -12005,13 +12078,14 @@ async function getModpackVersions(source, content_id) {
         let versions = await versions_pre_json.json();
         return versions.map(e => ({ "name": e.name, "value": e.id, "pass": e }));
     } else if (source == "curseforge") {
-        let versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
+        let versions = await window.enderlynx.getAllCurseforgeFiles(content_id);
         return versions.map(e => ({ "name": e.displayName, "value": e.id.toString() + ".0", "pass": e }));
     }
 }
 
 let contentInfoHistory = [];
 let contentInfoIndex = 0;
+let dialogContextMenu = new ContextMenu();
 
 async function displayContentInfo(content_source, content_id, instance_id, vanilla_version, loader, locked, disableAddToHistory = false, content_list_to_update, infoData, pt, states) {
     if (!content_source) return;
@@ -12031,7 +12105,6 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
 
     contentInfo.innerHTML = "";
     contentInfo.showModal();
-    let dialogContextMenu = new ContextMenu();
     contentInfo.onscroll = () => {
         dialogContextMenu.hideContextMenu();
     }
@@ -12152,7 +12225,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             }
             let description_pre_json = await fetch(`https://api.curse.tools/v1/cf/mods/${content_id}/description`);
             description = await description_pre_json.json();
-            versions = await window.electronAPI.getAllCurseforgeFiles(content_id);
+            versions = await window.enderlynx.getAllCurseforgeFiles(content_id);
             if (versions.data) versions = versions.data;
         } catch (e) {
             loading.errorOut(e, () => {
@@ -12315,7 +12388,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-solid fa-globe"></i>',
             "title": translate("app.discover.view.website"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.website);
+                window.enderlynx.openInBrowser(content.urls.website);
             }
         })
     }
@@ -12324,7 +12397,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-solid fa-code"></i>',
             "title": translate("app.discover.view.source"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.source);
+                window.enderlynx.openInBrowser(content.urls.source);
             }
         })
     }
@@ -12333,7 +12406,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-solid fa-book-atlas"></i>',
             "title": translate("app.discover.view.wiki"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.wiki);
+                window.enderlynx.openInBrowser(content.urls.wiki);
             }
         })
     }
@@ -12342,7 +12415,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-solid fa-bug"></i>',
             "title": translate("app.discover.view.issues"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.issues);
+                window.enderlynx.openInBrowser(content.urls.issues);
             }
         })
     }
@@ -12351,7 +12424,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-discord"></i>',
             "title": translate("app.discover.view.discord"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.discord);
+                window.enderlynx.openInBrowser(content.urls.discord);
             }
         })
     }
@@ -12360,7 +12433,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-x-twitter"></i>',
             "title": translate("app.discover.view.twitter"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.twitter);
+                window.enderlynx.openInBrowser(content.urls.twitter);
             }
         })
     }
@@ -12369,7 +12442,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-bluesky"></i>',
             "title": translate("app.discover.view.bluesky"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.bluesky);
+                window.enderlynx.openInBrowser(content.urls.bluesky);
             }
         })
     }
@@ -12378,7 +12451,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-mastodon"></i>',
             "title": translate("app.discover.view.mastodon"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.mastodon);
+                window.enderlynx.openInBrowser(content.urls.mastodon);
             }
         })
     }
@@ -12387,7 +12460,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-instagram"></i>',
             "title": translate("app.discover.view.instagram"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.instagram);
+                window.enderlynx.openInBrowser(content.urls.instagram);
             }
         })
     }
@@ -12396,7 +12469,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-youtube"></i>',
             "title": translate("app.discover.view.youtube"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.youtube);
+                window.enderlynx.openInBrowser(content.urls.youtube);
             }
         })
     }
@@ -12405,7 +12478,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-reddit"></i>',
             "title": translate("app.discover.view.reddit"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.reddit);
+                window.enderlynx.openInBrowser(content.urls.reddit);
             }
         })
     }
@@ -12414,7 +12487,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-facebook"></i>',
             "title": translate("app.discover.view.facebook"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.facebook);
+                window.enderlynx.openInBrowser(content.urls.facebook);
             }
         })
     }
@@ -12423,7 +12496,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-twitch"></i>',
             "title": translate("app.discover.view.twitch"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.twitch);
+                window.enderlynx.openInBrowser(content.urls.twitch);
             }
         })
     }
@@ -12432,7 +12505,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-tiktok"></i>',
             "title": translate("app.discover.view.tiktok"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.tiktok);
+                window.enderlynx.openInBrowser(content.urls.tiktok);
             }
         })
     }
@@ -12441,7 +12514,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-pinterest"></i>',
             "title": translate("app.discover.view.pinterest"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.pinterest);
+                window.enderlynx.openInBrowser(content.urls.pinterest);
             }
         })
     }
@@ -12450,7 +12523,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-github"></i>',
             "title": translate("app.discover.view.github"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.github);
+                window.enderlynx.openInBrowser(content.urls.github);
             }
         })
     }
@@ -12459,7 +12532,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-brands fa-patreon"></i>',
             "title": translate("app.discover.view.patreon"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.patreon);
+                window.enderlynx.openInBrowser(content.urls.patreon);
             }
         })
     }
@@ -12469,7 +12542,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 "icon": '<i class="fa-solid fa-hand-holding-dollar"></i>',
                 "title": e.platform == "Other" ? translate("app.discover.donate") : translate("app.discover.donate.platform", "%p", e.platform),
                 "func": () => {
-                    window.electronAPI.openInBrowser(e.url);
+                    window.enderlynx.openInBrowser(e.url);
                 }
             })
         });
@@ -12479,7 +12552,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
             "title": translate("app.discover.open_in_browser"),
             "func": (e) => {
-                window.electronAPI.openInBrowser(content.urls.browser);
+                window.enderlynx.openInBrowser(content.urls.browser);
             }
         }
     ].concat(links));
@@ -12923,7 +12996,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                                         "content": translate("app.discover.changelog.done")
                                     }
                                 ], [], () => { });
-                                window.electronAPI.getCurseforgeChangelog(content_id, e.id, (v) => {
+                                window.enderlynx.getCurseforgeChangelog(content_id, e.id, (v) => {
                                     element.innerHTML = v;
                                     afterMarkdownParse();
                                 }, (err) => {
@@ -12997,14 +13070,14 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
                             "title": translate("app.discover.author.open_in_browser"),
                             "func": () => {
-                                window.electronAPI.openInBrowser(e.browser_url);
+                                window.enderlynx.openInBrowser(e.browser_url);
                             }
                         },
                         {
                             "icon": '<i class="fa-solid fa-copy"></i>',
                             "title": translate("app.discover.author.copy_user_id"),
                             "func": async () => {
-                                let success = await window.electronAPI.copyToClipboard(e.user.id);
+                                let success = await window.enderlynx.copyToClipboard(e.user.id);
                                 if (success) {
                                     displaySuccess(translate("app.discover.author.copy_user_id.success"));
                                 } else {
@@ -13044,7 +13117,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             "icon": '<i class="fa-solid fa-copy"></i>',
                             "title": translate("app.discover.gallery.image.copy"),
                             "func": async () => {
-                                let success = await window.electronAPI.copyImageToClipboard(e.raw_url);
+                                let success = await window.enderlynx.copyImageToClipboard(e.raw_url);
                                 if (success) {
                                     displaySuccess(translate("app.discover.gallery.image.copy.success"));
                                 } else {
@@ -13076,7 +13149,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
 }
 
 function parseModrinthMarkdown(md) {
-    return window.electronAPI.parseModrinthMarkdown(md);
+    return window.enderlynx.parseMarkdown(md);
 }
 
 function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked) {
@@ -13088,14 +13161,14 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                 "title": translate("app.discover.open_in_browser"),
                 "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
                 "func": () => {
-                    window.electronAPI.openInBrowser(src);
+                    window.enderlynx.openInBrowser(src);
                 }
             },
             {
                 "title": translate("app.discover.copy_image"),
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "func": async () => {
-                    let success = await window.electronAPI.copyImageToClipboard(src);
+                    let success = await window.enderlynx.copyImageToClipboard(src);
                     if (success) {
                         displaySuccess(translate("app.discover.copy_image.success"));
                     } else {
@@ -13107,7 +13180,7 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                 "title": translate("app.discover.copy_image_link"),
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "func": async () => {
-                    let success = await window.electronAPI.copyToClipboard(src);
+                    let success = await window.enderlynx.copyToClipboard(src);
                     if (success) {
                         displaySuccess(translate("app.discover.copy_image_link.success"));
                     } else {
@@ -13132,14 +13205,14 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                 "title": translate("app.discover.open_in_browser"),
                 "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
                 "func": () => {
-                    window.electronAPI.openInBrowser(url);
+                    window.enderlynx.openInBrowser(url);
                 }
             },
             {
                 "title": translate("app.discover.copy"),
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "func": async () => {
-                    let success = await window.electronAPI.copyToClipboard(url);
+                    let success = await window.enderlynx.copyToClipboard(url);
                     if (success) {
                         displaySuccess(translate("app.discover.copy.success"));
                     } else {
@@ -13221,12 +13294,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
             }
             el.addEventListener('click', (e) => {
                 e.preventDefault();
-                window.electronAPI.openInBrowser(url);
+                window.enderlynx.openInBrowser(url);
             });
             el.addEventListener('keydown', (e) => {
                 if (e.key == "Enter" || e.key == " ") {
                     e.preventDefault();
-                    window.electronAPI.openInBrowser(url);
+                    window.enderlynx.openInBrowser(url);
                 }
             });
             if (!dialogContextMenu) return;
@@ -13325,7 +13398,7 @@ document.addEventListener("scroll", function (e) {
 }, true);
 
 async function addDesktopShortcut(instanceInfo) {
-    let success = await window.electronAPI.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.refresh().name, instanceInfo.refresh().image);
+    let success = await window.enderlynx.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.refresh().name, instanceInfo.refresh().image);
     if (success) {
         displaySuccess(translate("app.instances.shortcut.created"));
     } else {
@@ -13334,7 +13407,7 @@ async function addDesktopShortcut(instanceInfo) {
 }
 
 async function addDesktopShortcutWorld(instanceInfo, worldName, worldType, worldId, worldImage) {
-    let success = await window.electronAPI.createDesktopShortcut(instanceInfo.instance_id, worldName, worldImage, worldType, worldId);
+    let success = await window.enderlynx.createDesktopShortcut(instanceInfo.instance_id, worldName, worldImage, worldType, worldId);
     if (success) {
         displaySuccess(translate("app.worlds.shortcut.created"));
     } else {
@@ -13356,7 +13429,7 @@ function openShareDialogForFile(file_path) {
     copyButton.className = "share-link-copy";
     copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>';
     copyButton.onclick = async () => {
-        let success = await window.electronAPI.copyToClipboard(file_path);
+        let success = await window.enderlynx.copyToClipboard(file_path);
         if (success) {
             displaySuccess(translate("app.share.copy_path.success"));
         } else {
@@ -13376,14 +13449,14 @@ function openShareDialogForFile(file_path) {
         {
             "icon": '<i class="fa-solid fa-floppy-disk"></i>',
             "func": () => {
-                window.electronAPI.saveToDisk(file_path);
+                window.enderlynx.saveToDisk(file_path);
             },
             "tooltip": translate("app.share.save")
         },
         {
             "icon": '<i class="fa-solid fa-folder"></i>',
             "func": () => {
-                window.electronAPI.showFileInFolder(file_path);
+                window.enderlynx.showFileInFolder(file_path);
             },
             "tooltip": translate("app.share.folder")
         }
@@ -13408,7 +13481,7 @@ function openShareDialogForFile(file_path) {
 async function openShareDialog(title, url, text) {
     let shareWrapper = document.createElement("div");
     shareWrapper.className = "share-wrapper";
-    let qrCodeUrl = await window.electronAPI.generateQRCode(url);
+    let qrCodeUrl = await window.enderlynx.generateQRCode(url);
     let qrCodeWrapper = document.createElement("button");
     qrCodeWrapper.className = "share-qrcode-wrapper";
     let qrCode = document.createElement("img");
@@ -13439,7 +13512,7 @@ async function openShareDialog(title, url, text) {
     copyButton.className = "share-link-copy";
     copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>';
     copyButton.onclick = async () => {
-        let success = await window.electronAPI.copyToClipboard(url);
+        let success = await window.enderlynx.copyToClipboard(url);
         if (success) {
             displaySuccess(translate("app.share.copy_link.success"));
         } else {
@@ -13459,42 +13532,42 @@ async function openShareDialog(title, url, text) {
         {
             "icon": '<i class="fa-solid fa-envelope"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(`mailto:example@example.com?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + " " + url)}`)
+                window.enderlynx.openInBrowser(`mailto:example@example.com?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text + " " + url)}`)
             },
             "tooltip": translate("app.share.email")
         },
         {
             "icon": '<i class="fa-solid fa-globe"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(url);
+                window.enderlynx.openInBrowser(url);
             },
             "tooltip": translate("app.share.browser")
         },
         {
             "icon": '<i class="fa-brands fa-x-twitter"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title + "\n\n" + text + " " + url)}`)
+                window.enderlynx.openInBrowser(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title + "\n\n" + text + " " + url)}`)
             },
             "tooltip": translate("app.share.x")
         },
         {
             "icon": '<i class="fa-brands fa-bluesky"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(`https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + url)}`)
+                window.enderlynx.openInBrowser(`https://bsky.app/intent/compose?text=${encodeURIComponent(text + " " + url)}`)
             },
             "tooltip": translate("app.share.bluesky")
         },
         {
             "icon": '<i class="fa-brands fa-mastodon"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(`https://tootpick.org/#text=${encodeURIComponent(title + "\n\n" + text + " " + url)}`)
+                window.enderlynx.openInBrowser(`https://tootpick.org/#text=${encodeURIComponent(title + "\n\n" + text + " " + url)}`)
             },
             "tooltip": translate("app.share.mastodon")
         },
         {
             "icon": '<i class="fa-brands fa-reddit"></i>',
             "func": () => {
-                window.electronAPI.openInBrowser(`https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`)
+                window.enderlynx.openInBrowser(`https://www.reddit.com/submit?title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`)
             },
             "tooltip": translate("app.share.reddit")
         }
@@ -13538,7 +13611,7 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
             }
         }
     } else if (source == "curseforge") {
-        let version_json = await window.electronAPI.getCurseforgePage(project_id, 1);
+        let version_json = await window.enderlynx.getCurseforgePage(project_id, 1);
         max_pages = Math.ceil(version_json.pagination.totalCount / version_json.pagination.pageSize) + 1;
         version_json = version_json.data.map(e => ({
             "game_versions": e.gameVersions,
@@ -13576,7 +13649,7 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
                     not_found = false;
                     continue;
                 }
-                version_json = await window.electronAPI.getCurseforgePage(project_id, count);
+                version_json = await window.enderlynx.getCurseforgePage(project_id, count);
                 version_json = version_json.data.map(e => ({
                     "game_versions": e.gameVersions,
                     "files": [
@@ -13636,7 +13709,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
+            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -13658,7 +13731,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setVersionId(newVersionId);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
+            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -13668,13 +13741,13 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         }
 
         if (oldFileName != content.file_name) {
-            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
+            let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
             if (!success) {
                 displayError(translate("app.content.update.old_file_fail", "%f", oldFileName));
                 content.setVersion(oldVersion);
                 content.setVersionId(oldVersionId);
                 content.setFileName(oldFileName);
-                let success2 = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
+                let success2 = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
                 if (!success2) {
                     displayError(translate("app.content.update.new_file_fail", "%f", initialContent.file_name));
                 }
@@ -13682,7 +13755,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         }
     } else if (content.source == "curseforge") {
         let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instanceInfo.loader);
-        let version_json = await window.electronAPI.getCurseforgePage(content.source_info, 1, content.type == "mod" ? game_flavor : -1);
+        let version_json = await window.enderlynx.getCurseforgePage(content.source_info, 1, content.type == "mod" ? game_flavor : -1);
         max_pages = Math.ceil(version_json.pagination.totalCount / version_json.pagination.pageSize) + 1;
         version_json = version_json.data.map(e => ({
             "game_versions": e.gameVersions,
@@ -13724,7 +13797,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
                     continue;
                 }
                 let game_flavor = ["", "forge", "", "", "fabric", "quilt", "neoforge"].indexOf(instanceInfo.loader);
-                version_json = await window.electronAPI.getCurseforgePage(content.source_info, count, game_flavor);
+                version_json = await window.enderlynx.getCurseforgePage(content.source_info, count, game_flavor);
                 version_json = version_json.data.map(e => ({
                     "game_versions": e.gameVersions,
                     "files": [
@@ -13759,7 +13832,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
+            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -13779,7 +13852,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         content.setVersionId(newVersionId);
 
         if (content.disabled) {
-            let new_file_name = window.electronAPI.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
+            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 content.setDisabled(false);
@@ -13789,19 +13862,19 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         }
 
         if (oldFileName != content.file_name) {
-            let success = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
+            let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
             if (!success) {
                 displayError(translate("app.content.update.old_file_fail", "%f", oldFileName));
                 content.setVersionId(oldVersionId);
                 content.setFileName(oldFileName);
-                let success2 = await window.electronAPI.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
+                let success2 = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
                 if (!success2) {
                     displayError(translate("app.content.update.new_file_fail", "%f", initialContent.file_name));
                 }
             }
         }
     } else if (content.source == "vanilla_tweaks") {
-        await window.electronAPI.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instanceInfo.vanilla_version, instanceInfo.instance_id, content.file_name);
+        await window.enderlynx.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instanceInfo.vanilla_version, instanceInfo.instance_id, content.file_name);
     }
 }
 
@@ -13812,7 +13885,7 @@ function fixPathForImage(path) {
 async function repairInstance(instance, whatToRepair) {
     instance.setMcInstalled(false);
     instance.setFailed(false);
-    let r = await window.electronAPI.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version, whatToRepair);
+    let r = await window.enderlynx.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version, whatToRepair);
     if (r.error) {
         instance.setFailed(true);
     } else {
@@ -13973,7 +14046,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             if (dialog_to_close) dialog_to_close.close();
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
-            let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+            let instance_id = window.enderlynx.getInstanceFolderName(info.name);
             let files_url = `https://api.modrinth.com/v2/project/${project_id}/version`;
             if (source == "curseforge") {
                 files_url = `https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true`
@@ -14002,20 +14075,20 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             instance.setInstalledVersion(version.id);
             showSpecificInstanceContent(instance);
             if (source == "modrinth") {
-                await window.electronAPI.downloadModrinthPack(instance_id, version.files[0].url, title);
+                await window.enderlynx.downloadModrinthPack(instance_id, version.files[0].url, title);
             } else if (source == "curseforge") {
                 instance.setLoader("");
                 instance.setVanillaVersion("");
-                await window.electronAPI.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), title);
+                await window.enderlynx.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), title);
             }
             let mr_pack_info = {};
             if (source == "modrinth") {
-                mr_pack_info = await window.electronAPI.processMrPack(instance_id, "pack.mrpack", info.loader, title);
+                mr_pack_info = await window.enderlynx.processMrPack(instance_id, "pack.mrpack", info.loader, title);
                 let default_options = new DefaultOptions();
-                let v = window.electronAPI.setOptionsTXT(instance.instance_id, default_options.getOptionsTXT(), false);
+                let v = await window.enderlynx.setOptionsTXT(instance.instance_id, default_options.getOptionsTXT(), false);
                 instance.setAttemptedOptionsTxtVersion(v);
             } else if (source == "curseforge") {
-                mr_pack_info = await window.electronAPI.processCfZip(instance_id, "pack.zip", project_id, title);
+                mr_pack_info = await window.enderlynx.processCfZip(instance_id, "pack.zip", project_id, title);
                 if (mr_pack_info.error) {
                     instance.setFailed(true);
                     instance.setInstalling(false);
@@ -14041,7 +14114,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
             });
             instance.setInstalling(false);
-            let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
+            let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
             if (r.error) {
                 instance.setFailed(true);
             } else {
@@ -14196,17 +14269,17 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     displayError(translate("app.instances.no_name"));
                     return;
                 }
-                let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+                let instance_id = window.enderlynx.getInstanceFolderName(info.name);
                 let loader_version = "";
                 try {
                     if (info.loader == "fabric") {
-                        loader_version = (await window.electronAPI.getFabricVersion(info.game_version))
+                        loader_version = (await window.enderlynx.getFabricVersion(info.game_version))
                     } else if (info.loader == "forge") {
-                        loader_version = (await window.electronAPI.getForgeVersion(info.game_version))
+                        loader_version = (await window.enderlynx.getForgeVersion(info.game_version))
                     } else if (info.loader == "neoforge") {
-                        loader_version = (await window.electronAPI.getNeoForgeVersion(info.game_version))
+                        loader_version = (await window.enderlynx.getNeoForgeVersion(info.game_version))
                     } else if (info.loader == "quilt") {
-                        loader_version = (await window.electronAPI.getQuiltVersion(info.game_version))
+                        loader_version = (await window.enderlynx.getQuiltVersion(info.game_version))
                     }
                 } catch (e) {
                     displayError(translate("app.instances.failed_to_create"));
@@ -14243,7 +14316,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
                 }
                 instance.setInstalling(false);
-                let r = await window.electronAPI.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
+                let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
                 if (r.error) {
                     instance.setFailed(true);
                 } else {
@@ -14396,25 +14469,25 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     closeAllDialogs();
     instanceInfo.setInstalling(true);
     instanceInfo.setMcInstalled(false);
-    await window.electronAPI.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
+    await window.enderlynx.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
     instanceInfo.clearContent();
     if (source == "modrinth") {
-        await window.electronAPI.downloadModrinthPack(instanceInfo.instance_id, modpack_info.files[0].url, instanceInfo.name);
+        await window.enderlynx.downloadModrinthPack(instanceInfo.instance_id, modpack_info.files[0].url, instanceInfo.name);
         instanceInfo.setVanillaVersion(modpack_info.game_versions[0], true);
         instanceInfo.setLoader(modpack_info.loaders[0]);
     } else if (source == "curseforge") {
-        await window.electronAPI.downloadCurseforgePack(instanceInfo.instance_id, (`https://mediafilez.forgecdn.net/files/${Number(modpack_info.id.toString().substring(0, 4))}/${Number(modpack_info.id.toString().substring(4, 7))}/${encodeURIComponent(modpack_info.fileName)}`), instanceInfo.name);
+        await window.enderlynx.downloadCurseforgePack(instanceInfo.instance_id, (`https://mediafilez.forgecdn.net/files/${Number(modpack_info.id.toString().substring(0, 4))}/${Number(modpack_info.id.toString().substring(4, 7))}/${encodeURIComponent(modpack_info.fileName)}`), instanceInfo.name);
     }
     let mr_pack_info = {};
     if (source == "modrinth") {
-        mr_pack_info = await window.electronAPI.processMrPack(instanceInfo.instance_id, "pack.mrpack", instanceInfo.loader, instanceInfo.name);
+        mr_pack_info = await window.enderlynx.processMrPack(instanceInfo.instance_id, "pack.mrpack", instanceInfo.loader, instanceInfo.name);
         if (mr_pack_info.error) {
             instanceInfo.setFailed(true);
             instanceInfo.setInstalling(false);
             return;
         }
     } else if (source == "curseforge") {
-        mr_pack_info = await window.electronAPI.processCfZip(instanceInfo.instance_id, "pack.zip", instanceInfo.install_id, instanceInfo.name);
+        mr_pack_info = await window.enderlynx.processCfZip(instanceInfo.instance_id, "pack.zip", instanceInfo.install_id, instanceInfo.name);
         if (mr_pack_info.error) {
             instanceInfo.setFailed(true);
             instanceInfo.setInstalling(false);
@@ -14434,7 +14507,7 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
         instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
     });
     instanceInfo.setInstalling(false);
-    let r = await window.electronAPI.downloadMinecraft(instanceInfo.instance_id, instanceInfo.loader, instanceInfo.vanilla_version, mr_pack_info.loader_version);
+    let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, instanceInfo.loader, instanceInfo.vanilla_version, mr_pack_info.loader_version);
     if (r.error) {
         instanceInfo.setFailed(true);
     } else {
@@ -14484,7 +14557,7 @@ window.onoffline = () => {
 
 async function checkForUpdates(isManual) {
     try {
-        let result = await window.electronAPI.checkForUpdates();
+        let result = await window.enderlynx.checkForUpdates();
         if (!result.update) {
             if (isManual) displaySuccess(translate("app.settings.updates.none_found"));
         } else {
@@ -14500,11 +14573,11 @@ async function checkForUpdates(isManual) {
                 }
             ], [], async () => {
                 if (result.os == "unix") {
-                    window.electronAPI.openInBrowser(result.browser_url);
+                    window.enderlynx.openInBrowser(result.browser_url);
                     return;
                 }
                 try {
-                    await window.electronAPI.downloadUpdate(result.download_url, result.new_version, result.checksum);
+                    await window.enderlynx.downloadUpdate(result.download_url, result.new_version, result.checksum);
                 } catch (e) {
                     displayError(translate("app.settings.updates.download_failed"));
                     return;
@@ -14520,7 +14593,7 @@ async function checkForUpdates(isManual) {
                         "content": translate("app.settings.updates.complete.confirm")
                     }
                 ], [], () => {
-                    window.electronAPI.updateEnderLynx();
+                    window.enderlynx.updateEnderLynx();
                 });
             });
         }
@@ -14550,7 +14623,7 @@ async function createElPack(instance, content_list, overrides, pack_version) {
             "disabled": e.disabled
         }))
     }
-    window.electronAPI.createElPack(instance.instance_id, instance.name, manifest, overrides);
+    window.enderlynx.createElPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createMrPack(instance, content_list, overrides, pack_version) {
     instance = instance.refresh();
@@ -14606,7 +14679,7 @@ async function createMrPack(instance, content_list, overrides, pack_version) {
         "quilt": "quilt-loader"
     }
     if (convert[instance.loader]) manifest.dependencies[convert[instance.loader]] = instance.loader_version;
-    window.electronAPI.createMrPack(instance.instance_id, instance.name, manifest, overrides);
+    window.enderlynx.createMrPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createCfZip(instance, content_list, overrides, pack_version) {
     instance = instance.refresh();
@@ -14633,7 +14706,7 @@ async function createCfZip(instance, content_list, overrides, pack_version) {
         })),
         "overrides": "overrides"
     }
-    window.electronAPI.createCfZip(instance.instance_id, instance.name, manifest, overrides);
+    window.enderlynx.createCfZip(instance.instance_id, instance.name, manifest, overrides);
 }
 
 let importInstance = (info, file_path) => {
@@ -14648,10 +14721,10 @@ let importInstance = (info, file_path) => {
             "content": translate("app.import.elpack.confirm")
         }
     ], [], async () => {
-        let instance_id = window.electronAPI.getInstanceFolderName(info.name);
+        let instance_id = window.enderlynx.getInstanceFolderName(info.name);
         let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
         showSpecificInstanceContent(instance);
-        let packInfo = await window.electronAPI.processPackFile(file_path, instance_id, info.name);
+        let packInfo = await window.enderlynx.processPackFile(file_path, instance_id, info.name);
         if (packInfo.error) {
             instance.setFailed(true);
             instance.setInstalling(false);
@@ -14670,7 +14743,7 @@ let importInstance = (info, file_path) => {
             instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
         });
         instance.setInstalling(false);
-        let r = await window.electronAPI.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+        let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
         if (r.error) {
             instance.setFailed(true);
         } else {
@@ -14687,10 +14760,12 @@ let importInstanceFromContentProvider = (info) => {
     installButtonClick(info.project_type, info.source, info.loaders, info.icon, info.name, info.author, info.game_versions, info.project_id, undefined, document.createElement("button"), undefined, undefined, () => { }, undefined);
 }
 
-window.electronAPI.onOpenFile(importInstance);
+window.enderlynx.onOpenFile(importInstance);
 
-function openInstanceShareDialog(instanceInfo) {
-    let options = window.electronAPI.getInstanceFiles(instanceInfo.instance_id);
+async function openInstanceShareDialog(instanceInfo) {
+    document.body.classList.add("loading");
+    let options = await window.enderlynx.getInstanceFiles(instanceInfo.instance_id);
+    document.body.classList.remove("loading");
     let content = instanceInfo.getContent();
     let contentSpecific = [];
     let contentMap = {};
@@ -14944,10 +15019,10 @@ document.body.ondrop = (e) => {
     e.preventDefault();
     [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
     let overlay = activeOverlay;
-    const files = window.electronAPI.readPathsFromDrop(Object.entries(e.dataTransfer.files).map(e => e[1]));
+    const files = window.enderlynx.readPathsFromDrop(Object.entries(e.dataTransfer.files).map(e => e[1]));
     if (overlay.dataset.action == "instance-import") {
-        files.forEach(file => {
-            let info = window.electronAPI.readPackFile(file.path);
+        files.forEach(async (file) => {
+            let info = await window.enderlynx.readPackFile(file.path);
             if (!info) {
                 displayError(translate("app.import.instance.fail", "%f", file.name));
                 return;
@@ -14956,12 +15031,12 @@ document.body.ondrop = (e) => {
         });
     } else if (overlay.dataset.action == "content-import") {
         new Promise(async (resolve) => {
-            document.body.style.cursor = "progress";
+            document.body.classList.add("loading")
             let instance = new Instance(overlay.dataset.instanceId);
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
-                if (window.electronAPI.isInstanceFile(file.path)) {
-                    let info = window.electronAPI.readPackFile(file.path);
+                if (await window.enderlynx.isInstanceFile(file.path)) {
+                    let info = await window.enderlynx.readPackFile(file.path);
                     if (!info) {
                         displayError(translate("app.import.instance.fail", "%f", file.name));
                         return;
@@ -14973,27 +15048,27 @@ document.body.ondrop = (e) => {
                     document.body.style.cursor = "";
                     return;
                 }
-                let success = await window.electronAPI.importContent(file.path, "auto", overlay.dataset.instanceId);
+                let success = await window.enderlynx.importContent(file.path, "auto", overlay.dataset.instanceId);
                 if (!success) {
                     displayError(translate("app.import.content.fail", "%f", file.name));
-                    document.body.style.cursor = "";
+                    document.body.classList.remove("loading");
                     return;
                 }
             }
             if (document.body.contains(overlay)) setInstanceTabContentContent(instance, overlay.parentElement);
-            document.body.style.cursor = "";
+            document.body.classList.remove("loading");
         });
     } else if (overlay.dataset.action == "world-import") {
         new Promise(async (resolve) => {
             let instance = new Instance(overlay.dataset.instanceId);
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
-                if (window.electronAPI.isInstanceFile(file.path)) {
-                    let info = window.electronAPI.readPackFile(file.path);
+                if (await window.enderlynx.isInstanceFile(file.path)) {
+                    let info = await window.enderlynx.readPackFile(file.path);
                     if (!info) return;
                     importInstance(info, file.path);
                 }
-                let success = await window.electronAPI.importWorld(file.path, overlay.dataset.instanceId, file.name);
+                let success = await window.enderlynx.importWorld(file.path, overlay.dataset.instanceId, file.name);
                 if (!success) {
                     displayError(translate("app.import.worlds.fail", "%f", file.name));
                     return;
@@ -15005,13 +15080,13 @@ document.body.ondrop = (e) => {
         new Promise(async (resolve) => {
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
-                if (window.electronAPI.isInstanceFile(file.path)) {
-                    let info = window.electronAPI.readPackFile(file.path);
+                if (await window.enderlynx.isInstanceFile(file.path)) {
+                    let info = await window.enderlynx.readPackFile(file.path);
                     if (!info) return;
                     importInstance(info, file.path);
                 }
                 console.log(file.path);
-                let dataUrl = await window.electronAPI.pathToDataUrl(file.path);
+                let dataUrl = await window.enderlynx.pathToDataUrl(file.path);
                 console.log(dataUrl);
                 importSkin({
                     "skin": dataUrl,
@@ -15026,7 +15101,7 @@ document.body.ondrop = (e) => {
 };
 
 function getDefaultImage(code) {
-    let data = window.electronAPI.getDefaultImage(code);
+    let data = window.enderlynx.getDefaultImage(code);
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
 }
 
@@ -15075,4 +15150,4 @@ try {
     }
 } catch (e) { }
 
-data.setDefault("saved_version", window.electronAPI.version.replace("-dev", ""));
+data.setDefault("saved_version", window.enderlynx.version.replace("-dev", ""));

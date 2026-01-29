@@ -7,8 +7,11 @@ const os = require('os');
 
 const execFileAsync = promisify(execFile);
 
-const userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
-    .split('=')[1]);
+let userPath;
+
+function setUserPathAgain(user_path) {
+    userPath = user_path;
+}
 
 const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\JavaSoft\\Java Runtime Environment",
@@ -29,13 +32,13 @@ const COMMON_JAVA_DIRS_WINDOWS = [
     "C:\\Program Files (x86)\\Java",
     "C:\\Program Files\\Eclipse Adoptium",
     "C:\\Program Files (x86)\\Eclipse Adoptium",
-    path.resolve(userPath,"java")
+    () => path.resolve(userPath, "java")
 ];
 
 const COMMON_JAVA_DIRS_UNIX = [
     "/usr/local/java",
     "/usr/lib/jvm",
-    path.resolve(userPath,"java")
+    () => path.resolve(userPath, "java")
 ]
 
 async function getJavaVersion(javawPath) {
@@ -100,18 +103,19 @@ async function findJavaInstallations(v) {
 
     // From known install locations
     for (const javaDir of platformString == "windows" ? COMMON_JAVA_DIRS_WINDOWS : COMMON_JAVA_DIRS_UNIX) {
-        if (fs.existsSync(javaDir)) {
-            const subdirs = fs.readdirSync(javaDir, { withFileTypes: true });
+        let dir = typeof javaDir == 'string' ? javaDir : javaDir();
+        if (fs.existsSync(dir)) {
+            const subdirs = fs.readdirSync(dir, { withFileTypes: true });
             for (const dirent of subdirs) {
                 if (dirent.isDirectory()) {
-                    const fullPath = path.join(javaDir, dirent.name, "bin");
+                    const fullPath = path.join(dir, dirent.name, "bin");
                     if (fs.existsSync(path.join(fullPath, platformString == "windows" ? "javaw.exe" : "java"))) {
                         jrePaths.add(fullPath);
                     }
-                    const subdirs2 = fs.readdirSync(path.join(javaDir, dirent.name), { withFileTypes: true });
+                    const subdirs2 = fs.readdirSync(path.join(dir, dirent.name), { withFileTypes: true });
                     for (const dirent2 of subdirs2) {
                         if (dirent2.isDirectory()) {
-                            const fullPath = path.join(javaDir, dirent.name, dirent2.name, "bin");
+                            const fullPath = path.join(dir, dirent.name, dirent2.name, "bin");
                             if (fs.existsSync(path.join(fullPath, platformString == "windows" ? "javaw.exe" : "java"))) {
                                 jrePaths.add(fullPath);
                             }
@@ -132,7 +136,6 @@ async function findJavaInstallations(v) {
         for (const p of [...reg32, ...reg64, ...user32, ...user64]) jrePaths.add(p);
     }
 
-    // Validate all collected paths
     const javaResults = [];
     for (const binPath of jrePaths) {
         const javaw = path.join(binPath, platformString == "windows" ? "javaw.exe" : "java");
@@ -165,5 +168,6 @@ class JavaSearch {
 }
 
 module.exports = {
-    JavaSearch
+    JavaSearch,
+    setUserPathAgain
 }

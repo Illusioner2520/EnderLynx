@@ -1,25 +1,11 @@
-const { contextBridge, ipcRenderer, clipboard, nativeImage, shell, webUtils } = require('electron');
+const { contextBridge, ipcRenderer, clipboard, shell, webUtils } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { JavaSearch } = require('./java_scan.js');
-const { spawn, exec } = require('child_process');
-const nbt = require('prismarine-nbt');
-const AdmZip = require('adm-zip');
-const https = require('https');
 const Database = require('better-sqlite3');
-const axios = require('axios');
-const FormData = require('form-data');
-const sharp = require("sharp");
-const crypto = require('crypto');
 const os = require('os');
-const createDesktopShortcut = require("create-desktop-shortcuts");
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
-const pngToIcoModule = require('png-to-ico');
 const QRCode = require('qrcode');
-const readline = require('readline');
-
-const pngToIco = pngToIcoModule.default;
 
 let cfServerInfo = {};
 
@@ -114,6 +100,7 @@ if (!fs.existsSync(path.resolve(userPath, "log_config.xml"))) {
         fs.writeFileSync(path.resolve(userPath, "log_config.xml"), "");
     }
 }
+const svgData = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
 let srcConfigPath = path.resolve(__dirname, "updater.exe");
 if (os.platform() != 'win32') srcConfigPath = path.resolve(__dirname, "updater");
 fs.mkdirSync(path.resolve(userPath, "updater"), { recursive: true })
@@ -154,81 +141,33 @@ function openInBrowser(url) {
     shell.openExternal(url);
 }
 
-function readElPack(file_path) {
-    try {
-        const zip = new AdmZip(file_path);
-        const manifestEntry = zip.getEntry('manifest.json');
-        if (!manifestEntry) return null;
-        const manifestData = manifestEntry.getData().toString('utf-8');
-        return JSON.parse(manifestData);
-    } catch (e) {
-        return null;
-    }
-}
-function readMrPack(file_path) {
-    try {
-        const zip = new AdmZip(file_path);
-        const manifestEntry = zip.getEntry('modrinth.index.json');
-        if (!manifestEntry) return null;
-        const manifestData = manifestEntry.getData().toString('utf-8');
-        let jsonData = JSON.parse(manifestData);
-        console.log(jsonData);
-        let loader = "vanilla";
-        let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
-        let keys = Object.keys(jsonData.dependencies)
-        for (const key of keys) {
-            if (loaders.includes(key)) {
-                loader = key;
-                break;
-            }
-        }
-        return {
-            name: jsonData.name,
-            game_version: jsonData.dependencies.minecraft,
-            loader: loader.replace("-loader", ""),
-            loader_version: jsonData.dependencies[loader],
-            image: ""
-        };
-    } catch (e) {
-        return null;
-    }
+async function readElPack(file_path) {
+    return await ipcRenderer.invoke('read-elpack', file_path);
 }
 
-function readCfZip(file_path) {
-    try {
-        const zip = new AdmZip(file_path);
-        const manifestEntry = zip.getEntry('manifest.json');
-        if (!manifestEntry) return null;
-        const manifestData = manifestEntry.getData().toString('utf-8');
-        let jsonData = JSON.parse(manifestData);
-        let loaderSplit = jsonData.minecraft.modLoaders[0].id.split("-");
-        return {
-            name: jsonData.name,
-            game_version: jsonData.minecraft.version,
-            loader: loaderSplit[0],
-            loader_version: loaderSplit[1],
-            image: ""
-        };
-    } catch (e) {
-        return null;
-    }
+async function readMrPack(file_path) {
+    return await ipcRenderer.invoke('read-mrpack', file_path);
+}
+
+async function readCfZip(file_path) {
+    return await ipcRenderer.invoke('read-cfzip', file_path);
 }
 
 ipcRenderer.on('new-args', (event, newargs) => {
     processArgs(newargs.slice(1));
 });
 
-contextBridge.exposeInMainWorld('electronAPI', {
+contextBridge.exposeInMainWorld('enderlynx', {
     onOpenFile: (callback) => {
-        ipcRenderer.on('open-file', (event, filePath) => {
+        ipcRenderer.on('open-file', async (event, filePath) => {
             let ext = path.extname(filePath);
             let info = {};
             if (ext == ".elpack") {
-                info = readElPack(filePath);
+                info = await readElPack(filePath);
             } else if (ext == ".mrpack") {
-                info = readMrPack(filePath);
+                info = await readMrPack(filePath);
             } else if (ext == ".zip") {
-                info = readCfZip(filePath);
+                info = await readCfZip(filePath);
             }
             if (info) callback(info, filePath);
         });
@@ -273,39 +212,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
         let appMetrics = await ipcRenderer.invoke('get-app-metrics');
         return appMetrics;
     },
-    readPackFile: (file_path) => {
+    readPackFile: async (file_path) => {
         let ext = path.extname(file_path);
         if (ext == ".elpack") {
-            return readElPack(file_path);
+            return await readElPack(file_path);
         } else if (ext == ".mrpack") {
-            return readMrPack(file_path);
+            return await readMrPack(file_path);
         } else if (ext == ".zip") {
-            return readCfZip(file_path);
+            return await readCfZip(file_path);
         }
     },
-    getInstanceFiles: (instance_id) => {
-        const dirPath = path.resolve(userPath, "minecraft", "instances", instance_id);
-        if (!fs.existsSync(dirPath)) return [];
-        function getAllFilesRecursive(baseDir, relDir = "") {
-            const absDir = path.join(baseDir, relDir);
-            let results = [];
-            const entries = fs.readdirSync(absDir, { withFileTypes: true });
-            if (entries.length == 0) {
-                results.push(relDir.replace(/\\/g, "/"));
-            }
-            for (const entry of entries) {
-                const relPath = path.join(relDir, entry.name);
-                if (entry.isDirectory()) {
-                    results = results.concat(getAllFilesRecursive(baseDir, relPath));
-                } else {
-                    results.push(relPath.replace(/\\/g, "/"));
-                }
-            }
-            return results;
-        }
-        return getAllFilesRecursive(dirPath);
+    getInstanceFiles: async (instance_id) => {
+        return await ipcRenderer.invoke('get-instance-files', instance_id);
     },
-    parseModrinthMarkdown: (md) => {
+    parseMarkdown: (md) => {
         const mkd = new MarkdownIt('default', {
             html: true,
             linkify: true,
@@ -370,29 +290,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     } catch (e) { }
                 } else { }
             } else {
-                const serversDatPath = path.resolve(userPath, "minecraft/instances", world.instance_id || "", "servers.dat");
-                if (fs.existsSync(serversDatPath)) {
-                    console.log("FOUND servers.dat");
-                    try {
-                        const buffer = fs.readFileSync(serversDatPath);
-                        const data = await nbt.parse(buffer);
-                        const servers = data.parsed?.value?.servers?.value?.value || [];
-                        const server = servers.find(s => (s.ip?.value || "") === world.world_id);
-                        if (server) {
-                            console.log("Found server");
-                            allWorlds.push({
-                                type: "multiplayer",
-                                name: server.name?.value || "Unknown",
-                                ip: server.ip?.value || "",
-                                icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
-                                pinned: true,
-                                instance_id: world.instance_id,
-                                last_played: getServerLastPlayed(world.instance_id, server.ip?.value || "")
-                            });
-                        }
-                    } catch (e) {
-                        console.error(e);
-                    }
+                const servers = await getMultiplayerWorlds(world.instance_id);
+                const server = servers.find(s => (s.ip) == world.world_id);
+                if (server) {
+                    allWorlds.push({
+                        ...server,
+                        pinned: true,
+                        instance_id: world.instance_id,
+                        last_played: getServerLastPlayed(world.instance_id, server.ip)
+                    });
                 }
             }
         }
@@ -404,34 +310,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getRecentlyPlayedWorlds: async (instance_ids) => {
         return await ipcRenderer.invoke('get-recently-played-worlds', instance_ids);
     },
-    setOptionsTXT: (instance_id, content, dont_complete_if_already_exists) => {
-        const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
-        let alreadyExists = fs.existsSync(optionsPath);
-        if (dont_complete_if_already_exists && alreadyExists) {
-            return content.version;
-        }
-        if (!alreadyExists) {
-            fs.writeFileSync(optionsPath, content.content, "utf-8");
-            return content.version;
-        } else {
-            let lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
-            for (let j = 0; j < content.keys.length; j++) {
-                let key = content.keys[j];
-                let value = content.values[j];
-                let found = false;
-                inner: for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].trim().startsWith(key + ":")) {
-                        lines[i] = `${key}:${value}`;
-                        found = true;
-                        break inner;
-                    }
-                }
-                if (!found) {
-                    lines.push(`${key}:${value}`);
-                }
-            }
-            fs.writeFileSync(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
-        }
+    setOptionsTXT: async (instance_id, content, dont_complete_if_already_exists) => {
+        return await ipcRenderer.invoke('set-options-txt', instance_id, content, dont_complete_if_already_exists);
     },
     deleteWorld: (instance_id, world_id) => {
         const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
@@ -453,24 +333,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     duplicateInstanceFiles: async (old_instance_id, new_instance_id) => {
         return await ipcRenderer.invoke('duplicate-instance-files', old_instance_id, new_instance_id);
     },
-    updateOptionsTXT: (instance_id, key, value) => {
-        const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
-        let lines = [];
-        if (fs.existsSync(optionsPath)) {
-            lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
-        }
-        let found = false;
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim().startsWith(key + ":")) {
-                lines[i] = `${key}:${value}`;
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            lines.push(`${key}:${value}`);
-        }
-        fs.writeFileSync(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+    updateOptionsTXT: async (instance_id, key, value) => {
+        return await ipcRenderer.invoke('update-options-txt', instance_id, key, value);
     },
     databaseGet: (sql, ...params) => {
         return db.prepare(sql).get(...params);
@@ -481,9 +345,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     databaseRun: (sql, ...params) => {
         return db.prepare(sql).run(...params);
     },
-    readFile: (...filePath) => {
+    getLangFile: (locale) => {
+        if (!enableDevMode) {
+            filePath = path.resolve(process.resourcesPath, 'app.asar', 'resources', 'lang', `${locale}.json`);
+        } else {
+            filePath = path.resolve(`./resources/lang/${locale}.json`);
+        }
         try {
-            const content = fs.readFileSync(path.resolve(...filePath), 'utf-8');
+            const content = fs.readFileSync(filePath, 'utf-8');
             return content;
         } catch (err) {
             return `Error reading file: ${err.message}`;
@@ -507,36 +376,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.send('set-discord-activity', activity)
     },
     killProcess: async (pid) => {
-        if (!pid) return false;
-        pid = Number(pid);
-
-        return new Promise((resolve) => {
-            exec(`taskkill /PID ${pid} /T`, (error) => {
-                if (error) {
-                    console.log(`Graceful taskkill failed: ${error.message}`);
-                }
-
-                let elapsed = 0;
-                const interval = setInterval(() => {
-                    if (!checkForProcess(pid)) {
-                        clearInterval(interval);
-                        return resolve(true);
-                    }
-
-                    elapsed += 500;
-                    if (elapsed >= 5000) {
-                        clearInterval(interval);
-                        exec(`taskkill /PID ${pid} /T /F`, (forceError) => {
-                            if (forceError) {
-                                console.log(`Force kill failed: ${forceError.message}`);
-                            }
-                            const stillAlive = checkForProcess(pid);
-                            resolve(!stillAlive);
-                        });
-                    }
-                }, 500);
-            });
-        });
+        return await ipcRenderer.invoke('kill-process', pid);
     },
     getWorlds,
     getSinglePlayerWorlds,
@@ -549,19 +389,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     triggerMicrosoftLogin: async () => {
         return await ipcRenderer.invoke('trigger-microsoft-login');
     },
-    getInstanceLogs: (instance_id) => {
-        let patha = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
-        fs.mkdirSync(patha, { recursive: true });
-        return fs.readdirSync(patha).filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz")).map(e => {
-            let date = e.replace(".log", "").split("_");
-            if (date[1]) date[1] = date[1].replaceAll("-", ":");
-            let dateStr = date.join(" ");
-            let parsedDate = new Date(dateStr);
-            return ({
-                "date": isNaN(parsedDate.getTime()) ? e : parsedDate.toString(),
-                "file_name": e
-            });
-        });
+    getInstanceLogs: async (instance_id) => {
+        return await ipcRenderer.invoke('get-instance-logs', instance_id);
     },
     getLog: (instance_id, file_name) => {
         let log_path = file_name ? path.resolve(userPath, "minecraft/instances", instance_id, "logs", file_name) : instance_id;
@@ -786,26 +615,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${instance_id}`), { recursive: true });
         return instance_id;
     },
-    getInstanceFolders: (instance_id) => {
-        const instancePath = path.resolve(userPath, `minecraft/instances/${instance_id}`);
-        if (!fs.existsSync(instancePath)) return [];
-        const entries = fs.readdirSync(instancePath).map(name => {
-            const fullPath = path.join(instancePath, name);
-            const stat = fs.statSync(fullPath);
-            return {
-                name: stat.isDirectory() ? '<i class="fa-solid fa-folder"></i> ' + name : '<i class="fa-solid fa-file"></i> ' + name,
-                isDirectory: stat.isDirectory(),
-                isFile: stat.isFile(),
-                path: fullPath,
-                value: fullPath
-            };
-        });
-        // Folders first, then files
-        return [
-            ...entries.filter(e => e.isDirectory),
-            ...entries.filter(e => e.isFile)
-        ];
-    },
     downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
         return await ipcRenderer.invoke('download-minecraft', instance_id, loader, vanilla_version, loader_version);
     },
@@ -979,46 +788,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     processMrPack,
     processCfZip,
-    getScreenshots: (instance_id) => {
-        let screenshotsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots`);
-        fs.mkdirSync(screenshotsPath, { recursive: true });
-        let files = fs.readdirSync(screenshotsPath)
-            .filter(file => /\.(png|jpg|jpeg|bmp|gif)$/i.test(file))
-            .map(file => {
-                let date = file.replace(".png", "").split("_");
-                if (date[1]) date[1] = date[1].replaceAll(".", ":");
-                if (date[2]) date = [date[0], date[1]]
-                let dateStr = date.join(" ");
-                let parsedDate = new Date(dateStr);
-
-                return {
-                    file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
-                    real_file_name: file,
-                    file_path: path.resolve(userPath, `minecraft/instances/${instance_id}/screenshots/` + file).replace(/\\/g, '/')
-                }
-            });
-        return files;
+    getScreenshots: async (instance_id) => {
+        return await ipcRenderer.invoke('get-screenshots', instance_id);
     },
     copyToClipboard: async (text) => {
         clipboard.writeText(text);
         return true;
     },
     copyImageToClipboard: async (file_path) => {
-        try {
-            let image;
-            if (/^https?:\/\//.test(file_path)) {
-                // file_path is a URL, download it first
-                const response = await axios.get(file_path, { responseType: "arraybuffer" });
-                let buffer = await sharp(response.data).png().toBuffer();
-                image = nativeImage.createFromBuffer(buffer);
-            } else {
-                image = nativeImage.createFromPath(file_path);
+        let image = await ipcRenderer.invoke('copy-image-to-clipboard', file_path);
+        if (image) {
+            try {
+                clipboard.writeImage(image);
+                return true;
+            } catch (e) {
+                return false;
             }
-            clipboard.writeImage(image);
-            return true;
-        } catch (err) {
-            return false;
         }
+        return false;
     },
     deleteScreenshot: (instance_id, file_name) => {
         let file_path = path.resolve(userPath, "minecraft/instances", instance_id, "screenshots", file_name);
@@ -1060,206 +847,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('download-cape', url, id);
     },
     setCape: async (player_info, cape_id) => {
-        let date = new Date();
-        date.setHours(date.getHours() - 1);
-        if (new Date(player_info.expires) < date) {
-            try {
-                player_info = await getNewAccessToken(player_info.refresh_token);
-            } catch (err) {
-                throw new Error("Unable to update access token.");
-            }
-        }
-        if (cape_id) {
-            const res = await axios.put(
-                'https://api.minecraftservices.com/minecraft/profile/capes/active',
-                { capeId: cape_id },
-                {
-                    headers: {
-                        Authorization: `Bearer ${player_info.access_token}`,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (res.status < 200 || res.status >= 300) {
-                throw new Error("Unable to set cape");
-            }
-            return { "status": res.status, "player_info": player_info, "skin_info": res.data };
-        } else {
-            const res = await axios.delete(
-                'https://api.minecraftservices.com/minecraft/profile/capes/active',
-                {
-                    headers: {
-                        Authorization: `Bearer ${player_info.access_token}`
-                    }
-                }
-            );
-
-            if (res.status < 200 || res.status >= 300) {
-                throw new Error("Unable to set cape");
-            }
-            return { "status": res.status, "player_info": player_info, "skin_info": res.data };
-        }
+        return await ipcRenderer.invoke('set-cape', player_info, cape_id);
     },
     setSkinFromURL: async (player_info, skin_url, variant) => {
-        let date = new Date();
-        date.setHours(date.getHours() - 1);
-        if (new Date(player_info.expires) < date) {
-            try {
-                player_info = await getNewAccessToken(player_info.refresh_token);
-            } catch (err) {
-                throw new Error("Unable to update access token.");
-            }
-        }
-
-        const res = await axios.post(
-            'https://api.minecraftservices.com/minecraft/profile/skins',
-            { variant: variant, url: skin_url },
-            {
-                headers: {
-                    Authorization: `Bearer ${player_info.access_token}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        if (res.status < 200 || res.status >= 300) {
-            throw new Error("Unable to set cape");
-        }
-        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+        return await ipcRenderer.invoke('set-skin-from-url', player_info, skin_url, variant);
     },
     setSkin: async (player_info, skin_id, variant) => {
-        let date = new Date();
-        date.setHours(date.getHours() - 1);
-        if (new Date(player_info.expires) < date) {
-            try {
-                player_info = await getNewAccessToken(player_info.refresh_token);
-            } catch (err) {
-                throw new Error("Unable to update access token.");
-            }
-        }
-        let filePath = path.resolve(userPath, `minecraft/skins/${skin_id}.png`);
-        if (!fs.existsSync(filePath)) {
-            throw new Error(`Skin file not found at ${filePath}`);
-        }
-        const form = new FormData();
-        form.append('variant', variant);
-        form.append('file', fs.createReadStream(filePath), {
-            filename: `${skin_id}.png`,
-            contentType: 'image/png',
-        });
-
-        const formHeaders = form.getHeaders();
-
-        const targetUrl = new URL('https://api.minecraftservices.com/minecraft/profile/skins');
-
-        return await new Promise((resolve, reject) => {
-            const req = https.request({
-                hostname: targetUrl.hostname,
-                port: targetUrl.port,
-                path: targetUrl.pathname,
-                method: 'POST',
-                headers: {
-                    ...formHeaders,
-                    'Authorization': `Bearer ${player_info.access_token}`
-                }
-            }, (res) => {
-                let data = '';
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    if (res.statusCode < 200 || res.statusCode >= 300) {
-                        let errorMsg = `Unable to set skin (status ${res.statusCode})`;
-                        try {
-                            const errorJson = JSON.parse(data);
-                            if (errorJson && errorJson.errorMessage) {
-                                errorMsg += `: ${errorJson.errorMessage}`;
-                            }
-                        } catch (e) {
-                            // ignore JSON parse error, just use default message
-                        }
-                        reject(new Error(errorMsg));
-                    } else {
-                        try {
-                            resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": JSON.parse(data) });
-                        } catch (e) {
-                            reject(new Error("Unable to parse skin info response"));
-                        }
-                    }
-                });
-            });
-
-            req.on('error', (e) => {
-                console.error('Native HTTP Request Error:', e);
-                reject(new Error("Unable to set skin: " + e.message));
-            });
-
-            form.pipe(req);
-        });
+        return await ipcRenderer.invoke('set-skin', player_info, skin_id, variant);
     },
     getProfile: async (player_info) => {
-        let date = new Date();
-        date.setHours(date.getHours() - 1);
-        if (new Date(player_info.expires) < date) {
-            try {
-                player_info = await getNewAccessToken(player_info.refresh_token);
-            } catch (err) {
-                throw new Error("Unable to update access token.");
-            }
-        }
-        const res = await axios.get('https://api.minecraftservices.com/minecraft/profile', {
-            headers: {
-                Authorization: `Bearer ${player_info.access_token}`
-            }
-        });
-        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+        return await ipcRenderer.invoke('get-profile', player_info);
     },
     importSkin: async (dataurl) => {
-        const hash = await hashImageFromDataUrl(dataurl);
-        const base64Data = dataurl.split(',')[1];
-        if (!base64Data) throw new Error("Invalid data URL");
-        const buffer = Buffer.from(base64Data, "base64");
-        fs.writeFileSync(path.resolve(userPath, `minecraft/skins/${hash.hash}.png`), buffer);
-        return hash.hash;
+        return await ipcRenderer.invoke('import-skin', dataurl);
     },
     getTotalRAM: () => {
         return Math.floor(os.totalmem() / (1024 * 1024));
     },
     testJavaInstallation: async (file_path) => {
-        try {
-            if (!fs.existsSync(file_path)) return false;
-            const stat = fs.statSync(file_path);
-            if (!stat.isFile()) return false;
-
-            const ext = path.extname(file_path).toLowerCase();
-            if (process.platform === "win32" && ext !== ".exe") return false;
-
-            return await new Promise((resolve) => {
-                const result = spawn(file_path, ["-version"]);
-                let output = "";
-                let error = "";
-
-                result.stdout?.on("data", (data) => { output += data.toString(); });
-                result.stderr?.on("data", (data) => { error += data.toString(); });
-
-                result.on("close", (code) => {
-                    const combined = (output + error).toLowerCase();
-                    if (
-                        code === 0 &&
-                        (combined.includes("java version") || combined.includes("openjdk version"))
-                    ) {
-                        resolve(true);
-                    } else {
-                        resolve(false);
-                    }
-                });
-
-                result.on("error", () => resolve(false));
-            });
-        } catch {
-            return false;
-        }
+        return await ipcRenderer.invoke('test-java-installation', file_path);
     },
     triggerFileImportBrowse: async (file_path, type) => {
         let startDir = file_path;
@@ -1340,8 +946,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return result.filePaths[0];
     },
     detectJavaInstallations: async (v) => {
-        let javaSearch = new JavaSearch();
-        return javaSearch.findJavaInstallations(v);
+        return await ipcRenderer.invoke('detect-java-installations', v);
     },
     getJavaInstallations: () => {
         let javaPaths = [];
@@ -1368,32 +973,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (!fs.existsSync(the_path)) return [];
         return (await getWorlds(the_path)).map(e => ({ "name": e.name, "value": path.resolve(the_path, e.id) }));
     },
-    transferWorld: (old_world_path, instance_id, delete_previous_files) => {
-        const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
-        fs.mkdirSync(savesPath, { recursive: true });
-
-        const worldName = path.basename(old_world_path);
-        let targetName = worldName;
-        let counter = 1;
-        while (fs.existsSync(path.join(savesPath, targetName))) {
-            targetName = `${worldName}_${counter}`;
-            counter++;
-        }
-        const destPath = path.join(savesPath, targetName);
-
-        fs.cpSync(old_world_path, destPath, { recursive: true });
-
-        console.log(delete_previous_files);
-
-        if (delete_previous_files) {
-            console.log("Deleting " + old_world_path);
-            fs.rmSync(old_world_path, { recursive: true, force: true });
-        }
-
-        return { new_world_path: destPath };
+    transferWorld: async (old_world_path, instance_id, delete_previous_files) => {
+        return await ipcRenderer.invoke('transfer-world', old_world_path, instance_id, delete_previous_files);
     },
     getLauncherInstances: async (instance_path) => {
-        console.log(instance_path);
         if (!fs.existsSync(instance_path)) return [{ "name": "Unable to locate Instances", "value": "error" }];
         return fs.readdirSync(instance_path)
             .filter(f => {
@@ -1408,38 +991,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getLauncherInstancePath: (launcher) => {
         switch (launcher.toLowerCase()) {
             case "modrinth": {
-                // Default Modrinth AppData path
                 const p = path.join(os.homedir(), "AppData", "Roaming", "com.modrinth.theseus", "profiles");
                 return fs.existsSync(p) ? p : "";
             }
             case "curseforge": {
-                // Default CurseForge Minecraft instance path
                 const p = path.join(os.homedir(), "curseforge", "minecraft", "Instances");
                 return fs.existsSync(p) ? p : "";
             }
             case "vanilla": {
-                // return "";
-                // Default vanilla Minecraft saves path
                 const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft");
                 return fs.existsSync(p) ? p : "";
             }
             case "multimc": {
-                // MultiMC instances folder
                 const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft", "instances");
                 return fs.existsSync(p) ? p : "";
             }
             case "prism": {
-                // Prism Launcher instances folder
                 const p = path.join(os.homedir(), "AppData", "Roaming", "PrismLauncher", "instances");
                 return fs.existsSync(p) ? p : "";
             }
             case "atlauncher": {
-                // ATLauncher instances folder
                 const p = path.join(os.homedir(), "AppData", "Roaming", "ATLauncher", "instances");
                 return fs.existsSync(p) ? p : "";
             }
             case "gdlauncher": {
-                // GDLauncher instances folder
                 const p = path.join(os.homedir(), "AppData", "Roaming", "GDLauncher", "instances");
                 return fs.existsSync(p) ? p : "";
             }
@@ -1451,9 +1026,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
                 return "";
         }
     },
-    getInstanceOptions: (instance_id) => {
+    getInstanceOptions: async (instance_id) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
-        return getOptions(optionsPath);
+        return await getOptions(optionsPath);
     },
     getOptions,
     importContent,
@@ -1484,120 +1059,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     createDesktopShortcut: async (instance_id, instance_name, iconSource, worldType, worldId) => {
-        const desktopPath = await ipcRenderer.invoke('get-desktop');
-        let safeName = instance_name.replace(/[<>:"/\\|?*]/g, '_');
-        let shortcutExt = "desktop";
-        if (os.platform() == 'win32') shortcutExt = "lnk";
-        let iconExt = "png";
-        if (os.platform() == 'win32') iconExt = "ico";
-        let shortcutPath = path.join(desktopPath, `${safeName} - EnderLynx.${shortcutExt}`);
-
-        let base_shortcut = safeName + " - EnderLynx";
-        let count_shortcut = 1;
-
-        let name = `${safeName} - EnderLynx`;
-
-        while (fs.existsSync(shortcutPath)) {
-            shortcutPath = path.join(desktopPath, `${base_shortcut} (${count_shortcut}).${shortcutExt}`);
-            name = `${base_shortcut} (${count_shortcut})`;
-            count_shortcut++;
-        }
-
-        let target, workingDir, args;
-
-        let isDev = enableDevMode;
-
-        if (isDev) {
-            target = path.join(__dirname, 'node_modules', 'electron', 'dist', 'electron.exe');
-            workingDir = path.resolve(__dirname);
-            args = `"${workingDir}" "--instance=${instance_id}"`;
-            if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
-        } else {
-            target = process.execPath;
-            workingDir = path.dirname(process.execPath);
-            args = `"--instance=${instance_id}"`;
-            if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
-        }
-
-        if (!iconSource) {
-            iconSource = "resources/icons/icon." + iconExt;
-        }
-
-        let base_path_name = instance_id;
-        let current_count = 1;
-
-        let iconPath = path.resolve(userPath, "icons", instance_id + '.' + iconExt);
-
-        while (fs.existsSync(iconPath)) {
-            iconPath = path.resolve(userPath, "icons", base_path_name + "_" + current_count + "." + iconExt);
-            current_count++;
-        }
-
-        try {
-            if (os.platform() == 'win32') {
-                await convertToIco(iconSource, iconPath);
-            } else {
-                await convertToPng(iconSource, iconPath);
-            }
-        } catch (e) {
-            console.error(e);
-        }
-
-        if (!fs.existsSync(iconPath)) {
-            let enderlynxiconpath = path.resolve(userPath, "icons", "enderlynx." + iconExt);
-            if (!fs.existsSync(enderlynxiconpath)) {
-                fs.copyFileSync(path.resolve(__dirname, "icon." + iconExt), enderlynxiconpath);
-            }
-            iconPath = enderlynxiconpath;
-        }
-
-        return new Promise((resolve) => {
-            console.log("VBScriptPath: " + path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcut", "src", "windows.vbs"));
-            createDesktopShortcut({
-                windows: {
-                    filePath: target,
-                    outputPath: desktopPath,
-                    name,
-                    comment: `Launch Minecraft instance "${instance_name}"`,
-                    icon: iconPath,
-                    arguments: args,
-                    VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
-                },
-                linux: {
-                    filePath: target,
-                    outputPath: desktopPath,
-                    name,
-                    description: `Launch Minecraft instance "${instance_name}"`,
-                    icon: iconPath,
-                    arguments: args,
-                    type: 'Application'
-                },
-                osx: {
-                    filePath: target,
-                    outputPath: desktopPath,
-                    name
-                }
-            });
-            resolve(true);
-
-            // ws.create(shortcutPath, {
-            //     target,
-            //     args,
-            //     workingDir,
-            //     runStyle: 1,
-            //     desc: `Launch Minecraft instance "${instance_name}"`,
-            //     icon: iconPath
-            // }, (err) => {
-            //     console.log(err);
-            //     if (err) {
-            //         resolve(false);
-            //         return false;
-            //     } else {
-            //         resolve(true);
-            //         return true;
-            //     }
-            // });
-        });
+        return await ipcRenderer.invoke('create-desktop-shortcut', instance_id, instance_name, iconSource, worldType, worldId);
     },
     shareLogs: async (logs) => {
         const params = new URLSearchParams();
@@ -1659,139 +1121,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
     analyzeLogs: async (instance_id, last_log_date, current_log_path) => {
-        let lastDate = null;
-        if (last_log_date) {
-            let date = last_log_date.replace(".log", "").split("_");
-            if (date[1]) date[1] = date[1].replaceAll("-", ":");
-            let dateStr = date.join(" ");
-            lastDate = new Date(dateStr);
-            if (isNaN(lastDate.getTime())) lastDate = null;
-        }
-
-        const logs_path = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
-        fs.mkdirSync(logs_path, { recursive: true });
-        let allMatches = [];
-        let totalPlaytime = 0;
-
-        const logs = fs.readdirSync(logs_path)
-            .filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz"));
-
-        let most_recent_log = "";
-
-        for (let i = 0; i < logs.length; i++) {
-            const log = logs[i];
-            let date = log.replace(".log", "").split("_");
-            if (date[1]) date[1] = date[1].replaceAll("-", ":");
-            let dateStr = date.join(" ");
-            let parsedDate = new Date(dateStr);
-            if (isNaN(parsedDate.getTime())) continue;
-            if (lastDate && parsedDate <= lastDate) continue;
-
-            const logPath = path.join(logs_path, log);
-
-            let startTimestamp = "";
-            let endTimestamp = "";
-
-            try {
-                const fileStream = fs.createReadStream(logPath, "utf8");
-                const rl = readline.createInterface({
-                    input: fileStream,
-                    crlfDelay: Infinity
-                });
-                let startFound = false;
-                let previousHour = 0;
-                for await (const line of rl) {
-                    let searchForStart = () => {
-                        const tsEnd = line.indexOf("]");
-                        if (tsEnd === -1) return;
-                        const timestamp = line.slice(1, tsEnd);
-                        if (isNaN(new Date(timestamp).getTime())) {
-                            const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
-                            if (hh && mm && ss) {
-                                const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
-                                startTimestamp = combined.toISOString();
-                                startFound = true;
-                            } else {
-                                return;
-                            }
-                            return;
-                        }
-                        startTimestamp = timestamp;
-                        startFound = true;
-                    }
-                    let searchForEnd = () => {
-                        const tsEnd = line.indexOf("]");
-                        if (tsEnd === -1) return;
-                        const timestamp = line.slice(1, tsEnd);
-                        if (isNaN(new Date(timestamp).getTime())) {
-                            const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
-                            if (hh && mm && ss) {
-                                if (hh < previousHour) {
-                                    parsedDate.setDate(parsedDate.getDate() + 1);
-                                }
-                                previousHour = hh;
-                                const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
-                                endTimestamp = combined.toISOString();
-                            } else {
-                                return;
-                            }
-                            return;
-                        }
-                        endTimestamp = timestamp;
-                    }
-                    if (!startFound) searchForStart();
-                    else searchForEnd();
-
-                    let searchForConnectingTo = () => {
-                        if (line.includes("[CHAT]")) return;
-
-                        // Timestamp
-                        const tsEnd = line.indexOf("]");
-                        if (tsEnd === -1) return;
-                        let timestamp = line.slice(1, tsEnd); // remove leading "["
-                        if (isNaN(new Date(timestamp).getTime())) {
-                            const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
-                            if (hh && mm && ss) {
-                                const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
-                                timestamp = combined.toISOString();
-                            } else {
-                                return;
-                            }
-                        }
-
-                        // Extract host/port part
-                        const marker = "Connecting to ";
-                        const start = line.indexOf(marker) + marker.length;
-                        const after = line.slice(start);
-
-                        const [host, port] = after.split(",").map(s => s.trim());
-
-                        if (host && port) {
-                            allMatches.push([timestamp, host, port]);
-                        }
-                    }
-                    if (line.includes("Connecting to ")) searchForConnectingTo();
-                }
-            } catch (e) {
-                console.error("Error reading log:", logPath, e);
-                continue;
-            }
-
-            if (current_log_path && path.resolve(logPath) === path.resolve(current_log_path)) {
-                break;
-            }
-
-            let playtime = new Date(endTimestamp).getTime() - new Date(startTimestamp).getTime();
-            if (!isNaN(playtime)) totalPlaytime += playtime;
-
-            most_recent_log = log;
-        }
-
-        return ({
-            "last_played_servers": allMatches,
-            "total_playtime": (totalPlaytime / 1000),
-            "most_recent_log": most_recent_log
-        });
+        return await ipcRenderer.invoke('analyze-logs', instance_id, last_log_date, current_log_path);
     },
     saveToDisk: async (file_path) => {
         let result = await ipcRenderer.invoke('show-save-dialog', {
@@ -1806,7 +1136,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         fs.copyFileSync(file_path, result.filePath);
     },
     checkForUpdates,
-    compareVersions,
     updateEnderLynx,
     downloadUpdate,
     changeFolder: async (old_path, new_path) => {
@@ -1837,15 +1166,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
             name: f.name
         }));
     },
-    isInstanceFile: (file_path) => {
-        let ext = path.extname(file_path);
-        if (ext == ".mrpack" || ext == ".elpack") return true;
-        if (ext == ".zip") {
-            const zip = new AdmZip(file_path);
-            if (zip.getEntry('pack.mcmeta')) return false;
-            if (zip.getEntry('manifest.json')) return true;
-        }
-        return false;
+    isInstanceFile: async (file_path) => {
+        return await ipcRenderer.invoke('is-instance-file', file_path);
     },
     queryServer: async (host, port) => {
         return await ipcRenderer.invoke('query-server', host, port);
@@ -1854,7 +1176,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('add-server', instance_id, ip, name);
     },
     getDefaultImage: (code) => {
-        let data = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
         let hash = code ? hashString(code) : 0;
         let hue = hash % 360;
         let saturation = 70;
@@ -1863,7 +1184,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         if (code === undefined) {
             strokeColor = `#777`;
         }
-        data = data.replaceAll("__ACCENT__", strokeColor);
+        let data = svgData.replaceAll("__ACCENT__", strokeColor);
         return data;
     },
     openWorldFolder: (instance_id, world_id) => {
@@ -1894,65 +1215,6 @@ function hashString(str) {
     return Math.abs(hash);
 }
 
-async function convertToIco(input, outputPath) {
-    let imageBuffer;
-
-    if (input.startsWith('data:image/')) {
-        const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
-        imageBuffer = Buffer.from(base64Data, 'base64');
-    } else if (input.startsWith('http://') || input.startsWith('https://')) {
-        const response = await axios.get(input, { responseType: 'arraybuffer' });
-        imageBuffer = Buffer.from(response.data);
-    } else if (fs.existsSync(input)) {
-        imageBuffer = fs.readFileSync(input);
-    } else {
-        throw new Error('Invalid input: must be a data URL, image URL, or file path');
-    }
-
-    const resized = await sharp(imageBuffer, { failOnError: false })
-        .ensureAlpha()
-        .resize(256, 256, {
-            fit: 'contain',
-            kernel: sharp.kernel.nearest,
-            background: { r: 0, g: 0, b: 0, alpha: 0 }
-        })
-        .png()
-        .toBuffer();
-
-    const icoBuffer = await pngToIco(resized);
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-    fs.writeFileSync(outputPath, icoBuffer);
-}
-
-async function convertToPng(input, outputPath) {
-    let imageBuffer;
-
-    if (input.startsWith('data:image/')) {
-        const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
-        imageBuffer = Buffer.from(base64Data, 'base64');
-    } else if (input.startsWith('http://') || input.startsWith('https://')) {
-        const response = await axios.get(input, { responseType: 'arraybuffer' });
-        imageBuffer = Buffer.from(response.data);
-    } else if (fs.existsSync(input)) {
-        imageBuffer = fs.readFileSync(input);
-    } else {
-        throw new Error('Invalid input: must be a data URL, image URL, or file path');
-    }
-
-    const pngBuffer = await sharp(imageBuffer, { failOnError: false })
-        .ensureAlpha()
-        .resize(256, 256, {
-            fit: 'contain',
-            kernel: sharp.kernel.nearest,
-            background: { r: 0, g: 0, b: 0, alpha: 0 }
-        })
-        .png()
-        .toBuffer();
-
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-    fs.writeFileSync(outputPath, pngBuffer);
-}
-
 async function getWorld(levelDatPath) {
     return await ipcRenderer.invoke('get-world', levelDatPath);
 }
@@ -1969,21 +1231,6 @@ async function getSinglePlayerWorlds(instance_id) {
     return await getWorlds(patha);
 }
 
-async function hashImageFromDataUrl(dataUrl) {
-    const base64Data = dataUrl.split(',')[1];
-    if (!base64Data) throw new Error("Invalid data URL");
-
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-
-    const { data, info } = await sharp(imageBuffer)
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-    const hash = crypto.createHash('sha256').update(data).digest('hex');
-    return { "hash": hash, "buffer": data };
-}
-
 function folderExists(folderPath) {
     try {
         return fs.statSync(folderPath).isDirectory();
@@ -1992,92 +1239,11 @@ function folderExists(folderPath) {
     }
 }
 
-async function getNewAccessToken(refresh_token) {
-    return ipcRenderer.invoke('get-new-access-token', refresh_token);
-}
-
 async function importWorld(file_path, instance_id, worldName) {
     return await ipcRenderer.invoke('import-world', file_path, instance_id, worldName);
 }
 async function importContent(file_path, content_type, instance_id) {
-    let destFolder = "";
-    let fileType = content_type;
-
-    if (content_type === "auto") {
-        if (file_path.endsWith(".jar") || file_path.endsWith(".jar.disabled")) {
-            try {
-                const tempZip = new AdmZip(file_path);
-                if (tempZip.getEntry("fabric.mod.json")) {
-                    destFolder = "mods";
-                    fileType = "mod";
-                } else if (tempZip.getEntry("META-INF/mods.toml")) {
-                    destFolder = "mods";
-                    fileType = "mod";
-                } else if (tempZip.getEntry("quilt.mod.json")) {
-                    destFolder = "mods";
-                    fileType = "mod";
-                } else {
-                    destFolder = "mods";
-                    fileType = "mod";
-                }
-            } catch (e) {
-                destFolder = "mods";
-                fileType = "mod";
-            }
-        } else if (file_path.endsWith(".zip") || file_path.endsWith(".zip.disabled")) {
-            try {
-                const tempZip = new AdmZip(file_path);
-                if (tempZip.getEntry("pack.mcmeta")) {
-                    destFolder = "resourcepacks";
-                    fileType = "resource_pack";
-                } else if (tempZip.getEntry("shaders/")) {
-                    destFolder = "shaderpacks";
-                    fileType = "shader";
-                } else {
-                    destFolder = "resourcepacks";
-                    fileType = "resource_pack";
-                }
-            } catch (e) {
-                destFolder = "resourcepacks";
-                fileType = "resource_pack";
-            }
-        } else {
-            return null;
-        }
-    } else {
-        if (content_type === "mod") destFolder = "mods";
-        else if (content_type === "resource_pack") destFolder = "resourcepacks";
-        else if (content_type === "shader") destFolder = "shaderpacks";
-        else destFolder = "mods";
-    }
-
-    const destPath = path.resolve(userPath, `minecraft/instances/${instance_id}/${destFolder}`);
-    fs.mkdirSync(destPath, { recursive: true });
-
-    let fileName = path.basename(file_path);
-    let finalPath = path.join(destPath, fileName);
-
-    let uniqueFinalPath = finalPath;
-    let uniqueFileName = fileName;
-    let count = 1;
-    while (fs.existsSync(uniqueFinalPath)) {
-        const ext = path.extname(fileName);
-        const base = path.basename(fileName, ext);
-        uniqueFileName = `${base} (${count})${ext}`;
-        uniqueFinalPath = path.join(destPath, uniqueFileName);
-        count++;
-    }
-    await new Promise((resolve) => {
-        fs.copyFile(file_path, uniqueFinalPath, () => resolve());
-    });
-    fileName = uniqueFileName;
-    finalPath = uniqueFinalPath;
-
-    return {
-        file_name: fileName,
-        type: fileType,
-        dest: finalPath
-    };
+    return await ipcRenderer.invoke('import-content', file_path, content_type, instance_id);
 }
 
 async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
@@ -2104,18 +1270,15 @@ async function getSkinFromURL(url) {
 
 async function getSkinFromUsername(username) {
     try {
-        // Step 1: Get UUID from username
         const profileRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
         if (!profileRes.ok) throw new Error(`Username "${username}" not found`);
         const profile = await profileRes.json();
         const uuid = profile.id;
 
-        // Step 2: Get skin data from session server
         const sessionRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${uuid}`);
         if (!sessionRes.ok) throw new Error(`Failed to fetch profile for UUID ${uuid}`);
         const sessionData = await sessionRes.json();
 
-        // Step 3: Decode base64 texture data
         const textureProp = sessionData.properties.find(p => p.name === 'textures');
         const textureJson = JSON.parse(Buffer.from(textureProp.value, 'base64').toString('utf8'));
 
@@ -2132,50 +1295,11 @@ async function getSkinFromUsername(username) {
 }
 
 async function downloadSkin(url) {
-    let imageBuffer;
-    if (url.startsWith("data:")) {
-        imageBuffer = Buffer.from(url.split(",")[1], "base64");
-    } else {
-        const response = await axios.get(url, { responseType: "arraybuffer" });
-        imageBuffer = Buffer.from(response.data);
-    }
-
-    const { data, info } = await sharp(imageBuffer)
-        .ensureAlpha()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-    const hash = crypto.createHash('sha256')
-        .update(data)
-        .digest('hex');
-
-    fs.mkdirSync(path.resolve(userPath, "minecraft/skins"), { recursive: true });
-
-    fs.writeFileSync(path.resolve(userPath, `minecraft/skins/${hash}.png`), imageBuffer);
-
-    const base64 = imageBuffer.toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-    return { hash, dataUrl };
+    return await ipcRenderer.invoke('download-skin', url);
 }
 
 async function pathToDataUrl(file_path) {
-    if (!file_path) return null;
-
-    try {
-        if (fs.existsSync(file_path)) {
-            const buffer = fs.readFileSync(file_path);
-            try {
-                const pngBuf = await sharp(buffer).png().toBuffer();
-                return `data:image/png;base64,${pngBuf.toString('base64')}`;
-            } catch (err) {
-                return null;
-            }
-        }
-        return null;
-    } catch (err) {
-        return null;
-    }
+    return await ipcRenderer.invoke('path-to-data-url', file_path);
 }
 
 function checkForProcess(pid) {
@@ -2198,51 +1322,11 @@ async function getMultiplayerWorlds(instance_id) {
 }
 
 function showFileInFolder(filePath) {
-    let command;
-    switch (process.platform) {
-        case 'win32':
-            command = `explorer /select, "${path.resolve(filePath)}"`;
-            break;
-        case 'darwin':
-            command = `open -R "${path.resolve(filePath)}"`;
-            break;
-        case 'linux':
-            command = `xdg-open "${path.resolve(filePath)}"`;
-            break;
-        default:
-            console.error('Unsupported operating system.');
-            return;
-    }
-
-    exec(command, (error) => {
-        if (error && error.code !== 1) {
-            console.error(`Error showing file: ${error}`);
-        }
-    });
+    ipcRenderer.send('show-file-in-folder', filePath);
 }
 
 function openFolder(folderPath) {
-    let command;
-    switch (process.platform) {
-        case 'win32':
-            command = `explorer "${path.resolve(folderPath)}"`;
-            break;
-        case 'darwin':
-            command = `open "${path.resolve(folderPath)}"`;
-            break;
-        case 'linux':
-            command = `xdg-open "${path.resolve(folderPath)}"`;
-            break;
-        default:
-            console.error('Unsupported operating system.');
-            return;
-    }
-
-    exec(command, (error) => {
-        if (error && error.code !== 1) {
-            console.error(`Error opening folder: ${error}`);
-        }
-    });
+    ipcRenderer.send('open-folder', folderPath);
 }
 
 async function checkForUpdates() {
@@ -2319,19 +1403,8 @@ function compareVersions(v1, v2) {
     return 0;
 }
 
-function getOptions(optionsPath) {
-    if (!fs.existsSync(optionsPath)) return [];
-    const lines = fs.readFileSync(optionsPath, "utf-8").split(/\r?\n/);
-    const options = [];
-    for (const line of lines) {
-        if (!line.trim() || line.trim().startsWith("#")) continue;
-        const idx = line.indexOf(":");
-        if (idx === -1) continue;
-        const key = line.slice(0, idx).trim();
-        const value = line.slice(idx + 1).trim();
-        options.push({ key, value });
-    }
-    return options;
+async function getOptions(optionsPath) {
+    return ipcRenderer.invoke('get-options', optionsPath);
 }
 
 function getMaxConcurrentDownloads() {

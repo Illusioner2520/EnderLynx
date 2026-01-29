@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
 const fs = require('fs');
+const fsPromises = require('fs/promises');
 const AdmZip = require('adm-zip');
 const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
@@ -16,9 +17,15 @@ const https = require('https');
 const stringArgv = require('string-argv').default;
 const axios = require('axios');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const { version } = require('./package.json');
 const os = require('os');
+const sharp = require("sharp");
+const FormData = require('form-data');
+const createDesktopShortcut = require("create-desktop-shortcuts");
+const pngToIco = require('png-to-ico').default;
+const readline = require('readline');
+const { JavaSearch, setUserPathAgain } = require('./java_scan.js');
 
 app.userAgentFallback = `EnderLynx/${version}`;
 
@@ -53,6 +60,7 @@ if (!fs.existsSync(user_path)) {
 }
 
 setUserPath(user_path);
+setUserPathAgain(user_path);
 
 let win;
 
@@ -93,6 +101,7 @@ const createWindow = () => {
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
             devTools: enableDev,
+            spellcheck: false,
             additionalArguments: additionalArguments
         },
         backgroundColor: "#0a0a0a",
@@ -260,7 +269,7 @@ ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overr
                 const stat = fs.statSync(srcPath);
                 if (stat.isDirectory()) {
                     async function addDirToZip(dir, zipPath) {
-                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        const entries = await fsPromises.readdir(dir, { withFileTypes: true });
                         for (const entry of entries) {
                             const entrySrc = path.join(dir, entry.name);
                             const entryDest = path.join(zipPath, entry.name);
@@ -316,7 +325,7 @@ ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overr
                 const stat = fs.statSync(srcPath);
                 if (stat.isDirectory()) {
                     async function addDirToZip(dir, zipPath) {
-                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        const entries = await fsPromises.readdir(dir, { withFileTypes: true });
                         for (const entry of entries) {
                             const entrySrc = path.join(dir, entry.name);
                             const entryDest = path.join(zipPath, entry.name);
@@ -372,7 +381,7 @@ ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overri
                 const stat = fs.statSync(srcPath);
                 if (stat.isDirectory()) {
                     async function addDirToZip(dir, zipPath) {
-                        const entries = fs.readdirSync(dir, { withFileTypes: true });
+                        const entries = await fsPromises.readdir(dir, { withFileTypes: true });
                         for (const entry of entries) {
                             const entrySrc = path.join(dir, entry.name);
                             const entryDest = path.join(zipPath, entry.name);
@@ -425,7 +434,7 @@ ipcMain.handle('delete-server', async (_, instance_id, ip, index) => {
 
     if (!fs.existsSync(serversDatPath)) return false;
     try {
-        const buffer = fs.readFileSync(serversDatPath);
+        const buffer = await fsPromises.readFile(serversDatPath);
         const data = await nbt.parse(buffer);
         let servers = data.parsed.value.servers.value.value || [];
         let completed = false;
@@ -448,7 +457,7 @@ ipcMain.handle('delete-server', async (_, instance_id, ip, index) => {
         data.parsed.value.servers.value.value = servers;
 
         const newBuffer = nbt.writeUncompressed(data.parsed);
-        fs.writeFileSync(serversDatPath, newBuffer);
+        await fsPromises.writeFile(serversDatPath, newBuffer);
         return true;
     } catch (e) {
         console.error("Failed to delete server from servers.dat:", e);
@@ -467,7 +476,7 @@ async function getMultiplayerWorlds(instance_id) {
     }
 
     try {
-        const buffer = fs.readFileSync(serversDatPath);
+        const buffer = await fsPromises.readFile(serversDatPath);
         const data = await nbt.parse(buffer);
         const servers = data.parsed?.value?.servers?.value?.value || [];
 
@@ -541,7 +550,7 @@ async function getWorlds(savesPath) {
 }
 
 async function getWorld(levelDatPath) {
-    const buffer = fs.readFileSync(levelDatPath);
+    const buffer = await fsPromises.readFile(levelDatPath);
     const decompressed = zlib.gunzipSync(buffer);
 
     const data = nbt.parseUncompressed(decompressed);
@@ -672,12 +681,10 @@ ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_conten
                                 let mime = 'image/png';
                                 if (iconPath.endsWith('.jpg') || iconPath.endsWith('.jpeg')) mime = 'image/jpeg';
                                 else if (iconPath.endsWith('.gif')) mime = 'image/gif';
-                                // Resize icon to max 40x40
                                 let resizedBuffer = iconBuffer;
                                 try {
                                     resizedBuffer = sharp(iconBuffer).resize({ width: 40, height: 40, fit: "inside" }).toBufferSync();
                                 } catch (e) {
-                                    // fallback to original if sharp fails
                                     resizedBuffer = iconBuffer;
                                 }
                                 modJson.icon = `data:${mime};base64,${resizedBuffer.toString('base64')}`;
@@ -905,7 +912,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
         fs.mkdirSync(srcDir, { recursive: true });
         fs.mkdirSync(destDir, { recursive: true });
 
-        const files = fs.readdirSync(srcDir);
+        const files = await fsPromises.readdir(srcDir);
 
         for (const file of files) {
             signal.throwIfAborted();
@@ -914,26 +921,18 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
             const destPath = path.join(destDir, file);
 
             if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+                continue;
             }
             try {
-                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
-                    resolve(v);
-                }));
-                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
-                    resolve(v);
-                }));
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
         }
 
-        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        let manifest_json = await fsPromises.readFile(path.resolve(extractToPath, "manifest.json"));
         manifest_json = JSON.parse(manifest_json);
 
         let content = [];
@@ -1080,42 +1079,36 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         signal.throwIfAborted();
 
         let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
+        let srcDir2 = path.resolve(user_path, `minecraft/instances/${instance_id}/client-overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
         fs.mkdirSync(srcDir, { recursive: true });
-        fs.mkdirSync(destDir, { recursive: true });
+        fs.mkdirSync(srcDir2, { recursive: true });
         signal.throwIfAborted();
 
-        const files = fs.readdirSync(srcDir);
+        let files = (await fsPromises.readdir(srcDir)).map(e => ({ dir: srcDir, name: e }));
+        files = files.concat((await fsPromises.readdir(srcDir2)).map(e => ({ dir: srcDir2, name: e })));
 
         for (const file of files) {
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
-            const srcPath = path.join(srcDir, file);
-            const destPath = path.join(destDir, file);
+            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file.name}`, processId, "good", cancelId);
+            const srcPath = path.join(file.dir, file.name);
+            const destPath = path.join(destDir, file.name);
 
             if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+                continue;
             }
 
             try {
-                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
-                    resolve(v);
-                }));
-                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
-                    resolve(v);
-                }));
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                return "Unable to enable overrides for folder " + file;
+                return "Unable to enable overrides for folder " + file.name;
             }
             signal.throwIfAborted();
         }
 
-        let modrinth_index_json = fs.readFileSync(path.resolve(extractToPath, "modrinth.index.json"));
+        let modrinth_index_json = await fsPromises.readFile(path.resolve(extractToPath, "modrinth.index.json"));
         modrinth_index_json = JSON.parse(modrinth_index_json);
 
         let content = [];
@@ -1274,7 +1267,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
         fs.mkdirSync(srcDir, { recursive: true });
         fs.mkdirSync(destDir, { recursive: true });
 
-        const files = fs.readdirSync(srcDir);
+        const files = await fsPromises.readdir(srcDir);
 
         for (const file of files) {
             signal.throwIfAborted();
@@ -1283,27 +1276,19 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
             const destPath = path.join(destDir, file);
 
             if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+                continue;
             }
 
             try {
-                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
-                    resolve(v);
-                }));
-                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
-                    resolve(v);
-                }));
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
         }
 
-        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        let manifest_json = await fsPromises.readFile(path.resolve(extractToPath, "manifest.json"));
         manifest_json = JSON.parse(manifest_json);
 
         let content = [];
@@ -1510,7 +1495,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
         fs.mkdirSync(srcDir, { recursive: true });
         fs.mkdirSync(destDir, { recursive: true });
 
-        const files = fs.readdirSync(srcDir);
+        const files = await fsPromises.readdir(srcDir);
 
         for (const file of files) {
             signal.throwIfAborted();
@@ -1519,26 +1504,18 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", m
             const destPath = path.join(destDir, file);
 
             if (fs.existsSync(destPath)) {
-                const stats = fs.lstatSync(destPath);
-                if (stats.isDirectory()) {
-                    fs.rmSync(destPath, { recursive: true, force: true });
-                } else {
-                    fs.unlinkSync(destPath);
-                }
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+                continue;
             }
             try {
-                await new Promise((resolve) => fs.cp(srcPath, destPath, { recursive: true }, (v) => {
-                    resolve(v);
-                }));
-                await new Promise((resolve) => fs.rm(srcPath, { recursive: true, force: true }, (v) => {
-                    resolve(v);
-                }));
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
                 return "Unable to enable overrides for folder " + file;
             }
         }
 
-        let manifest_json = fs.readFileSync(path.resolve(extractToPath, "manifest.json"));
+        let manifest_json = await fsPromises.readFile(path.resolve(extractToPath, "manifest.json"));
         manifest_json = JSON.parse(manifest_json);
 
         let dependency_res;
@@ -1680,7 +1657,7 @@ async function playMinecraft(loader, version, loaderVersion, instance_id, player
                 "accessToken": player_info.access_token,
                 "xuid": player_info.xuid,
                 "clientId": player_info.client_id
-            }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), {...parseEnvString(globalEnvVars), ...parseEnvString(envVars)}, preLaunch, postLaunch, parseJavaArgs(wrapper), postExit, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit), "player_info": player_info
+            }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), { ...parseEnvString(globalEnvVars), ...parseEnvString(envVars) }, preLaunch, postLaunch, parseJavaArgs(wrapper), postExit, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit), "player_info": player_info
         };
     } catch (err) {
         console.error(err);
@@ -2153,11 +2130,11 @@ async function downloadVanillaTweaksDataPacks(packs, version, instance_id, world
                 fs.mkdirSync(destPath, { recursive: true });
             } else {
                 fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                fs.writeFileSync(destPath, entry.getData());
+                await fsPromises.writeFile(destPath, entry.getData());
             }
         }
 
-        fs.unlinkSync(filePath);
+        await fsPromises.unlink(filePath);
     }
 
     return true;
@@ -2291,11 +2268,10 @@ async function addContent(instance_id, project_type, project_url, filename, data
             }
         }
 
-        // Optionally delete the temp world zip after extraction
-        fs.unlinkSync(install_path);
+        await fsPromises.unlink(install_path);
         const tempWorldPath = path.resolve(user_path, `minecraft/instances/${instance_id}/temp_worlds`);
         if (fs.existsSync(tempWorldPath)) {
-            fs.rmSync(tempWorldPath, { recursive: true, force: true });
+            await fsPromises.rm(tempWorldPath, { recursive: true, force: true });
         }
     }
 
@@ -2346,7 +2322,7 @@ async function addServer(instance_id, ip, title, image) {
     }
     try {
         if (serversDatExists) {
-            const buffer = fs.readFileSync(serversDatPath);
+            const buffer = await fsPromises.readFile(serversDatPath);
             data = await nbt.parse(buffer);
         }
         let servers = data.parsed?.value?.servers?.value?.value || [];
@@ -2361,7 +2337,7 @@ async function addServer(instance_id, ip, title, image) {
                 imageBuffer = Buffer.from(response.data);
                 iconBase64 = imageBuffer.toString('base64');
             } else if (fs.existsSync(image)) {
-                imageBuffer = fs.readFileSync(image);
+                imageBuffer = await fsPromises.readFile(image);
                 iconBase64 = imageBuffer.toString('base64');
             }
         }
@@ -2388,7 +2364,7 @@ async function addServer(instance_id, ip, title, image) {
         data.parsed.value.servers.value.value = servers;
 
         const newBuffer = nbt.writeUncompressed(data.parsed);
-        fs.writeFileSync(serversDatPath, newBuffer);
+        await fsPromises.writeFile(serversDatPath, newBuffer);
         return true;
     } catch (e) {
         console.error("Failed to add server to servers.dat:", e);
@@ -2724,9 +2700,7 @@ async function importWorld(file_path, instance_id, worldName) {
                         signal.throwIfAborted();
                         win.webContents.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`, processId, "good", cancelId);
                         fs.mkdirSync(path.dirname(dest), { recursive: true });
-                        await new Promise((resolve) => {
-                            fs.writeFile(dest, entry.getData(), () => resolve());
-                        });
+                        await fsPromises.writeFile(dest, entry.getData());
                     }
                 }
                 signal.throwIfAborted();
@@ -2767,9 +2741,7 @@ async function importWorld(file_path, instance_id, worldName) {
                                 signal.throwIfAborted();
                                 win.webContents.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`, processId, "good", cancelId);
                                 fs.mkdirSync(path.dirname(dest), { recursive: true });
-                                await new Promise((resolve) => {
-                                    fs.writeFile(dest, entry.getData(), () => resolve());
-                                });
+                                await fsPromises.writeFile(dest, entry.getData());
                             }
                         }
                     }
@@ -2821,7 +2793,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
             }
         });
         let data = Buffer.from(response.data);
-        fs.writeFileSync(zipPath, data);
+        await fsPromises.writeFile(zipPath, data);
         signal.throwIfAborted();
 
         try {
@@ -2830,7 +2802,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
                 .digest('hex');
             if ("sha256:" + hash != checksum) throw new Error();
         } catch (e) {
-            fs.unlinkSync(zipPath);
+            await fsPromises.unlink(zipPath);
             win.webContents.send('progress-update', `Downloading Update`, 100, "Failed to verify download.", processId, "error", cancelId);
             throw new Error("Failed to verify download. Stopping update.");
         }
@@ -2853,7 +2825,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         process.noAsar = prev;
 
-        fs.unlinkSync(zipPath);
+        await fsPromises.unlink(zipPath);
         signal.throwIfAborted();
 
         win.webContents.send('progress-update', `Downloading Update`, 100, "Done!", processId, "done", cancelId);
@@ -2862,7 +2834,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
         if (os.platform() != 'win32') updaterPath = path.join(user_path, "updater", "updater");
         let sourceDir = path.resolve(tempDir);
         if (os.platform() != 'win32' && os.platform() != 'darwin') {
-            sourceDir = path.join(sourceDir, fs.readdirSync(sourceDir)[0]);
+            sourceDir = path.join(sourceDir, (await fsPromises.readdir(sourceDir))[0]);
         }
         const targetDir = path.dirname(process.execPath);
         const exeToLaunch = process.execPath;
@@ -2912,6 +2884,952 @@ ipcMain.handle('trigger-microsoft-login', async () => {
     }
 });
 
-ipcMain.handle('get-new-access-token', async (refresh_token) => {
-    return await getNewAccessToken(refresh_token);
+ipcMain.handle('get-instance-files', async (_, instance_id) => {
+    const dirPath = path.resolve(user_path, "minecraft", "instances", instance_id);
+    if (!fs.existsSync(dirPath)) return [];
+    async function getAllFilesRecursive(baseDir, relDir = "") {
+        const absDir = path.join(baseDir, relDir);
+        let results = [];
+        const entries = await fsPromises.readdir(absDir, { withFileTypes: true });
+        if (entries.length == 0) {
+            results.push(relDir.replace(/\\/g, "/"));
+        }
+        for (const entry of entries) {
+            const relPath = path.join(relDir, entry.name);
+            if (entry.isDirectory()) {
+                results = results.concat(await getAllFilesRecursive(baseDir, relPath));
+            } else {
+                results.push(relPath.replace(/\\/g, "/"));
+            }
+        }
+        return results;
+    }
+    return await getAllFilesRecursive(dirPath);
+});
+
+function readElPack(file_path) {
+    try {
+        const zip = new AdmZip(file_path);
+        const manifestEntry = zip.getEntry('manifest.json');
+        if (!manifestEntry) return null;
+        const manifestData = manifestEntry.getData().toString('utf-8');
+        return JSON.parse(manifestData);
+    } catch (e) {
+        return null;
+    }
+}
+function readMrPack(file_path) {
+    try {
+        const zip = new AdmZip(file_path);
+        const manifestEntry = zip.getEntry('modrinth.index.json');
+        if (!manifestEntry) return null;
+        const manifestData = manifestEntry.getData().toString('utf-8');
+        let jsonData = JSON.parse(manifestData);
+        console.log(jsonData);
+        let loader = "vanilla";
+        let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
+        let keys = Object.keys(jsonData.dependencies)
+        for (const key of keys) {
+            if (loaders.includes(key)) {
+                loader = key;
+                break;
+            }
+        }
+        return {
+            name: jsonData.name,
+            game_version: jsonData.dependencies.minecraft,
+            loader: loader.replace("-loader", ""),
+            loader_version: jsonData.dependencies[loader],
+            image: ""
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+function readCfZip(file_path) {
+    try {
+        const zip = new AdmZip(file_path);
+        const manifestEntry = zip.getEntry('manifest.json');
+        if (!manifestEntry) return null;
+        const manifestData = manifestEntry.getData().toString('utf-8');
+        let jsonData = JSON.parse(manifestData);
+        let loaderSplit = jsonData.minecraft.modLoaders[0].id.split("-");
+        return {
+            name: jsonData.name,
+            game_version: jsonData.minecraft.version,
+            loader: loaderSplit[0],
+            loader_version: loaderSplit[1],
+            image: ""
+        };
+    } catch (e) {
+        return null;
+    }
+}
+
+ipcMain.handle('read-elpack', async (_, file_path) => {
+    return await readElPack(file_path);
+});
+
+ipcMain.handle('read-mrpack', async (_, file_path) => {
+    return await readMrPack(file_path);
+});
+
+ipcMain.handle('read-cfzip', async (_, file_path) => {
+    return await readCfZip(file_path);
+});
+
+ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists) => {
+    const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
+    let alreadyExists = fs.existsSync(optionsPath);
+    if (dont_complete_if_already_exists && alreadyExists) {
+        return content.version;
+    }
+    if (!alreadyExists) {
+        await fsPromises.writeFile(optionsPath, content.content, "utf-8");
+        return content.version;
+    } else {
+        let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
+        for (let j = 0; j < content.keys.length; j++) {
+            let key = content.keys[j];
+            let value = content.values[j];
+            let found = false;
+            inner: for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().startsWith(key + ":")) {
+                    lines[i] = `${key}:${value}`;
+                    found = true;
+                    break inner;
+                }
+            }
+            if (!found) {
+                lines.push(`${key}:${value}`);
+            }
+        }
+        await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+    }
+});
+
+ipcMain.handle('update-options-txt', async (_, instance_id, key, value) => {
+    const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
+    let lines = [];
+    if (fs.existsSync(optionsPath)) {
+        lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
+    }
+    let found = false;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim().startsWith(key + ":")) {
+            lines[i] = `${key}:${value}`;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        lines.push(`${key}:${value}`);
+    }
+    await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+});
+
+ipcMain.handle('kill-process', async (_, pid) => {
+    if (!pid) return false;
+    pid = Number(pid);
+
+    return new Promise((resolve, reject) => {
+        exec(os.platform() == 'win32' ? `taskkill /PID ${pid} /T` : `kill -TERM -${pid}`, (error) => {
+            let elapsed = 0;
+            const interval = setInterval(() => {
+                if (!checkForProcess(pid)) {
+                    clearInterval(interval);
+                    return resolve(true);
+                }
+
+                elapsed += 500;
+                if (elapsed >= 5000) {
+                    clearInterval(interval);
+                    exec(os.platform() == 'win32' ? `taskkill /PID ${pid} /T /F` : `kill -KILL -${pid}`, (forceError) => {
+                        if (forceError) {
+                            reject("failed to kill process");
+                            return;
+                        }
+                        const stillAlive = checkForProcess(pid);
+                        resolve(!stillAlive);
+                    });
+                }
+            }, 500);
+        });
+    });
+});
+
+function checkForProcess(pid) {
+    if (!pid) return false;
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (err) {
+        if (err.code === 'ESRCH') {
+            return false;
+        } else if (err.code === 'EPERM') {
+            return true;
+        }
+        throw err;
+    }
+}
+
+ipcMain.handle('get-instance-logs', async (_, instance_id) => {
+    let patha = path.resolve(user_path, `minecraft/instances/${instance_id}/logs`);
+    fs.mkdirSync(patha, { recursive: true });
+    let dirInfo = await fsPromises.readdir(patha);
+    return dirInfo.filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz")).map(e => {
+        let date = e.replace(".log", "").split("_");
+        if (date[1]) date[1] = date[1].replaceAll("-", ":");
+        let dateStr = date.join(" ");
+        let parsedDate = new Date(dateStr);
+        return ({
+            "date": isNaN(parsedDate.getTime()) ? e : parsedDate.toString(),
+            "file_name": e
+        });
+    });
+});
+
+ipcMain.handle('get-screenshots', async (_, instance_id) => {
+    let screenshotsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/screenshots`);
+    fs.mkdirSync(screenshotsPath, { recursive: true });
+    let screenshots = await fsPromises.readdir(screenshotsPath);
+    let files = screenshots.filter(file => /\.(png|jpg|jpeg|bmp|gif)$/i.test(file))
+        .map(file => {
+            let date = file.split(".").slice(0, -1).join(".").split("_");
+            if (date[1]) date[1] = date[1].replaceAll(".", ":");
+            if (date[2]) date = [date[0], date[1]]
+            let dateStr = date.join(" ");
+            let parsedDate = new Date(dateStr);
+
+            return {
+                file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
+                real_file_name: file,
+                file_path: path.resolve(screenshotsPath, file).replace(/\\/g, '/')
+            }
+        });
+    return files;
+});
+
+ipcMain.handle('get-options', async (_, optionsPath) => {
+    if (!fs.existsSync(optionsPath)) return [];
+    const info = await fsPromises.readFile(optionsPath, "utf-8");
+    const lines = info.split(/\r?\n/);
+    const options = [];
+    for (const line of lines) {
+        if (!line.trim() || line.trim().startsWith("#")) continue;
+        const idx = line.indexOf(":");
+        if (idx === -1) continue;
+        const key = line.slice(0, idx).trim();
+        const value = line.slice(idx + 1).trim();
+        options.push({ key, value });
+    }
+    return options;
+});
+
+ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
+    try {
+        let image;
+        if (/^https?:\/\//.test(file_path)) {
+            const response = await axios.get(file_path, { responseType: "arraybuffer" });
+            let buffer = await sharp(response.data).png().toBuffer();
+            image = nativeImage.createFromBuffer(buffer);
+        } else {
+            file_path = path.resolve(file_path);
+            image = nativeImage.createFromPath(file_path);
+        }
+        return image;
+    } catch (err) {
+        return false;
+    }
+});
+
+ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
+    let date = new Date();
+    date.setHours(date.getHours() - 1);
+    if (new Date(player_info.expires) < date) {
+        try {
+            player_info = await getNewAccessToken(player_info.refresh_token);
+        } catch (err) {
+            throw new Error("Unable to update access token.");
+        }
+    }
+    if (cape_id) {
+        const res = await axios.put(
+            'https://api.minecraftservices.com/minecraft/profile/capes/active',
+            { capeId: cape_id },
+            {
+                headers: {
+                    Authorization: `Bearer ${player_info.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        if (res.status < 200 || res.status >= 300) {
+            throw new Error("Unable to set cape");
+        }
+        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+    } else {
+        const res = await axios.delete(
+            'https://api.minecraftservices.com/minecraft/profile/capes/active',
+            {
+                headers: {
+                    Authorization: `Bearer ${player_info.access_token}`
+                }
+            }
+        );
+
+        if (res.status < 200 || res.status >= 300) {
+            throw new Error("Unable to set cape");
+        }
+        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+    }
+});
+
+ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) => {
+    let date = new Date();
+    if (new Date(player_info.expires) < date) {
+        try {
+            player_info = await getNewAccessToken(player_info.refresh_token);
+        } catch (err) {
+            throw new Error("Unable to update access token.");
+        }
+    }
+
+    const res = await axios.post(
+        'https://api.minecraftservices.com/minecraft/profile/skins',
+        { variant, url: skin_url },
+        {
+            headers: {
+                Authorization: `Bearer ${player_info.access_token}`,
+                'Content-Type': 'application/json'
+            }
+        }
+    );
+
+    if (res.status < 200 || res.status >= 300) {
+        throw new Error("Unable to set skin");
+    }
+    return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+});
+
+ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
+    let date = new Date();
+    if (new Date(player_info.expires) < date) {
+        try {
+            player_info = await getNewAccessToken(player_info.refresh_token);
+        } catch (err) {
+            throw new Error("Unable to update access token.");
+        }
+    }
+    let filePath = path.resolve(user_path, `minecraft/skins/${skin_id}.png`);
+    if (!fs.existsSync(filePath)) {
+        throw new Error(`Skin file not found at ${filePath}`);
+    }
+    const form = new FormData();
+    form.append('variant', variant);
+    form.append('file', fs.createReadStream(filePath), {
+        filename: `${skin_id}.png`,
+        contentType: 'image/png',
+    });
+
+    const formHeaders = form.getHeaders();
+
+    const targetUrl = new URL('https://api.minecraftservices.com/minecraft/profile/skins');
+
+    return await new Promise((resolve, reject) => {
+        const req = https.request({
+            hostname: targetUrl.hostname,
+            port: targetUrl.port,
+            path: targetUrl.pathname,
+            method: 'POST',
+            headers: {
+                ...formHeaders,
+                'Authorization': `Bearer ${player_info.access_token}`
+            }
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+            res.on('end', () => {
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                    let errorMsg = `Unable to set skin (status ${res.statusCode})`;
+                    try {
+                        const errorJson = JSON.parse(data);
+                        if (errorJson && errorJson.errorMessage) {
+                            errorMsg += `: ${errorJson.errorMessage}`;
+                        }
+                    } catch (e) { }
+                    reject(new Error(errorMsg));
+                } else {
+                    try {
+                        resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": JSON.parse(data) });
+                    } catch (e) {
+                        reject(new Error("Unable to parse skin info response"));
+                    }
+                }
+            });
+        });
+
+        req.on('error', (e) => {
+            console.error('Native HTTP Request Error:', e);
+            reject(new Error("Unable to set skin: " + e.message));
+        });
+
+        form.pipe(req);
+    });
+});
+
+ipcMain.handle('get-profile', async (_, player_info) => {
+    let date = new Date();
+    date.setHours(date.getHours() - 1);
+    if (new Date(player_info.expires) < date) {
+        try {
+            player_info = await getNewAccessToken(player_info.refresh_token);
+        } catch (err) {
+            throw new Error("Unable to update access token.");
+        }
+    }
+    const res = await axios.get('https://api.minecraftservices.com/minecraft/profile', {
+        headers: {
+            Authorization: `Bearer ${player_info.access_token}`
+        }
+    });
+    return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+});
+
+ipcMain.handle('import-skin', async (_, dataurl) => {
+    const hash = await hashImageFromDataUrl(dataurl);
+    const base64Data = dataurl.split(',')[1];
+    if (!base64Data) throw new Error("Invalid data URL");
+    const buffer = Buffer.from(base64Data, "base64");
+    await fsPromises.writeFile(path.resolve(user_path, `minecraft/skins/${hash.hash}.png`), buffer);
+    return hash.hash;
+});
+
+async function hashImageFromDataUrl(dataUrl) {
+    const base64Data = dataUrl.split(',')[1];
+    if (!base64Data) throw new Error("Invalid data URL");
+
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    const { data, info } = await sharp(imageBuffer)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+    const hash = crypto.createHash('sha256').update(data).digest('hex');
+    return { "hash": hash, "buffer": data };
+}
+
+ipcMain.handle('test-java-installation', async (_, file_path) => {
+    try {
+        if (!fs.existsSync(file_path)) return false;
+        const stat = await fsPromises.stat(file_path);
+        if (!stat.isFile()) return false;
+
+        const ext = path.extname(file_path).toLowerCase();
+        if (process.platform === "win32" && ext !== ".exe") return false;
+
+        return await new Promise((resolve) => {
+            const result = spawn(file_path, ["-version"]);
+            let output = "";
+            let error = "";
+
+            result.stdout?.on("data", (data) => { output += data.toString(); });
+            result.stderr?.on("data", (data) => { error += data.toString(); });
+
+            result.on("close", (code) => {
+                const combined = (output + error).toLowerCase();
+                if (
+                    code === 0 &&
+                    (combined.includes("java version") || combined.includes("openjdk version"))
+                ) {
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+            });
+
+            result.on("error", () => resolve(false));
+        });
+    } catch {
+        return false;
+    }
+});
+
+ipcMain.handle('transfer-world', async (_, old_world_path, instance_id, delete_previous_files) => {
+    const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
+    fs.mkdirSync(savesPath, { recursive: true });
+
+    const worldName = path.basename(old_world_path);
+    let targetName = worldName;
+    let counter = 1;
+    while (fs.existsSync(path.join(savesPath, targetName))) {
+        targetName = `${worldName}_${counter}`;
+        counter++;
+    }
+    const destPath = path.join(savesPath, targetName);
+
+    await fsPromises.cp(old_world_path, destPath, { recursive: true });
+
+    if (delete_previous_files) {
+        await fsPromises.rm(old_world_path, { recursive: true, force: true });
+    }
+
+    return { new_world_path: destPath };
+});
+
+ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, iconSource, worldType, worldId) => {
+    const desktopPath = app.getPath("desktop");
+    let safeName = instance_name.replace(/[<>:"/\\|?*]/g, '_');
+    let shortcutExt = "desktop";
+    if (os.platform() == 'win32') shortcutExt = "lnk";
+    let iconExt = "png";
+    if (os.platform() == 'win32') iconExt = "ico";
+    let shortcutPath = path.join(desktopPath, `${safeName} - EnderLynx.${shortcutExt}`);
+
+    let base_shortcut = safeName + " - EnderLynx";
+    let count_shortcut = 1;
+
+    let name = `${safeName} - EnderLynx`;
+
+    while (fs.existsSync(shortcutPath)) {
+        shortcutPath = path.join(desktopPath, `${base_shortcut} (${count_shortcut}).${shortcutExt}`);
+        name = `${base_shortcut} (${count_shortcut})`;
+        count_shortcut++;
+    }
+
+    let target, workingDir, args;
+
+    if (isDev) {
+        target = path.join(__dirname, 'node_modules', 'electron', 'dist', 'electron.exe');
+        workingDir = path.resolve(__dirname);
+        args = `"${workingDir}" "--instance=${instance_id}"`;
+        if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
+    } else {
+        target = process.execPath;
+        workingDir = path.dirname(process.execPath);
+        args = `"--instance=${instance_id}"`;
+        if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
+    }
+
+    if (!iconSource) {
+        iconSource = "resources/icons/icon." + iconExt;
+    }
+
+    let base_path_name = instance_id;
+    let current_count = 1;
+
+    let iconPath = path.resolve(user_path, "icons", instance_id + '.' + iconExt);
+
+    while (fs.existsSync(iconPath)) {
+        iconPath = path.resolve(user_path, "icons", base_path_name + "_" + current_count + "." + iconExt);
+        current_count++;
+    }
+
+    try {
+        if (os.platform() == 'win32') {
+            await convertToType(iconSource, iconPath, "ico");
+        } else {
+            await convertToType(iconSource, iconPath, "png");
+        }
+    } catch (e) {
+        console.error(e);
+    }
+
+    if (!fs.existsSync(iconPath)) {
+        let enderlynxiconpath = path.resolve(user_path, "icons", "enderlynx." + iconExt);
+        if (!fs.existsSync(enderlynxiconpath)) {
+            await fsPromises.copyFile(path.resolve(__dirname, "icon." + iconExt), enderlynxiconpath);
+        }
+        iconPath = enderlynxiconpath;
+    }
+
+    return new Promise((resolve) => {
+        createDesktopShortcut({
+            windows: {
+                filePath: target,
+                outputPath: desktopPath,
+                name,
+                comment: `Launch Minecraft instance "${instance_name}"`,
+                icon: iconPath,
+                arguments: args,
+                // VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
+            },
+            linux: {
+                filePath: target,
+                outputPath: desktopPath,
+                name,
+                description: `Launch Minecraft instance "${instance_name}"`,
+                icon: iconPath,
+                arguments: args,
+                type: 'Application'
+            },
+            osx: {
+                filePath: target,
+                outputPath: desktopPath,
+                name
+            }
+        });
+        resolve(true);
+    });
+});
+
+async function convertToType(input, outputPath, type = "ico") {
+    let imageBuffer;
+
+    if (input.startsWith('data:image/')) {
+        const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
+        imageBuffer = Buffer.from(base64Data, 'base64');
+    } else if (input.startsWith('http://') || input.startsWith('https://')) {
+        const response = await axios.get(input, { responseType: 'arraybuffer' });
+        imageBuffer = Buffer.from(response.data);
+    } else if (fs.existsSync(input)) {
+        imageBuffer = await fsPromises.readFile(input);
+    } else {
+        throw new Error('Invalid input: must be a data URL, image URL, or file path');
+    }
+
+    const resized = await sharp(imageBuffer, { failOnError: false })
+        .ensureAlpha()
+        .resize(256, 256, {
+            fit: 'contain',
+            kernel: sharp.kernel.nearest,
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .png()
+        .toBuffer();
+
+    let icoBuffer;
+    if (type == "ico") icoBuffer = await pngToIco(resized);
+    else icoBuffer = resized;
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+    await fsPromises.writeFile(outputPath, icoBuffer);
+}
+
+ipcMain.handle('analyze-logs', async (_, instance_id, last_log_date, current_log_path) => {
+    let lastDate = null;
+    if (last_log_date) {
+        let date = last_log_date.replace(".log", "").split("_");
+        if (date[1]) date[1] = date[1].replaceAll("-", ":");
+        let dateStr = date.join(" ");
+        lastDate = new Date(dateStr);
+        if (isNaN(lastDate.getTime())) lastDate = null;
+    }
+
+    const logs_path = path.resolve(user_path, `minecraft/instances/${instance_id}/logs`);
+    fs.mkdirSync(logs_path, { recursive: true });
+    let allMatches = [];
+    let totalPlaytime = 0;
+
+    const logs = (await fsPromises.readdir(logs_path))
+        .filter(e => e.includes(".log") && !e.includes("latest") && !e.includes(".gz"));
+
+    let most_recent_log = "";
+
+    for (let i = 0; i < logs.length; i++) {
+        const log = logs[i];
+        let date = log.replace(".log", "").split("_");
+        if (date[1]) date[1] = date[1].replaceAll("-", ":");
+        let dateStr = date.join(" ");
+        let parsedDate = new Date(dateStr);
+        if (isNaN(parsedDate.getTime())) continue;
+        if (lastDate && parsedDate <= lastDate) continue;
+
+        const logPath = path.join(logs_path, log);
+
+        let startTimestamp = "";
+        let endTimestamp = "";
+
+        try {
+            const fileStream = fs.createReadStream(logPath, "utf8");
+            const rl = readline.createInterface({
+                input: fileStream,
+                crlfDelay: Infinity
+            });
+            let startFound = false;
+            let previousHour = 0;
+            for await (const line of rl) {
+                let searchForStart = () => {
+                    const tsEnd = line.indexOf("]");
+                    if (tsEnd === -1) return;
+                    const timestamp = line.slice(1, tsEnd);
+                    if (isNaN(new Date(timestamp).getTime())) {
+                        const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
+                        if (hh && mm && ss) {
+                            const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
+                            startTimestamp = combined.toISOString();
+                            startFound = true;
+                        } else {
+                            return;
+                        }
+                        return;
+                    }
+                    startTimestamp = timestamp;
+                    startFound = true;
+                }
+                let searchForEnd = () => {
+                    const tsEnd = line.indexOf("]");
+                    if (tsEnd === -1) return;
+                    const timestamp = line.slice(1, tsEnd);
+                    if (isNaN(new Date(timestamp).getTime())) {
+                        const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
+                        if (hh && mm && ss) {
+                            if (hh < previousHour) {
+                                parsedDate.setDate(parsedDate.getDate() + 1);
+                            }
+                            previousHour = hh;
+                            const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
+                            endTimestamp = combined.toISOString();
+                        } else {
+                            return;
+                        }
+                        return;
+                    }
+                    endTimestamp = timestamp;
+                }
+                if (!startFound) searchForStart();
+                else searchForEnd();
+
+                let searchForConnectingTo = () => {
+                    if (line.includes("[CHAT]")) return;
+                    const tsEnd = line.indexOf("]");
+                    if (tsEnd === -1) return;
+                    let timestamp = line.slice(1, tsEnd);
+                    if (isNaN(new Date(timestamp).getTime())) {
+                        const [hh, mm, ss] = timestamp?.split(':')?.map(Number);
+                        if (hh && mm && ss) {
+                            const combined = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate(), hh, mm, ss);
+                            timestamp = combined.toISOString();
+                        } else {
+                            return;
+                        }
+                    }
+
+                    const marker = "Connecting to ";
+                    const start = line.indexOf(marker) + marker.length;
+                    const after = line.slice(start);
+
+                    const [host, port] = after.split(",").map(s => s.trim());
+
+                    if (host && port) {
+                        allMatches.push([timestamp, host, port]);
+                    }
+                }
+                if (line.includes("Connecting to ")) searchForConnectingTo();
+            }
+        } catch (e) {
+            console.error("Error reading log:", logPath, e);
+            continue;
+        }
+
+        if (current_log_path && path.resolve(logPath) === path.resolve(current_log_path)) {
+            break;
+        }
+
+        let playtime = new Date(endTimestamp).getTime() - new Date(startTimestamp).getTime();
+        if (!isNaN(playtime)) totalPlaytime += playtime;
+
+        most_recent_log = log;
+    }
+
+    return ({
+        "last_played_servers": allMatches,
+        "total_playtime": (totalPlaytime / 1000),
+        "most_recent_log": most_recent_log
+    });
+})
+
+ipcMain.handle('import-content', async (_, file_path, content_type, instance_id) => {
+    let destFolder = "";
+    let fileType = content_type;
+
+    if (content_type === "auto") {
+        if (file_path.endsWith(".jar") || file_path.endsWith(".jar.disabled")) {
+            destFolder = "mods";
+            fileType = "mod";
+            // try {
+            //     const tempZip = new AdmZip(file_path);
+            //     if (tempZip.getEntry("fabric.mod.json")) {
+            //         destFolder = "mods";
+            //         fileType = "mod";
+            //     } else if (tempZip.getEntry("META-INF/mods.toml")) {
+            //         destFolder = "mods";
+            //         fileType = "mod";
+            //     } else if (tempZip.getEntry("quilt.mod.json")) {
+            //         destFolder = "mods";
+            //         fileType = "mod";
+            //     } else {
+            //         destFolder = "mods";
+            //         fileType = "mod";
+            //     }
+            // } catch (e) {
+            //     destFolder = "mods";
+            //     fileType = "mod";
+            // }
+        } else if (file_path.endsWith(".zip") || file_path.endsWith(".zip.disabled")) {
+            try {
+                const tempZip = new AdmZip(file_path);
+                if (tempZip.getEntry("pack.mcmeta")) {
+                    destFolder = "resourcepacks";
+                    fileType = "resource_pack";
+                } else if (tempZip.getEntry("shaders/")) {
+                    destFolder = "shaderpacks";
+                    fileType = "shader";
+                } else {
+                    destFolder = "resourcepacks";
+                    fileType = "resource_pack";
+                }
+            } catch (e) {
+                destFolder = "resourcepacks";
+                fileType = "resource_pack";
+            }
+        } else {
+            return null;
+        }
+    } else {
+        if (content_type === "mod") destFolder = "mods";
+        else if (content_type === "resource_pack") destFolder = "resourcepacks";
+        else if (content_type === "shader") destFolder = "shaderpacks";
+        else destFolder = "mods";
+    }
+
+    const destPath = path.resolve(user_path, `minecraft/instances/${instance_id}/${destFolder}`);
+    fs.mkdirSync(destPath, { recursive: true });
+
+    let fileName = path.basename(file_path);
+    let finalPath = path.join(destPath, fileName);
+
+    let uniqueFinalPath = finalPath;
+    let uniqueFileName = fileName;
+    let count = 1;
+    while (fs.existsSync(uniqueFinalPath)) {
+        const ext = path.extname(fileName);
+        const base = path.basename(fileName, ext);
+        uniqueFileName = `${base} (${count})${ext}`;
+        uniqueFinalPath = path.join(destPath, uniqueFileName);
+        count++;
+    }
+    await fsPromises.copyFile(file_path, uniqueFinalPath);
+    fileName = uniqueFileName;
+    finalPath = uniqueFinalPath;
+
+    return {
+        file_name: fileName,
+        type: fileType,
+        dest: finalPath
+    }
+});
+
+ipcMain.handle('download-skin', async (_, url) => {
+    let imageBuffer;
+    if (url.startsWith("data:")) {
+        imageBuffer = Buffer.from(url.split(",")[1], "base64");
+    } else {
+        const response = await axios.get(url, { responseType: "arraybuffer" });
+        imageBuffer = Buffer.from(response.data);
+    }
+
+    const { data, info } = await sharp(imageBuffer)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+    const hash = crypto.createHash('sha256')
+        .update(data)
+        .digest('hex');
+
+    fs.mkdirSync(path.resolve(user_path, "minecraft/skins"), { recursive: true });
+
+    await fsPromises.writeFile(path.resolve(user_path, `minecraft/skins/${hash}.png`), imageBuffer);
+
+    const base64 = imageBuffer.toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    return { hash, dataUrl };
+});
+
+ipcMain.handle('path-to-data-url', async (_, file_path) => {
+    if (!file_path) return null;
+    try {
+        if (fs.existsSync(file_path)) {
+            const buffer = await fsPromises.readFile(file_path);
+            try {
+                const pngBuf = await sharp(buffer).png().toBuffer();
+                return `data:image/png;base64,${pngBuf.toString('base64')}`;
+            } catch (err) {
+                return null;
+            }
+        }
+        return null;
+    } catch (err) {
+        return null;
+    }
+});
+
+ipcMain.handle('detect-java-installations', async (_, v) => {
+    let javaSearch = new JavaSearch();
+    return javaSearch.findJavaInstallations(v);
+});
+
+ipcMain.on('show-file-in-folder', (_, filePath) => {
+    let command;
+    switch (process.platform) {
+        case 'win32':
+            command = `explorer /select, "${path.resolve(filePath)}"`;
+            break;
+        case 'darwin':
+            command = `open -R "${path.resolve(filePath)}"`;
+            break;
+        case 'linux':
+            command = `xdg-open "${path.resolve(filePath)}"`;
+            break;
+        default:
+            console.error('Unsupported operating system.');
+            return;
+    }
+
+    exec(command, (error) => {
+        if (error && error.code !== 1) {
+            console.error(`Error showing file: ${error}`);
+        }
+    });
+});
+
+ipcMain.on('open-folder', (_, folderPath) => {
+    let command;
+    switch (process.platform) {
+        case 'win32':
+            command = `explorer "${path.resolve(folderPath)}"`;
+            break;
+        case 'darwin':
+            command = `open "${path.resolve(folderPath)}"`;
+            break;
+        case 'linux':
+            command = `xdg-open "${path.resolve(folderPath)}"`;
+            break;
+        default:
+            console.error('Unsupported operating system.');
+            return;
+    }
+
+    exec(command, (error) => {
+        if (error && error.code !== 1) {
+            console.error(`Error opening folder: ${error}`);
+        }
+    });
+});
+
+ipcMain.handle('is-instance-file', (_, file_path) => {
+    let ext = path.extname(file_path);
+    if (ext == ".mrpack" || ext == ".elpack") return true;
+    if (ext == ".zip") {
+        const zip = new AdmZip(file_path);
+        if (zip.getEntry('pack.mcmeta')) return false;
+        if (zip.getEntry('manifest.json')) return true;
+    }
+    return false;
 });

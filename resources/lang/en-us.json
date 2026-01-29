@@ -390,7 +390,7 @@
     "app.instances.no_game_version": "Could not create instance because you didn't specify a game version",
     "app.instances.no_name": "Could not create instance because you didn't specify a name",
     "app.instances.play_time": "Play Time",
-    "app.instances.last_played": "Last Played",
+    "app.instances.last_played": "Last Played: %t",
     "app.instances.loading": "Loading",
     "app.instances.stopping": "Stopping",
     "app.instances.installing": "Installing",
