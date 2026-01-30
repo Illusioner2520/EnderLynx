@@ -875,5 +875,7 @@
     "app.vt.selected_pack_count.singular": "%c Pack Selected",
     "app.vt.incompatible_selected_pack_count": "%c Incompatible Packs Selected",
     "app.welcome": "Welcome back, %n!",
-    "app.welcome_no_user": "Welcome to EnderLynx!"
+    "app.welcome_no_user": "Welcome to EnderLynx!",
+    "app.instances.options.apply_defaults": "Apply Default Options",
+    "app.settings.options.apply_defaults": "Apply Default Options to Every Instance"
 }

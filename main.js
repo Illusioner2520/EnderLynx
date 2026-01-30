@@ -2977,7 +2977,7 @@ ipcMain.handle('read-cfzip', async (_, file_path) => {
     return await readCfZip(file_path);
 });
 
-ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists) => {
+ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
     const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
     let alreadyExists = fs.existsSync(optionsPath);
     if (dont_complete_if_already_exists && alreadyExists) {
@@ -2999,7 +2999,7 @@ ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_
                     break inner;
                 }
             }
-            if (!found) {
+            if (!found && !dont_add_to_end_if_already_exists) {
                 lines.push(`${key}:${value}`);
             }
         }
