@@ -7761,7 +7761,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
             {
                 "primary_column": {
                     "title": worldsMultiplayer[i].name,
-                    "desc": last_played.getFullYear() < 2000 ? translate("app.worlds.description.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
+                    "desc": last_played.getFullYear() < 2000 ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
                 },
                 "secondary_column": {
                     "title": () => translate("app.worlds.description.multiplayer"),
@@ -8849,7 +8849,7 @@ function formatDate(dateString, year_to_show_never_played_before) {
     let months = [translate("app.date.jan"), translate("app.date.feb"), translate("app.date.mar"), translate("app.date.apr"), translate("app.date.may"), translate("app.date.jun"), translate("app.date.jul"), translate("app.date.aug"), translate("app.date.sep"), translate("app.date.oct"), translate("app.date.nov"), translate("app.date.dec")];
     let date = new Date(dateString);
     if (isNaN(date.getTime()) || (year_to_show_never_played_before && date.getFullYear() < year_to_show_never_played_before)) {
-        return translate("app.worlds.description.never_played");
+        return translate("app.never_played");
     }
     return translate("app.date").replace("%m", months[date.getMonth()]).replace("%d", date.getDate()).replace("%y", date.getFullYear());
 }
@@ -8863,6 +8863,9 @@ function howLongAgo(timeString) {
 function formatTimeRelatively(timeString) {
     let today = new Date();
     let date = new Date(timeString);
+    if (isNaN(date.getTime()) || (date.getFullYear() < 2000)) {
+        return translate("app.never_played");
+    }
     let diff = today.getTime() - date.getTime();
     const minute = 60 * 1000;
     const hour = 60 * minute;
@@ -12182,7 +12185,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         content.combine_versions_and_loaders = false;
         content.authors = team_members.map(e => ({ ...e, "browser_url": `https://modrinth.com/user/${e.user.id}` }));
         content.source = "modrinth";
-        content.display_source = "Modrinth";
+        content.display_source = translate("app.discover.modrinth");
     } else if (content_source == "curseforge" && pt == "server") {
         content = {
             "icon_url": infoData.favicon,
@@ -12206,7 +12209,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
             "authors": [],
             "gallery": [],
             "convert_version_ids_to_numbers": true,
-            "display_source": "CurseForge"
+            "display_source": translate("app.discover.curseforge")
         }
     } else if (content_source == "curseforge") {
         let cf_content, description, versions;
@@ -12310,7 +12313,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                 "description": e.description
             })),
             "convert_version_ids_to_numbers": true,
-            "display_source": "CurseForge"
+            "display_source": translate("app.discover.curseforge")
         }
     }
     loading.element.remove();
@@ -14833,13 +14836,13 @@ async function openInstanceShareDialog(instanceInfo) {
         if (v == "elpack") distributionToggleWrapper.classList.remove("shown");
         if (v == "mrpack") {
             distributionToggleWrapper.classList.add("shown");
-            label.innerHTML = translate("app.instances.share.distribution", "%p", "Modrinth");
-            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", "Modrinth");
+            label.innerHTML = translate("app.instances.share.distribution", "%p", translate("app.discover.modrinth"));
+            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", translate("app.discover.modrinth"));
         }
         if (v == "cf_zip") {
             distributionToggleWrapper.classList.add("shown");
-            label.innerHTML = translate("app.instances.share.distribution", "%p", "CurseForge");
-            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", "CurseForge");
+            label.innerHTML = translate("app.instances.share.distribution", "%p", translate("app.discover.curseforge"));
+            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", translate("app.discover.curseforge"));
         }
         updateDistributionInfo(v, overrides, packVersion, name);
     }
