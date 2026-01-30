@@ -15,7 +15,6 @@ const { Auth } = require('msmc');
 const querystring = require('querystring');
 const https = require('https');
 const stringArgv = require('string-argv').default;
-const axios = require('axios');
 const crypto = require('crypto');
 const { spawn, exec } = require('child_process');
 const { version } = require('./package.json');
@@ -2333,9 +2332,12 @@ async function addServer(instance_id, ip, title, image) {
             if (image.startsWith('data:image/')) {
                 iconBase64 = image.replace(/^data:image\/png;base64,/, '').replace(/^data:image\/[a-zA-Z]+;base64,/, '');
             } else if (image.startsWith('http://') || image.startsWith('https://')) {
-                const response = await axios.get(image, { responseType: "arraybuffer" });
-                imageBuffer = Buffer.from(response.data);
-                iconBase64 = imageBuffer.toString('base64');
+                const response = await fetch(image);
+                if (response.ok) {
+                    const arrayBuffer = await response.arrayBuffer();
+                    const imageBuffer = Buffer.from(arrayBuffer);
+                    iconBase64 = imageBuffer.toString('base64');
+                }
             } else if (fs.existsSync(image)) {
                 imageBuffer = await fsPromises.readFile(image);
                 iconBase64 = imageBuffer.toString('base64');
@@ -2784,16 +2786,12 @@ async function downloadUpdate(download_url, new_version, checksum) {
         const zipPath = path.join(tempDir, "update.zip");
         signal.throwIfAborted();
 
-        const response = await axios.get(download_url, {
-            responseType: "arraybuffer",
-            onDownloadProgress: (progressEvent) => {
-                const percentCompleted = progressEvent.loaded * 80 / progressEvent.total;
-                signal.throwIfAborted();
+        await urlToFile(download_url, zipPath, {
+            signal, onProgress: (percentCompleted) => {
                 win.webContents.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...", processId, "good", cancelId);
             }
         });
-        let data = Buffer.from(response.data);
-        await fsPromises.writeFile(zipPath, data);
+
         signal.throwIfAborted();
 
         try {
@@ -3131,8 +3129,10 @@ ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
     try {
         let image;
         if (/^https?:\/\//.test(file_path)) {
-            const response = await axios.get(file_path, { responseType: "arraybuffer" });
-            let buffer = await sharp(response.data).png().toBuffer();
+            const response = await fetch(file_path);
+            if (!response.ok) return false;
+            const arrayBuffer = await response.arrayBuffer();
+            let buffer = await sharp(arrayBuffer).png().toBuffer();
             image = nativeImage.createFromBuffer(buffer);
         } else {
             file_path = path.resolve(file_path);
@@ -3155,35 +3155,37 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
         }
     }
     if (cape_id) {
-        const res = await axios.put(
+        const res = await fetch(
             'https://api.minecraftservices.com/minecraft/profile/capes/active',
-            { capeId: cape_id },
             {
+                method: 'PUT',
                 headers: {
                     Authorization: `Bearer ${player_info.access_token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ capeId: cape_id })
             }
         );
 
-        if (res.status < 200 || res.status >= 300) {
+        if (!res.ok) {
             throw new Error("Unable to set cape");
         }
-        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+        return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
     } else {
-        const res = await axios.delete(
+        const res = await fetch(
             'https://api.minecraftservices.com/minecraft/profile/capes/active',
             {
+                method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${player_info.access_token}`
                 }
             }
         );
 
-        if (res.status < 200 || res.status >= 300) {
+        if (!res.ok) {
             throw new Error("Unable to set cape");
         }
-        return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+        return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
     }
 });
 
@@ -3197,21 +3199,22 @@ ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) =>
         }
     }
 
-    const res = await axios.post(
+    const res = await fetch(
         'https://api.minecraftservices.com/minecraft/profile/skins',
-        { variant, url: skin_url },
         {
+            method: 'POST',
             headers: {
                 Authorization: `Bearer ${player_info.access_token}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ variant, url: skin_url })
         }
     );
 
-    if (res.status < 200 || res.status >= 300) {
+    if (!res.ok) {
         throw new Error("Unable to set skin");
     }
-    return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+    return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
 });
 
 ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
@@ -3292,12 +3295,16 @@ ipcMain.handle('get-profile', async (_, player_info) => {
             throw new Error("Unable to update access token.");
         }
     }
-    const res = await axios.get('https://api.minecraftservices.com/minecraft/profile', {
+
+    const res = await fetch('https://api.minecraftservices.com/minecraft/profile', {
         headers: {
-            Authorization: `Bearer ${player_info.access_token}`
-        }
+            Authorization: `Bearer ${player_info.access_token}`,
+        },
     });
-    return { "status": res.status, "player_info": player_info, "skin_info": res.data };
+
+    if (!res.ok) throw new Error("Unable to fetch profile");
+
+    return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
 });
 
 ipcMain.handle('import-skin', async (_, dataurl) => {
@@ -3485,8 +3492,10 @@ async function convertToType(input, outputPath, type = "ico") {
         const base64Data = input.replace(/^data:image\/\w+;base64,/, '');
         imageBuffer = Buffer.from(base64Data, 'base64');
     } else if (input.startsWith('http://') || input.startsWith('https://')) {
-        const response = await axios.get(input, { responseType: 'arraybuffer' });
-        imageBuffer = Buffer.from(response.data);
+        const response = await fetch(input);
+        if (!response.ok) throw new Error("Unable to fetch from internet");
+        const arrayBuffer = await response.arrayBuffer();
+        imageBuffer = Buffer.from(arrayBuffer);
     } else if (fs.existsSync(input)) {
         imageBuffer = await fsPromises.readFile(input);
     } else {
@@ -3729,8 +3738,10 @@ ipcMain.handle('download-skin', async (_, url) => {
     if (url.startsWith("data:")) {
         imageBuffer = Buffer.from(url.split(",")[1], "base64");
     } else {
-        const response = await axios.get(url, { responseType: "arraybuffer" });
-        imageBuffer = Buffer.from(response.data);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Unable to download skin");
+        const arrayBuffer = await response.arrayBuffer();
+        imageBuffer = Buffer.from(arrayBuffer);
     }
 
     const { data, info } = await sharp(imageBuffer)
