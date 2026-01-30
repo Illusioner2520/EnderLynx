@@ -13197,12 +13197,9 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
         }
     });
     document.querySelectorAll('.markdown-body a').forEach((el) => {
-        let url = el.getAttribute('data-href');
-        if (!url) {
-            url = el.getAttribute('href');
-            el.removeAttribute('href');
-            el.setAttribute("tabindex", "0");
-        }
+        let url = el.getAttribute('href');
+        el.removeAttribute('href');
+        el.setAttribute("tabindex", "0");
         let buttons = new ContextMenuButtons([
             {
                 "title": translate("app.discover.open_in_browser"),

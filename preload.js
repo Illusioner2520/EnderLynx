@@ -232,30 +232,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
             breaks: false
         });
 
-        const defaultRender = mkd.renderer.rules.link_open || function (tokens, idx, options, env, self) {
-            return self.renderToken(tokens, idx, options);
-        };
-
-        mkd.renderer.rules.link_open = function (tokens, idx, options, env, self) {
-            const token = tokens[idx];
-
-            const hrefIndex = token.attrIndex('href');
-            if (hrefIndex !== -1) {
-                const href = token.attrs[hrefIndex][1];
-
-                token.attrs.splice(hrefIndex, 1);
-
-                token.attrPush(['data-href', href]);
-                token.attrPush(['class', 'external-link']);
-                token.attrPush([
-                    'tabindex',
-                    "0"
-                ])
-            }
-
-            return defaultRender(tokens, idx, options, env, self);
-        };
-
         return mkd.render(md);
     },
     openInBrowser,
