@@ -5092,6 +5092,7 @@ body.offline #offline-notice {
 .def_opts_actions {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .multiple-file-select-child-container {

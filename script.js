@@ -552,8 +552,9 @@ class Instance {
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         if (do_not_set_options_txt) return;
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.enderlynx.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false);
-        this.setAttemptedOptionsTxtVersion(v);
+        window.enderlynx.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false, false, (v) => {
+            this.setAttemptedOptionsTxtVersion(v);
+        });
     }
     setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
         db.prepare("UPDATE instances SET attempted_options_txt_version = ? WHERE id = ?").run(attempted_options_txt_version, this.id);
@@ -905,10 +906,11 @@ class Data {
     addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
         db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(data.getDefault("default_width")), Number(data.getDefault("default_height")), Number(data.getDefault("default_ram")));
         let default_options = new DefaultOptions(vanilla_version);
-        let v = window.enderlynx.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true);
-        let instance = new Instance(instance_id);
-        instance.setAttemptedOptionsTxtVersion(v);
-        return instance;
+        window.enderlynx.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true, false, (v) => {
+            let instance = new Instance(instance_id);
+            instance.setAttemptedOptionsTxtVersion(v);
+        });
+        return new Instance(instance_id);
     }
 
     deleteInstance(instance_id) {
@@ -3315,6 +3317,37 @@ settingsButtonEle.onclick = () => {
     }
     addButton.className = "bug-button";
     def_opts_buttons.appendChild(addButton);
+
+    let applyDefaults = document.createElement("button");
+    applyDefaults.innerHTML = '<i class="fa-regular fa-file-lines"></i> ' + translate("app.settings.options.apply");
+    applyDefaults.onclick = () => {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.settings.options.apply.title"), "notice", translate("app.settings.options.apply.description"), [
+            {
+                "type": "cancel",
+                "content": translate("app.settings.options.apply.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.settings.options.apply.confirm")
+            }
+        ], [], async () => {
+            let instances = data.getInstances();
+            for (let i = 0; i < instances.length; i++) {
+                let instanceInfo = instances[i];
+                try {
+                    let default_options = new DefaultOptions(instanceInfo.vanilla_version);
+                    let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, default_options.getOptionsTXT(), false, true);
+                    instanceInfo.setAttemptedOptionsTxtVersion(v);
+                } catch (e) {
+                    displayError(translate("app.settings.options.apply.fail", "%i", instanceInfo.name));
+                }
+            }
+            displaySuccess(translate("app.settings.options.apply.done"));
+        })
+    }
+    applyDefaults.className = "bug-button";
+    def_opts_buttons.appendChild(applyDefaults);
 
     let dialog = new Dialog();
     let java_installations = [{
@@ -8241,8 +8274,35 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
         }
     });
     typeDropdown.style.minWidth = "200px";
+    let applyDefaults = document.createElement("button");
+    applyDefaults.classList.add("add-content-button");
+    applyDefaults.innerHTML = '<i class="fa-regular fa-file-lines"></i>' + translate("app.instances.options.apply")
+    applyDefaults.onclick = async () => {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.instances.options.apply.title"), "notice", translate("app.instances.options.apply.description"), [
+            {
+                "type": "cancel",
+                "content": translate("app.instances.options.apply.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.instances.options.apply.confirm")
+            }
+        ], [], async () => {
+            let default_options = new DefaultOptions(instanceInfo.vanilla_version);
+            try {
+                let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, default_options.getOptionsTXT(), false, true);
+                instanceInfo.setAttemptedOptionsTxtVersion(v);
+                displaySuccess(translate("app.instances.options.apply.done"));
+            } catch (e) {
+                displayError(translate("app.instances.options.apply.fail"));
+            }
+            setInstanceTabContentOptions(instanceInfo, element);
+        });
+    }
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
+    searchAndFilter.appendChild(applyDefaults);
     element.innerHTML = "";
     element.appendChild(searchAndFilter);
     let info = document.createElement("div");
@@ -14084,7 +14144,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             let mr_pack_info = {};
             if (source == "modrinth") {
                 mr_pack_info = await window.enderlynx.processMrPack(instance_id, "pack.mrpack", info.loader, title);
-                let default_options = new DefaultOptions();
+                let default_options = new DefaultOptions(info.game_version);
                 let v = await window.enderlynx.setOptionsTXT(instance.instance_id, default_options.getOptionsTXT(), false);
                 instance.setAttemptedOptionsTxtVersion(v);
             } else if (source == "curseforge") {

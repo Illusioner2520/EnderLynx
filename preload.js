@@ -286,8 +286,10 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getRecentlyPlayedWorlds: async (instance_ids) => {
         return await ipcRenderer.invoke('get-recently-played-worlds', instance_ids);
     },
-    setOptionsTXT: async (instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
-        return await ipcRenderer.invoke('set-options-txt', instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
+    setOptionsTXT: async (instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists, callback) => {
+        let result = await ipcRenderer.invoke('set-options-txt', instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
+        if (callback) callback(result);
+        return result;
     },
     deleteWorld: (instance_id, world_id) => {
         const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);

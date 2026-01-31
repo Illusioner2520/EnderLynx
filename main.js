@@ -2988,12 +2988,16 @@ ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_
         return content.version;
     } else {
         let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
+        let version = content.version;
         for (let j = 0; j < content.keys.length; j++) {
             let key = content.keys[j];
             let value = content.values[j];
             let found = false;
             inner: for (let i = 0; i < lines.length; i++) {
                 if (lines[i].trim().startsWith(key + ":")) {
+                    if (key == "version") {
+                        version = Number(lines[i].trim().split(":").slice(1).join(":").trim());
+                    }
                     lines[i] = `${key}:${value}`;
                     found = true;
                     break inner;
@@ -3004,6 +3008,7 @@ ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_
             }
         }
         await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+        return version;
     }
 });
 

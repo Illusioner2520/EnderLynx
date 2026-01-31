@@ -876,6 +876,18 @@
     "app.vt.incompatible_selected_pack_count": "%c Incompatible Packs Selected",
     "app.welcome": "Welcome back, %n!",
     "app.welcome_no_user": "Welcome to EnderLynx!",
-    "app.instances.options.apply_defaults": "Apply Default Options",
-    "app.settings.options.apply_defaults": "Apply Default Options to Every Instance"
+    "app.instances.options.apply": "Apply Default Options",
+    "app.settings.options.apply": "Apply Default Options to Every Instance",
+    "app.instances.options.apply.title": "Apply Default Options?",
+    "app.instances.options.apply.description": "Are you sure that you want to override your current options for your default options?",
+    "app.instances.options.apply.confirm": "Apply",
+    "app.instances.options.apply.cancel": "Cancel",
+    "app.instances.options.apply.done": "Default options applied",
+    "app.instances.options.apply.fail": "Failed to apply default options",
+    "app.settings.options.apply.fail": "Failed to apply default options to instance %i",
+    "app.settings.options.apply.title": "Apply Default Options?",
+    "app.settings.options.apply.description": "Are you sure that you want to override your current options for your default options for <u>every</u> instance?",
+    "app.settings.options.apply.confirm": "Apply",
+    "app.settings.options.apply.cancel": "Cancel",
+    "app.settings.options.apply.done": "Default options applied to every instance"
 }
