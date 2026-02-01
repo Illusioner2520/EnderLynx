@@ -7212,11 +7212,12 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     }
     for (let i = 0; i < worldsMultiplayer.length; i++) {
         let last_played = await getServerLastPlayed(instanceInfo.instance_id, worldsMultiplayer[i].ip);
+        console.log(last_played.getFullYear());
         worldList.push(
             {
                 "primary_column": {
                     "title": worldsMultiplayer[i].name,
-                    "desc": last_played.getFullYear() < 2000 ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
+                    "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
                 },
                 "secondary_column": {
                     "title": () => translate("app.worlds.description.multiplayer"),
