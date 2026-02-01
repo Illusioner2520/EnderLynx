@@ -3,59 +3,11 @@ document.getElementsByTagName("title")[0].innerHTML = sanitize(translate("app.na
 
 history.scrollRestoration = "manual"
 
-class SQL {
-    constructor(sql) {
-        this.sql = sql;
-    }
-    get(...params) {
-        return window.enderlynx.databaseGet(this.sql, ...params);
-    }
-    run(...params) {
-        return window.enderlynx.databaseRun(this.sql, ...params);
-    }
-    all(...params) {
-        return window.enderlynx.databaseAll(this.sql, ...params);
-    }
-}
-
-class DB {
-    prepare(sql) {
-        return new SQL(sql);
-    }
-}
-
-const db = new DB();
-
 let minecraftVersions = [];
-let getMCVersions = () => {
-    let mc_versions = db.prepare("SELECT * FROM mc_versions_cache").all();
-    mc_versions.sort((a, b) => {
-        return (new Date(a.date_published)).getTime() - (new Date(b.date_published)).getTime();
-    });
-    return mc_versions.map(e => e.name);
-}
-minecraftVersions = getMCVersions();
 
 let fetchUpdatedMCVersions = async () => {
-    let result_pre_json = await fetch(`https://launchermeta.mojang.com/mc/game/version_manifest.json`);
-    let result = await result_pre_json.json();
-    console.log("Setting default to " + result.latest.release);
-    data.setDefault("latest_release", result.latest.release);
-    let mc_versions = db.prepare('SELECT * FROM mc_versions_cache').all();
-    let mc_version_names = mc_versions.map(e => e.name);
-    for (let i = 0; i < result.versions.length; i++) {
-        let e = result.versions[i];
-        if (!mc_version_names.includes(e.id)) {
-            db.prepare("INSERT INTO mc_versions_cache (name, date_published) VALUES (?, ?)").run(e.id, e.releaseTime);
-        } else {
-            mc_version_names.splice(mc_version_names.indexOf(e.id), 1);
-        }
-    }
-    for (let i = 0; i < mc_version_names.length; i++) {
-        let id = mc_version_names[i];
-        db.prepare("DELETE FROM mc_versions_cache WHERE name = ?").run(id);
-    }
-    minecraftVersions = getMCVersions();
+    let mcVersions = await window.enderlynx.fetchUpdatedMCVersions();
+    minecraftVersions = mcVersions;
 }
 
 fetchUpdatedMCVersions();
@@ -88,93 +40,26 @@ class DefaultOptions {
         this.version = v;
     }
 
-    getVersions() {
-        let v = db.prepare("SELECT * FROM options_defaults WHERE key = ?").all("version");
-        return v.map(e => e.version).filter(e => e);
+    async getDefault(key) {
+        return await window.enderlynx.getDefaultOption(key);
     }
 
-    checkDefault(key) {
-        if (key == "version") {
-            let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ? AND version = ?").get(key, this.version);
-            if (!default_) {
-                db.prepare("INSERT INTO options_defaults (key, value, version) VALUES (?, ?, ?)").run(key, "", this.version);
-                return true;
-            }
-            return true;
-        }
-        let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key);
-        if (!default_) {
-            db.prepare("INSERT INTO options_defaults (key, value) VALUES (?, ?)").run(key, "");
-            return true;
-        }
-        return true;
+    async setDefault(key, value) {
+        await window.enderlynx.setDefaultOption(key, value);
     }
 
-    getDefault(key) {
-        let default_ = db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key);
-        if (!default_) {
-            return null;
-        }
-        return default_.value;
+    async deleteDefault(key) {
+        await window.enderlynx.deleteDefaultOption(key);
     }
 
-    setDefault(key, value) {
-        if (!this.checkDefault(key)) {
-            return null;
-        }
-        if (key == "version") {
-            db.prepare("UPDATE options_defaults SET value = ? WHERE key = ? AND version = ?").run(value, key, this.version);
-            return;
-        }
-        db.prepare("UPDATE options_defaults SET value = ? WHERE key = ?").run(value, key);
-    }
-
-    deleteDefault(key) {
-        db.prepare("DELETE FROM options_defaults WHERE key = ?").run(key);
-    }
-
-    getOptionsTXT(dataVersion) {
-        let v;
-        if (!dataVersion) {
-            let thisIndex = minecraftVersions.indexOf(this.version);
-            let versions = this.getVersions();
-            let min_distance = 10000;
-            let version_to_use = "something_not_null";
-            if (versions.includes(this.version)) {
-                version_to_use = this.version;
-            } else {
-                versions.forEach(e => {
-                    let vIndex = minecraftVersions.indexOf(e);
-                    if (vIndex > thisIndex) return;
-                    if (thisIndex - vIndex < min_distance) {
-                        min_distance = thisIndex - vIndex;
-                        version_to_use = e;
-                    }
-                });
-            }
-            v = db.prepare("SELECT * FROM options_defaults WHERE key = ? AND version = ?").get("version", version_to_use);
-        }
-        let r = db.prepare("SELECT * FROM options_defaults WHERE NOT key = ?").all("version");
-        let content = "";
-        if (!dataVersion) dataVersion = v?.value;
-        if (!dataVersion) dataVersion = 100;
-        content = "version:" + (dataVersion ? dataVersion : (v?.value ? v?.value : "100")) + "\n";
-        dataVersion = Number(dataVersion);
-        r.forEach(e => {
-            if (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && keyToNum[e.value]) {
-                content += e.key + ":" + keyToNum[e.value] + "\n"
-            } else {
-                content += e.key + ":" + e.value + "\n"
-            }
-        });
-        return { "content": content, "version": Number((dataVersion ? dataVersion : (v?.value ? v?.value : "100"))), "keys": r.map(e => e.key), "values": r.map(e => e.value).map(e => (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && keyToNum[e]) ? keyToNum[e] : e) };
+    async getOptionsTXT(dataVersion) {
+        return await window.enderlynx.getDefaultOptionsTXT(this.version, dataVersion);
     }
 }
 
 class Skin {
-    constructor(id) {
-        let skin = db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(id);
-        if (!skin) throw new Error("Skin not found");
+    constructor(skin) {
+        if (!skin) return;
         this.id = skin.id;
         this.name = skin.name;
         this.model = skin.model;
@@ -190,32 +75,32 @@ class Skin {
         this.head = skin.head;
     }
 
-    setModel(model) {
-        db.prepare("UPDATE skins SET model = ? WHERE id = ?").run(model, this.id);
+    async setModel(model) {
+        await window.enderlynx.updateSkin("model", model, this.id);
         this.model = model;
     }
 
-    setName(name) {
-        db.prepare("UPDATE skins SET name = ? WHERE id = ?").run(name, this.id);
+    async setName(name) {
+        await window.enderlynx.updateSkin("name", name, this.id);
         this.name = name;
     }
 
-    delete() {
-        db.prepare("DELETE FROM skins WHERE id = ?").run(this.id);
+    async delete() {
+        await window.enderlynx.deleteSkin(this.id);
     }
 
-    setLastUsed(last_used) {
-        db.prepare("UPDATE skins SET last_used = ? WHERE id = ?").run(last_used ? last_used.toISOString() : null, this.id);
+    async setLastUsed(last_used) {
+        await window.enderlynx.updateSkin("last_used", last_used, this.id);
         this.last_used = last_used;
     }
 
-    setFavorited(favorited) {
-        db.prepare("UPDATE skins SET favorited = ? WHERE id = ?").run(Number(favorited), this.id);
+    async setFavorited(favorited) {
+        await window.enderlynx.updateSkin("favorited", favorited, this.id);
         this.favorited = favorited;
     }
 
-    setTextureKey(texture_key) {
-        db.prepare("UPDATE skins SET texture_key = ? WHERE id = ?").run(texture_key, this.id);
+    async setTextureKey(texture_key) {
+        await window.enderlynx.updateSkin("texture_key", texture_key, this.id);
         this.texture_key = texture_key;
     }
 
@@ -224,9 +109,9 @@ class Skin {
             callback(this.preview);
             return;
         }
-        renderSkinToDataUrl(this.skin_url, (v) => {
-            db.prepare("UPDATE skins SET preview = ? WHERE id = ?").run(v, this.id);
-            db.prepare("UPDATE skins SET preview_model = ? WHERE id = ?").run(this.model, this.id);
+        renderSkinToDataUrl(this.skin_url, async (v) => {
+            await window.enderlynx.updateSkin("preview", v, this.id);
+            await window.enderlynx.updateSkin("preview_model", this.model, this.id);
             this.preview = v;
             this.preview_model = this.model;
             callback(v);
@@ -238,41 +123,22 @@ class Skin {
             callback(this.head);
             return;
         }
-        skinToHead(this.skin_url, (v) => {
-            db.prepare("UPDATE skins SET head = ? WHERE id = ?").run(v, this.id);
+        skinToHead(this.skin_url, async (v) => {
+            await window.enderlynx.updateSkin("head", v, this.id);
             this.head = v;
             callback(v);
         });
     }
 
-    setActive(uuid) {
-        let old = db.prepare("SELECT * FROM skins WHERE active_uuid LIKE ?").all(`%;${uuid};%`);
-        old.forEach((e) => {
-            if (e.active_uuid.split(";").indexOf(uuid) == -1) return;
-            db.prepare("UPDATE skins SET active_uuid = ? WHERE id = ?").run(e.active_uuid.split(";").toSpliced(e.active_uuid.split(";").indexOf(uuid), 1).join(";"), e.id);
-        });
-        let current = new Skin(this.id);
-        let list = current.active_uuid.split(";");
-        if (list.length == 1) {
-            list = ["", ""];
-        }
-        list.splice(1, 0, uuid);
-        db.prepare("UPDATE skins SET active_uuid = ? WHERE id = ?").run(list.join(";"), this.id);
+    async setActive(uuid) {
+        await window.enderlynx.setActiveSkin(uuid, this.id);
         this.setLastUsed(new Date());
-    }
-    removeActive(uuid) {
-        let current = new Skin(this.id);
-        let list = current.active_uuid.split(";");
-        if (!list.includes(uuid)) return;
-        list.splice(list.indexOf(uuid), 1)
-        db.prepare("UPDATE skins SET active_uuid = ? WHERE id = ?").run(list.join(";"), this.id);
     }
 }
 
 class Cape {
-    constructor(id) {
-        let cape = db.prepare("SELECT * FROM capes WHERE id = ? LIMIT 1").get(id);
-        if (!cape) throw new Error("Cape not found");
+    constructor(cape) {
+        if (!cape) return;
         this.id = cape.id;
         this.cape_name = cape.cape_name;
         this.uuid = cape.uuid;
@@ -281,35 +147,18 @@ class Cape {
         this.active = Boolean(cape.active);
     }
 
-    delete() {
-        db.prepare("DELETE FROM capes WHERE id = ?").run(this.id);
+    async setActive() {
+        await window.enderlynx.setCapeActive(this.id);
     }
 
-    setActive() {
-        let old = db.prepare("SELECT * FROM capes WHERE uuid = ? AND active = ?").all(this.uuid, Number(true));
-        old.forEach((e) => {
-            db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(Number(false), e.id);
-        });
-        db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(Number(true), this.id);
-    }
-
-    removeActive() {
-        db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(Number(false), this.id);
+    async removeActive() {
+        await window.enderlynx.removeCapeActive(this.id);
     }
 }
 
 class Content {
-    constructor(id_or_instanceId, fileName) {
-        let content;
-
-        if (!fileName) {
-            content = db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(id_or_instanceId);
-        } else {
-            content = db.prepare("SELECT * FROM content WHERE instance = ? AND file_name = ? LIMIT 1").get(id_or_instanceId, fileName);
-        }
-
-        if (!content) throw new Error("Content not found");
-
+    constructor(content) {
+        if (!content) return;
         this.id = content.id;
         this.name = content.name;
         this.author = content.author;
@@ -322,66 +171,68 @@ class Content {
         this.instance = content.instance;
         this.source_info = content.source_info;
         this.version_id = content.version_id;
-
-        this.id_or_instanceId = id_or_instanceId;
-        this.fileName = fileName;
         if (!content_watches[this.id]) content_watches[this.id] = {};
     }
 
-    refresh() {
-        return new Content(this.id_or_instanceId, this.fileName);
+    static async getContent(content_id) {
+        let content = await window.enderlynx.getContent(content_id);
+        return new Content(content);
     }
 
-    setName(name) {
-        db.prepare("UPDATE content SET name = ? WHERE id = ?").run(name, this.id);
+    async refresh() {
+        return await Content.getContent(this.id);
+    }
+
+    async setName(name) {
+        await window.enderlynx.updateContent("name", name, this.id);
         this.name = name;
     }
-    setAuthor(author) {
-        db.prepare("UPDATE content SET author = ? WHERE id = ?").run(author, this.id);
+    async setAuthor(author) {
+        await window.enderlynx.updateContent("author", author, this.id);
         this.author = author;
     }
-    setDisabled(disabled) {
-        db.prepare("UPDATE content SET disabled = ? WHERE id = ?").run(Number(disabled), this.id);
+    async setDisabled(disabled) {
+        await window.enderlynx.updateContent("disabled", disabled, this.id);
         this.disabled = disabled;
         if (content_watches[this.id].onchangedisabled) {
             content_watches[this.id].onchangedisabled(disabled);
         }
     }
-    setImage(image) {
-        db.prepare("UPDATE content SET image = ? WHERE id = ?").run(image, this.id);
+    async setImage(image) {
+        await window.enderlynx.updateContent("image", image, this.id);
         this.image = image;
     }
-    setFileName(file_name) {
-        db.prepare("UPDATE content SET file_name = ? WHERE id = ?").run(file_name, this.id);
+    async setFileName(file_name) {
+        await window.enderlynx.updateContent("file_name", file_name, this.id);
         this.file_name = file_name;
     }
-    setSource(source) {
-        db.prepare("UPDATE content SET source = ? WHERE id = ?").run(source, this.id);
+    async setSource(source) {
+        await window.enderlynx.updateContent("source", source, this.id);
         this.source = source;
     }
-    setType(type) {
-        db.prepare("UPDATE content SET type = ? WHERE id = ?").run(type, this.id);
+    async setType(type) {
+        await window.enderlynx.updateContent("type", type, this.id);
         this.type = type;
     }
-    setVersion(version) {
-        db.prepare("UPDATE content SET version = ? WHERE id = ?").run(version, this.id);
+    async setVersion(version) {
+        await window.enderlynx.updateContent("version", version, this.id);
         this.version = version;
     }
-    setVersionId(version_id) {
-        db.prepare("UPDATE content SET version_id = ? WHERE id = ?").run(version_id, this.id);
+    async setVersionId(version_id) {
+        await window.enderlynx.updateContent("version_id", version_id, this.id);
         this.version_id = version_id;
     }
-    setInstance(instance) {
-        db.prepare("UPDATE content SET instance = ? WHERE id = ?").run(instance, this.id);
+    async setInstance(instance) {
+        await window.enderlynx.updateContent("instance", instance, this.id);
         this.instance = instance;
     }
-    setSourceInfo(source_info) {
-        db.prepare("UPDATE content SET source_info = ? WHERE id = ?").run(source_info, this.id);
+    async setSourceInfo(source_info) {
+        await window.enderlynx.updateContent("source_info", source_info, this.id);
         this.source_info = source_info;
     }
 
-    delete() {
-        db.prepare("DELETE FROM content WHERE id = ?").run(this.id);
+    async delete() {
+        await window.enderlynx.deleteContentDatabase(this.id);
     }
 
     watchForChange(name, func) {
@@ -394,9 +245,8 @@ let instance_watches = {};
 let content_watches = {}
 
 class Instance {
-    constructor(instance_id) {
-        let content = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
-        if (!content) throw new Error(translate("app.error.instance_not_found"));
+    constructor(content) {
+        if (!content) return;
         this.name = content.name;
         this.date_created = new Date(content.date_created);
         this.date_modified = new Date(content.date_modified);
@@ -436,202 +286,205 @@ class Instance {
         this.provided_java_args = content.provided_java_args;
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
-    get pinned() {
-        let inst = db.prepare("SELECT * FROM pins WHERE instance_id = ? AND type = ?").get(this.instance_id, "instance");
-        return Boolean(inst);
+
+    static async getInstance(instance_id) {
+        return new Instance(await window.enderlynx.getInstance(instance_id));
     }
-    setLastAnalyzedLog(last_analyzed_log) {
-        db.prepare("UPDATE instances SET last_analyzed_log = ? WHERE id = ?").run(last_analyzed_log, this.id);
+    async isPinned() {
+        return await window.enderlynx.isInstancePinned(this.instance_id);
+    }
+    async setLastAnalyzedLog(last_analyzed_log) {
+        await window.enderlynx.updateInstance("last_analyzed_log", last_analyzed_log, this.instance_id);
         this.last_analyzed_log = last_analyzed_log;
         if (instance_watches[this.instance_id].onchangelast_analyzed_log) {
             instance_watches[this.instance_id].onchangelast_analyzed_log(last_analyzed_log);
         }
     }
-    setInstalledVersion(installed_version) {
-        db.prepare("UPDATE instances SET installed_version = ? WHERE id = ?").run(installed_version, this.id);
+    async setInstalledVersion(installed_version) {
+        await window.enderlynx.updateInstance("installed_version", installed_version, this.instance_id);
         this.installed_version = installed_version;
         if (instance_watches[this.instance_id].onchangeinstalled_version) {
             instance_watches[this.instance_id].onchangeinstalled_version(installed_version);
         }
     }
-    setJavaArgs(java_args) {
-        db.prepare("UPDATE instances SET java_args = ? WHERE id = ?").run(java_args, this.id);
+    async setJavaArgs(java_args) {
+        await window.enderlynx.updateInstance("java_args", java_args, this.instance_id);
         this.java_args = java_args;
         if (instance_watches[this.instance_id].onchangejava_args) {
             instance_watches[this.instance_id].onchangejava_args(java_args);
         }
     }
-    setEnvVars(env_vars) {
-        db.prepare("UPDATE instances SET env_vars = ? WHERE id = ?").run(env_vars, this.id);
+    async setEnvVars(env_vars) {
+        await window.enderlynx.updateInstance("env_vars", env_vars, this.instance_id);
         this.env_vars = env_vars;
         if (instance_watches[this.instance_id].onchangeenv_vars) {
             instance_watches[this.instance_id].onchangeenv_vars(env_vars);
         }
     }
-    setPreLaunchHook(pre_launch_hook) {
-        db.prepare("UPDATE instances SET pre_launch_hook = ? WHERE id = ?").run(pre_launch_hook, this.id);
+    async setPreLaunchHook(pre_launch_hook) {
+        await window.enderlynx.updateInstance("pre_launch_hook", pre_launch_hook, this.instance_id);
         this.pre_launch_hook = pre_launch_hook;
         if (instance_watches[this.instance_id].onchangepre_launch_hook) {
             instance_watches[this.instance_id].onchangepre_launch_hook(pre_launch_hook);
         }
     }
-    setPostLaunchHook(post_launch_hook) {
-        db.prepare("UPDATE instances SET post_launch_hook = ? WHERE id = ?").run(post_launch_hook, this.id);
+    async setPostLaunchHook(post_launch_hook) {
+        await window.enderlynx.updateInstance("post_launch_hook", post_launch_hook, this.instance_id);
         this.post_launch_hook = post_launch_hook;
         if (instance_watches[this.instance_id].onchangepost_launch_hook) {
             instance_watches[this.instance_id].onchangepost_launch_hook(post_launch_hook);
         }
     }
-    setWrapper(wrapper) {
-        db.prepare("UPDATE instances SET wrapper = ? WHERE id = ?").run(wrapper, this.id);
+    async setWrapper(wrapper) {
+        await window.enderlynx.updateInstance("wrapper", wrapper, this.instance_id);
         this.wrapper = wrapper;
         if (instance_watches[this.instance_id].onchangewrapper) {
             instance_watches[this.instance_id].onchangewrapper(wrapper);
         }
     }
-    setPostExitHook(post_exit_hook) {
-        db.prepare("UPDATE instances SET post_exit_hook = ? WHERE id = ?").run(post_exit_hook, this.id);
+    async setPostExitHook(post_exit_hook) {
+        await window.enderlynx.updateInstance("post_exit_hook", post_exit_hook, this.instance_id);
         this.post_exit_hook = post_exit_hook;
         if (instance_watches[this.instance_id].onchangepost_exit_hook) {
             instance_watches[this.instance_id].onchangepost_exit_hook(post_exit_hook);
         }
     }
-    setJavaVersion(java_version) {
-        db.prepare("UPDATE instances SET java_version = ? WHERE id = ?").run(java_version, this.id);
+    async setJavaVersion(java_version) {
+        await window.enderlynx.updateInstance("java_version", java_version, this.instance_id);
         this.java_version = java_version;
         if (instance_watches[this.instance_id].onchangejava_version) instance_watches[this.instance_id].onchangejava_version(java_version);
     }
-    setJavaPath(java_path) {
-        db.prepare("UPDATE instances SET java_path = ? WHERE id = ?").run(java_path, this.id);
+    async setJavaPath(java_path) {
+        await window.enderlynx.updateInstance("java_path", java_path, this.instance_id);
         this.java_path = java_path;
         if (instance_watches[this.instance_id].onchangejava_path) instance_watches[this.instance_id].onchangejava_path(java_path);
     }
-    setWindowWidth(window_width) {
-        db.prepare("UPDATE instances SET window_width = ? WHERE id = ?").run(window_width, this.id);
+    async setWindowWidth(window_width) {
+        await window.enderlynx.updateInstance("window_width", window_width, this.instance_id);
         this.window_width = window_width;
         if (instance_watches[this.instance_id].onchangewindow_width) instance_watches[this.instance_id].onchangewindow_width(window_width);
     }
-    setWindowHeight(window_height) {
-        db.prepare("UPDATE instances SET window_height = ? WHERE id = ?").run(window_height, this.id);
+    async setWindowHeight(window_height) {
+        await window.enderlynx.updateInstance("window_height", window_height, this.instance_id);
         this.window_height = window_height;
         if (instance_watches[this.instance_id].onchangewindow_height) instance_watches[this.instance_id].onchangewindow_height(window_height);
     }
-    setAllocatedRam(allocated_ram) {
-        db.prepare("UPDATE instances SET allocated_ram = ? WHERE id = ?").run(allocated_ram, this.id);
+    async setAllocatedRam(allocated_ram) {
+        await window.enderlynx.updateInstance("allocated_ram", allocated_ram, this.instance_id);
         this.allocated_ram = allocated_ram;
         if (instance_watches[this.instance_id].onchangeallocated_ram) instance_watches[this.instance_id].onchangeallocated_ram(allocated_ram);
     }
-    setName(name) {
-        db.prepare("UPDATE instances SET name = ? WHERE id = ?").run(name, this.id);
+    async setName(name) {
+        await window.enderlynx.updateInstance("name", name, this.instance_id);
         this.name = name;
         if (instance_watches[this.instance_id].onchangename) instance_watches[this.instance_id].onchangename(name);
     }
-    setLastPlayed(last_played) {
-        db.prepare("UPDATE instances SET last_played = ? WHERE id = ?").run(last_played ? last_played.toISOString() : null, this.id);
+    async setLastPlayed(last_played) {
+        await window.enderlynx.updateInstance("last_played", last_played, this.instance_id);
         this.last_played = last_played;
         if (instance_watches[this.instance_id].onchangelast_played) instance_watches[this.instance_id].onchangelast_played(last_played);
     }
-    setDateCreated(date_created) {
-        db.prepare("UPDATE instances SET date_created = ? WHERE id = ?").run(date_created.toISOString(), this.id);
+    async setDateCreated(date_created) {
+        await window.enderlynx.updateInstance("date_created", date_created, this.instance_id);
         this.date_created = date_created;
         if (instance_watches[this.instance_id].onchangedate_created) instance_watches[this.instance_id].onchangedate_created(date_created);
     }
-    setDateModified(date_modified) {
-        db.prepare("UPDATE instances SET date_modified = ? WHERE id = ?").run(date_modified.toISOString(), this.id);
+    async setDateModified(date_modified) {
+        await window.enderlynx.updateInstance("date_modified", date_modified, this.instance_id);
         this.date_modified = date_modified;
         if (instance_watches[this.instance_id].onchangedate_modified) instance_watches[this.instance_id].onchangedate_modified(date_modified);
     }
-    setLoader(loader) {
-        db.prepare("UPDATE instances SET loader = ? WHERE id = ?").run(loader, this.id);
+    async setLoader(loader) {
+        await window.enderlynx.updateInstance("loader", loader, this.instance_id);
         this.loader = loader;
         if (instance_watches[this.instance_id].onchangeloader) instance_watches[this.instance_id].onchangeloader(loader);
     }
-    setVanillaVersion(vanilla_version, do_not_set_options_txt) {
-        db.prepare("UPDATE instances SET vanilla_version = ? WHERE id = ?").run(vanilla_version, this.id);
+    async setVanillaVersion(vanilla_version, do_not_set_options_txt) {
+        await window.enderlynx.updateInstance("vanilla_version", vanilla_version, this.instance_id);
         this.vanilla_version = vanilla_version;
         if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         if (do_not_set_options_txt) return;
         let default_options = new DefaultOptions(vanilla_version);
-        window.enderlynx.setOptionsTXT(this.instance_id, default_options.getOptionsTXT(), false, false, (v) => {
+        window.enderlynx.setOptionsTXT(this.instance_id, await default_options.getOptionsTXT(), false, false, (v) => {
             this.setAttemptedOptionsTxtVersion(v);
         });
     }
-    setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
-        db.prepare("UPDATE instances SET attempted_options_txt_version = ? WHERE id = ?").run(attempted_options_txt_version, this.id);
+    async setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
+        await window.enderlynx.updateInstance("attempted_options_txt_version", attempted_options_txt_version, this.instance_id);
         this.attempted_options_txt_version = attempted_options_txt_version;
     }
-    setLoaderVersion(loader_version) {
-        db.prepare("UPDATE instances SET loader_version = ? WHERE id = ?").run(loader_version, this.id);
+    async setLoaderVersion(loader_version) {
+        await window.enderlynx.updateInstance("loader_version", loader_version, this.instance_id);
         this.loader_version = loader_version;
         if (instance_watches[this.instance_id].onchangeloader_version) instance_watches[this.instance_id].onchangeloader_version(loader_version);
     }
-    setPlaytime(playtime) {
-        db.prepare("UPDATE instances SET playtime = ? WHERE id = ?").run(playtime, this.id);
+    async setPlaytime(playtime) {
+        await window.enderlynx.updateInstance("playtime", playtime, this.instance_id);
         this.playtime = playtime;
         if (instance_watches[this.instance_id].onchangeplaytime) instance_watches[this.instance_id].onchangeplaytime(playtime);
     }
-    setLocked(locked) {
-        db.prepare("UPDATE instances SET locked = ? WHERE id = ?").run(Number(locked), this.id);
+    async setLocked(locked) {
+        await window.enderlynx.updateInstance("locked", locked, this.instance_id);
         this.locked = locked;
         if (instance_watches[this.instance_id].onchangelocked) instance_watches[this.instance_id].onchangelocked(locked);
     }
-    setDownloaded(downloaded) {
-        db.prepare("UPDATE instances SET downloaded = ? WHERE id = ?").run(Number(downloaded), this.id);
+    async setDownloaded(downloaded) {
+        await window.enderlynx.updateInstance("downloaded", downloaded, this.instance_id);
         this.downloaded = downloaded;
         if (instance_watches[this.instance_id].onchangedownloaded) instance_watches[this.instance_id].onchangedownloaded(downloaded);
     }
-    setGroup(group) {
-        db.prepare("UPDATE instances SET group_id = ? WHERE id = ?").run(group, this.id);
+    async setGroup(group) {
+        await window.enderlynx.updateInstance("group_id", group, this.instance_id);
         this.group = group;
         if (instance_watches[this.instance_id].onchangegroup) instance_watches[this.instance_id].onchangegroup(group);
     }
-    setImage(image) {
-        db.prepare("UPDATE instances SET image = ? WHERE id = ?").run(image, this.id);
+    async setImage(image) {
+        await window.enderlynx.updateInstance("image", image, this.instance_id);
         this.image = image;
         if (instance_watches[this.instance_id].onchangeimage) instance_watches[this.instance_id].onchangeimage(image);
     }
-    setPid(pid) {
-        db.prepare("UPDATE instances SET pid = ? WHERE id = ?").run(pid, this.id);
+    async setPid(pid) {
+        await window.enderlynx.updateInstance("pid", pid, this.instance_id);
         this.pid = pid;
         if (instance_watches[this.instance_id].onchangepid) instance_watches[this.instance_id].onchangepid(pid);
     }
-    setCurrentLogFile(current_log_file) {
-        db.prepare("UPDATE instances SET current_log_file = ? WHERE id = ?").run(current_log_file, this.id);
+    async setCurrentLogFile(current_log_file) {
+        await window.enderlynx.updateInstance("current_log_file", current_log_file, this.instance_id);
         this.current_log_file = current_log_file;
         if (instance_watches[this.instance_id].onchangecurrent_log_file) instance_watches[this.instance_id].onchangecurrent_log_file(current_log_file);
     }
-    setInstallSource(install_source) {
-        db.prepare("UPDATE instances SET install_source = ? WHERE id = ?").run(install_source, this.id);
+    async setInstallSource(install_source) {
+        await window.enderlynx.updateInstance("install_source", install_source, this.instance_id);
         this.install_source = install_source;
         if (instance_watches[this.instance_id].onchangeinstall_source) instance_watches[this.instance_id].onchangeinstall_source(install_source);
     }
-    setInstallId(install_id) {
-        db.prepare("UPDATE instances SET install_id = ? WHERE id = ?").run(install_id, this.id);
+    async setInstallId(install_id) {
+        await window.enderlynx.updateInstance("install_id", install_id, this.instance_id);
         this.install_id = install_id;
         if (instance_watches[this.instance_id].onchangeinstall_id) instance_watches[this.instance_id].onchangeinstall_id(install_id);
     }
-    setInstalling(installing) {
-        db.prepare("UPDATE instances SET installing = ? WHERE id = ?").run(Number(installing), this.id);
+    async setInstalling(installing) {
+        await window.enderlynx.updateInstance("installing", installing, this.instance_id);
         this.installing = installing;
         if (instance_watches[this.instance_id].onchangeinstalling) instance_watches[this.instance_id].onchangeinstalling(installing);
     }
-    setMcInstalled(mc_installed) {
-        db.prepare("UPDATE instances SET mc_installed = ? WHERE id = ?").run(Number(mc_installed), this.id);
+    async setMcInstalled(mc_installed) {
+        await window.enderlynx.updateInstance("mc_installed", mc_installed, this.instance_id);
         this.mc_installed = mc_installed;
         if (instance_watches[this.instance_id].onchangemc_installed) instance_watches[this.instance_id].onchangemc_installed(mc_installed);
     }
-    setFailed(failed) {
-        db.prepare("UPDATE instances SET failed = ? WHERE id = ?").run(Number(failed), this.id);
+    async setFailed(failed) {
+        await window.enderlynx.updateInstance("failed", failed, this.instance_id);
         this.failed = failed;
         if (instance_watches[this.instance_id].onchangefailed) instance_watches[this.instance_id].onchangefailed(failed);
     }
-    setUsesCustomJavaArgs(uses_custom_java_args) {
-        db.prepare("UPDATE instances SET uses_custom_java_args = ? WHERE id = ?").run(Number(uses_custom_java_args), this.id);
+    async setUsesCustomJavaArgs(uses_custom_java_args) {
+        await window.enderlynx.updateInstance("uses_custom_java_args", uses_custom_java_args, this.instance_id);
         this.uses_custom_java_args = uses_custom_java_args;
         if (instance_watches[this.instance_id].onchangeuses_custom_java_args) instance_watches[this.instance_id].onchangeuses_custom_java_args(uses_custom_java_args);
     }
-    setProvidedJavaArgs(provided_java_args) {
-        db.prepare("UPDATE instances SET provided_java_args = ? WHERE id = ?").run(provided_java_args, this.id);
+    async setProvidedJavaArgs(provided_java_args) {
+        await window.enderlynx.updateInstance("provided_java_args", provided_java_args, this.instance_id);
         this.provided_java_args = provided_java_args;
         if (instance_watches[this.instance_id].onchangeprovided_java_args) instance_watches[this.instance_id].onchangeprovided_java_args(provided_java_args);
     }
@@ -641,367 +494,75 @@ class Instance {
         instance_watches[this.instance_id]["onchange" + name] = func;
     }
 
-    addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
-        if (!file_name) throw new Error("File Name not set");
-        db.prepare('INSERT into content (name,author,image,file_name,source,type,version,instance,source_info,disabled,version_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(name, author, image, file_name, source, type, version, this.instance_id, source_info, Number(disabled), version_id);
-        return new Content(this.instance_id, file_name);
+    async addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
+        return await window.enderlynx.addContentDatabase(name, author, image, file_name, source, type, version, this.instance_id, source_info, disabled, version_id);
     }
 
-    getContent() {
-        let content = db.prepare("SELECT * FROM content WHERE instance = ?").all(this.instance_id);
-        return content.map(e => new Content(e.id));
+    async getContent() {
+        let content = await window.enderlynx.getInstanceContentDatabase(this.instance_id);
+        return content.map(e => new Content(e));
     }
 
-    clearContent() {
-        let content = this.getContent();
+    async clearContent() {
+        let content = await this.getContent();
         content.forEach(e => {
             e.delete();
         });
     }
 
-    delete() {
-        db.prepare("DELETE FROM instances WHERE id = ?").run(this.id);
-        db.prepare("DELETE FROM content WHERE instance = ?").run(this.instance_id);
-        db.prepare("DELETE FROM last_played_servers WHERE instance_id = ?").run(this.instance_id);
+    async delete() {
+        window.enderlynx.deleteInstance(this.instance_id);
     }
 
-    refresh() {
-        return new Instance(this.instance_id);
+    async refresh() {
+        return Instance.getInstance(this.instance_id);
     }
 }
 
-let defaultSkins = [{
-    "name": translate("app.skins.steve"),
-    "model": "wide",
-    "texture_key": "31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAE5klEQVR4Xu1aMWsUQRgVVJCAoIIgglaJBG2UGIKCOU0hJHZKijRBsAnaWSjaiNjESgtTpT0bmxQWNvkJ+U9n3ube8ubNt7e5xOzdxX3wmNmZb/fmvflmdtm9M2dqcOfmxR44N325KFnn8ecXDwbSrzdxoODO7auleNTdgHfP5hKeKgNUsJff1zqZeBJ9fr2Jg4vW9Ef5Xxiga9+XAkRWLYFTYYDOuGYDxIMU6psf2r6tL54OA3wPUEIkBFeVfr2Jg4r2DRGk2OWZSwnZ7tcbO2hqU9j0tQtJyjMLlGqCnqPX0WtEcSh9PI0jGiBIIVpX8V7yvEg04/z6aPPxNA4V4QNm2/ar5d7vD+u9P1/eFOWvt2tF2/2ZK1ksyGO2aZ0msM3H0zg4IB2oziSEQjCEUzyJvkhUdE3WGc9jH0/j0IGxxC0M4iACQoHnj76WolEHcIwYtOGc6Fo0NDJoLAzwGaIgJWf89eO7BTUDlBTlM6/7gxqCYx9P4+BAUHLmeQ//8XKxfKDBre390nzBpRtTSQxvecwEvaYb4Mc+nsbBpzYV7yaghGiYwJKiaZCey+vpk+Gt61MJ2e7jGTke3vvaUy4sLBScnZ0t6PEZ9vbK5aHGog19fn2nXy7Dzk6vZLebLNHiN44LHxCF0wiPz7AvUsWrCSdhgO5H+B0PHxo+oKNkwEkbMLW7mxkwVhlwoktgX3S0BI6cAU/mt3sgfhzl04c/S7KNJan957a2EurMYFCl+P7Aq+LBpF2FiuCSbPv0KaWfUwcKPKwB2g9isOc3NwuWgvpCmZbeHsUnIr2N7S4ehOiNjQPSAI2rwyCBnh3eD0LI2Y8fC6Je/nC/9DaPdxPcrEwQ2T3ImNAAPacOgwRWGaB1iiHrBHl8IoyiVISnuJPi1QRlHVwgj6M27SNdUDLjZoDOfmRAtva7B5scyQ1Vy4h6juvN4Ab4DEeG6LGndGlAX4gb4PGeIaX4/rHe4nTH1zYVrfHF5luHyABfBoP6KYr0FNZZ9dgo3s+NRKkRkQFad70ZKKxKYJ0BGKSKKTJAZ5TZ0Bfk8aEBEh8ZoEaoASg9xvVm8PRW4UqPIylIxVG4i2OMxyUGiHjE6Ky6OBqgRniM682wsrLSA31zczLOqaIiM1Sgx5YGiGgVD6pYFxeZ4P2uNwMebzudTiJqdXU1E4oYj0Vdl4gapplDIyjMY3T5aAwyscoAzQw3QGNdbwY+41OcC6TwKA51NYDUZcSSM+rxvtcwhu0qxkWCfmv0GNfbokWLFi1atJgc4AVoFf3xmU+dSUyLFi1atGjRokVT8FdpQ39c1XeE+/S3QB4+dnADhv68bgbwTc+hX3GNGm7AUTOAj7qaARNpwLEyYL+uGTCWS0Df/vpLTu/TfsZkHzODbwS6JDKOGocRyWzwPjD5wqsGDDJB20YNNwClG6D9dQaUH0uqBLsho4YLdJHer22FAXXf9+uoWdI3xt8bVPGfGOjieRy1aR/p3/b9Q4d/8FCiz8fTOKoE+2xrv8arGL3f687vt8Kxui1GAuuWgNINGCRc+1j38TQOF4gyMiAyB4xS3YW7AUofT+Pw9PeZ1vZomURr3EUOygofT+Pgl2QKrKJ/bifrxFcJHxsD+LlcRQ3z/4LIABfsx9rm42kc0f8GVCCFR3GoQ0jVPuBZEfX5eIbFX3srPNN8aUvJAAAAAElFTkSuQmCC"
-}, {
-    "name": translate("app.skins.alex"),
-    "model": "slim",
-    "texture_key": "46acd06e8483b176e8ea39fc12fe105eb3a2a4970f5100057e9d84d4b60bdfa7",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFJklEQVR4Xu2aP2sUURTF/RRir2BAsQyC4GJjaSwEg1iJqRSDgiBooSIWoggiYm0l2KiNiKCNhaWFlYVWVhYWfoAxZ8xZfnvyJtmdkN2dMBcO7++8fefc+2Zn3ps9e7awX48G1e/ng0rpjztHRlJD7a5zXqmQ43XOTMQQOSPrd7UAf18u10jCTRHiuhyvc2ZCTR5mPUVwW47XOaP3GQXON4ljMXK8zll61eRc/vn5RfXt3eOhEFwau0IAk7bXGe6CBDAkhGExcrzOmUgy7Bn+jgDh99fXI3B9jjd3lqFd8jKJu815Lgf3Yx3Hz7LyOZ+pmwmWSCbZJMd6lykCyymAr835TN048SSek1bq0E7i7M/ooLAeg7+X85m6pdecFkVYW9t/vn8arvOSCKxznoQpylzcJD0pkh/x8hpR2f4LB2rygvIyi1DyMoUkYfdT/VwIkF7mHd2EN4OFoggUIAlTpLkQwJMcPuxsRv7Dm/9YL/MvzySV2tMkTO/z93I+Uzd6ww8x+b++QYh18nlDJHGP6ehi3m1zIUDa1VdXKmJxcbHGwsJCjeyf9vDjg+r++3s1OYPEc/xEjpem8Q06I/u1tpyQiVuI7J9mAQR5ebi01kXwuOePHRxBWwFEXlGb/VpbTrBtBNy+e27kncAilMhThBwvLQXYkQjgpNpEgMjz5YjLIcffrgDbjgB5ywPefHujunjicHXt1GJ16+zxOm84MhzeBidE7/MmqQmqjktrK2gupfETTX2SZ6OJnH7M5C+fPFKTF5SnCIK95bJ+zNd7Qk+fXRr5m1S+JICuKdWRVArtPOvTIUqTZ6PJ2yIq2PMmr1R1FCD7UQBPXqlFSPIkndeZ5NMvT4ap8yyX6vLa5NloJkKiJG8xSiJZAJKxByxCkncbyyScqa5vg+TZaAxzhr8FYIQICn+WSSYnrzTJUoCSF+llgQ9khO8vCbcnz0ZbXl6uDIa4iauOfYSVlZUayjOMk0AdBWsp12aKUurPcfIJlH99FIL3GyF5NprJmJAJlgiXQELpzSREAQy2u8z6JJ4ilMhPJECJ4Orq6oY6izIYDKqlpaUaypMQiSgvUZKQ692HQrluqgIkoQzxbFfqyFB+39G9Qxw6s7Dhbm/CJqY+vIZiZKq2JJ0CcCm0EoChTpIlwu7DsgmYsAgmSYtjgdg/2wnVJ+kSeUbCxAKYLEl5CSTxFEiQp3xnF/KBJFP3cfgT9jzbk7jJ580vRUiejabne5EysVzzJi34fYBlT5Tk9M9x/fTREaiO4vCaFIJI8ikC01YR0FtvvfW20+bdIG6Jc5uMcFuO0XnL8wLXc7doVxKX2fu7luBW5tDP+nFMewqJfPdPqE+OM1NrS7633nrrrbfeeuuWeU9QaHO4qmcGb4Z0coODAgiTHq/7XUEC6FB14i2uWVseeU8aAX5n6GwEpACTRoAE8BLoRATw5NjwuSLPHQ2JUtoI1QapX5ezLTFXb5VJ0ALwcDUPWRkh3CmmALl7zH5Kcx4zMxL3wWqeMpfg43gR4nkiy1nHNOcxM+NROb8dYPjnNwXsk+/y48K/n/VG7iHkXgI5bMtSgCRrTztCEnm+n6c9JahPzmNmxuMzLoNxvi/QqZMJlU53mqA+OY+ZWekoLc8V85id/enVccgbOY+ZWRJUeZLvCzovQBLiAWuJsFJHhvK55pNoE3IeMzOGOkmWCJeQAowjwlzdA0yWpDb7viBB4rwZJmmSn6t/gc2+LxAcCULp+wKu/63I70QE/AMDdqWZ7rX6YgAAAABJRU5ErkJggg=="
-}, {
-    "name": translate("app.skins.ari"),
-    "model": "wide",
-    "texture_key": "4c05ab9e07b3505dc3ec11370c3bdce5570ad2fb2b562e9b9dd9cf271f81aa44",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEyElEQVR4Xu2aP4sUQRTEhYsMTARBRBRURDNB1NDEQwMRMdHgAk3ESA1FDtREM5OLDIwM9Cv4WYz9AJqIKKzUYB21v+mZ3bnb65u724Kip7vfzr6qefNnp/fQoRl4d+34ZOP6qcnH1TNNq762RW2X+O353U1yf3sOFp4G2BQKp/h9YYDF+4hnP02g8H1jAI/4EPH7woBZFUDBJPe355Ciswq8TcEk97fnYANsQp4OWQHfXz2a4r4yIO8EPA1K4tME7m908IXMwl5fOjp1lNW3AaKE5TxjszpyTK3pcbXMpzoy2WxphoT/2HjaUNucd5/7yrFRGuAE8yj5iHtOon9/fjtFjWWMPmNRNiANYjU4jvlUh5ORAIvzue6EKd5MMfn5ktCsjDSE+VSHE7EAl7dLXvPCuZWVTYHaFjSXp4RaG1A68mmG+8ynOjIZl3pu/3jztCGPfo7bKG9LcJrgakgT3Gc+1ZGl6cR8seO579vblBER62rQPvJ2SNE2ZBQVkOKdmOj7O02geN/v56GNSEOYz67j8Oq9SfLylasNz1+42JDxhIWp/fl+teGfL/c3eeTOWi+5P+LXh9ub+/r28mKrEhk/GDTAwm0E44k8ldyqSmyGRPI7zHkMSDNtgIQv7NGbSQ2tAF7ofCot0oC/Xx+NuwKUnK8Pvo7s5CmwrQpgAiQNyTFtK4kSaYCOmsg4CZEo0VWibc97LkvfY5r3Z0zv03HU28KxB48nfaRg9p1MJiVKrMvS4p1UCqWwvGjaAMZ4zPP+ztI+qbcFCj7x8NkUNWbBNiRJQWlAkiIdz4SzX5rjmI96GpAx1NtCyYDTT15MGWCxWRXuU1CWdomMpyAawHnGlgzIeeptgQZkFZQEkxTUZUDGkU46BffFk2kASb0tUFCJWzHAYiiEfc6R3t9WSb0tUFCJfQZQhKgv7hLEWI2VqsWxvpD2Me82JPW2YGFsOdbFdLskmsJskONpQpqkGIko/QbhAxB/t3ibelvIezvFmbz/J/XE9+nm2VYrrq+vN3Q/Y0rxpOZKBtCM5GAD/IRnrt68NVlbW2takfNkHtE8qqJN4nlZiiU9T0F94mnCXAbkY26aMI94fZYGOPE8fWQC4yi4i10GqJ/nPttBBmyHFC9afF4/+iqhjzzqJROypVHUu+PQecuxnULN75obNZOq+V1zo2ZSo3ipShw4A3xPTy4isXneGvN7xV1/0epXYhzfCmaJmTW/KxjNgsduwWsLHD8wuHHyyETk+IHBoiuAP5XzVyN/PeaY47i/KlikAUssscQSS+wl8J2hX5z4LRLjCb4g5UsOxo8ONCBfn4mMJ3i/96qvTWD86EADhlaAROda4oGrAJ4Co68ACuaaQokZy7fAfYsqpXHmUx0UxKUzkvHNUf7/BlgGUDBNYJ/5VIdEWZC2S/8voAFJiS4Z0GUC55hPdaQoG8D/F5AZTwO6BJcMGaUBWQUUXiINGErmUx0lA4aQK0FDqSqwGa6OvirK6lFLPYOxXQO4xjeUzKc60gAa4e1sSRtgQbnux3XA7I/mwUgifEvreg7IeZJHdJZgjjOf6uCS+dD/F9AACuzra5v5VAcF2YSSeP4usAG5xM31fRqQ44plPtXB/wsMJQ3oElziIirgH4/zgLkTkjiIAAAAAElFTkSuQmCC"
-}, {
-    "name": translate("app.skins.efe"),
-    "model": "slim",
-    "texture_key": "fece7017b1bb13926d1158864b283b8b930271f80a90482f174cca6a17e88236",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFK0lEQVR4Xu2awYscRRjFcw9JhLiHoMIGzCVLIIRlEQJGDDkIghA9RBBBBdkl4EEFPYm5CCrkorlo9CBBCJGQu168GTx49OYf4D+QY8tr+A1vXqom3e3uzHTSDx71dVV1zfe++qpmumsOHXoErl35svnq3W9bfvHW9Zmtel1/9875hczxRgcX7UGgROgHl87M8bEJgIv3bIAl8R6EHG90SMEeBNmPfQBy3WN/+tpnT0YAEC3BiGYDVL3KFA7VluONDoi+cfXH2exLGPUqS1mgOrXleKMDYnMvoG7RV+EoMsBFlda713kWeFBK91EPsx47/Vk6So5LnK9xtX2zd3Ouz/sX9mZ2isrgsFRK/dOfpUNO5Gy7GNpv7b7U3Pnw1ZlAXXufFOdLhHtKmZL+LB04p/L3z99o6Y7KRnwSEZTc73WeNbIZGzv9WTp8diRKO3g6Luxtbc+EyxZo1/3aH3Sv2kl7SgJJHVyLbwkcUamdWwIkRs6qFHPmIe26/+ZHt9s6dn/VaZ9gbPYBD8RaBMCdUfnT7sutGJaFBP68+0or7pOLmy1lq079yACV//7z+kygxGvpqFSdbPUjELSnP0sHsylnRM2gxOC47Jx5yBJwkTD7+md4n/Rn5Xjh5LkGvnhqp3n7xLnm8sZWS9nZP3Hvrz8b8fb9P5rvf/u1pWzqNe7557dn44tel+MlfGwCu6/PHC5elPD3nttpKTv7J3BQG+KbO5stZRMExpdgJ/U5XkJjEFTE6zOy32C4+KEZ8PXduw8FQHX7kQHMvsY6kAxw8SKzD7N/Qg5KLEFAvKi2HD+Z4yV8Se1LBijqZ585/ZAji0i6iqztXPuHjx1vnnr6REvZuRfkPQTI7ezDGJB6+pAZKlNnFRK0tXFqTlgKLvFRAdCYzgxACsB5t70tA+D9s5+YOqvIGVU29AlEBgBHyAJmPx3OAGSdszTzGYy8J3VWIaGaIQQTBAKRgkVvT/H6cKWwnGIJyGYTrIktiXAuEsw14+k6dVZRm+1SnYuHpQC4Y7X1nP1LAr1vtpcCOTgAtT2gFITskwFwJ3zWkxmEvJdrvkH6MnVW4Wsekrq1AHg2yNkkM0MAfBYR56UHANHefwhTZxUuFvvvH7abBw/uzQUCuyuPHNtoH440juxs934EgaARELXle8auTJ1VpEOiHM+6Gj07fOP03xbYpYzyDdipOrWlsK5MnVWkoL7M3/SiBMt5Nkrs7Kf6zaPPzoLAbwZsteUTpf/8TXp76qwiBfUls6fSvx6pW9Qu5nOBZ4DaUjji/fyB0oOQOqtQumvNp7Ck+qgv61qU7c674C7XIpmR/cikFJ9BKAWg1xKYMGHChAkTJkyYsKbg+Z7H3Np1MscZLfw9QR/mOBPGinz4cpsHOfGXj8/OPbDlOBMmTFgO/MWHOOR0mZekg97wrBr59mfI/wsIgE59taGN6g2Pv+4amgG8Ih91BsC+/y8gACqVAbzry35rA1/vKd5ZOoFSvQt2Upellsda/dJbJNyF1s4fPeVLglM4+0P6sTKkaBeZs579agEQEUydH5n1Ovs7aKQghOcBCSc+3l4KADOcJU+A1KUfK0MGAMGlOhcPfZY91WszT7DSj5UhhZZEy85DUNryOb4r+Xyu/f0ApdPbS+MMhq9x6OeGTk99goBjfcnnky1D6VoGAbES5ueIXf9fwPd8X6YfK0MKgl3/Y+Ci8gB0EdOPlSEF9WUGoEsgRpEBXSkxfsyNnaJdvPqkHyvD//1/QQZgkfiDyID/AMdpmCl88QvjAAAAAElFTkSuQmCC"
-}, {
-    "name": translate("app.skins.kai"),
-    "model": "wide",
-    "texture_key": "e5cdc3243b2153ab28a159861be643a4fc1e3c17d291cdd3e57a7f370ad676f3",
-    "url": "data:image/png;base64,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"
-}, {
-    "name": translate("app.skins.makena"),
-    "model": "slim",
-    "texture_key": "7cb3ba52ddd5cc82c0b050c3f920f87da36add80165846f479079663805433db",
-    "url": "data:image/png;base64,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"
-}, {
-    "name": translate("app.skins.noor"),
-    "model": "slim",
-    "texture_key": "6c160fbd16adbc4bff2409e70180d911002aebcfa811eb6ec3d1040761aea6dd",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEsklEQVR4Xu2aTWoUQRzFszGEgJqETFDUEDWJCiIGVCQuXCgo2bkRv3YKHkAXuvUGbrxC8Ag5hGcaeQNv+Oc3Vd1d7aR7xuTBo6qrqmvqvfro6q5ZWKjBvUsXho83V4cKn+8MRnGFTndeLmR9c4eUqBim0v5bA2LPx1D8sb99jE5nfXOHlAE04r83IAqXaBpxKgyQ8LcPto6FNuDni70JA5R2Kgw4/PBsJDaa4Gvlsb65Aw3glJDIKrK+mYOEpFb1VNwGsHyqLMO4fsTpw/Z0DjYyXt9cWx7F1ZNHnw8mQuWpTFUdDJnP9nQO9lCMex5L7J/v70dhpOd/7FHGaQBDtqdzRMESKepawiz09+v9EXPXKqt7fD9NcOgRNZMGuKctxtcSKry5e20sWHHBJqhsNM3XFM5wZgxQY+Jw13Uc6nXUfb4nTgsKToVsT+dwY+Kzm7TQL09ujRiFk67HAmVwDJnO9nQON4o7OW5oUr3ufN4nUmguZHt6x+Dl3nDz3dMRFb8/WBreXl0chyxPcN7HuPJU787XV0kqj/URv26sDM3YGSzXGhIdGcUrZHkiGqB4HPo2IGWC01kfQQMkXiOO5VqDBrQZAaanQ0yz0BxZH0EDZnIEcEH09TQMOLwzmO4IYAOaMA7bT2vnJph6miiN5ZpQgslvG4uVVBnqzILiKLCO8YfdaMUXl5bHI2Bl/fJEPu/JkeJP3IDc4hTp6VFlgESLgyvX58cAik+ZwDUiLkputOJRvEYD880qEywm0vfkqPwiAy4+3J4QlROrsqQFRCHRAJEGpO6hEb6OZtG4FJ1PnVlQUCljo6IBEu1pIDI/xZRoCmxK6syCgkpJA9wLNsDTICfQPNq7Oi7j+NwZEBlHgKdAjhIsquHxuhMD+LwuJcW40XFR9dOC5ZoYwN9rSurMIt7EN76q116Tzosa5h4hEq/Q0yPFaByv2Za6NjmfOrM42F0fkh8fbY3I9BS5R2DP5x6nTUnhFh+32QyLDND+nrQ4pqfIBosUzGuS+45YnuJpQgxbjYB5g1+3FTLvVEDCZ+ZQpQ/YAI0C5p0aSLxMYHoviF973DssY3joRtZ9PGUdgn9nd+P8Mbo+lu8MTQ2IaV7QnMcTpVjWcL5EO03xqns6QRsDKNrDO1XWyBmQK98Z2hggKC1FlovodajnUNfwuvwSTKueBe6+ShnrqhNYl98LKKiUsa4m4pqUifCboanPXQ5TdDnWkwX35aVkfdMGX52bkvWc4QxnOEMn4LlC6eFqXMjafODQU6bXLTEPU6L4Jsfr0QCd+pZ+4pLw3I6zE9CArkeA3yVmxoC2I0CbmjYjQOI7fU/gxqgJvYtUnJ/ITe7wTOf79/lNoK73p74+UBwF1pHC2xgQ43UCvUgyvTUoiO8KzBc9PfowQKjLL0KV+JQJXCMovM4ArQ/RAGKqvdsEOvaiqJxYHqyKFC7yxYasMqC4d9lbpaSgUlJ8U1JHa1BQKSmolBTWlG4/p4jIbwikyowN4AJVSgoqJYU1pdvPdE6XHMcG/Ct4PN0V2Y7eEBvFE9x4kltC3k/OlAH8v0Dp/wskJh5zxzP+FF2O7egN/L+AWPL/AhpQJf4kRsBfkTxADPB27yIAAAAASUVORK5CYII="
-}, {
-    "name": translate("app.skins.sunny"),
-    "model": "wide",
-    "texture_key": "a3bd16079f764cd541e072e888fe43885e711f98658323db0f9a6045da91ee7a",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFJElEQVR4Xu2awYscRRjF8x+I4MmD6Ap6EFmIyC4RERVhl0g0p01YYQ9qhEWR7MFADAYky16CCOYWJMJeIjkk59VLPPoX7N/hP9D6Gt7w9jfV09O7Y+9Mth88qrq+6m/qffVV90zVnDvXgqWlpWp5eblaXV2tub6+Xpdqk+3JlysTSX8LB4tO4XlNwST9LRwk2BngWXddpGCS/hYOQwZMkQFPd94bE+42+ls4TJMBEptByGv6WziU3gCmM+DwzsWRaFNtz0QA8jWoAHA5WGyJstHf3CHF5cyqTPGTgpD29OXnhOulezme3uFBcnAeYApvCkBJaFMAeB/H0ztKs5yizBSe4kxmgtvsi58zNwHY+OB8ZV75aGXE0sAZmOyT96ZP8dN33ixSNo6nd/xw9d3K/OfBVk09wHQtYaoL/3UdPdxUF1RXH/VV3fenzzZyPL3j7uaFyszXl65VWlQT1Wfn0ttHXofp07x9+a0jdDvH0ztKX2D4OrPYGx++XDMzha+9kr8H18qci9ekB0vySw1nPgWn6K7keE4d7+/8UV269bSm6ltbW9Xa2lpN1dmfuHn/fLX8+eOx7Nj8/oVKttev/DaR9Ed8/dOrtS+XzEb27wwGwOJN9ic0KAWAS8EDlsgXL94rcpoAKIjy5dLiZ5ZRDEDXDNCgSgHwrJ00AL1ngEQn2Z/IJZDPEM8aU56kP2LmGaDB6oNVTqL7MECahU++eW5UOgM0QM+K6jlr2T/bs5QP1T+7+VL18VfPj0r2pZ1+qHcMFnfh+l8jsRIm+lq2DFLaOSDRgfEscVAsOavOItW3996oxblkX9rph3rHwABwhm3LDLi693fNpgxQuwVywOzPYLg8lQxQ2RYAMe0SQR4cHIzqGggHlSWD4fvsW6JOQuodQykAnuG2JeAAkdkvAyHRDBaZvuWDgrqSesfgAHjQKTDbcglkv6b7c5moLbOCwbqx9+voM51dzrB8wvPLlTnJTr1j4Ox1pQOQzxAJpxD3y3vcXwFQvXRPvuP5dZyvwFIf6h0DBXVlKQASkBlgUc4QPlRdt3Dfo5KCyMyCYwWAKZNO2G5b1ksBKKWyyQD4/rwn+1MQWRrfsQPAm5s+JMkAZCo7CzKlJwWAwZONY5lmXJ0CwB87/s6fvwHItHMpZGpz5kt9Ofu5dGSj6BSfa5/l1AHQ05k8PDysyfaSnRlA0aU2PgNSNK8pvBSELDtnwIABAwYMGDBgbnFt75Uqufv7yhG22elv4aCdnqT2FL67/1pN1dvs9DeA+OLOk4q8/vOfNdlestPfcaD9ALb1hs1bDyvSQtlestPfcfDjL49m4mdhceYD8O3te2c7AAOeJeTujuq5szTN4SoPTnZ3d6vt7e26FNl/7sAAcDuN/QkepW1sbNRUEPb391vvP3UwAGc+A7yBarI/sXAZ4E1Rb4A2MTdBM0A83WUG0M4DVo6nd3BXOHeBfc1zgLTzfJ8ZQHvapjr//7/BAHCGbWvaBucML3QG8JCjKQC265rH2V3Zth/QZqeezmAAdM2jcQYglwAFdWXbfkCbnXo6wwHw+uYaNzMA2c/HW0k/+fMNILJdfTmezuBvff7eLzHtEnYSSpiPtCwy3/tNdF/q6Qz+1ufv/RLTTkFdyRm2eL3zKdq0TX2pp3fwaDoPJ9luW9aZ1pn2TUsg6xxP76C4EhmEpIVkanPGmzgXGcAfO/z/QIlpz9TPGaZYcmbPgJOC/x3g/wdKTLvEOAMoXmvd6730TJhFBvwLF5puRHnAy2sAAAAASUVORK5CYII="
-}, {
-    "name": translate("app.skins.zuri"),
-    "model": "wide",
-    "texture_key": "f5dddb41dcafef616e959c2817808e0be741c89ffbfed39134a13e75b811863d",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAE10lEQVR4Xu2asYsUSRjFvePSEzY5DkTB5TwVAxUWTMYVjeQwGcwuMdzkNtxMPC5YQwMVQTDRwEhDweP+ATExFe5v8fp4DW95++vqmS12bae1Hzyquvqb2nqvvurpqdpjx5bg+A/fNes/rTUn1n5sVHfp+m+XT7e8s3l+H93O/kaHFF4ywkLThGxjf6MDxavMrEixJbK/0SFFc/aZASWyv9Eh17uM4DKgYJL9jQ4UTxMomGR/o0Ou/Qsnf+48Cyz0q/4W8KzbAGYAxacJ7G/lYCFc2/mg4zLgvYzJstTGz3I8gyPFse5Ss7l981Jz7/aVlqqrjcJK5mRfabY/w/EMjhxs0qJTOOn7NiONoNAsM47jGRw50Idbt1phBxFfMkHX6iOFUzxN4XgGhwepB1afeOH6qe/3rlUXHEcT1FdpKXC5rIQBOXiLTgOcFSXqXhrgz6aJNCNNWIlvCX9d+auLgpI7s3MtfZ2xZn4FlvpkLMczOPjmRmZmJCl2GR3Lz3A8Xxxvn+40yfX19X1kPPHnmY3m7wdPOoLVpnvu9/6dm/vodvZHvP/1RvPvxVstVddk7P5+reWj7fnSzy8FDdjY2NgTrzrjiTQgZ58G9JH9ESn+xbnZXjYeWUY9v7vVJI/agI9vH+/RorON/RE24LNlQMmAJOMJG5DPCNWPyoDSEjhUBmgAEqryw+vdlh6Mr0sxptJQwkQP7N3LV50nvgzwfcfrs6Lulah7//xytWUKt3gvg+zPsSb1dpDrj+LSgL4Y/ZEcgAcqE0SL8aA1QBqQwtxm4RbkuvtxnPviGPw56u2gJIwZkCawrj+Ug2aK5uBNx5dik2qnEck+A/w3VFJvB33iF5mQpAE5myksM2DRDFMoBdaSejtIAyhe9/gsyHjVPRMpgEJoiE0oCc8Ykc+SJN818qFrUm8HFEXBfeJNi0kTSsIzG3IJMDbFq07RfBtNIzLGJfV20CdM1JN/mQEWQzIbeL/EUnwKTeGlV3K2H8gAfu/X0sYkuZRySdWSgnmdWcC4QQz4Y/NsL/969qYl22tIwUm9/dkAU22DGkByBknGLyNFW3hJfJpgI6i3g3zPF2ezWTOfz9tSdDt/FZopSnU+I5I0wde8n9cWnVmgd36nvVOfpWIOZICFpti+6xJLgnLNqz3fKRhPk8iSAf7hY8Fqc2nxB86ACRMmTJgwYcLKQrtK/3361Etuo3knSvdUsr8JEybsB3+z15L9jQ75y6vvF1neYxv7Gx04o7VkfxMmfOPw88HkDhLjCW6Re3NjNBscNKD2eF1b4WmCT329I8T4lQM3NWsN4IHK6DKgZEDN/xdwCax8BijNc4OTm6B+b+jbBFXK+yDT6c8s4HGZqWuOZ3DkercBFMmYJE9zfSRmE1I4S8VxPIODwlRnBqQJrJcMyFnO2c9zQ5ccz+DgrKYBfSYkaUAtuR/A/YIk9wqOZL8gDeBrMk0oZQvP9nm+v4iK5XgGB0Wl4EXiTQuh8DwRYnuWHM/g6BNG9sXRAB6DUTzvczzVYLrWkt/7tbS4NCBZaktSTzVyhkozljOXpesUVMucYZHn+4sMUCz1VIMzWksKqiUNsAmLjMj/D6CewXHY/y/I9M9ngc/3Swbk0TjHMzgO+/8FEuSz/RTPDEjm/wdwPLX4H8bzDGXhwa6jAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.steve_cake"),
-    "model": "wide",
-    "texture_key": "b182ad5783a343be3e202ac35902270a8d31042fdfd48b849fc99a55a1b60a91",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADOElEQVR4Xu2ZsWsUQRSHj4QUaWy1sImdIAoiAYUgSSGaylRpBQsRLM46zRERrfwnQgQbsbOLIKidhZ2dpY2IjRxcMd7c3Syz35ubvXezuew5u/Bxm9+8fffeb+d2wk6n1+t1Yjy5ddmkwHxajOmb6Uc/Ob8QCBvSwnxaRn3+/jPu1346JgfjtQiBsCEtzKfFNTr4/sOYjQ3zcb0zPp+YwHgtQiBsSAvzaSlu9dZWgTUhTwP298efw5mQnwHOBK95ezBeixAIG9LCfFpGXXoN82C8FiEQNqSF+bREl8GhMYzXktxgKuMG+5O7PDkPUTUeI3JtcwwgpWkfGCeRJmNxZ26AXdOLdb34J8cV6A6v+CE2/ufb91FKOWnCJJeN6Rzu3jBnCX+TpeJRrB1j/CzQYPu3G+scPbprPhw+KGG1EIyrgteHYLF+0T4cr4uxO5weQzilOD4LbCIEC1o0wRlQF7zbIVjQoikegvxtpsKH3TRY0KIRwrm9F8bn1cHTEowndy6smBjMT5iP/DruGse3gz319UQITFi3AdtfPkVhPuI3fyoGsKCmGnBqM4AFNdWA2maAvWi9966ABVmNX+LDBh9eWo3C+Cpsk/5d5ww4ebwtcOZY2DBJNoANvry2FoXxVSylASzU0UgDrl55Zm5uHo1wBuzcPhlhNTsegwWzSML4KhZqgMU1n2LAYDAwx/c+F4Xac6v91wZ87e4UBjj+Pt8d4Wt+7CwslQEWV5z/LPDPXRwbnUbjDXANhQzwoQE+bNo3tfEGcFW4/uZ1FMZXEVqZqlYof1Vjw6QWA2LLKPFjWXiIWM5pOVQG7JxfMfcvrhZ0N9dK2PEY/EIWSVoD5jAgBuMJGyZCyA0h5IYQckMIuSGE3BBCbgghN4SQG0LIDSHkhhByQwi5IYTcEEJuCCE3hJAbQkiFLyS0m6t8Ccp8jE9FCKmw4HkM8E1gPsanIoRU+ApsHgOWegbUYcBSzQC/uNBL0aoXmKFNDW6A+BshPjae9WgRgpbWgNwN4E5RaHfJwVhLa0BrQGtAa0DWBnBVCK0koRXFrSqsR4sQtLCh7Azgdjm31/2td8a67fXWABgQg/GsR8s/quvoLEoGqMUAAAAASUVORK5CYII="
-},
-{
-    "name": translate("app.skins.alex_globe"),
-    "model": "wide",
-    "texture_key": "6c25523e7dabfcaf0dbe32d90fd0c001d5d57ac66206a0595defe9be5947ff08",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEYElEQVR4Xu2ZO2gVURCGE1CsxEIEESQKQcFCRQXBSkihpSBiIQgBUQvBB4hCjKQQtFFQBC0UH4WNhVaSwlIFS220sAhiZ2t8EGFlFuYy95uzZ+/Z3evNzab4SO7MnLPz/3vO7rI7MjMzMxJj0/6L2eqzB3Lkf0VjG3Yfj8L5qvDj169MYU558/5jZmG+CBcgmydnM2Hd7b35X2HttV35b4GCCedLpUg446nCFRcgKnps+ktHtIWCCedLJSRe45qrcuYVFyAifP29rzmHn13pIOIlt/XQHSdakRznaxIawHwvuABR8cLr2Rc5aoLEBmlAE7gACRmg/A8DYluAsSq4AJEzTeEqXg0ImaBxzpdKSGhTF0DBBYgu95B4QS+SRXC+VCiW1BEvjMhZslf6rdfm3JXeXvyseCJj7d1CnhPWHD3W9fwgSEzj0kRIpMYIBRSNYa4IZ0DR7U6haJuzY+VZQQ0oQg0QUhu30CSBD0ZFK6XLgC0XPnVMEAGE4mkAxccM0NXAhupCwTHxQm5AkQmCChFkiVtolq2NibcGhJqruhrKxIZq82d9NUCaDpkgXL9xsANzgoxR4TIHBVM4DagiusoYxRlgV4FdDdaM6asTHVQ0hQs6X+iiR7QZ7mE2XJWyVZEbEDOBqAE21rVNIJ5wNdhmqhpAkfZ3SLyNdQywJvRiBFFRMfE0gQaQUPPMhWqK4qFcV1IYP70is9yaOt8F68mH42NZDM5POB/5+/llpszP3kweT1yAEzZtwNTbySicj1jxfTGADS1WA/q2AtjQYjWgsRUgg4483d2BDfEAhAK/XdoWhfVliEh71rkCvj+87FBzBAomI6N7RjMLBTJP2DAFE9aX0XcD+r0CtJFWGmCbVxNYX8bQGSAHXVhYyE492N5pVP6XmORYX8bQGKDi2CRJNaHvBpwcX5FZbuxY2QXzxDbKZv88uZvDpikyBufkXBSfbAAFPz68qgsKpkkxA0JoHYUWEZtzURjALWG3kzYh/6fcBextNrQtFcnx+OyBgkltA+zBYs3+fLQvh7dJwueR2JyNGMBH3XevnncxfeaEw9b3asDvFxPBhvlgZcUvKQM0x3o2T1hPWE8omLhAXbifCesHjQvUhYIJ6weNC9SFggnrB40L1IWCCesHjQukQoG8rRHWl8HjNY0LpDJ3bmNmmb+/Mwrry+DxmsYFUuEZlvu9Rev0N+vL4PGaxgVSYcMh8UorDGCesL4Mjm8aF0jFNtprwxQZg2ObxgVSqdIoRcbg2KZxgVSqNkqhRXBc07hA23CBtuECbcMF2oYL1IUvJPjChfWEL0E5H+vr4gJ1YcNVDLAmcD7W18UF6sJXYVUMGOoV0IQBQ7UC2CANKHuBGfqowQ8g9kOIRerZTyoukErslbbAPBl6Ayi4dSuAgpYNWDagZQbEPpwKzJMlZwC/LtMQmtN6A7glZKtwG4W2k24p9pOKC6TSegP46Zyf1/kobJH6ZQMCBsRgPftJ5R/ol9XBDMVMugAAAABJRU5ErkJggg=="
-},
-{
-    "name": translate("app.skins.sheep_cosplayer"),
-    "model": "wide",
-    "texture_key": "7cbe449d9d37c111a07a902e322d3869d98790c48f1fa16a24bcbe2d8d73808b",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADsklEQVR4Xu2aPYvUUBSG8xOEBREXCzsLbdfa0srCztbOf7AgOLbij7C1cm1dC21EsLB2C0UF2cZawSJyAmc589zPM5PMZDIJPGTm3K/zvvcmk49pFotFk+P669M2x+Xjp1nYn5drH3+2OTgeYX8kCBAKJjJI0zRRahIoISJvfv7dcf/sz8VnQQ1gGyVXpgQBQsFkkwaQvTGAM6+rYW8MoPi9WwE645bZgDEZkIP9eakxIAf7I0WBm0CEXHl/FiDx0jkg1VbgODFGYQATpwGpzRoQM8L2zzGVURpgRQn/XjyKssoKYHyUBlgjBDmhyqbCZZPYKgaQnTCAM19aARrjOBxT9qMzwApSgTr77Zu3HboKUgYoHCfG6AygGUsGPH7SsYoB/K6MwoAUFJSC7TwEFwZfHt5pc7A+4QBe2B+heG9+JAiwQ8L6RETcu3UjCsXGYH+EBvx99qCjNj8SBCiYsD6ZDdiiAbJn/RKBYO2QzqagAOHr928d2od+Z70aKNgLBZNBDJDt+NLtiwsW+Swb69VAQV4omAxigLRrPzxfQmKsVwMFeaFgMqgBr+4edeydAX1CQV4omDQikjcZKWjOqrPqgYK8UDCJGqDHLeMUPxswGzAbECTcNzzpcvwSFEx2wgAdy+am+dEgQsFkZw2QeC8GMMAEXl49WoL1CdsT1veiT4EUlnsJAkx4bAbYt0SzAftqgH01xnIvQcL8HWV5DRxEYb0aJAcRyveC9t0gcV0H6CBKrjObVM4cDqKwXg0xA+zbYS1L5cwcSNQA63CNAbZOblDWS7W35bKnATUrQMpzuSg7Y4DOeq0BpVyU3gxgEiXYPsY6K0ChYDKYAaVk2T7GqgZImfZBwSQIeMkZwL+z9GGAPRTYp+17UgbE+qfQFMyXNO9OT9rz8x9L6Ma41CU5A3LLVQWWDGDCfTOYASVGZYDl08FB++vwsEM+s5yURKTQdiWYcN80cn0vQmvgfUHNvcHYCQKcAa9gPpAgrE94qKzbnuUkCEzBAPvrw3ISBGYDJmCA/fllOQkEe8/WTJAPTVlOKNiLvc6QfG1MsFrYVojeC1hiZtjvFDQWA/QQSGnTNlED2OkuGmBXgO7ZVpiEAfqAlPnnVoAyCQNKK2BQA0Qk3yCloDkCE/LCXG3MGqB1SPCz4CVmgOfVGhPykjNADg1OLgkEedm2AUpKqI3HWPt2eNsGcEK8bN2AEjxpspyCvKz9PECSoFCPARRo22sfqboCBXlZ+3nAEAbIflMG/AdGckNyTM+wKQAAAABJRU5ErkJggg=="
-},
-{
-    "name": translate("app.skins.cardboard_cosplayer"),
-    "model": "wide",
-    "texture_key": "6acf91326bd116ce889e461ddb57e92ace07a8367dbd2d191075078fccc3c727",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAERElEQVR4Xu2ZPYvVUBCGbyNY7C74gRY2y4Jg40fnIihb2qhYWcrCgpXNFoKFKNj4D6xlCztbGzsRwfUXWO0fsPEPRCYw18kzJyeZPbm5WfcWDzeZmZx73jcnJ8nJrKqqWY61i5tVjoNH21nYXpRv7/crRfZ/HLysLKyP4gKEggkFE7YXJWXA57e7NRorwQUIBRMKJmwvSpsBNlaCCxAKJhRM2F6UlAGMleAChIIJBRO2F+Xo6FclrAxYlgEXNm860YrkKJiwvSg04GDvXvXpxeNxDVATUtsUTNheFBEpogXmUrEo8zOcEtdn25Kq4aghektTvh4ezmFuEdTX+Jmza/MOjb0tw9liDdCYnq22/eOgx0/OgBQUzP3jIJeW/M6kE8uEHcsxhHDSMODLs50adlJm4adXz8/zsi0xmeT6HJ/D3tKIXKNts32qJkUuX88BFEBRsi/x768eNNBaW6+1FJmDnWIHdXthBvC2lUINqKrfNTSgBHaKHdTtSRjQNgJK4OstX3XbXntTNSnkOmfM5hqNCutXtirLk8u3GrCebDzcqUpge4T1Ou+ooazvwgVE9KUb23OOYwDPssLOp2B7hPUrA1YG/DNAflnfRX0b5HVvDeBti7XskEDhEQOGhoJJ2ADW8w8VPTMK831Z37vbYGN/q0lHPQWTrAGyTfGuHn8YhQKIqz9tBvAy4shinlAwmbwBFByFgsnKACdoYgZwSFMgYT0Fk6QBFop39QlRESiYUJC+h7TBegomM1l60pVXRd/6GLfLVQoFRaFgQkELMcBCA5gnThBvU4D1XVBg6q00BwWT4hFAgefeXcvCegomFDS4AXzWf3P7evXx/p0a2WaeUBAFE9ZTMKEgK3wQAxggFMz82MhChq7mCMxHcQEyZQNkRYf5KC5ApmzAqR0BFuaj1B8YBV09ZQHR+twHS9tmLt8Hu4qrou2qLtvXkdF3hMy/skhxH0elU/bLCvM2lzKUAqWObebaH5qGY0MYYNvjOrwV3SW8rf2hqT8wRK4p6ZQVxbwIF2Ecim1DkoIJ64fGBUpRE3n22wxj3o4WxoSuSbDLcOICpdhJKgXrmbd18ktBbJ/tsZ554gKlcJamMA5t5pWfH17P27DieQz/fxIGpJAhLb80gHVk4QaUvg2yQd7mGKMBuePGwAVKsSL0DNihL6TOzNizv+ICpfBaZqzv0BwL96wfXQ9ggykDpowLkC7BhIuqu8//NGA9aVsT7LvAoSNMzNdJM4cLkKgB9rviMgzQOabv6HMBctIM+O9GgIiOGMDnCOaJC0ThRxMawI8sjFFwFPZHz76OAMHejfig5ARFKTFA9ikoumrM/kRxgSg0QIStDAgYwE9ZXNdnnrA/UVwgSqkBFDz0l58uXCDKyoCVAd6ANpifhAGl6wGlx1PQ6AYwEIWCaADzhIJOpAE80ydqBPBZP7oeQKLHU5CKHsuAvw+1fL9JgifbAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.alex_party"),
-    "model": "slim",
-    "texture_key": "66206c8f51d13d2d31c54696a58a3e8bcd1e5e7db9888d331d0753129324e4f1",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAD6ElEQVR4Xu2aMYvUQBzF90scWLgIorCKCF5xHIJioYWtIFjZWpyVje0WNhYWgliJYGNjY+kHsLEUEfwAgoWFICciHqz3Am99+2ayu7MJk2yS4kdm/5n537w3k0kyudF0Oh0t4/vj/Znz9eH5efnj3VMFGkMZIO752kYQcCDox8sbC2is8wa4+GUGOL0w4Ofr+0vxfG0jCDgufjBgMGAwoFsG8NaVgt7yquIdyk2yARD/692T2kzwDuVm5PfuVUA8DagD71Bu1jJg5/SlgqMvbwv42+ttgncoN1EDKBRlCD08/D279+LiPI4yYjiHpz2tn4p3KDeFAXycJRDDqX706fNcYMDxuXm949+ex8XG4t6h3Iy80wCCMMIUBv68elbEAMqMs67ncLEoc+FrtQEcUR1ZNUHF0wDP4Qbw6AYg7h3KTRA493x3pozH4wW8vnP2wbUZcCPImUcXluL5HB0cPGjx6PXWJQjUYYA/DRIY4Pkdz+dw5v398HQwQGeB11uXIOAd6rwBuO7wh3kNHnw7Me/M1fcni9jO7ctzWI9teM0rLpziy+CiqIskc/lC7JeAouuDCy2jMEDxESkzgLh47ThxwTH01ggx2Q2gWI78pgagDcvsrIsF2oa5VAxzZzNAjUidAWrE3pv/lxAvpzLRWkY7zYvfWQyIJeEfQdnPOyoKuIE0gOe8Pg2IkcWAyWQyI56EBmgdR4XzqAupljmqagTKPvJazmoA2N27soCfd/TyAGWzgKK9/ipab4BP57ppxID967cK1jVAFzS9g/gzBWeB1tdLwKf/1hig+LR3vD4NidGYATfvHBSkGEBxOOqtUGcER5WiWfaRZxltshjA53yK4gzgbz+v+Kj5iDtefxUQA7EKYzEDeHShZQQBJ/VlaNsIAn0jCDi9nwGdN4ALFxcdv3cjpk9mrMc2nnDbqPw26AnLaMu3QKfyfoAnRBuPQTg/q/u5pql9BsT2AyCe21xev2mCQFUoHkYQio/NjqYJAlXhyFM8yzTF6zdNEKgDv4yI12sDQaBvBIG+EQT6RuX9AE+4bRQGoKCifD8gVqczBnjASX0Z8pU/tT2/EWLXRzc5vF5dBIGqdM6AVAF1GrDJFlcqQcBJFbB1BviLDjqtb4PAX5b0Rcjb68uQ7/DGyrqpSfE4+i6w7vjWaUggwEdQxTtIUKU9cANi4hsxgCPJjsbKSFDWfhMDALa7XXwjBqwjAAlcADqnnfbzq8hugAdScQG9M0CfCmmAgpg/PXqbzhgAUj+vDwZ00YCUz+uDAU0b4B1K3Q9wUtu3wgAUtFMp+wGAz/ll7f28EjMAAmP/EwBQp04D/gEkM/45yXRakwAAAABJRU5ErkJggg=="
-},
-{
-    "name": translate("app.skins.steve_party"),
-    "model": "wide",
-    "texture_key": "c05e396bbf744082122f77b7277af390d11d2d4e93dd2f8c67942ca9626db24d",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADXUlEQVR4Xu2av4vUQBTH1x9XaKOl9bGFoOBeowg2ZyXXWfkH2KjVNVYibKFgIXa2Z2WvhWCjxYKIIIKWFnJWNoqFIGITeYEX3n5mMrnZ5GJyM8UHMm9fJu/7TSY/ZnYyn88nIa6vHylCvL65GYT9DQ0nQETkg3NrtVAwYX9DwwmQbECNAXkIpH4FJG9AHgLmCuCj0ZrD/oZG43NeoXBeDXXbTbCgvtmTAT+ebjuxrmBBfTO5cupwEeL7zq1iOp2WiBGCtkUA82NhQX0TNEDGsAje3f1cogbYtuRwvxhYUN8sGfB38bBE25/uXK0EX7p4rzJAttUAyanbfy+woL5xDLCC1ADl9/2tEhtj/qgNEAFERMpY18tekZgaQCgyBAvqm4mMYQrwGeCjzgCFL0U+WFDfOIHzGzcKy+zkoSWYT14uXhUhZrNZEPZHvnz9VljUaDWd+U04gS4MYJFKFwb8/PWnUPbFALnDK20M4HDwGaDvE9mA/2kAL3kacGZ9a4mN09eW4BgXpDgaIDHmCU9ePA+yeP+xEkzUVCL7KBRMog2gCfZgihZY17aweDJKAxS9+TFuYfFEcih80Ab4irRt5rN44uszG3AQDeDNLzkDmuJ6PyE0zponUDCZnLj9qDg2f1Zx/PG7JexvkktY+H4YwD5t3zz77IuCyYSiN9++qQiZofDgtjhBirBnjPlNDN4A+2krB5ei+NWo8FNY4Jsm4QuVD35hxnxtVkNAC5JCdy6sldii7RDQ4mQ7dA/xwXx7P/FBsXYyRj/HrWDmUzBx5gRF9N2zR0t8Z41niILqhNbFKZhQkBVeZ8CH7ct7N4ABQsH8few4AZINyAYkbsAq6GO0rj0knEAXiFh5bKpw3WbeEHACXcAzzvaQcAKp4QRSwwmkhhNIDSeQGk4gNZxAalQbTfMBdqeD9Frcej6AHY4NJ0BiBXPCI3Z/zvrqxIZOdjC/LU6AxArowgA78TlKA+wcYOz+2YChGdAEV41oAIcEJz05p08DLL7FE9YTixOIpY0Bkp8NyAZkA7IBSRvAtX2+CSpWtCL5rCcWJxBL2/8XjP4K8ImuW2Ln0rqQvAFc2W3C5gusJ5ZqY9X5gLb/L6ABvvX/ELauVWg9H8DfY/f3GWCNoGBF/wNAQbH8AzbvMlGP5kSQAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.creeper_pinata_cosplay"),
-    "model": "wide",
-    "texture_key": "b7393199a84eb9e932efa8dda6829423875eb65af76cb82912ade62f93996b9c",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADuElEQVR4Xu2asYoUQRRFNxZBFg0MBUNBMBD9Cr/ATBCMRROTAUNNV3/AxG8wMvQPBFMDERYDA0105Ba8oeZ0bXW/qurqXmeDs7e3uubVu69rZqqr52iz2RzluHb95rYGxvPya/NyK769u7OnxpVbz7IwHhk0EBrywnheZPLnh/vBOFXQMGE8MmggNOSF8byYUZkmBzUDyMUMuJgBBzgDqAczA3JfhTRMGI9UG6xFJk4fPd4Z6n28eAGUhCWVOo6vlrXHbanXeI5XUYBLJ5/O1NistafaSnXxAiiRHDR7Vlspqy9ATCvTMasowPGTj6MaX3WR6lOiixdAiUwhVYAWrKIAV++dZFXEpuNj9vXqXlXF1xcPtjnYn3AhQr48PM7CeIT5fH/7NDA1PzJo4ACE/QkNExomjEeYT2x+Sn5k0MABCPsTGiY0TBiPMJ+LGRCZ1zH7jzEI6MU+jOIPpRzsPwbH80LDpEkBPr+5vFOZlOpqpzTuO0U5nhcaJtUFMFOGblX//vkdsD72v86x/xgczwsNk9kKoO/40/evAvb/f1sAM2a7N2rnh5PUzvM1OeV4XmiYVBfATMWoXaZttccCeOB4XmiYNCkAr5ydk/nXN+5m+44px/NCw6S6AEqU8Coa7DcFjueFhkmTAvx4fnuyptpyyvG80DCpLoCZmguO54WGSZMCaAlrCaeOU21TjzWGrfeFfbUK5pKChsmuAPZJTR3D1vCWeOtjyyUugClzSUHDZNBglTd4fml4r8DzXgYN56EAtqE5WwHiqcjzSzN7Aez9Z/D80jR/C8ikApUqA7aGhr0wHpl9gFo0hhZEpcp4pPoBAwO2RiZqYDxS/ZiJAVtDQ14Yj4QC6FFxqTJga2QidZc4VRmP7P0CowQGbA3vKL0wHtn96KBUGbA1MsGr6lHGI7tfWJTCgK2RiRoYj4QCqFqlyoCtkQmtSkuV8cjs77FazESpjjH7e2zthCmmg1I97wwaNHVieH4MbkgQ9ifsb9iGCPsTrVBjeJ4MGtZaACsC+xNboouiAsR7AWsqgGcGVBegZj+AiRP2J+wf701OLYDrLaBOvMf3KBPuDQ17GVTMCxPqjb6NlEephrtBHZQqE+qNjNRQvR/AhHpDQ17C3aCMlCoT6g1Xpl6t3g9gQr2RkRrC3aCMlCoT6k3qqnq0ej+ACfVGRmoId4MyUqpMqDdarcpIqVbvBzCh3mg1Z0v2Eq3edWVCtcTP/+PH4uxncGnrJfyRmVJlQoK/McgZIPHz/x4F+AfuuU5a4+l80wAAAABJRU5ErkJggg=="
-},
-{
-    "name": translate("app.skins.creeper_cosplay"),
-    "model": "wide",
-    "texture_key": "b9f7facdca2bf4772fa168e1c3cf7b020124eb1fc82118307d426da1b88c32c5",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEVUlEQVR4Xt2ZsYoUQRRF9xNMDDTTRDCWXRATwUTYUAxMzfYPzCYWv8DI0Ez8AdFE8A8U88VPEAxG37J3uHO6qrp7uqa67QuX7qp6U/Xufa97d2dPTnrw88ntbYkfb94rkvtNxdnp8+p7FhEi4tDStUTuNwVxXnMDoso6OOjjlh3gwj0fjzkKQoRXnKRgkvsdAgltKlzw553iW3SAC57FgBBB4U4KJrnfoZjNBK8+u6BFBwhugF+PjhChSueuJXK/KTiKaFVxrivzKYksrTlKcZ01JtT6upfMHIgk5uSvy8tZObsB/lKNhFqPZzdASakinijnjrE+uwHfPn+ZlbMbwHdSc/Ct3PrKfJpjs9ns8fzTo63z4fv7e2PGk28f3NlOYV9+269vtuKfdxcdMr4X/ECIvPj+bCc87v3KeJKCxrIvv5L4KgZ4xSXazWA8SUFj2Zdfkw6QYDdD94wnKWgs+/IriT/IgBAmsvU553EaU0BthiivOjvgx8vHHboh1NsBBanipIygGUy4NpsY4FVnxd0cj11VB7DaOdKsnAG/X79IknFD2MwAVVpCOXYDfMyEg69unF39nq0k4j7mGDeEzQxICeccxecM0B8eufEYNjGAJuieXeCxQx6BuP/w9HTyI1AixR9kAMVSuAumWUw4GKJTZNwQUtwQHmQAmZqXAS1/D6C4IRxtQOoZF9kNHtPCALY8SfEHGcBK516ENGg1BjhdqN/nyIRrk4JJih9tQG2og7xT1C3sML54I4b79YGPKNebIyXc3zE0w9eD3K8P3IPrzeEVdSM4x3WJ4H59WFwHsNocl6of5H590B7al+tHR6rF757fuiLHKWP8nnOLqGgfvHpKPMT+W9qN4z7mWO0hXcHzFgdW36nKe4UpUOSc4nje4kABpaRpkgyhaI/hHosDBZSSdqP8cxTt5nCPxYECSklTKN8BKXO4x+KQEsAYgcLdkJT40uO0GDBxjfWTIFj6EZh6L/i8vxe4lpr3z5W6sRpSiV9Xbo+aZ/L8vNMFacxYiqcJ+9keARLmCcZVVY+10u8AbopfaShj+Fk3wdeYbxHaQO2rMeMcFMMxE88ZkVrLraeEa073mme+HehDosTThP+V1Fsd/GekVysS8MrFmPFkfInBr76djO8DHyWuTwYT0kFsW5nBeFJCaxmgTlA+XJ8MJpR6Lt0IxpO1O4AdyfXJYEKlF1msMZ6s3QEsAtcnw1ss1fqsgGJ1n/pCk/8Cy5kR8cynOfz5cuF6BLwCEu0xqzDARZXosavtAHaBxhIsrqoDXLAbwq7wdZmyCgPYAV59CqZhqzEgZQTX2CE5A4ZyUQbw7e9G8BEpdcBYssP8vNTZXoS4Us9o+IY54UzAxxQ0lm6on+VX5ZI6n3pGww/xZFKmeAIaUxDbvEQZ4KJy1c+d3xFzPbn7z04nCOChTj+QFdC4hgEu1gU7/Xw3pvN9wIl9F+AmDKU2zj17ZA0DpvAvhasBunPe5YkAAAAASUVORK5CYII="
-},
-{
-    "name": translate("app.skins.buff_butcher"),
-    "model": "wide",
-    "texture_key": "5e4e09eccbce11e701c51bb64b102d688a6ac4018c725dd2b780210aee101b31",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADPElEQVR4Xu2asWoVQRSG8wbaaKGCaLQQCwuTIJJCEIKiXAyoYLDQNIJCwCKPIFhY+gCCqexuE32DW9rY2PkcNhvOhXM5fnt2Zid3M+7o/PBxNzNzh/P/d3az7OzKSkSPb11qQhzu/QrC+YoTDRMaJpyvONEw2Xu0EYTzFScaJjRMOF9xomFCw4TzFScaJjRMOF9xomFCw4TzFScaJjRMON/oREO5YT3ZxYJOkrfb63NsG+vJrq2bq00Odu9eWwQgx9rOerLr56ffTR++vFlrtaUgpr1j1pNdLFSgWdHm6qlWe+g7pJgAxIjitbGP/ZwvBuvJri4jHrtnzs1Ro+w/TgisJ7v6mk+FRrtgPX9d919/bixy7ls4ntp49rF5eONsI58WbXv17msQzkdx/HQ6be6tXVnA8ckaKgDeEZ5UALPZrHl6+/ICjk/WiztXG8vQAexvXQzC+SgGMPgKKC2ApVfA+pMPjcBCiI4TJpPJ4pinjBQlZnlRlDbp88YLvDjSaBe2LoH99NuSFkLDxJp/ufN8jhx7hsTsweGPhXk5/mcCkLEaAM3YAORTjAu2zRuv6Glm23SOLmiY/fTbEgsiTFjavF/eGlKzlj4BeL8+TyXCaw376bclFkS8ADy4YmLUAJwAPGiIjDIA+dekyN8HO+fHGwCf2hA+2GC/FwAN8+/RB6C/Xp8Avu1vLs339w/+wPbZu7zjQL8t0aAgt5cC2z34y3q/uM7HcYoY1dDl2PbZuzwPGhaS7gxpKJU+p4CY1+uBYq8fXBG2j4Zj5pMDkGV8/cLp1tJW1KiM8cZ5AZBYACH0u/rJe/+QefkO/VZVVVVVVVVVVVVVVVVVVVUNLj7QSN1c5UNR+7BDHoZw/Og0dADFPeFZdnudARS3AoYOYPQrQHeM+CCUcIepCwYQg/VkV98AeG1Q/vsAaIj7+zFYT3bxFxRTNB8KILa3F4P1ZJcXgBB6icKiV/hYAPZiaGE92cUAYu8QkdDOThe61zjKAMRU6B0iUvwK4GYp9w5jFH8N8AKw7xfE4CmQCuvJLgYgpLxfQENc4iFGG0AKDCAlhFEEoO8NqCEuccV7t8A7BaxBXUmh9wNYT6qOAFYKzXkiwrtJAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.buff_butcher_alternate"),
-    "model": "wide",
-    "texture_key": "d66ed86ce96a1b63c30f1baac762f638717930866474ac4fce697cdbd0bd6fbb",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADLUlEQVR4Xu2aP2sUQRjG8w3S2VikECFWVkaEFKkE0VIPPCxUECFpbNIktZDCQkhIZ+WR1Neo3+A601j6GazsV56D95j77ezMbm5v3NF54MftzczOvc+zf27Z3Y2NiA4fblUhrkajIJwvO9EwoWHC+bITDZOf5+MgnC870TChYcL5shMNExomnC870TChYcL5shMNExomnC870TChYcL5BicaSg3rSS4WtE4+vdmZ47axnuR6uXe7SsHJ0+1FAFq2dtaTXL+Ojqo2VN8ntbYuyLRvmfUkFwsVNCs9GF3U2kPrkGwCkBHD18Y+9nO+GKwnuZqM+Ph9+XGOGWX/dUJgPcnV1nxXaLQJ1vPX9Wj/c+Wye2tzCY6ndp6fVU/u3qj06ePt+69BOB/F8dPpdOnfhuM7q68ATsd3llhXALPZrN/rCv5/9x0AL44I56MYQO97QG4BrLwH3Hv2oRIshNg48Wr8YrHMQ0ZFKQCeFNWmPt94wZMjjTbh1iXYT781WSE0TFzzxwfv5mjZZ0hmJ19+LMxr+Z8JQGMtAJphAC6xAIQdZm4b5yE0zH76rYkFESasNt+WNxgc4Xi3eN/W56FEeP+B/fRbEwsivgBC0DDh+BIAdmFCQ2SQAeivydD3yfjmcAPgFiK8LmA/DdEwv3M8DRMaImsJ4Pz1/TltAvh2uLsyVyePl3D7+Ptdod+auIIwc2z3wUAE9wBdrgqOc0O0Q0bL7A/BelgT/dbElbvi7vqGLwBesrqHAfcIHlJNsBbDHUO/NWmQLj44OX/ELlLY36bQWAAhbF375Dwh81qHfouKioqKioqKioqKioqKiop6F29odH24ypui7s0O3Qzh+MGp7wCyu8PDW1SrBpDdHtB3AIPfA+yJkVuoDz5haoIBxGA9ydU2AJ4bjP8+ABri8/0YrCe5uAVliuZDAcSe7cVgPcnlC0CEXqJwsZNlLAAGarCe5GIAsXeICP81aNCH+6yR9SQXA5Cp0DtEJPs94Dpb0CX7c4AvAPf9ghhcvyusJ7lYkFjFHAMKofGsJ7looA9otAmNZT3JZdf4seI1hm1mosm8ne1D7wewnq76AxzZzWJWGY1cAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.barn_builder"),
-    "model": "wide",
-    "texture_key": "2007b66a99ae905c81f339e2a0a4bf4b99e9454a485d5164e3e1051c3036ad70",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAETUlEQVR4Xu2asWoUURSGJyHYR7Cx2BAhIooYAgYtBKvYpBAsrNRU2lhsI3aWvoAgPoON2PsA9nkAO8EilYUgyrhn2LOe+c69O3tmNzOr2YWPnXvm3jv//+/N7OxMiu8fbpc3i3elvAaDQZFA6vPA+WqMDtsrxfHb6+WltSfl8/fTAyiKokLbATjfcgXw8eX5cmPjSrm+/rT8dVIZpMhJAMaUQ+axmH2cb7kC+PzoViVybe1e+fX4DAZAQQkmAUwL4V8PoNzf38+JbQyA5hEC51u+AMbGnLgxkwB020LTJDHf8gXQwH8fgDOVIhfAvFBQ18wcwGlBQV0zcwBywcTaIqCgrllYAPItcvLtU3UtIZSvfrg+KSioa7IBiGFBTmTyknOA1mRbXrJPaxzH+XJQUNc0BiBXioK2c3WO43w5KKhrGgOwyG8GgfWoaQsFdU0ogCY4xyxQUNcUD69erLF99KW0UPDm5mat/8Bf3NT66wXR3ovf1fvOzk4Txf3d3SyXH9woBZ2f48XU8HDLGc1xagHwinAVwCqAJQ1AhCli2LZTNdtOBSTIPp4gpabiiezjHAr7MoAc2o+GySQAGs2Z1rbWUge2feUKUbdpwgaQM1ftf3anIteH2H40TGoroA08uNbVuLwPh8O/Y8ZmaiTqk/nY1wTBY2v/SbCjbRomyQDsJ9wIBZrxJNl/PGamWgtomCQDmJdUeKnatH1aG53QKmhsGjpGoGFSHL35Wc4DhTcZivL68bWaoVmRcQINk0K/PuRvVTk4OKiwNX7dKBSsJJd/C9SQPbE1YYOgYTIJoC0UbJH7AvKwhfUI9oQ2KzYMGiZzrwBJWT5hm7ptSwisNbXttt6ObwsNk7lXAJe6Re8OsR6Bx4tCw8QFkFoB7GPhkl00qsm+R6BhIq/aALvsGQCXl0DBUfiJE9Vk31ULzaagYeJ+bFhGB6xgXZEfQyMTczEy2YjqUOS4+uKPOULDxJlaBRCAB+sDGoriTEWgmD6goSjOVASK6QMaiuJMRaCYPqChKM5UBIrpAxqK4kxFoJg+oKEozlQEiukDGoriTEWgmD6goSjOVASK6QMaiuJMRaCYPqChKM5UBIrpAxqK4kxFoJg+oKEozlQEiukDGoriTEWgmD6goSjOFDuQ4eHW1AC2cUODT274cJXwDi9vcIxYBbAK4CwHcPfCucUGwEITEoBt7+EGp22narYt2zTcAqcxgis0kQuARnOmta01MZF6omNp2O80RnCFKDQbZsqjLdZT+5cyAPsJN5IwGKHzAHJ/Aq1JmEphnyMq431OYwRXUMQo0brtx/8XiEJT09Bn/vifAac9gisoMnEO20+/nvQxmsBniwK/zpTESS0JwxDGdac9gitEoaEoXOo5GIgw/tNwmiK4QhQ10nYFyEPOOXGaIrhCFBrqmqUMgCuA+yPo+Nw8vQcgx6cou/St8MTydWO1n53LvidwmiL8AQtFWPMRH+/YAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.homestead_healer"),
-    "model": "wide",
-    "texture_key": "b9e9d1b51b4be289b9525d4decd798cb7912e920bac8846a2df70e9ff4f0b1d8",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADZklEQVR4Xu2asW7UQBRFt6KAAgmJOqSCghYKpEh8AA1SylBSg6BYUZMf4A8QUr6BipqeAomGmjYFteEtutHzmTe2x9lMds1c6Wh3Z8az794ZW443q9WIul/fOs/vH1/Dz+dfPvbaBefbO9HQUABkEQGYwTksJoApO+Dl0WHCfxMAjS8uAG5tQuOLC2DuDtA4zrd34ooTGiecb+cUrazee6Pvjx/18H2540nUznqqKyqOAZhhrqwPIXe8/2zYdcEfsxcBcOXJ1AByn1lPdUVFaZUYgF/93KnAucY+s57qioqy9/5KLmSaZmys397+ffR5ZwPwaKXt1XR3/fQiAHtv8mN4PGFoOxNAZDrHyYPVBrZ7QzQbtekmydpZT3VFV/dS5gSg0FnPtev8883O8+zkTQ+Opx4//9T9PL29QXPos+/Lwfkom8PDxeD4YkUBqK8kAO6sFsDfNtv6NEw4H3UtAcw5BRiAznsaJpyP2noANBxhhb29d2Pzyr77T14nWGE07y+IHht75/A4hGYjou/20G8iGopQAAb7WICK0IpEAdCkHUPzkZmI6Lu3FoDfmgqAu4AFqAg/B+8EOXaKkRxjx9FvIppmADJ+mQB4n+DHDm119dkcudfou30//SaiaQbw4eGtHlcRgLZ81M5QCI9jP/0m0hbPEQXgYQEqwo/hH0ocz/Pfh8LvEzI41k6/ibjqWjVteQbAU+HsaJVl3b3oDr7/e68dwDFjsDbV5xlqp99EnFwT0TiZEoCZv4oASqDfRExN0DDROG5nbWnOZ1vfiM73IXhDVQr9JuJVvhRedARXwpvi2CF4p1cK/SZiYoYd+G79avPKPsKCBQNg/1RoqBT6TWRGLwO3+sWWRwDsnwoNlUK/TU1NTU1NTU1NTU1NTU1NTVsXH4TM+XF16IkQx++cogDU1wKYEIA9OV5cACWnwN4FQMOGf6jJx+i+z8b6x+X67YCnwRCsp7poXgHQOMkFoH+amArrqS4+xs6tPNG4vQ+AxkrJBWDhTHllPdXF3wzNFNtyDAUwFdZTXZEptuWwsf608RdBnlJkMQHw4tkLJLjAchzrqa7IFNtyMIA5sJ7qikyxLYeN5a/NpbCe6uJVvRTe6ZXCeqqLK2JYYfbTub2yj9BQKaynuvj/AqXQUCmsp1R/AB9XSbTAQuguAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.beefriender"),
-    "model": "wide",
-    "texture_key": "59f2872323bf515aa8d84c00931fbf8170b2cec5138961527c09ffcd06ca4ab2",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADV0lEQVR4Xu2aMWsUQRiGU1wRCJIEiZxBCUl+gYUQbCxsBK20srbwByjpbG3s7K3zHwz2/gFFSCNaib2kEFa+he/47plvZ3fuNns7uXnhYfdmZufmfXd2b7OTjY0WPT++U8W4t7MVhf1lJxomNEzYX3a6/HxcxXi0tx2F/WUnnnFCw4T9Zafq+/0qxu/3+1HYX3aaTCaBaUXqaJiwv+y09gHQNKFhwv5GJ72ZyWBla+/wcoaFk0+/AuNSpvX2GNtXFjfJLgF4l4GtawuAzwbKWgXAM59FAOTt0V4Ny7sGYM98NgFIuUi2lxdnNXNlaxHAl68z84qUpQaQ5SVgz/yP169q7Exg+6YAPLILgHQNIAbHs3LpwBWeNban9EbZhIQTg/1RT27vVhY5ESnjaxUDeHDzxhxsT9EwoeFvp9OaRQNIPUGtYgCpX0DDhAEQ9kcxgCufAWMPIHV8gTgAmY7nL7dn8HKw01VgYMLTg6kL2y3aPgX6DeQF4O03lfELBRrpaqhruxToN9CL/d1K8Azafd4MFX6hxTN0sLXpwmObytvgMfQb6M3RrTqAJqxZuYafTXfm6mmkaeC2js8OPNa2Y1kq9BtIArCIyQ8PD2t4A/MC4CUSGzSNWz4+3qxh+bLQbyAvADVH810DUFJMVX//zNrLPusXhX4DeQEsOwOEVPO6Pf/5r9cQ6DdQ3wEINK9m2E6wRm0AGsK7k7sBNNmEtKXfQF4Ay1wCOngalC3bar3WaQC2nOYHCSBlBlizNG9N6j4HaetsAPqZ5ruGoO3oN5D+xHUJgM8AgprmtE9Bz7b3mcZTod9ANJQKz7w+QtOkfbxOQf7YkecI3eo+jSp8/qDfoqKioqKioqKioqKioqKiot6ly91K6uKlrB/Yxc+5dYWLs9bjVy4GwDdIbE/FAui00rNq8ZXU2s2AqwxglDOAr8DtC00upROp52t5MWkvGf5DhK0bRSCeKW/f41oEoAP3TNt9XUjhTfHaBKDYVSPCelll4vHZB8CVJda3BSD/fc4bXwyOZ3DRgJhWg4sE4M2aWD3HM7g4wGVnAA221XM8g4sD7DMAvc4tUjb6AHRwfQTgMfoA+pgBNE1GE4AOqC0AGugLjmdwcUB9IH/02OteP7O8j5/B/9mMb01DvTTrAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.beefriender_alternate"),
-    "model": "wide",
-    "texture_key": "7cd85127cbc710a1c9a53c6bb3474f59995c222b9d8c57b293993cc2d8a225aa",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADS0lEQVR4Xu2aT2vUQBjGe9hDsWgbZKWWQnF79CQiihcLBRF6qyfP/QriTfDuzbMe/BoWv4Z41pN4Fw/C6Jvyhre/TCaZTRozu/PAj6Qzk+k8TyZ/yOzGRoueH+67EPd2toKwv+REw4SGCftLTr8/H7oQx/PtIOwvOfGMExom7C85ua8PXIgfb/eCsL/kNJvNaqYVqaNhwv6S09oHQNOEhgn7m5z0ZiaDla29w8sZFh59+l4zLmVab4+xfSVxk+wSgO8ysHVtAfDdQFmrAHjmkwiAfHx6UMLyrgHYM59MAFIuku2bh/sltoztVzIANU5iA0jyErABnBVFyTIB+EguANI1gBAcz3+XDlzhWWN76vVi7kJIOCHYH3V/XjjL++OFu3vjWgXbR4sBPL55/RJsT9EwoeEvr3ZLlg3Amr+SANZ+Bkw9gN4zgAOQ6Xh+tl3By8FOV4GBcYAktn0bbf3Rb02+AHz7TWVtAyCx7dto649+a3qxVzjBZ9Du82aotA2AHGxtemlqx3LC/89j6Leml4tbZQBNWLNyDZ/u7lyqp5Gmgds6vjvwWNuOZbHQb00SgEVMvntyp4Q3MF8AvERCg6Zxy4dnmyUs7wv91uQLQM3RfNcAlBhT7tfPqr3ss35Z6LcmXwB9Z4AQa16359/+DBoC/dY0dAACzasZthOsURuAhsDnvECTTXR6L/AF0OcS0MHToGzZVuu1TgOw5TQ/SgAxM8CapXlrUvc5SFtnA9C/ab5rCNqOfmvSR1yXAPgOIKhpTvsY9Gz7/qbxWOhX5Zw7+ld5VAWwLDzz+gpNk/b1Ogb57iCPUN3qPo02QeOq0vwFWVlZWVlZWVlZWVlZWVlZWf2ky91K7OKqfPA4uV1U2HUFWQlm+8mJAfALEttToQAEtp+cuFa3djPgKgOY5AzgJ3D7QZNL6UTq+VleTNpLxoYh2LpJBOIz5dv3sRIB6MB9pu2+LqTwprgyASh21YiwXlaZeHzyAXBlifVtAcivz3njC8HxjC4aENNqcJkAfLMmVM/xjC4OsO8MoMG2eo5ndHGAQwYga3uc8lI2+QB0cEME4GPyAQwxA2iaTCYAPs+bArCPLwuNxcLxjC4aioWGFP4ewG6HfAz+BfXfE7V8VnsdAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.ranch_ranger"),
-    "model": "wide",
-    "texture_key": "25dc6421d47cad8e2bdf93f56fae9ab06fcfe218c8645c1775ae2e4563c065ad",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAD8klEQVR4Xu2az27TQBCHfeoREFIpICgSoVSCHioBQnCASCjiwB8hQPTEqXfUx+DGlQM3BLwJD9FngFfAZKxMNflm7XjiKOsmrfQp8XrtzPfz2k68LcqyLJrY394pm3i3tzcLt88+Ubx9Mij/Hb8Q3ErByt6+fL1ipQK4Nzhf/vj+RXArBR7xVQygEPmzAFoEsJKnABvIWQBGVkNYuwBGdx9UrGQAOqwtPOpNAWhbB1xRy6Q4/josyd9foyk0ALYT7qclrqhlkgxgybiilknyFFBeDQbVecz2RSIBvNnfnxsKRXEBiLS+CrfObZXyV4yvl9om7+VP1mmb3TaIk4pAoSiNAcjR/7QzquDV3bavTAB6NBVKyxEX2M7tEpJNOKkIFIpSsPimAOrgdhGyB3Bw5+oUP4/2SsvzGxfIVP9xABXvd3cr5Mout0SGJG2/Pz927YSChHeRcQ0pnGgdKxPAs0sbeQJIFbh2AXx4dKUUTmUAFBakULv87XD7BPZlQbMCsPvq+BW6FRQmxf3Xm6Uw/HitfDlGXm0Asqx9UvADBZHSfSoqawPQELj9IqEwmQpAWVQAltQIWMYooDCpDUCZNwC7D6EuAAm5dwEo2k7ppgD0iOq1xAbA64kNQENY9CuFycIDsBdRlVfJugBsCIuGwqQYbm6Uit5Gjh7erDC3lZM+RAUs9hpiBZsCqENub12gMJkKgMgO2Eaebl2c+kCZZdIAyz+HU8vyngXakC3sNy8UJp1HAANQVFgD4Pq2yJcvrcG+bwuFSeMIaAOHrJA6BbRtnlPAfh4DmgWFiQtAUtMRoMvss8wAlj4C7MZ9DkCOLmVTUJi4HxsRDvBDqg1jaQf7WPjji8uzoDBxUhH4YW2g/NoFsGgoFMVJRWAxOaBQFCcVgcXkgEJRnFQEFpMDCkVxUhFYTA4oFMVJRWAxOaBQFCcVgcXkgEJRnFQEFpMDCkVxUhFYTA4oFMVJRWAxOaBQFCcVgcXkgEJRnFQEFpMDCkVxUhFYTA4oFMVJRWAxOaBQFCcVgcUIqQcaTZOrRJ4e28fuB/6BzHoGIK+T96sfgJ2cmUifBdDbU4DCin0w2vQQlNNxDMBO05HJ9JeTiuCkIkgAWowUKf9fYANoKt5uN28AE5xUBCcVQXZAkS4BpNq4LoGTiuCkIqQCsFPiLYpPSupy4vyv2noTAE8BlQgcPSdIWXnVqXfbppz+ABL9dJmyvRwBLE6IzC43odvZfST25aQiOKkIDEDgbG4XErKpNicVwUlFYADzjADbJ4Xtk+rfqwAy4aQiOKkIdQFwBHC9hUeU2D41/Z1UBCcVQT6cQqkiub6pr2Dn/mcFMOw4Av4D/tigEeZ/LxYAAAAASUVORK5CYII="
-},
-{
-    "name": translate("app.skins.pig_whisperer"),
-    "model": "wide",
-    "texture_key": "83e283ab33558baa2cd0184d2e85f090c795a797bdbcb2cc47230c27f23fe9b1",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAC6UlEQVR4Xu2Zv2oUURTG8wKpBWsVLGwSEDut7NIF0glp7ER8gwULiQ+gjSCkswp5gVSB4AOkyCOksRYER0/CgbO/+/fgct3Jng9+ZObeO3fP9+XO7OzM1lZDB893pho/Tl9X4XyzEw0TGiacb3ai4Ze7jzczADUeAWxaAGJYYQCyTcOE881OV2/eTYqY1r+63YLzzU405IXzrZ3s+WyXthq4PvpQRcfx2tAL6xkuFiRsdAA0R8OEYzhfC9YzXF8fPJ2E68uL278w93fIJKJxkfQxADuXcPZotwrrGS77NScwAN3++e14idwYgfO1YD3DpUvx1/nihlIA3/dfZbcZgM7DpV6C9QxXbwC9K2B2AWjBit7Beb8F9DjO14L1/HfpxUs5eHJvCY6nPu49nGpwfsL5KF5EJfTfi+0bVnLrzYIigAjgjgfAArwwoLfP7lfxjqdhL/Sb6PPicPoXvIa842nIC/0mOvnyfiohBltt1ozcAgs0zP0cnrH8PLZb6DcRDdbM5tq8Ba2Sns+j30Rc0l54TVg36DcRE/PCc84iBej2i0/bSX8Oe0xPewv6TURDPedgz0VKl6cg+xKAwrGWktFSewv6TURT9jubxjk2F5LtE/SiKMZ7xpM7E0DveP21qfs8p73Qb6JaQezLjeEHKvYUkH29W+O4pWOObp8oSQDaxvcMPchq0236TURT3hXAJWcRA7qtAXCMRX9eSwDaxp/Pgs7FdsVeb+g3Uc0c+3LQhMUG0AuPoTlPALJNv6FQKBQKhUKhUCgUCoVCKxcfc/EBCsdT9oGMwMddHL92igAigA0LgIa9MCAG0IL1DBdflnopBVALw/axnuFqvT6vkQtAzbUC0H7WM1w5U2wrUQrAA+sZLi5pL7wmeGE9w8X/iBe+GcohRtmmsJ7hoiEhd76W+mgox+wCsC9YGUQEgAB4TnthPcNF8zmTtT7e6XlhPcNFg4JnBfDVthfWM1w0nzNZg4a8sB6v/gCGgsd9V9IDLAAAAABJRU5ErkJggg=="
-},
-{
-    "name": translate("app.skins.pig_whisperer_alternate"),
-    "model": "wide",
-    "texture_key": "e1fc44f1d69fd2864df7b80618a38af4170d4800f2df4fbde81c17b74b2a818b",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAADDElEQVR4Xu2aPYoUURDH9wIbC2aCigYmriwbDghmmy2ICoIHEPEAwoKB6AE0EQQzIwNzU/EABnuEvYEY2HYNlNT8ut4Xuz7naf3hz3R31byuX+3rnv7YnZ2C7q32ppx/fHqQNccbTgSmCUxzvOFEYJrANMcbTgSmCUxzvOFEYJrANMcbTnduXpvUAqyfukxgmuMNp+8f3k9qgdZPXT55/DRrjjecbAM8E5jmeFung+uXJs8KcPryRdaax++r7SHkmfV0FwuOBsy2cASmbQ7HGaIB7y7vT9an375swM0pk4jgIoltNGn+Lsf7fHUva9bTXfyLpWYAT35eDscZYgZooc+O9tdONeDr0UN3mQ2w4wzZADVPgrkZIOb3h2kAC081IOVUA2rNev66eBK7e+PChplPvTq8MuXM8WmOR53cPpys5XL75/Hu2udy6c2CogHRgH+8ASyg1WzQk4OLWbfmc3+8kCrFybvQm+NH01ncCtSaXwIsxcm7EIE+vn3+24x5ORZmfRk9m8Bc99ySy/1xuzV5F8rBMebltBZ0nq7ZH3kXIpyF5DavAZyC22byLsSOtZo75PGpy6vXu1XHLF3KL8XJuxCBao7BmpOUTk+xrEsD1F5+yqnxa+PkXYhQ9jeb4Mz1mmRjYj0pCnhNPl0CLMXJuxAL+VMNqM3Xu01dJ2CrybtQriDGvBzuUDvPQ0Cv1lL56+/Md5fyKQ3QbfdXtzbMu0kvLrOt+m6TUK0zIAdk12sbILfWpQboWLkGqMm7UA6OMc85IK7rtlS+Zw+wtgFVMyAUCoVCoVAoFAqFQqFQ6KziAw8+QGE+xZepw/3rbTQgGvCfNYDArWaD7ENZaQDjss3msJ7u4ovTVhPQPpH2nkzb2NY2IPeKnTECEjIV02XW010E9CBzMQK2mvV0FwEVkttSDeA5odWsp7v4F2k1gfhmqBRnPd1FILE9S5diJcBSnPV0FwHF9necjYgGFBrQatbTXYT3IHMx7+1u6f2/NevpLgKKW2ZACbAUZz3dRXgPMucSYCnOelr1C0ujGNVjQEcGAAAAAElFTkSuQmCC"
-},
-{
-    "name": translate("app.skins.snowfeather"),
-    "model": "wide",
-    "texture_key": "721c05483a435d4362047ccb62e075ef5f001aa63a7e0e2afe03e60759bab91d",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.stray"),
-    "model": "wide",
-    "texture_key": "b914cf5106aaa82409fdd9213fbdb1479b4d65aecc5d5e22b1f25e5744c4c4f7",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.strider"),
-    "model": "wide",
-    "texture_key": "5eb077c54ecfc7e760c36add887b68859d7a3160d331580ff859f7353d959151",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.villager_1"),
-    "model": "wide",
-    "texture_key": "b271a744ef479018927575952621b110b9c11f62730a95729af7e8591cf8dbf6",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.villager_2"),
-    "model": "wide",
-    "texture_key": "748923629fed7c6ec9462016b4480fa3cff8c16e82ee6fe26d4b707f4de10060",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.wither_skeleton"),
-    "model": "wide",
-    "texture_key": "3d996abc69ea70a20442855e429bf44b45111f9818d0f8c46272e12d12bec218",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.pale_lumberjack"),
-    "model": "wide",
-    "texture_key": "6f8fc677cdcd4c6eed67d90c08d23162abc3a3a85357c7636fdf80d874aa857f",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.creaking"),
-    "model": "wide",
-    "texture_key": "9a0af2b1fd9659480d43132db95cd7d459d1a66480fe42150e132d03b9731573",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFkElEQVR4Xu2azYodVRSFM3bgSJwJJjjIIKA48IdkEBIRBBFDyMBJBDU6CFFpBEEiOJOQmeATNPgMjiQPFPARStaFdVn91amffftW9b0xGxbnb9fps9be51Tdqr50acL+evq4+/v0dIM/f7rXqa1SbdU/vfbqKDjf0ZnJm7BFsDAkTHC+o7Mkn9E3SJjgfEdnJJ9b4qIF+OW3nxedf2OHugWe/PH7YnOfsUPNgFUFyOgzI0iY4HxVS6JM+VVEyIi3soCECc5Xtc9u39zM4XKob2djRLMt5J5X/Yv3Xu89D0zNMQauR5aRvX39w+7+3c+777/5alOKtOrub11TMkbYbZUia8Im/+DmG2faQl7D+bJs9XM9JCKiz09e6/49fX9TirxEUP+vJz+ef0twwY6qyQommnWO6xpuDwrQKrke7nMRFlEhs0Cl+h6dPDxfFpiwSu1ZEXL0SbgF++ga1TVHzpmitgRQJHW9SkGERMRtEc0twGxoXVPBRgAv0gIwumNIvxTAcxpqm3iOKwg8LJUFd+7d6VRmxFvZkNftZF6gT20TqgpgeJ4kb8K5zVKAlnkrMBMyG1Qq+tw2JfOCTSiFINkhJHHOk2I4C1J0rkdkcl/7wMvUz6yw3077X0YyS4BCpFhcj4wRHUr9vQhA+/Lr+13iyuU3z4D+tEcfXO2Mpx+/tUH2TYHz0ehPselftn0JYPJVETgfjf651VpbqmzHJsDiGfDuO29vyatOf1ourkpe4Hw0+p87A3Ti+p7rW4ohATSWoEBc0KGBfHu2iwDy2wJ/sBrxqn8V5NszkRCplgAWpyKAUCU15c/xbLs+5EO+PbMAuo9agCQ4R4DqXqf/1LXpP3Rtq18g3555L1uAzIKqAENEcnzKd8x/6LqhMbXJt2dVAVIIobU49o1hyp9kqyDfnokkBTC5OYegF/rPd1d6hJ49ubHtd8n6lD9vc8b1y6+MYvZt0VFOAVKIKQG8aJWuu81+17M95e8HHP7qzN8YhvtKD0Ym6dteEhwSIH1aRMYIsj3lv6sA9iHfnpFgFVqkU5gp3hob82v5ZzSHyGfau5ydAfmcr0fdfF3E3wGGxvyInHt4rO52lvRp+acAiYy0SLfGZgkgIi2QNIUy8sRdAo742Asa7vsE+R69SfRPPrrV/fDtg1k/zl44E/kEx194U9Qd/f+lACIv4j6DOL668fD04rxPnar0I+yXBFmyb2jeVTPEC8mFqZ+LdV8u3uOeJ6/JuSlktl3PPrc9z6LW+uPqpwCsM9JZTwHkp7pKw2Pplz7ZVrmo5YK8AEY6o8YFuo/+viZJZJ3iuL/VXsVyMSlKLrQVGYrBaNqPNjZ24VaJDPt4bf6AIvI3A2GfnPulvbSFjGlMa42zj+3VLF+D661QIseGoDlaB1eWrXEeiK1T/cJEqZgJusy6xn17U1/Ws89t3v89x0Gb79kJk3Hdfi3/HON17j8qyzfKAl+m0J/GFyLVFxwSjRm1qu1bAL74pD/N29Dg+OK2bwGqGeDI+3zh+OJGAbSIfJdIfxoFqGZAniGr3EX4mlyk8zapbwcqPUaQcBU8VPMAbR2qmSF72SIVAVpfnkioitZt2G0TznaSn5ORk0YBTJgCbMgOCDD0vSCJDo1pDY6kiGVk3fZWyPretkhLAMMC6Klym/IQID+GkGT2t+oWIIkwtTnWqp/LWgJk9CmAsfWPKBMmy2xIcD2yvZGbYxUBMvrOABKqIkVK8N0BYT/yKRsFOHPCzxCA3/X5fX8I9uN6VreWACQqAZwdFIDEBD3wtD6HE3OeCxa3MQGcCfkcwDETqQiQn8i5nrLlLcuovBegAFVkOg+JwMib/EFsAT7rC/k/BnrY4Fj2mZDIZGRJmLAP17O6kXw+908hBRgjPfY/AlxP1f4DHdYiztEAqp4AAAAASUVORK5CYII="
-},
-{
-    "name": translate("app.skins.ghast_riding_swimmer"),
-    "model": "wide",
-    "texture_key": "e12d98dab548e92cad7ac80f92d8fefbb9ca7a1af94aa4f428daf6ef723aa8e0",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.happy_ghast_pilot"),
-    "model": "wide",
-    "texture_key": "8409954698b6c7741460fdd85d6ec6a5e0a9ad04ade7e2c72c913f02936a607d",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.copper_chemist"),
-    "model": "wide",
-    "texture_key": "33aef79a4ca986a2971057d35046e71dce326b645353e6f92d56e1c4bb3b0073",
-    "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFj0lEQVR4Xu2av4skRRzFLxMRvEBFueCE40ROWdTzF3LCHuKJigp6F53BsigoKIgYnQriYiSLroKJwRlcIAZqaCCCgZHsP2CigX+BYD7yCt7w7tM13V3jOLsz64NHVX3r2zX1vl1dU1Xdx44N4M+dNyd9/PW7a4U/fbk7ZZbZ3spBIr/dulC49+wDhVsP3lKoulnCXWZ7KwcHgHe+FoAa2d7KQSJ115X+/NalaTCcUjDJ9lYOKdaPQQaFgkm2t3LI4Z48UiPAk54nQU+KDgZFa/K7/MMX6xOAPlKw8mlne4cOFLRssj9Lhzqh2V10Pic755XaL23yyfpae7OuV579WTr8XB8U2Z+lQ8/uxa8+LM9w8qlP3yk8+dqLhcrbl3bXJd2m63///JHJ33+8Uqi87exPQu3fcOKOwuP33D31TZt88ppmbG9vT8TNzc1pKnpGT6G2ZQBs83Vuh+3WysqzPwn9jsWKtqdtKIiDYKd++/H7UlYqZgA0q8uWAbCfr5kllHmn7E9Cv6O7zACkbSEBSGrYWtQv31wtqSYz20wHo1ZPsX1kf5YOi6Egi8+ASJBoG4VnG7RnXebZnwPHxsbGJHnTqTsLOQxnwavGGjXrs32S7RFsU49Dkv7NYIccAJP+hDvGUbCyAdBdn2cErE0A1n4EeEHy/pWXp+m1qx8U7n78RqeDmgBdL1+u7Nyxz959+zo6ADXuPHHvdaIWSertQKJz1abUQVCa4vUPIF/XKU8xDsLXn3xUOCYAGQjR+UzJ9CVdJ1JvBxJhOgAOihY6Fp4BSPLHzQxCn3hvjIaYolymD/2VUm8HFs7Uqz0LNy3c630fjiTdCQ9Dl+lXY4pQmc94K6m3A4slvdRN8aJsOQK4v88tNMXQj9eQsue6fx5SbwcpNsVTuOi5IINAISmItrHMaymoldTbQT7jnPBSeKbpz87PEjKGeexuckjfeva+jo1MH+rt4OztN0/+DSmC1P6fooaofxnn+8SNIfV2wP9N8b1nThfSXmN2ltQdlU8tALXr5O81RmsAZK/VUW8Hl87c1RG1c/H+QtpF+Zsq94mqCa8xr2OeK9FWUm8HtQC0jIDsNNNZAUg/XpM+Iu+o77InOdbTTr0dUFBrANTJXD5TnOYA16ed17icS20HwMOb4saQepsxb4PNf0eHFX6WWgOwNkjxRzIAFj56Vv0f82Ft5ox5sb+/PzGUZ/3aY29vb3r3lWf92kOiT/21VXgkA6Bhf3z3ocJ8BG577OGJeeLC+cK0DTF/41BDQ1/CxSM5CR4YuL8X/Q6f9hrZ3spBG5rnzwwLefzkjdMtcG6H6bdykAiJo51QkLgTXIsA6E62BiBHAv1WDq9uPz0RtR83c49u2o9ke2uH1iMmni77Ov21jbme7xO8NjDp3wdN5C9cfmny6JPnCpWnzyBaD0QYgNZNzqICIPFKJfz8688VKk+/QeSByJg7yAC0jqBFBEB/487rrjsABzoClhWAFC9IdD4GWbcQULDW37MOPE0ffPa9XR7L7Is/xExbwo+F04XAwv26LMWJFux8vlleZABSlM4UnDcomuW5wXeGKW4MKaiVXra7P84rCPlpbtYZfaNlNBgAC/O3Bg6IP75I8XrLzH+JVuabqnlIPc2w8AyAvzKRQOeTFi9/ifAEm3mXWc+yt9DzknqaYeEeBfmdAb83qH2DQEF9AaCP8tkXCspy7dNc+s+FnAAzGGT6pK1PHMWTDAAnP5YpuNRzfy/6237a/wtapAWn8DFpR9CMcm0ElPqx5wGztsM15stVTTSsT1JQXzBq5exj9Q4HqvXqxJgAaMvsTg+J6vu+IKl2fBI8L7OPfYJrI6DUqyNjzgN8IjQkXmx5vc6lbiuzj7zDo8q555/nPICClh0A/q3NYiLt/wB5ecIRSUHk5AAAAABJRU5ErkJggg=="
-},
-{
-    "name": translate("app.skins.copper_welder"),
-    "model": "wide",
-    "texture_key": "514b10ff7bc50dd01b5438632815b9e27cfe54064d1a28ef6014f3309d278b38",
-    "url": "data:image/png;base64,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"
-},
-{
-    "name": translate("app.skins.zombie_horse_onesie"),
-    "model": "wide",
-    "texture_key": "f0feb1b31b6c8fd9f2d405de335c760a6c41aebb22c39ad059beb8b20c6fbe62",
-    "url": "data:image/png;base64,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"
-}]
-
-class Data {
-    getInstances() {
-        let instances = db.prepare("SELECT * FROM instances").all();
-        return instances.map(e => new Instance(e.instance_id));
-    }
-
-    addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
-        db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(data.getDefault("default_width")), Number(data.getDefault("default_height")), Number(data.getDefault("default_ram")));
-        let default_options = new DefaultOptions(vanilla_version);
-        window.enderlynx.setOptionsTXT(instance_id, default_options.getOptionsTXT(), true, false, (v) => {
-            let instance = new Instance(instance_id);
-            instance.setAttemptedOptionsTxtVersion(v);
-        });
-        return new Instance(instance_id);
-    }
-
-    deleteInstance(instance_id) {
-        db.prepare("DELETE FROM instances WHERE instance_id = ?").run(instance_id);
-    }
-
-    getProfiles() {
-        let profiles = db.prepare("SELECT * FROM profiles").all();
-        return profiles.map(e => new Profile(e.id));
-    }
-
-    getDefaultProfile() {
-        let profile = db.prepare("SELECT * FROM profiles WHERE is_default = ?").get(1);
-        if (!profile) return null;
-        return new Profile(profile.id);
-    }
-
-    deleteProfile(uuid) {
-        db.prepare("DELETE FROM profiles WHERE uuid = ?").get(uuid);
-    }
-
-    addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
-        let result = db.prepare("INSERT INTO profiles (access_token,client_id,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?,?)").run(access_token, client_id, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
-        return new Profile(result.lastInsertRowid);
-    }
-
-    getProfileFromUUID(uuid) {
-        let result = db.prepare("SELECT * FROM profiles WHERE uuid = ?").get(uuid);
-        return new Profile(result.id);
-    }
-
-    getDefault(type) {
-        let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
-        if (!default_) {
-            let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": window.enderlynx.version.replace("-dev", ""), "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false" };
-            let value = defaults[type];
-            db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
-            return value;
-        }
-        return default_.value;
-    }
-
-    setDefault(type, value) {
-        this.getDefault(type);
-        db.prepare("UPDATE defaults SET value = ? WHERE default_type = ?").run(value, type);
-    }
-
-    getSkins() {
-        let skins = db.prepare("SELECT * FROM skins").all();
-        return skins.map(e => new Skin(e.id));
-    }
-
-    getSkinsNoDefaults() {
-        let skins = db.prepare("SELECT * FROM skins WHERE NOT default_skin = ?").all(Number(true));
-        return skins.map(e => new Skin(e.id));
-    }
-
-    async getDefaultSkins() {
-        let skins = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(Number(true));
-        if (skins.length != defaultSkins.length) {
-            let texture_keys = skins.map(e => e.texture_key);
-            for (let i = 0; i < defaultSkins.length; i++) {
-                let e = defaultSkins[i];
-                if (!texture_keys.includes(e.texture_key)) {
-                    let info = await window.enderlynx.downloadSkin(e.url);
-                    db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, Number(true), "", e.texture_key);
-                }
-            }
-            let skins2 = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(Number(true));
-            return skins2.map(e => new Skin(e.id));
-        }
-        return skins.map(e => new Skin(e.id));
-    }
-
-    addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
-        let skins = this.getSkins();
-        let previousSkinIds = skins.map(e => e.skin_id);
-        if (previousSkinIds.includes(skin_id) && !overrideCheck) {
-            let skin = new Skin(skins[previousSkinIds.indexOf(skin_id)].id);
-            if (texture_key) skin.setTextureKey(texture_key);
-            return skin;
-        }
-        let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin, last_used, texture_key) VALUES (?,?,?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false), last_used ? last_used.toISOString() : null, texture_key ? texture_key : null);
-        return new Skin(result.lastInsertRowid);
-    }
+async function getInstances() {
+    let instances = await window.enderlynx.getInstances();
+    return instances.map(e => new Instance(e));
+}
+async function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
+    return new Instance(await window.enderlynx.addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed));
+}
+async function getProfiles() {
+    let profiles = await window.enderlynx.getProfiles();
+    return profiles.map(e => new Profile(e));
+}
+async function getDefaultProfile() {
+    return new Profile(await window.enderlynx.getDefaultProfile());
+}
+async function deleteProfile(uuid) {
+    await window.enderlynx.deleteProfile(uuid);
+}
+async function addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
+    return new Profile(await window.enderlynx.addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default));
+}
+async function getProfileFromUUID(uuid) {
+    return new Profile(await window.enderlynx.getProfileDatabase(uuid));
+}
+async function getDefault(type) {
+    return await window.enderlynx.getDefault(type);
+}
+async function setDefault(type, value) {
+    await window.enderlynx.setDefault(type, value);
+}
+async function getSkinsNoDefaults() {
+    let skins = await window.enderlynx.getSkinsNoDefaults();
+    return skins.map(e => new Skin(e));
+}
+async function getDefaultSkins() {
+    let skins = await window.enderlynx.getDefaultSkins();
+    return skins.map(e => new Skin(e));
+}
+async function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
+    return new Skin(await window.enderlynx.addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key));
 }
 
 class Profile {
-    constructor(id) {
-        let profile = db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").get(id);
-        if (!profile) throw new Error(translate("app.error.profile_not_found"));
+    constructor(profile) {
+        if (!profile) return;
         this.id = profile.id;
         this.access_token = profile.access_token;
         this.client_id = profile.client_id;
@@ -1013,93 +574,76 @@ class Profile {
         this.is_demo = Boolean(profile.is_demo);
         this.is_default = Boolean(profile.is_default);
     }
-    setDefault() {
-        let data = new Data();
-        let old_default_profile = data.getDefaultProfile();
-        if (old_default_profile) db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(false), old_default_profile.id);
-        db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(Number(true), this.id);
+    async setDefault() {
+        await window.enderlynx.setDefaultProfile(this.id);
     }
 
-    setAccessToken(access_token) {
-        db.prepare("UPDATE profiles SET access_token = ? WHERE id = ?").run(access_token, this.id);
+    async setAccessToken(access_token) {
+        await window.enderlynx.updateProfile("access_token", access_token, this.id);
         this.access_token = access_token;
     }
 
-    setClientId(client_id) {
-        db.prepare("UPDATE profiles SET client_id = ? WHERE id = ?").run(client_id, this.id);
+    async setClientId(client_id) {
+        await window.enderlynx.updateProfile("client_id", client_id, this.id);
         this.client_id = client_id;
     }
 
-    setExpires(expires) {
-        db.prepare("UPDATE profiles SET expires = ? WHERE id = ?").run(expires.toISOString(), this.id);
+    async setExpires(expires) {
+        await window.enderlynx.updateProfile("expires", expires, this.id);
         this.expires = expires;
     }
 
-    setName(name) {
-        db.prepare("UPDATE profiles SET name = ? WHERE id = ?").run(name, this.id);
+    async setName(name) {
+        await window.enderlynx.updateProfile("name", name, this.id);
         this.name = name;
     }
 
-    setRefreshToken(refresh_token) {
-        db.prepare("UPDATE profiles SET refresh_token = ? WHERE id = ?").run(refresh_token, this.id);
+    async setRefreshToken(refresh_token) {
+        await window.enderlynx.updateProfile("refresh_token", refresh_token, this.id);
         this.refresh_token = refresh_token;
     }
 
-    setUuid(uuid) {
-        db.prepare("UPDATE profiles SET uuid = ? WHERE id = ?").run(uuid, this.id);
+    async setUuid(uuid) {
+        await window.enderlynx.updateProfile("uuid", uuid, this.id);
         this.uuid = uuid;
     }
 
-    setXuid(xuid) {
-        db.prepare("UPDATE profiles SET xuid = ? WHERE id = ?").run(xuid, this.id);
+    async setXuid(xuid) {
+        await window.enderlynx.updateProfile("xuid", xuid, this.id);
         this.xuid = xuid;
     }
 
-    setIsDemo(is_demo) {
-        db.prepare("UPDATE profiles SET is_demo = ? WHERE id = ?").run(Number(is_demo), this.id);
+    async setIsDemo(is_demo) {
+        await window.enderlynx.updateProfile("is_demo", is_demo, this.id);
         this.is_demo = Boolean(is_demo);
     }
 
-    delete() {
-        db.prepare("DELETE FROM profiles WHERE id = ?").run(this.id);
+    async delete() {
+        await window.enderlynx.deleteProfile(this.uuid);
     }
 
-    getCapes() {
-        let capes = db.prepare("SELECT * FROM capes WHERE uuid = ?").all(this.uuid);
-        return capes.map(e => new Cape(e.id));
+    async getCapes() {
+        let capes = await window.enderlynx.getCapes(this.uuid);
+        return capes.map(e => new Cape(e));
     }
 
-    addCape(cape_name, cape_id, cape_url) {
-        let capes = this.getCapes();
-        let previousCapeIds = capes.map(e => e.cape_id);
-        if (previousCapeIds.includes(cape_id)) {
-            return new Cape(capes[previousCapeIds.indexOf(cape_id)].id);
-        }
-        let result = db.prepare("INSERT INTO capes (uuid, cape_name, cape_id, cape_url) VALUES (?,?,?,?)").run(this.uuid, cape_name, cape_id, cape_url);
-        return new Cape(result.lastInsertRowid);
+    async addCape(cape_name, cape_id, cape_url) {
+        return new Cape(await window.enderlynx.addCape(cape_name, cape_id, cape_url, this.uuid));
     }
 
-    getActiveSkin() {
-        let result = db.prepare("SELECT * FROM skins WHERE active_uuid LIKE ? LIMIT 1").get(`%;${this.uuid};%`);
-        if (!result) return null;
-        return new Skin(result.id);
+    async getActiveSkin() {
+        return new Skin(await window.enderlynx.getActiveSkin(this.uuid));
     }
 
-    getActiveCape() {
-        let result = db.prepare("SELECT * FROM capes WHERE uuid = ? AND active = ? LIMIT 1").get(this.uuid, Number(true));
-        if (!result) return null;
-        return new Cape(result.id);
+    async getActiveCape() {
+        return new Cape(await window.enderlynx.getActiveCape(this.uuid));
     }
 
-    removeActiveCape() {
-        let old = db.prepare("SELECT * FROM capes WHERE uuid = ? AND active = ?").all(this.uuid, Number(true));
-        old.forEach((e) => {
-            db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(Number(false), e.id);
-        });
+    async removeActiveCape() {
+        let cape = await this.getActiveCape();
+        await cape.removeActive();
     }
 }
-
-let data = new Data();
 
 class MinecraftAccountSwitcher {
     constructor(element, players) {
@@ -1122,8 +666,8 @@ class MinecraftAccountSwitcher {
             this.element.querySelector('.player-head-menu').src = e;
         });
     }
-    setPlayerInfo() {
-        let default_player = this.default_player ?? data.getDefaultProfile();
+    async setPlayerInfo() {
+        let default_player = this.default_player ?? await getDefaultProfile();
         this.default_player = default_player;
         if (default_player) {
             this.element.setAttribute("popovertarget", "player-dropdown");
@@ -1312,12 +856,12 @@ class MinecraftAccountSwitcher {
     }
 }
 
-function getPlayerHead(profile, callback) {
+async function getPlayerHead(profile, callback) {
     if (!profile) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
         return;
     }
-    let skin = profile.getActiveSkin();
+    let skin = await profile.getActiveSkin();
     // if no skin is set, just display steve for now
     if (!skin) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
@@ -1362,7 +906,6 @@ let currentSubTab = "";
 let currentInstanceId = "";
 
 function resetDiscordStatus(bypassLock) {
-    console.log("current tab", currentTab);
     if (!rpcLocked || bypassLock) {
         window.enderlynx.setActivity({
             "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" || currentTab == "instance" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
@@ -1380,7 +923,7 @@ class PageContent {
         this.func = func;
         this.title = title;
     }
-    displayContent(dont_add_to_log) {
+    async displayContent(dont_add_to_log) {
         if (!dont_add_to_log) {
             page_log = page_log.slice(0, page_index + 1).concat([() => {
                 for (let i = 0; i < navButtons.length; i++) {
@@ -1410,9 +953,9 @@ class PageContent {
             return;
         }
         content.innerHTML = "";
-        content.appendChild(this.func());
+        content.appendChild(await this.func());
         if (this.title == "instances") {
-            groupInstances(data.getDefault("default_group"), true);
+            groupInstances(await getDefault("default_group"), true);
         }
         currentTab = this.title;
         resetDiscordStatus();
@@ -1453,32 +996,32 @@ class LiveMinecraft {
         this.nameElement.innerHTML = sanitize(instanceInfo.name);
         this.element.classList.add("minecraft-live");
         this.stopButton.onclick = () => {
-            stopInstance(instanceInfo.refresh());
+            stopInstance(instanceInfo);
             this.findLive();
         }
         this.logButton.onclick = () => {
-            showSpecificInstanceContent(instanceInfo.refresh(), 'logs');
+            showSpecificInstanceContent(instanceInfo, 'logs');
         }
         let buttons = new ContextMenuButtons([
             {
                 "title": translate("app.live.context.view"),
                 "icon": '<i class="fa-solid fa-eye"></i>',
                 "func": () => {
-                    showSpecificInstanceContent(instanceInfo.refresh());
+                    showSpecificInstanceContent(instanceInfo);
                 }
             },
             {
                 "title": translate("app.live.context.logs"),
                 "icon": '<i class="fa-solid fa-terminal"></i>',
                 "func": () => {
-                    showSpecificInstanceContent(instanceInfo.refresh(), 'logs');
+                    showSpecificInstanceContent(instanceInfo, 'logs');
                 }
             },
             {
                 "title": translate("app.live.context.stop"),
                 "icon": '<i class="fa-regular fa-circle-stop"></i>',
                 "func": () => {
-                    stopInstance(instanceInfo.refresh());
+                    stopInstance(instanceInfo);
                     this.findLive();
                 }
             }
@@ -1506,9 +1049,9 @@ class LiveMinecraft {
         rpcLocked = false;
     }
     async findLive() {
-        for (const instances of data.getInstances()) {
-            if (window.enderlynx.checkForProcess(instances.pid)) {
-                this.setLive(instances)
+        for (const instance of await getInstances()) {
+            if (window.enderlynx.checkForProcess(instance.pid)) {
+                this.setLive(instance);
                 return;
             }
         }
@@ -1618,13 +1161,13 @@ class MoreMenu {
         this.buttons = buttons;
         this.refreshButtons();
     }
-    refreshButtons() {
+    async refreshButtons() {
         this.element.innerHTML = "";
         for (let i = 0; i < this.buttons.buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("context-menu-button");
-            let icon = typeof this.buttons.buttons[i].icon === "function" ? this.buttons.buttons[i].icon() : this.buttons.buttons[i].icon;
-            let title = typeof this.buttons.buttons[i].title === "function" ? this.buttons.buttons[i].title() : this.buttons.buttons[i].title;
+            let icon = typeof this.buttons.buttons[i].icon === "function" ? await this.buttons.buttons[i].icon() : this.buttons.buttons[i].icon;
+            let title = typeof this.buttons.buttons[i].title === "function" ? await this.buttons.buttons[i].title() : this.buttons.buttons[i].title;
             buttonElement.innerHTML = icon + sanitize(title);
             if (this.buttons.buttons[i].danger) {
                 buttonElement.classList.add("danger");
@@ -1678,7 +1221,7 @@ class ContextMenu {
             }
         });
     }
-    showContextMenu(buttons, x, y) {
+    async showContextMenu(buttons, x, y) {
         this.element.style.left = x + "px";
         this.element.style.right = "";
         let xTranslate = "0px";
@@ -1695,8 +1238,8 @@ class ContextMenu {
         for (let i = 0; i < buttons.buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("context-menu-button");
-            let icon = typeof buttons.buttons[i].icon === "function" ? buttons.buttons[i].icon() : buttons.buttons[i].icon;
-            let title = typeof buttons.buttons[i].title === "function" ? buttons.buttons[i].title() : buttons.buttons[i].title;
+            let icon = typeof buttons.buttons[i].icon === "function" ? await buttons.buttons[i].icon() : buttons.buttons[i].icon;
+            let title = typeof buttons.buttons[i].title === "function" ? await buttons.buttons[i].title() : buttons.buttons[i].title;
             buttonElement.innerHTML = icon + sanitize(title);
             if (buttons.buttons[i].danger) {
                 buttonElement.classList.add("danger");
@@ -2298,7 +1841,12 @@ class ContentList {
 
         this.items = [];
         this.second_column_elements = [];
-        let renderEntry = (contentInfo) => {
+
+        this.renderEntries(features, content, contentMainElement, contentListBottom, fragment, element);
+    }
+
+    async renderEntries(features, content, contentMainElement, contentListBottom, fragment, element) {
+        let renderEntry = async (contentInfo) => {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
             if (contentInfo.class) contentEle.classList.add(contentInfo.class);
@@ -2345,11 +1893,11 @@ class ContentList {
             contentEle.appendChild(infoElement2);
             let infoElement2Title = document.createElement("div");
             infoElement2Title.className = "content-list-info-title-2";
-            infoElement2Title.innerHTML = sanitize(contentInfo.secondary_column.title());
+            infoElement2Title.innerHTML = sanitize(await contentInfo.secondary_column.title());
             infoElement2.appendChild(infoElement2Title);
             let infoElement2Desc = document.createElement("div");
             infoElement2Desc.className = "content-list-info-desc-2";
-            infoElement2Desc.innerHTML = (contentInfo.secondary_column.desc());
+            infoElement2Desc.innerHTML = (await contentInfo.secondary_column.desc());
             this.second_column_elements.push({
                 infoElement2Title,
                 infoElement2Desc,
@@ -2368,8 +1916,8 @@ class ContentList {
             if (features?.disable?.enabled) {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
-                toggle = new Toggle(toggleElement, (v) => {
-                    let result = toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown);
+                toggle = new Toggle(toggleElement, async (v) => {
+                    let result = await toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown);
                     if (!result) {
                         toggle.setValueWithoutTrigger(!v);
                         return;
@@ -2437,7 +1985,7 @@ class ContentList {
             return contentEle;
         }
         for (let i = 0; i < content.length; i++) {
-            renderEntry(content[i]);
+            await renderEntry(content[i]);
         }
         this.contentElement = contentMainElement;
         fragment.appendChild(contentMainElement);
@@ -2509,9 +2057,9 @@ class ContentList {
 
     updateSecondaryColumn() {
         let list = this.second_column_elements;
-        list.forEach(e => {
-            e.infoElement2Title.innerHTML = sanitize(e.title_func());
-            e.infoElement2Desc.innerHTML = sanitize(e.desc_func());
+        list.forEach(async (e) => {
+            e.infoElement2Title.innerHTML = sanitize(await e.title_func());
+            e.infoElement2Desc.innerHTML = sanitize(await e.desc_func());
         });
     }
 
@@ -2559,19 +2107,19 @@ class ContentList {
     }
 }
 
-function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown) {
-    let content = contentInfo.instance_info.getContent();
+async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown) {
+    let content = await contentInfo.instance_info.getContent();
     for (let i = 0; i < content.length; i++) {
         let e = content[i];
-        if (e.file_name == contentInfo.secondary_column.desc()) {
+        if (e.file_name == await contentInfo.secondary_column.desc()) {
             if (e.disabled) {
                 let new_file_name = window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_enable"));
                     return;
                 }
-                e.setDisabled(false);
-                e.setFileName(new_file_name);
+                await e.setDisabled(false);
+                await e.setFileName(new_file_name);
                 contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
             } else {
@@ -2580,8 +2128,8 @@ function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown)
                     displayError(translate("app.error.failure_to_disable"));
                     return;
                 }
-                e.setDisabled(true);
-                e.setFileName(new_file_name);
+                await e.setDisabled(true);
+                await e.setFileName(new_file_name);
                 contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_disable").replace("%s", e.name));
             }
@@ -2748,149 +2296,6 @@ let keys = {
     "key.mouse.19": "Button 19",
     "key.mouse.20": "Button 20"
 }
-let keyToNum = {
-    "key.keyboard.apostrophe": 40,
-    "key.keyboard.backslash": 43,
-    "key.keyboard.backspace": 14,
-    "key.keyboard.caps.lock": 58,
-    "key.keyboard.comma": 51,
-    "key.keyboard.delete": 211,
-    "key.keyboard.down": 208,
-    "key.keyboard.end": 207,
-    "key.keyboard.enter": 28,
-    "key.keyboard.equal": 13,
-    "key.keyboard.f1": 59,
-    "key.keyboard.f2": 60,
-    "key.keyboard.f3": 61,
-    "key.keyboard.f4": 62,
-    "key.keyboard.f5": 63,
-    "key.keyboard.f6": 64,
-    "key.keyboard.f7": 65,
-    "key.keyboard.f8": 66,
-    "key.keyboard.f9": 67,
-    "key.keyboard.f10": 68,
-    "key.keyboard.f11": 87,
-    "key.keyboard.f12": 88,
-    "key.keyboard.f13": 100,
-    "key.keyboard.f14": 101,
-    "key.keyboard.f15": 102,
-    "key.keyboard.f16": 103,
-    "key.keyboard.f17": 104,
-    "key.keyboard.f18": 105,
-    "key.keyboard.f19": 113,
-    "key.keyboard.f20": 114,
-    "key.keyboard.f21": 115,
-    "key.keyboard.f22": 116,
-    "key.keyboard.f23": 117,
-    "key.keyboard.f24": 118,
-    "key.keyboard.f25": 119,
-    "key.keyboard.grave.accent": 41,
-    "key.keyboard.home": 199,
-    "key.keyboard.insert": 210,
-    "key.keyboard.keypad.0": 82,
-    "key.keyboard.keypad.1": 79,
-    "key.keyboard.keypad.2": 80,
-    "key.keyboard.keypad.3": 81,
-    "key.keyboard.keypad.4": 75,
-    "key.keyboard.keypad.5": 76,
-    "key.keyboard.keypad.6": 77,
-    "key.keyboard.keypad.7": 71,
-    "key.keyboard.keypad.8": 72,
-    "key.keyboard.keypad.9": 73,
-    "key.keyboard.keypad.add": 78,
-    "key.keyboard.keypad.decimal": 83,
-    "key.keyboard.keypad.divide": 181,
-    "key.keyboard.keypad.enter": 156,
-    "key.keyboard.keypad.equal": 141,
-    "key.keyboard.keypad.multiply": 55,
-    "key.keyboard.keypad.subtract": 74,
-    "key.keyboard.left": 203,
-    "key.keyboard.left.alt": 56,
-    "key.keyboard.left.bracket": 26,
-    "key.keyboard.left.control": 29,
-    "key.keyboard.left.shift": 42,
-    "key.keyboard.left.win": 219,
-    "key.keyboard.menu": 221,
-    "key.keyboard.minus": 12,
-    "key.keyboard.num.lock": 69,
-    "key.keyboard.page.down": 209,
-    "key.keyboard.page.up": 201,
-    "key.keyboard.pause": 197,
-    "key.keyboard.period": 52,
-    "key.keyboard.print.screen": 183,
-    "key.keyboard.right": 205,
-    "key.keyboard.right.alt": 184,
-    "key.keyboard.right.bracket": 27,
-    "key.keyboard.right.control": 157,
-    "key.keyboard.right.shift": 54,
-    "key.keyboard.right.win": 220,
-    "key.keyboard.scroll.lock": 70,
-    "key.keyboard.semicolon": 39,
-    "key.keyboard.slash": 53,
-    "key.keyboard.space": 57,
-    "key.keyboard.tab": 15,
-    "key.keyboard.unknown": -1,
-    "key.keyboard.up": 200,
-    "key.keyboard.a": 30,
-    "key.keyboard.b": 48,
-    "key.keyboard.c": 46,
-    "key.keyboard.d": 32,
-    "key.keyboard.e": 18,
-    "key.keyboard.f": 33,
-    "key.keyboard.g": 34,
-    "key.keyboard.h": 35,
-    "key.keyboard.i": 23,
-    "key.keyboard.j": 36,
-    "key.keyboard.k": 37,
-    "key.keyboard.l": 38,
-    "key.keyboard.m": 50,
-    "key.keyboard.n": 49,
-    "key.keyboard.o": 24,
-    "key.keyboard.p": 25,
-    "key.keyboard.q": 16,
-    "key.keyboard.r": 19,
-    "key.keyboard.s": 31,
-    "key.keyboard.t": 20,
-    "key.keyboard.u": 22,
-    "key.keyboard.v": 47,
-    "key.keyboard.w": 17,
-    "key.keyboard.x": 45,
-    "key.keyboard.y": 21,
-    "key.keyboard.z": 44,
-    "key.keyboard.0": 11,
-    "key.keyboard.1": 2,
-    "key.keyboard.2": 3,
-    "key.keyboard.3": 4,
-    "key.keyboard.4": 5,
-    "key.keyboard.5": 6,
-    "key.keyboard.6": 7,
-    "key.keyboard.7": 8,
-    "key.keyboard.8": 9,
-    "key.keyboard.9": 10,
-    "key.mouse.left": -100,
-    "key.mouse.right": -99,
-    "key.mouse.middle": -98,
-    "key.mouse.1": -97,
-    "key.mouse.2": -96,
-    "key.mouse.3": -95,
-    "key.mouse.4": -94,
-    "key.mouse.5": -93,
-    "key.mouse.6": -92,
-    "key.mouse.7": -91,
-    "key.mouse.8": -90,
-    "key.mouse.9": -89,
-    "key.mouse.10": -88,
-    "key.mouse.11": -87,
-    "key.mouse.12": -86,
-    "key.mouse.13": -85,
-    "key.mouse.14": -84,
-    "key.mouse.15": -83,
-    "key.mouse.16": -82,
-    "key.mouse.17": -81,
-    "key.mouse.18": -80,
-    "key.mouse.19": -79,
-    "key.mouse.20": -78
-};
 
 let codeToKey = {
     "Backquote": "key.keyboard.grave.accent",
@@ -3023,7 +2428,7 @@ let discoverButton = new NavigationButton(discoverButtonEle, translate("app.page
 let settingsButton = new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa-solid fa-gear"></i>');
 let wardrobeButton = new NavigationButton(wardrobeButtonEle, translate("app.page.wardrobe"), '<i class="fa-solid fa-user"></i>', wardrobeContent);
 
-settingsButtonEle.onclick = () => {
+settingsButtonEle.onclick = async () => {
     let selectedKeySelect;
     let selectedKeySelectFunction;
 
@@ -3078,10 +2483,10 @@ settingsButtonEle.onclick = () => {
     document.body.addEventListener("mousedown", previousMouseDownEventListener);
 
     let defaultOptions = new DefaultOptions();
-    let values = db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version");
+    let values = await window.enderlynx.getDefaultOptions();
     let def_opts = document.createElement("div");
     def_opts.className = "option-list";
-    let generateUIForOptions = (values) => {
+    let generateUIForOptions = async (values) => {
         def_opts.innerHTML = "";
         for (let i = 0; i < values.length; i++) {
             let e = values[i];
@@ -3094,9 +2499,9 @@ settingsButtonEle.onclick = () => {
             titleElement.innerHTML = e.key;
             item.appendChild(titleElement);
 
-            let onChange = (v) => {
+            let onChange = async (v) => {
                 values[i].value = (type == "text" ? '"' + v + '"' : v);
-                if (defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
+                if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
                     setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                     setDefaultButton.onclick = onRemove;
                 } else {
@@ -3207,7 +2612,7 @@ settingsButtonEle.onclick = () => {
                 displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
             }
 
-            if (defaultOptions.getDefault(e.key) == e.value) {
+            if (await defaultOptions.getDefault(e.key) == e.value) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 setDefaultButton.onclick = onRemove;
             }
@@ -3255,16 +2660,17 @@ settingsButtonEle.onclick = () => {
                 "type": "confirm",
                 "content": translate("app.settings.def_opts.import.confirm")
             }
-        ], [], (v) => {
+        ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
             let options = window.enderlynx.getOptions(info.options_txt_location);
-            db.prepare("DELETE FROM options_defaults WHERE key != ?").run("version");
+            await window.enderlynx.deleteDefaultOptions();
             let defaultOptions = new DefaultOptions();
-            options.forEach(e => {
+            for (let i = 0; i < options.length; i++) {
+                let e = options[i];
                 if (e.key == "version") return;
-                defaultOptions.setDefault(e.key, e.value);
-            });
+                await defaultOptions.setDefault(e.key, e.value);
+            }
             generateUIForOptions(options);
         })
     }
@@ -3305,14 +2711,14 @@ settingsButtonEle.onclick = () => {
                 "type": "confirm",
                 "content": translate("app.settings.def_opts.add.confirm")
             }
-        ], [], (v) => {
+        ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
             let defaultOptions = new DefaultOptions();
             if (info.key != "version") {
-                defaultOptions.setDefault(info.key, info.value);
+                await defaultOptions.setDefault(info.key, info.value);
             }
-            generateUIForOptions(db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version"));
+            generateUIForOptions(await window.enderlynx.getDefaultOptions());
         })
     }
     addButton.className = "bug-button";
@@ -3332,12 +2738,12 @@ settingsButtonEle.onclick = () => {
                 "content": translate("app.settings.options.apply.confirm")
             }
         ], [], async () => {
-            let instances = data.getInstances();
+            let instances = getInstances();
             for (let i = 0; i < instances.length; i++) {
                 let instanceInfo = instances[i];
                 try {
                     let default_options = new DefaultOptions(instanceInfo.vanilla_version);
-                    let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, default_options.getOptionsTXT(), false, true);
+                    let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, await default_options.getOptionsTXT(), false, true);
                     instanceInfo.setAttemptedOptionsTxtVersion(v);
                 } catch (e) {
                     displayError(translate("app.settings.options.apply.fail", "%i", instanceInfo.name));
@@ -3415,7 +2821,7 @@ settingsButtonEle.onclick = () => {
                         }
                         setTimeout(() => {
                             if (b.getAttribute("data-num") == num) {
-                                b.innerHTML = '<i class="fa-solid fa-play"></i>Test';
+                                b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.settings.java.test");
                                 b.classList.remove("failed");
                             }
                         }, 3000);
@@ -3519,7 +2925,7 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.theme.dark"), "value": "dark" },
                 { "name": translate("app.settings.theme.light"), "value": "light" }
             ],
-            "default": data.getDefault("default_mode"),
+            "default": await getDefault("default_mode"),
             "onchange": (v) => {
                 if (v == "light") {
                     document.body.classList.add("light");
@@ -3549,7 +2955,7 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.color.gray"), "value": "gray" },
                 { "name": translate("app.settings.color.light_gray"), "value": "light_gray" }
             ],
-            "default": data.getDefault("default_accent_color"),
+            "default": await getDefault("default_accent_color"),
             "onchange": (v) => {
                 accent_colors.forEach(e => {
                     document.body.classList.remove(e);
@@ -3566,7 +2972,7 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.sidebar.spacious"), "value": "spacious" },
                 { "name": translate("app.settings.sidebar.compact"), "value": "compact" }
             ],
-            "default": data.getDefault("default_sidebar"),
+            "default": await getDefault("default_sidebar"),
             "onchange": (v) => {
                 if (v == "compact") {
                     document.body.classList.add("compact");
@@ -3584,7 +2990,7 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.sidebar.left"), "value": "left" },
                 { "name": translate("app.settings.sidebar.right"), "value": "right" }
             ],
-            "default": data.getDefault("default_sidebar_side"),
+            "default": await getDefault("default_sidebar_side"),
             "onchange": (v) => {
                 if (v == "right") {
                     document.body.classList.add("sidebar-right");
@@ -3605,14 +3011,14 @@ settingsButtonEle.onclick = () => {
                 { "name": translate("app.settings.page.discover"), "value": "discover" },
                 { "name": translate("app.settings.page.wardrobe"), "value": "wardrobe" }
             ],
-            "default": data.getDefault("default_page")
+            "default": await getDefault("default_page")
         },
         {
             "type": "toggle",
             "name": translate("app.settings.thin_scrollbars"),
             "tab": "appearance",
             "id": "thin_scrollbars",
-            "default": data.getDefault("thin_scrollbars") == "true",
+            "default": await getDefault("thin_scrollbars") == "true",
             "onchange": (v) => {
                 if (v) {
                     document.body.classList.add("thin-scrollbars");
@@ -3627,7 +3033,7 @@ settingsButtonEle.onclick = () => {
             "tab": "appearance",
             "id": "discord_rpc",
             "desc": translate("app.settings.discord_rpc.description"),
-            "default": data.getDefault("discord_rpc") == "true"
+            "default": await getDefault("discord_rpc") == "true"
         },
         {
             "type": "toggle",
@@ -3635,7 +3041,7 @@ settingsButtonEle.onclick = () => {
             "tab": "appearance",
             "id": "potato_mode",
             "desc": translate("app.settings.potato_pc.description"),
-            "default": data.getDefault("potato_mode") == "true"
+            "default": await getDefault("potato_mode") == "true"
         },
         {
             "type": "toggle",
@@ -3643,7 +3049,7 @@ settingsButtonEle.onclick = () => {
             "tab": "appearance",
             "id": "hide_ip",
             "desc": translate("app.settings.hide_ips.description"),
-            "default": data.getDefault("hide_ip") == "true"
+            "default": await getDefault("hide_ip") == "true"
         },
         {
             "type": "toggle",
@@ -3651,7 +3057,7 @@ settingsButtonEle.onclick = () => {
             "tab": "appearance",
             "id": "modrinth_link",
             "desc": translate("app.settings.modrinth_link.description"),
-            "default": data.getDefault("link_with_modrinth") == "true"
+            "default": await getDefault("link_with_modrinth") == "true"
         },
         {
             "type": "slider",
@@ -3659,7 +3065,7 @@ settingsButtonEle.onclick = () => {
             "desc": translate("app.settings.resources.downloads.description"),
             "tab": "resources",
             "id": "max_concurrent_downloads",
-            "default": Number(data.getDefault("max_concurrent_downloads")),
+            "default": Number(await getDefault("max_concurrent_downloads")),
             "min": 1,
             "max": 20,
             "increment": 1,
@@ -3694,7 +3100,7 @@ settingsButtonEle.onclick = () => {
             "desc": translate("app.settings.defaults.ram.description"),
             "tab": "defaults",
             "id": "default_ram",
-            "default": Number(data.getDefault("default_ram")),
+            "default": Number(await getDefault("default_ram")),
             "min": 512,
             "max": window.enderlynx.getTotalRAM(),
             "increment": 64,
@@ -3706,7 +3112,7 @@ settingsButtonEle.onclick = () => {
             "desc": translate("app.settings.defaults.width.description"),
             "tab": "defaults",
             "id": "default_width",
-            "default": Number(data.getDefault("default_width"))
+            "default": Number(await getDefault("default_width"))
         },
         {
             "type": "number",
@@ -3714,42 +3120,42 @@ settingsButtonEle.onclick = () => {
             "desc": translate("app.settings.defaults.height.description"),
             "tab": "defaults",
             "id": "default_height",
-            "default": Number(data.getDefault("default_height"))
+            "default": Number(await getDefault("default_height"))
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.custom_env_vars"),
             "tab": "globals",
             "id": "global_env_vars",
-            "default": data.getDefault("global_env_vars")
+            "default": await getDefault("global_env_vars")
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.pre_launch_hook"),
             "tab": "globals",
             "id": "global_pre_launch_hook",
-            "default": data.getDefault("global_pre_launch_hook")
+            "default": await getDefault("global_pre_launch_hook")
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.post_launch_hook"),
             "tab": "globals",
             "id": "global_post_launch_hook",
-            "default": data.getDefault("global_post_launch_hook")
+            "default": await getDefault("global_post_launch_hook")
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.wrapper"),
             "tab": "globals",
             "id": "global_wrapper",
-            "default": data.getDefault("global_wrapper")
+            "default": await getDefault("global_wrapper")
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.post_exit_hook"),
             "tab": "globals",
             "id": "global_post_exit_hook",
-            "default": data.getDefault("global_post_exit_hook")
+            "default": await getDefault("global_post_exit_hook")
         },
         {
             "type": "notice",
@@ -3812,25 +3218,25 @@ settingsButtonEle.onclick = () => {
     ], async (v) => {
         let info = {};
         v.forEach(e => info[e.id] = e.value);
-        data.setDefault("default_width", info.default_width);
-        data.setDefault("default_height", info.default_height);
-        data.setDefault("default_ram", info.default_ram);
-        data.setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
-        data.setDefault("default_page", info.default_page);
-        data.setDefault("discord_rpc", (info.discord_rpc).toString());
-        data.setDefault("potato_mode", (info.potato_mode).toString());
-        data.setDefault("hide_ip", (info.hide_ip).toString());
-        data.setDefault("link_with_modrinth", (info.modrinth_link).toString());
-        data.setDefault("global_pre_launch_hook", info.global_pre_launch_hook);
-        data.setDefault("global_post_launch_hook", info.global_post_launch_hook);
-        data.setDefault("global_wrapper", info.global_wrapper);
-        data.setDefault("global_post_exit_hook", info.global_post_exit_hook);
-        data.setDefault("global_env_vars", info.global_env_vars);
-        data.setDefault("default_mode", info.default_mode);
-        data.setDefault("default_accent_color", info.default_accent_color);
-        data.setDefault("default_sidebar", info.default_sidebar);
-        data.setDefault("default_sidebar_side", info.default_sidebar_side);
-        data.setDefault("thin_scrollbars", (info.thin_scrollbars).toString());
+        await setDefault("default_width", info.default_width);
+        await setDefault("default_height", info.default_height);
+        await setDefault("default_ram", info.default_ram);
+        await setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
+        await setDefault("default_page", info.default_page);
+        await setDefault("discord_rpc", (info.discord_rpc).toString());
+        await setDefault("potato_mode", (info.potato_mode).toString());
+        await setDefault("hide_ip", (info.hide_ip).toString());
+        await setDefault("link_with_modrinth", (info.modrinth_link).toString());
+        await setDefault("global_pre_launch_hook", info.global_pre_launch_hook);
+        await setDefault("global_post_launch_hook", info.global_post_launch_hook);
+        await setDefault("global_wrapper", info.global_wrapper);
+        await setDefault("global_post_exit_hook", info.global_post_exit_hook);
+        await setDefault("global_env_vars", info.global_env_vars);
+        await setDefault("default_mode", info.default_mode);
+        await setDefault("default_accent_color", info.default_accent_color);
+        await setDefault("default_sidebar", info.default_sidebar);
+        await setDefault("default_sidebar_side", info.default_sidebar_side);
+        await setDefault("thin_scrollbars", (info.thin_scrollbars).toString());
         if (info.potato_mode) {
             document.body.classList.add("potato");
         } else {
@@ -3878,12 +3284,12 @@ settingsButtonEle.onclick = () => {
             }
         });
         window.enderlynx.changeFolder(window.enderlynx.userPath, info.folder_location);
-    }, () => {
-        let color_theme = data.getDefault("default_mode");
-        let accent_color = data.getDefault("default_accent_color");
-        let sidebar_mode = data.getDefault("default_sidebar");
-        let sidebar_side = data.getDefault("default_sidebar_side");
-        let thin_scrollbars = data.getDefault("thin_scrollbars");
+    }, async () => {
+        let color_theme = await getDefault("default_mode");
+        let accent_color = await getDefault("default_accent_color");
+        let sidebar_mode = await getDefault("default_sidebar");
+        let sidebar_side = await getDefault("default_sidebar_side");
+        let thin_scrollbars = await getDefault("thin_scrollbars");
         if (thin_scrollbars) {
             document.body.classList.add("thin-scrollbars");
         } else {
@@ -3916,13 +3322,13 @@ let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
 async function toggleMicrosoftSignIn() {
     try {
         let newData = await window.enderlynx.triggerMicrosoftLogin();
-        let players = data.getProfiles().map(e => e.uuid);
+        let players = (await getProfiles()).map(e => e.uuid);
         if (!newData.access_token) throw new Error();
         if (!newData.refresh_token) throw new Error();
         if (!newData.client_id) throw new Error();
         if (players.includes(newData.uuid)) {
-            let player = data.getProfileFromUUID(newData.uuid);
-            player.setDefault();
+            let player = await getProfileFromUUID(newData.uuid);
+            await player.setDefault();
             accountSwitcher.selectPlayer(player);
             await updateSkinsAndCapes(newData);
             accountSwitcher.selectPlayer(player);
@@ -3932,8 +3338,8 @@ async function toggleMicrosoftSignIn() {
                 displayError(translate("app.login_error.no_username"));
                 return;
             }
-            let newPlayer = data.addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
-            newPlayer.setDefault();
+            let newPlayer = await addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
+            await newPlayer.setDefault();
             accountSwitcher.addPlayer(newPlayer);
             await updateSkinsAndCapes(newData);
             accountSwitcher.selectPlayer(newPlayer);
@@ -3967,8 +3373,8 @@ async function showHomeContent(oldEle) {
     welcomeElement.className = "welcome-container";
     let innerWelcomeElement = document.createElement("div");
     innerWelcomeElement.className = "welcome";
-    changehomewelcome = () => {
-        let profile = data.getDefaultProfile();
+    changehomewelcome = async () => {
+        let profile = await getDefaultProfile();
         if (profile) {
             innerWelcomeElement.textContent = translate("app.welcome", "%n", profile.name);
         } else {
@@ -4001,9 +3407,9 @@ async function showHomeContent(oldEle) {
     ele.appendChild(column1);
     ele.appendChild(column2);
     let pinnedWorldsList = await getPinnedWorlds();
-    let pinnedInstancesList = getPinnedInstances();
+    let pinnedInstancesList = await getPinnedInstances();
     let lastPlayedWorldsList = await getRecentlyPlayedWorlds();
-    let lastPlayedInstancesList = getRecentlyPlayedInstances();
+    let lastPlayedInstancesList = await getRecentlyPlayedInstances();
     let pinnedWorldTitle = document.createElement("h2");
     pinnedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_worlds");
     pinnedWorldTitle.dataset.id = "ui:pinned_world_title";
@@ -4028,7 +3434,7 @@ async function showHomeContent(oldEle) {
     let lastPlayedInstanceGrid = document.createElement("div");
     lastPlayedInstanceGrid.className = "home-list-section";
     lastPlayedInstanceGrid.dataset.id = "ui:last_played_instance_grid";
-    let updateHomeGrid = () => {
+    let updateHomeGrid = async () => {
         animateGridReorder(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
 
         let pinnedWorlds = pinnedWorldsList;
@@ -4051,7 +3457,9 @@ async function showHomeContent(oldEle) {
         pinnedWorldGrid.innerHTML = "";
         column1.innerHTML = "";
         column2.innerHTML = "";
-        pinnedWorlds.concat(lastPlayedWorlds).forEach(e => {
+        let worlds = pinnedWorlds.concat(lastPlayedWorlds);
+        for (let i = 0; i < worlds.length; i++) {
+            let e = worlds[i];
             if (!e.ip) e.type = "singleplayer";
             else e.type = "multiplayer";
 
@@ -4097,16 +3505,16 @@ async function showHomeContent(oldEle) {
             itemInfo.appendChild(itemTitle);
             itemInfo.appendChild(itemDesc);
             item.appendChild(itemInfo);
-            let instanceInfo = new Instance(e.instance_id);
+            let instanceInfo = await Instance.getInstance(e.instance_id);
             let playButton = document.createElement("button");
             playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
             playButton.className = "home-play-button";
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>Play';
+            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
             playButton.onclick = async () => {
                 playButton.className = "home-loading-button";
                 playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
                 e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
-                showSpecificInstanceContent(instanceInfo.refresh());
+                showSpecificInstanceContent(instanceInfo);
             }
             let morebutton = document.createElement("button");
             morebutton.className = "home-list-more";
@@ -4117,16 +3525,16 @@ async function showHomeContent(oldEle) {
                     "icon": '<i class="fa-solid fa-play"></i>',
                     "func": async () => {
                         playButton.className = "home-loading-button";
-                        playButton.innerHTML = '<i class="spinner"></i>Loading'
+                        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.loading");
                         e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
-                        showSpecificInstanceContent(instanceInfo.refresh());
+                        showSpecificInstanceContent(instanceInfo);
                     }
                 } : null,
                 {
                     "title": translate("app.instance.view"),
                     "icon": '<i class="fa-solid fa-eye"></i>',
                     "func": () => {
-                        showSpecificInstanceContent(instanceInfo.refresh());
+                        showSpecificInstanceContent(instanceInfo);
                     }
                 },
                 e.type == "singleplayer" ? {
@@ -4137,12 +3545,12 @@ async function showHomeContent(oldEle) {
                     }
                 } : null,
                 {
-                    "title": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                    "icon": () => isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                    "func": (i, c) => {
+                    "title": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                    "icon": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                    "func": async (i, c) => {
                         if (c) c.remove();
-                        let world_pinned = isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type);
-                        world_pinned ? (e.type == "singleplayer" ? unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : unpinMultiplayerWorld(e.ip, instanceInfo.instance_id)) : (e.type == "singleplayer" ? pinSingleplayerWorld(e.id, instanceInfo.instance_id) : pinMultiplayerWorld(e.ip, instanceInfo.instance_id))
+                        let world_pinned = await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type);
+                        world_pinned ? (e.type == "singleplayer" ? await unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : await unpinMultiplayerWorld(e.ip, instanceInfo.instance_id)) : (e.type == "singleplayer" ? await pinSingleplayerWorld(e.id, instanceInfo.instance_id) : await pinMultiplayerWorld(e.ip, instanceInfo.instance_id))
                         i.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
                         i.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                         if (!world_pinned) {
@@ -4215,21 +3623,23 @@ async function showHomeContent(oldEle) {
             item.appendChild(playButton);
             item.appendChild(morebutton);
             e.pinned ? pinnedWorldGrid.appendChild(item) : lastPlayedWorldGrid.appendChild(item);
-        });
-        pinnedInstances.concat(lastPlayedInstances).forEach(e => {
+        }
+        let instances = pinnedInstances.concat(lastPlayedInstances);
+        for (let i = 0; i < instances.length; i++) {
+            let e = instances[i];
             let item = document.createElement("div");
             item.className = "home-entry";
             item.onclick = (event) => {
                 if (event.target.matches("button")) return;
                 if (event.target.matches("i")) return;
-                showSpecificInstanceContent(e.refresh());
+                showSpecificInstanceContent(e);
             }
             item.setAttribute("tabindex", "0");
             item.onkeydown = (event) => {
                 if (event.target.matches("button")) return;
                 if (event.target.matches("i")) return;
                 if (event.key == "Enter" || event.key == " ") {
-                    showSpecificInstanceContent(e.refresh());
+                    showSpecificInstanceContent(e);
                 }
             }
             item.dataset.id = "instance:" + e.instance_id;
@@ -4283,7 +3693,7 @@ async function showHomeContent(oldEle) {
                     playButton.className = "home-loading-button";
                     playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
                     await playInstance(instanceInfo);
-                    showSpecificInstanceContent(instanceInfo.refresh());
+                    showSpecificInstanceContent(instanceInfo);
                 }
                 if (more) more.refreshButtons();
             }
@@ -4303,15 +3713,15 @@ async function showHomeContent(oldEle) {
                             playButton.className = "home-loading-button";
                             playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
                             await playInstance(instanceInfo);
-                            showSpecificInstanceContent(instanceInfo.refresh());
+                            showSpecificInstanceContent(instanceInfo);
                         }
                     }
                 },
                 instanceInfo.locked ? null : {
                     "icon": '<i class="fa-solid fa-plus"></i>',
                     "title": translate("app.button.content.add"),
-                    "func": (e) => {
-                        instanceInfo = instanceInfo.refresh();
+                    "func": async (e) => {
+                        instanceInfo = await instanceInfo.refresh();
                         showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
                     }
                 },
@@ -4333,25 +3743,25 @@ async function showHomeContent(oldEle) {
                     "icon": '<i class="fa-solid fa-wrench"></i>',
                     "title": translate("app.button.instances.repair"),
                     "func": () => {
-                        showRepairDialog(instanceInfo.refresh());
+                        showRepairDialog(instanceInfo);
                     }
                 },
                 {
                     "icon": '<i class="fa-solid fa-gear"></i>',
                     "title": translate("app.button.instances.open_settings"),
-                    "func": (e) => {
-                        showInstanceSettings(new Instance(instanceInfo.instance_id));
+                    "func": async (e) => {
+                        showInstanceSettings(await instanceInfo.refresh());
                     }
                 },
                 {
-                    "icon": () => instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                    "title": () => instanceInfo.pinned ? translate("app.instances.unpin") : translate("app.instances.pin"),
-                    "func": (e, c) => {
+                    "icon": async () => await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                    "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                    "func": async (e, c) => {
                         if (c) c.remove();
-                        instanceInfo.pinned ? unpinInstance(instanceInfo) : pinInstance(instanceInfo);
-                        e.setTitle(instanceInfo.pinned ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                        e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                        if (instanceInfo.pinned) {
+                        await instanceInfo.isPinned() ? await unpinInstance(instanceInfo) : await pinInstance(instanceInfo);
+                        e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                        e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                        if (await instanceInfo.isPinned()) {
                             pinnedInstancesList.push(instanceInfo);
                         } else {
                             pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
@@ -4412,7 +3822,7 @@ async function showHomeContent(oldEle) {
             item.appendChild(playButton);
             item.appendChild(morebutton);
             e.actuallyPinned ? pinnedInstanceGrid.appendChild(item) : lastPlayedInstanceGrid.appendChild(item);
-        });
+        };
         let noPinnedWorlds = document.createElement("div");
         noPinnedWorlds.className = "home-entry-empty";
         noPinnedWorlds.innerHTML = translate("app.worlds.no_pinned");
@@ -4577,31 +3987,47 @@ async function showHomeContent(oldEle) {
 let home_modpacks = {};
 let mc_news = {};
 
-if (data.getDefault("default_mode") == "light") {
-    document.body.classList.add("light");
+async function applyDefaults() {
+    if (await getDefault("default_mode") == "light") {
+        document.body.classList.add("light");
+    }
+    document.body.classList.add(await getDefault("default_accent_color"));
+    if (await getDefault("default_sidebar") == "compact") {
+        document.body.classList.add("compact");
+    }
+    if (await getDefault("default_sidebar_side") == "right") {
+        document.body.classList.add("sidebar-right");
+    }
+    if (await getDefault("potato_mode") == "true") {
+        document.body.classList.add("potato");
+    }
+    if (await getDefault("thin_scrollbars") == "true") {
+        document.body.classList.add("thin-scrollbars");
+    }
+    if (await getDefault("hide_ip") == "true") {
+        document.body.classList.add("hide_ip");
+    }
+    let defaultpage = await getDefault("default_page");
+    let other_default_page = window.enderlynx.isOtherStartingPage();
+    if (other_default_page) defaultpage = other_default_page;
+    if (defaultpage == "home") {
+        homeButton.setSelected();
+        homeContent.displayContent();
+    } else if (defaultpage == "instances") {
+        instanceButton.setSelected();
+        instanceContent.displayContent();
+    } else if (defaultpage == "discover") {
+        setTimeout(() => {
+            discoverButton.setSelected();
+            discoverContent.displayContent();
+        }, 0);
+    } else if (defaultpage == "wardrobe") {
+        wardrobeButton.setSelected();
+        wardrobeContent.displayContent();
+    }
 }
 
-document.body.classList.add(data.getDefault("default_accent_color"));
-
-if (data.getDefault("default_sidebar") == "compact") {
-    document.body.classList.add("compact");
-}
-
-if (data.getDefault("default_sidebar_side") == "right") {
-    document.body.classList.add("sidebar-right");
-}
-
-if (data.getDefault("potato_mode") == "true") {
-    document.body.classList.add("potato");
-}
-
-if (data.getDefault("thin_scrollbars") == "true") {
-    document.body.classList.add("thin-scrollbars");
-}
-
-if (data.getDefault("hide_ip") == "true") {
-    document.body.classList.add("hide_ip");
-}
+applyDefaults();
 
 function animateGridReorder(querySelector, pseudoElements) {
     const cards = [...document.querySelectorAll(querySelector)];
@@ -4671,9 +4097,9 @@ function animateGridReorder(querySelector, pseudoElements) {
 let skinViewer;
 let refreshWardrobe;
 
-function showWardrobeContent() {
+async function showWardrobeContent() {
     content.innerHTML = "";
-    if (!data.getDefaultProfile()) {
+    if (!(await getDefaultProfile())) {
         let ele = document.createElement("div");
         content.appendChild(ele);
         ele.style.padding = "8px";
@@ -4756,17 +4182,17 @@ function showWardrobeContent() {
     searchAndFilter.appendChild(searchElement);
     let dropdownElement = document.createElement("div");
     dropdownElement.style.minWidth = "200px";
-    let sortdropdown = new Dropdown("Sort by", [
+    let sortdropdown = new Dropdown(translate("app.wardrobe.sort_by"), [
         {
-            "name": "Favorites First",
+            "name": translate("app.wardrobe.sort_by.favorites_first"),
             "value": "favorites_first"
         },
         {
-            "name": "Name",
+            "name": translate("app.wardrobe.sort_by.name"),
             "value": "name"
         },
         {
-            "name": "Last Used",
+            "name": translate("app.wardrobe.sort_by.last_used"),
             "value": "last_used"
         }
     ], dropdownElement, "favorites_first", () => {
@@ -4784,10 +4210,10 @@ function showWardrobeContent() {
     skinOptions.appendChild(skinList);
     capeOptions.appendChild(capeList);
 
-    let default_profile = data.getDefaultProfile();
-    let activeCape = default_profile.getActiveCape();
+    let default_profile = await getDefaultProfile();
+    let activeCape = await default_profile.getActiveCape();
 
-    let capes = default_profile.getCapes();
+    let capes = await default_profile.getCapes();
     capes.sort((a, b) => {
         if (a.cape_name > b.cape_name) return 1;
         if (a.cape_name < b.cape_name) return -1;
@@ -4891,7 +4317,7 @@ function showWardrobeContent() {
     detailsWrapper.appendChild(detailstop);
     detailsWrapper.appendChild(detailContent);
     detailContent.appendChild(defaultSkinList);
-    let showDefSkins = () => { }
+    let showDefSkins = async () => { }
     let hideDefSkins = () => {
         detailsWrapper.classList.remove("open");
     }
@@ -4939,17 +4365,17 @@ function showWardrobeContent() {
             skinList.appendChild(e.element);
         });
     }
-    let showContent = (noAnimate) => {
+    let showContent = async (noAnimate) => {
         if (!noAnimate) animateGridReorder(".skin");
         skinEntries = [];
-        let activeSkin = default_profile.getActiveSkin();
+        let activeSkin = await default_profile.getActiveSkin();
         skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
             model: activeSkin?.model == "slim" ? "slim" : "default",
         });
-        let activeCape = default_profile.getActiveCape();
+        let activeCape = await default_profile.getActiveCape();
         skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
         skinList.innerHTML = '';
-        let skins = data.getSkinsNoDefaults();
+        let skins = await getSkinsNoDefaults();
         skins.forEach((e) => {
             let skinEntry = new SkinEntry(e, true, skinViewer, default_profile, showContent, filterSkins);
             skinEntries.push(skinEntry);
@@ -4960,7 +4386,7 @@ function showWardrobeContent() {
             detailChevron.innerHTML = '<i class="spinner"></i>';
             let eles = document.querySelectorAll(".my-account-option.default-skin");
             if (eles.length == 0) {
-                let defaultSkins = await data.getDefaultSkins();
+                let defaultSkins = await getDefaultSkins();
                 defaultSkins.forEach(e => {
                     let skinEntry = new SkinEntry(e, false, skinViewer, default_profile, showContent, filterSkins);
                     defaultSkinList.appendChild(skinEntry.element);
@@ -4990,17 +4416,17 @@ function showWardrobeContent() {
     refreshButton.appendChild(refreshButtonText);
     refreshButton.onclick = async () => {
         refreshButtonIcon.classList.add("spinning");
-        let profile = data.getDefaultProfile();
+        let profile = await getDefaultProfile();
         try {
             let res = await window.enderlynx.getProfile(profile);
-            profile.setAccessToken(res.player_info.access_token);
-            profile.setClientId(res.player_info.client_id);
-            profile.setExpires(res.player_info.expires);
-            profile.setName(res.player_info.name);
-            profile.setRefreshToken(res.player_info.refresh_token);
-            profile.setUuid(res.player_info.uuid);
-            profile.setXuid(res.player_info.xuid);
-            profile.setIsDemo(res.player_info.is_demo);
+            await profile.setAccessToken(res.player_info.access_token);
+            await profile.setClientId(res.player_info.client_id);
+            await profile.setExpires(res.player_info.expires);
+            await profile.setName(res.player_info.name);
+            await profile.setRefreshToken(res.player_info.refresh_token);
+            await profile.setUuid(res.player_info.uuid);
+            await profile.setXuid(res.player_info.xuid);
+            await profile.setIsDemo(res.player_info.is_demo);
             await updateSkinsAndCapes(res.skin_info);
             refreshButtonIcon.classList.remove("spinning");
             showContent();
@@ -5168,7 +4594,7 @@ class SkinEntry {
                 let oldEle = document.querySelector(".my-account-option.skin.selected");
                 if (oldEle) oldEle.classList.remove("selected");
                 currentEle.classList.add("selected");
-                e.setActive(default_profile.uuid);
+                await e.setActive(default_profile.uuid);
                 skinViewer.loadSkin(e.skin_url, {
                     model: e.model == "wide" ? "default" : "slim"
                 });
@@ -5211,9 +4637,9 @@ class SkinEntry {
                     ], [], async (v) => {
                         let info = {};
                         v.forEach(e => { info[e.id] = e.value });
-                        e.setName(info.name);
-                        if (!info.name) e.setName(translate("app.wardrobe.unnamed"));
-                        e.setModel(info.model);
+                        await e.setName(info.name);
+                        if (!info.name) await e.setName(translate("app.wardrobe.unnamed"));
+                        await e.setModel(info.model);
                         showContent(true);
                     });
                 }
@@ -5307,13 +4733,13 @@ class SkinEntry {
                 "title": translate("app.wardrobe.skin.delete"),
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "danger": true,
-                "func": (a, b) => {
+                "func": async (a, b) => {
                     if (e.active_uuid.replaceAll(";", "")) {
                         displayError(translate("app.wardrobe.skin.delete.in_use"));
                         return;
                     }
                     if (b) b.remove();
-                    e.delete();
+                    await e.delete();
                     showContent();
                 }
             } : null
@@ -5324,7 +4750,7 @@ class SkinEntry {
         skinEle.className = "my-account-option";
         if (!allowEditing) skinEle.classList.add("default-skin");
         skinEle.classList.add("skin");
-        skinEle.title = e.name;
+        skinEle.title = allowEditing ? e.name : translate(e.name);
         skinEle.setAttribute("role", "button");
         skinEle.setAttribute("tabindex", 0);
         let skinMore = document.createElement("button");
@@ -5337,9 +4763,9 @@ class SkinEntry {
         skinFavoriteIcon.classList.add(`fa-${e.favorited ? "solid" : "regular"}`);
         skinFavorite.appendChild(skinFavoriteIcon);
         if (e.favorited) skinFavorite.classList.add("starred");
-        skinFavorite.onclick = (ev) => {
+        skinFavorite.onclick = async (ev) => {
             ev.stopPropagation();
-            e.setFavorited(!e.favorited);
+            await e.setFavorited(!e.favorited);
             if (e.favorited) {
                 skinFavorite.classList.add("starred");
                 skinFavoriteIcon.classList.add("staranimation");
@@ -5425,13 +4851,13 @@ async function importSkin(info, callback) {
             } else {
                 model = "wide";
             }
-            data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
+            await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
             callback();
         };
         tempImg.src = info.skin;
         return;
     }
-    data.addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
+    await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
     callback();
 }
 
@@ -5552,9 +4978,9 @@ function renderSkinToDataUrl(skinPath, callback, model) {
     skin.src = skinPath;
 }
 
-function sortInstances(how) {
+async function sortInstances(how) {
     if (!document.getElementsByClassName("group-list")[0]) return;
-    data.setDefault("default_sort", how);
+    await setDefault("default_sort", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
     let groups = document.getElementsByClassName("group");
@@ -5599,10 +5025,10 @@ function sortInstances(how) {
     }
 }
 
-function groupInstances(how, noAnimate) {
+async function groupInstances(how, noAnimate) {
     if (!noAnimate) animateGridReorder(".instance-item");
     if (!document.getElementsByClassName("group-list")[0]) return;
-    data.setDefault("default_group", how);
+    await setDefault("default_group", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
     attrhow = "data-" + attrhow;
     let instances = Array.from(document.querySelectorAll(".group-list .instance-item"));
@@ -5672,7 +5098,7 @@ let loaders = {
     "quilt": translate("app.loader.quilt"),
     "": translate("app.loader.unknown")
 }
-function showInstanceContent(e) {
+async function showInstanceContent(e) {
     let ele = document.createElement("div");
     ele.classList.add("instance-content");
     let title = document.createElement("div");
@@ -5699,7 +5125,7 @@ function showInstanceContent(e) {
     { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
     { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
     { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
-    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, data.getDefault("default_sort"), () => {
+    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, await getDefault("default_sort"), () => {
         groupInstances(groupBy.getSelected);
     });
     let group = document.createElement('div');
@@ -5709,7 +5135,7 @@ function showInstanceContent(e) {
         { "name": translate("app.instances.group.pinned"), "value": "pinned" },
         { "name": translate("app.instances.group.loader"), "value": "loader" },
         { "name": translate("app.instances.group.game_version"), "value": "game_version" }
-    ], group, data.getDefault("default_group"), groupInstances);
+    ], group, await getDefault("default_group"), groupInstances);
     searchAndFilter.appendChild(search);
     searchAndFilter.appendChild(sort);
     searchAndFilter.appendChild(group);
@@ -5723,7 +5149,7 @@ function showInstanceContent(e) {
     ele.appendChild(noResultsEle);
     instanceGrid.appendChild(groupOne);
     ele.appendChild(instanceGrid);
-    let instances = data.getInstances();
+    let instances = await getInstances();
     for (let i = 0; i < instances.length; i++) {
         let running = checkForProcess(instances[i].pid);
         if (!running) instances[i].setPid(null);
@@ -5743,10 +5169,10 @@ function showInstanceContent(e) {
         instanceElement.setAttribute("data-game-version", instances[i].vanilla_version);
         instanceElement.setAttribute("data-custom-groups", instances[i].group);
         instanceElement.setAttribute("data-loader", instances[i].loader);
-        instanceElement.setAttribute("data-pinned", instances[i].pinned ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+        instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
         instanceElement.setAttribute("data-none", "");
         instanceElement.onclick = (e) => {
-            showSpecificInstanceContent(new Instance(instances[i].instance_id));
+            showSpecificInstanceContent(instances[i]);
         }
         instanceElement.classList.add("instance-item");
         instanceElement.dataset.id = instances[i].instance_id;
@@ -5768,7 +5194,7 @@ function showInstanceContent(e) {
         instances[i].watchForChange("name", (t) => {
             instanceName.innerHTML = sanitize(t);
             instanceElement.setAttribute("data-name", t);
-            groupInstances(data.getDefault("default_group"));
+            groupInstances(getDefault("default_group"));
         });
         instanceName.classList.add("instance-name");
         instanceName.innerHTML = sanitize(instances[i].name);
@@ -5782,17 +5208,17 @@ function showInstanceContent(e) {
             loader_text = loaders[l];
             instanceDesc.innerHTML = sanitize(loader_text + " " + version_text);
             instanceElement.setAttribute("data-loader", l);
-            groupInstances(data.getDefault("default_group"));
+            groupInstances(getDefault("default_group"));
         });
         instances[i].watchForChange("vanilla_version", (v) => {
             version_text = v;
             instanceDesc.innerHTML = sanitize(loader_text + " " + version_text);
             instanceElement.setAttribute("data-game-version", v);
-            groupInstances(data.getDefault("default_group"));
+            groupInstances(getDefault("default_group"));
         });
         instances[i].watchForChange("group", (g) => {
             instanceElement.setAttribute("data-custom-groups", g);
-            groupInstances(data.getDefault("default_group"));
+            groupInstances(getDefault("default_group"));
         });
         instanceInfoEle.appendChild(instanceDesc);
         instanceElement.appendChild(instanceInfoEle);
@@ -5804,9 +5230,9 @@ function showInstanceContent(e) {
                     await stopInstance(instances[i]);
                     instanceContent.displayContent();
                 } : async (e) => {
-                    showSpecificInstanceContent(instances[i].refresh(), undefined, undefined, true);
+                    await showSpecificInstanceContent(instances[i], undefined, undefined, true);
                     await playInstance(instances[i]);
-                    showSpecificInstanceContent(instances[i].refresh());
+                    showSpecificInstanceContent(instances[i]);
                 }
             },
             instances[i].locked ? null : {
@@ -5834,24 +5260,24 @@ function showInstanceContent(e) {
                 "icon": '<i class="fa-solid fa-wrench"></i>',
                 "title": translate("app.button.instances.repair"),
                 "func": () => {
-                    showRepairDialog(instances[i].refresh());
+                    showRepairDialog(instances[i]);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
-                "func": (e) => {
-                    showInstanceSettings(new Instance(instances[i].instance_id));
+                "func": async (e) => {
+                    showInstanceSettings(await instances[i].refresh());
                 }
             },
             {
-                "icon": () => instances[i].pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                "title": () => instances[i].pinned ? translate("app.instances.unpin") : translate("app.instances.pin"),
-                "func": (e) => {
-                    instances[i].pinned ? unpinInstance(instances[i]) : pinInstance(instances[i]);
-                    e.setTitle(instances[i].pinned ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                    e.setIcon(instances[i].pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                    instanceElement.setAttribute("data-pinned", instances[i].pinned ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+                "icon": async () => await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": async () => await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                "func": async (e) => {
+                    await instances[i].isPinned() ? await unpinInstance(instances[i]) : await pinInstance(instances[i]);
+                    e.setTitle(await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                    e.setIcon(await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
                     groupInstances(groupBy.getSelected);
                 }
             },
@@ -5908,7 +5334,7 @@ function showInstanceContent(e) {
     return ele;
 }
 
-function showCreateInstanceDialog() {
+async function showCreateInstanceDialog() {
     let dialog = new Dialog();
     dialog.showDialog(translate("app.button.instances.create"), "form", [
         {
@@ -5945,7 +5371,7 @@ function showCreateInstanceDialog() {
             "input_source": "loader",
             "source": VersionList.getVersions,
             "tab": "custom",
-            "default": VersionList.getLatestRelease()
+            "default": await VersionList.getLatestRelease()
         },
         {
             "type": "image-upload",
@@ -6089,65 +5515,64 @@ function showCreateInstanceDialog() {
                 displayError(translate("app.instances.failed_to_create"));
                 return;
             }
-            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
-            showSpecificInstanceContent(instance);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+            await showSpecificInstanceContent(instance);
             let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
             if (r.error) {
-                instance.setFailed(true);
+                await instance.setFailed(true);
             } else {
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setJavaArgs(r.java_args);
-                instance.setProvidedJavaArgs(r.java_args);
-                instance.setMcInstalled(true);
+                await instance.setJavaPath(r.java_installation);
+                await instance.setJavaVersion(r.java_version);
+                await instance.setJavaArgs(r.java_args);
+                await instance.setProvidedJavaArgs(r.java_args);
+                await instance.setMcInstalled(true);
             }
         } else if (info.selected_tab == "file") {
             if (!info.name_if) info.name_if = "";
             let instance_id = window.enderlynx.getInstanceFolderName(info.name_f);
-            let instance = data.addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
-            showSpecificInstanceContent(instance);
+            let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
+            await showSpecificInstanceContent(instance);
             let packInfo = await window.enderlynx.processPackFile(info.file, instance_id, info.name_f);
-            console.log(packInfo);
             if (packInfo.error) {
-                instance.setFailed(true);
-                instance.setInstalling(false);
+                await instance.setFailed(true);
+                await instance.setInstalling(false);
                 return;
             }
             if (!("loader_version" in packInfo)) {
                 displayError(packInfo);
                 return;
             }
-            instance.setLoader(packInfo.loader);
-            instance.setVanillaVersion(packInfo.vanilla_version);
-            instance.setLoaderVersion(packInfo.loader_version);
-            if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
-            if (!instance.name && packInfo.name) instance.setName(packInfo.name);
-            if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
-            packInfo.content.forEach(e => {
-                instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-            });
-            instance.setInstalling(false);
+            await instance.setLoader(packInfo.loader);
+            await instance.setVanillaVersion(packInfo.vanilla_version);
+            await instance.setLoaderVersion(packInfo.loader_version);
+            if (!instance.image && packInfo.image) await instance.setImage(packInfo.image);
+            if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
+            if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
+            for (let i = 0; i < packInfo.content.length; i++) {
+                let e = packInfo.content[i];
+                await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+            }
+            await instance.setInstalling(false);
             let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
             if (r.error) {
-                instance.setFailed(true);
+                await instance.setFailed(true);
             } else {
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setJavaArgs(r.java_args);
-                instance.setProvidedJavaArgs(r.java_args);
-                instance.setMcInstalled(true);
+                await instance.setJavaPath(r.java_installation);
+                await instance.setJavaVersion(r.java_version);
+                await instance.setJavaArgs(r.java_args);
+                await instance.setProvidedJavaArgs(r.java_args);
+                await instance.setMcInstalled(true);
             }
         } else if (info.selected_tab == "launcher") {
             // Import from launcher here
         } else if (info.selected_tab == "code") {
             let instance_id = window.enderlynx.getInstanceFolderName(info.name_c);
-            let instance = data.addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
-            showSpecificInstanceContent(instance);
+            let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
+            await showSpecificInstanceContent(instance);
             let packInfo = await window.enderlynx.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
-            console.log(packInfo);
             if (!packInfo) {
                 displayError(translate("app.cf.code.error"));
-                instance.delete();
+                await instance.delete();
                 instanceContent.displayContent();
                 return;
             }
@@ -6155,30 +5580,31 @@ function showCreateInstanceDialog() {
                 displayError(packInfo);
                 return;
             }
-            instance.setLoader(packInfo.loader);
-            instance.setVanillaVersion(packInfo.vanilla_version);
-            instance.setLoaderVersion(packInfo.loader_version);
-            if (!instance.name && packInfo.name) instance.setName(packInfo.name);
-            if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
-            packInfo.content.forEach(e => {
-                instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-            });
-            instance.setInstalling(false);
+            await instance.setLoader(packInfo.loader);
+            await instance.setVanillaVersion(packInfo.vanilla_version);
+            await instance.setLoaderVersion(packInfo.loader_version);
+            if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
+            if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
+            for (let i = 0; i < packInfo.content.length; i++) {
+                let e = packInfo.content[i];
+                await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+            }
+            await instance.setInstalling(false);
             let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
             if (r.error) {
-                instance.setFailed(true);
+                await instance.setFailed(true);
             } else {
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setJavaArgs(r.java_args);
-                instance.setProvidedJavaArgs(r.java_args);
-                instance.setMcInstalled(true);
+                await instance.setJavaPath(r.java_installation);
+                await instance.setJavaVersion(r.java_version);
+                await instance.setJavaArgs(r.java_args);
+                await instance.setProvidedJavaArgs(r.java_args);
+                await instance.setMcInstalled(true);
             }
         }
     });
 }
 
-function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log, make_button_loading) {
+async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log, make_button_loading) {
     if (!dont_add_to_log) {
         page_log = page_log.slice(0, page_index + 1).concat([() => {
             showSpecificInstanceContent(instanceInfo, default_tab, true);
@@ -6187,7 +5613,7 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
     }
     currentTab = "instance";
     currentInstanceId = instanceInfo.instance_id;
-    instanceInfo = instanceInfo.refresh();
+    instanceInfo = await instanceInfo.refresh();
     for (let i = 0; i < navButtons.length; i++) {
         navButtons[i].removeSelected();
     }
@@ -6296,10 +5722,10 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
         playButton.classList.add("instance-top-stop-button");
         playButton.onclick = stopButtonClick;
         if (tabs.selected == 'logs') {
-            setInstanceTabContentLogs(new Instance(instanceInfo.instance_id), tabsInfo);
+            setInstanceTabContentLogs(await Instance.getInstance(instanceInfo.instance_id), tabsInfo);
         }
         window.enderlynx.clearProcessWatches();
-        window.enderlynx.watchProcessForExit((new Instance(instanceInfo.instance_id)).pid, () => {
+        window.enderlynx.watchProcessForExit((await Instance.getInstance(instanceInfo.instance_id)).pid, () => {
             playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
             playButton.classList.remove("instance-top-stop-button");
             playButton.classList.remove("instance-top-loading-button");
@@ -6388,11 +5814,11 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
         playButton.classList.add("instance-top-loading-button");
         playButton.onclick = () => { };
     }
-    instanceInfo.watchForChange("mc_installed", (v) => {
-        calculatePlayButtonState(v, instanceInfo.refresh().failed);
+    instanceInfo.watchForChange("mc_installed", async (v) => {
+        calculatePlayButtonState(v, (await instanceInfo.refresh()).failed);
     });
-    instanceInfo.watchForChange("failed", (v) => {
-        calculatePlayButtonState(instanceInfo.refresh().mc_installed, v);
+    instanceInfo.watchForChange("failed", async (v) => {
+        calculatePlayButtonState((await instanceInfo.refresh()).mc_installed, v);
     });
     let threeDots = document.createElement("button");
     threeDots.classList.add("instance-top-more");
@@ -6430,23 +5856,23 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             "icon": '<i class="fa-solid fa-wrench"></i>',
             "title": translate("app.button.instances.repair"),
             "func": () => {
-                showRepairDialog(instanceInfo.refresh());
+                showRepairDialog(instanceInfo);
             }
         },
         {
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
-            "func": (e) => {
-                showInstanceSettings(new Instance(instanceInfo.instance_id), tabsInfo);
+            "func": async (e) => {
+                showInstanceSettings(await instanceInfo.refresh(), tabsInfo);
             }
         },
         {
-            "icon": () => instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-            "title": () => instanceInfo.pinned ? translate("app.instances.unpin") : translate("app.instances.pin"),
-            "func": (e) => {
-                instanceInfo.pinned ? unpinInstance(instanceInfo) : pinInstance(instanceInfo);
-                e.setTitle(instanceInfo.pinned ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                e.setIcon(instanceInfo.pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+            "icon": async () => await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+            "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+            "func": async (e) => {
+                await instanceInfo.isPinned() ? await unpinInstance(instanceInfo) : await pinInstance(instanceInfo);
+                e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
             }
         },
         {
@@ -6515,8 +5941,8 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
             }
         },
         {
-            "name": translate("app.instances.tabs.logs"), "value": "logs", "func": () => {
-                setInstanceTabContentLogs(instanceInfo.refresh(), tabsInfo);
+            "name": translate("app.instances.tabs.logs"), "value": "logs", "func": async () => {
+                setInstanceTabContentLogs(await instanceInfo.refresh(), tabsInfo);
             }
         },
         {
@@ -6532,28 +5958,21 @@ function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log,
     ]);
     tabs.selectOptionAdvanced(default_tab ?? "content");
     let analyzeLogs = async () => {
-        instanceInfo = instanceInfo.refresh();
+        instanceInfo = await instanceInfo.refresh();
         let info = await window.enderlynx.analyzeLogs(instanceInfo.instance_id, instanceInfo.last_analyzed_log, running ? instanceInfo.current_log_file : "");
-        instanceInfo.setPlaytime(info.total_playtime + instanceInfo.playtime);
-        if (info.most_recent_log) instanceInfo.setLastAnalyzedLog(info.most_recent_log);
+        await instanceInfo.setPlaytime(info.total_playtime + instanceInfo.playtime);
+        if (info.most_recent_log) await instanceInfo.setLastAnalyzedLog(info.most_recent_log);
         for (let i = 0; i < info.last_played_servers.length; i++) {
             let entry = info.last_played_servers[i];
-            console.log(entry);
-            let existing = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instanceInfo.instance_id, entry[1] + ":" + entry[2]);
-            if (!existing) {
-                db.prepare("INSERT INTO last_played_servers (ip, instance_id, date) VALUES (?, ?, ?)").run(entry[1] + ":" + entry[2], instanceInfo.instance_id, entry[0]);
-            } else {
-                db.prepare("UPDATE last_played_servers SET date = ? WHERE instance_id = ? AND ip = ?").run(entry[0], instanceInfo.instance_id, entry[1] + ":" + entry[2]);
-            }
+            await window.enderlynx.setServerLastPlayed(instanceInfo.instance_id, entry[1] + ":" + entry[2], entry[0]);
         }
     }
     analyzeLogs();
 }
 
-function getServerLastPlayed(instance_id, ip) {
-    if (!ip.includes(":")) ip += ":25565";
-    let result = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instance_id, ip);
-    return result ? new Date(result.date) : new Date(null);
+async function getServerLastPlayed(instance_id, ip) {
+    let result = await window.enderlynx.getServerLastPlayed(instance_id, ip);
+    return new Date(result);
 }
 
 function showInstanceSettings(instanceInfo, tabsInfo) {
@@ -6829,24 +6248,25 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
     ].filter(e => e), async (e) => {
         let info = {};
         e.forEach(e => { info[e.id] = e.value });
-        instanceInfo.setName(info.name);
-        instanceInfo.setImage(info.icon);
-        instanceInfo.setGroup(info.group);
-        instanceInfo.setWindowWidth(info.width);
-        instanceInfo.setWindowHeight(info.height);
-        instanceInfo.setAllocatedRam(info.allocated_ram);
-        instanceInfo.setJavaPath(info.java_path);
+        await instanceInfo.setDateModified(new Date());
+        await instanceInfo.setName(info.name);
+        await instanceInfo.setImage(info.icon);
+        await instanceInfo.setGroup(info.group);
+        await instanceInfo.setWindowWidth(info.width);
+        await instanceInfo.setWindowHeight(info.height);
+        await instanceInfo.setAllocatedRam(info.allocated_ram);
+        await instanceInfo.setJavaPath(info.java_path);
         if (resettingJavaArgs && info.java_args == instanceInfo.provided_java_args) {
-            instanceInfo.setUsesCustomJavaArgs(false);
+            await instanceInfo.setUsesCustomJavaArgs(false);
         } else if (info.java_args != instanceInfo.java_args) {
-            instanceInfo.setUsesCustomJavaArgs(true);
-            instanceInfo.setJavaArgs(info.java_args);
+            await instanceInfo.setUsesCustomJavaArgs(true);
+            await instanceInfo.setJavaArgs(info.java_args);
         }
-        instanceInfo.setEnvVars(info.env_vars);
-        instanceInfo.setPreLaunchHook(info.pre_launch_hook);
-        instanceInfo.setPostLaunchHook(info.post_launch_hook);
-        instanceInfo.setWrapper(info.wrapper);
-        instanceInfo.setPostExitHook(info.post_exit_hook);
+        await instanceInfo.setEnvVars(info.env_vars);
+        await instanceInfo.setPreLaunchHook(info.pre_launch_hook);
+        await instanceInfo.setPostLaunchHook(info.post_launch_hook);
+        await instanceInfo.setWrapper(info.wrapper);
+        await instanceInfo.setPostExitHook(info.post_exit_hook);
         if (info.modpack_version && (info.modpack_version != instanceInfo.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
             let source = instanceInfo.install_source;
             let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
@@ -6859,24 +6279,24 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
             return;
         }
         if (!info.loader || !info.game_version) return;
-        instanceInfo.setLoader(info.loader);
-        instanceInfo.setVanillaVersion(info.game_version, true);
-        instanceInfo.setLoaderVersion(info.loader_version);
-        instanceInfo.setMcInstalled(false);
+        await instanceInfo.setLoader(info.loader);
+        await instanceInfo.setVanillaVersion(info.game_version, true);
+        await instanceInfo.setLoaderVersion(info.loader_version);
+        await instanceInfo.setMcInstalled(false);
         let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
         if (r.error) {
-            instanceInfo.setFailed(true);
+            await instanceInfo.setFailed(true);
         } else {
             if (instanceInfo.java_version != r.java_version) {
-                instanceInfo.setJavaPath(r.java_installation);
-                instanceInfo.setJavaVersion(r.java_version);
+                await instanceInfo.setJavaPath(r.java_installation);
+                await instanceInfo.setJavaVersion(r.java_version);
             }
-            instanceInfo.setProvidedJavaArgs(r.java_args);
+            await instanceInfo.setProvidedJavaArgs(r.java_args);
             if (!instanceInfo.uses_custom_java_args) {
-                instanceInfo.setJavaArgs(r.java_args);
+                await instanceInfo.setJavaArgs(r.java_args);
             }
             if (info.update_content) {
-                let content = instanceInfo.getContent();
+                let content = await instanceInfo.getContent();
                 let processId = Math.random();
                 let cancel = false;
                 for (let i = 0; i < content.length; i++) {
@@ -6927,7 +6347,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                     setInstanceTabContentContent(instanceInfo, tabsInfo);
                 }
             }
-            instanceInfo.setMcInstalled(true);
+            await instanceInfo.setMcInstalled(true);
         }
     });
 }
@@ -6975,8 +6395,8 @@ function showRepairDialog(instanceInfo) {
             "type": "confirm",
             "content": translate("app.instances.repair.confirm")
         }
-    ], [], (v) => {
-        repairInstance(instanceInfo.refresh(), v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
+    ], [], async (v) => {
+        repairInstance(await instanceInfo.refresh(), v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
     });
 }
 function setInstanceTabContentContent(instanceInfo, element) {
@@ -6999,7 +6419,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     fileDropInner.className = "drop-overlay-inner";
     fileDropInner.innerHTML = translate("app.import.content.drop");
     fileDrop.appendChild(fileDropInner);
-    instanceInfo = instanceInfo.refresh();
+    instanceInfo = await instanceInfo.refresh();
     let instanceLockedBanner = document.createElement("div");
     instanceLockedBanner.className = "instance-locked-banner";
     let instanceLockedText = document.createElement("span");
@@ -7007,11 +6427,11 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     let instanceLockedButton = document.createElement("button");
     instanceLockedButton.className = "instance-locked-button";
     instanceLockedButton.innerHTML = '<i class="fa-solid fa-unlock"></i>' + translate("app.instance.unlock");
-    instanceLockedButton.onclick = () => {
-        instanceInfo.setLocked(false);
-        instanceInfo.setInstallSource("custom");
-        instanceInfo.setInstallId("");
-        instanceInfo.setInstalledVersion("");
+    instanceLockedButton.onclick = async () => {
+        await instanceInfo.setLocked(false);
+        await instanceInfo.setInstallSource("custom");
+        await instanceInfo.setInstallId("");
+        await instanceInfo.setInstalledVersion("");
         showSpecificInstanceContent(instanceInfo);
     }
     instanceLockedBanner.appendChild(instanceLockedText);
@@ -7096,8 +6516,8 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     let addContent = document.createElement("button");
     addContent.classList.add("add-content-button");
     addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
-    addContent.onclick = () => {
-        instanceInfo = instanceInfo.refresh();
+    addContent.onclick = async () => {
+        instanceInfo = await instanceInfo.refresh();
         showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
     }
     if (instanceInfo.locked) {
@@ -7135,23 +6555,25 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     searchAndFilter.appendChild(addContent);
     let contentListWrap = document.createElement("div");
     let checkForPlayerContent = async () => {
-        let old_file_names = instanceInfo.getContent().map((e) => e.file_name);
+        let instanceContent = await instanceInfo.getContent();
+        let old_file_names = instanceContent.map((e) => e.file_name);
         let newContent = await getInstanceContent(instanceInfo);
         let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
-        console.log(newContentAdd);
-        newContentAdd.forEach(e => {
-            instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-        });
+        for (let i = 0; i < newContentAdd.length; i++) {
+            let e = newContentAdd[i];
+            await instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+        }
         let deleteContent = newContent.deleteContent;
-        deleteContent.forEach(e => {
-            let content = new Content(instanceInfo.instance_id, e);
-            content.delete();
-        });
+        for (let i = 0; i < deleteContent.length; i++) {
+            let e = deleteContent[i];
+            let index = old_file_names.indexOf(e);
+            await instanceContent[index].delete();
+        }
     }
-    let showContent = () => {
+    let showContent = async () => {
         contentListWrap.innerHTML = '';
         let content = [];
-        let instance_content = instanceInfo.getContent();
+        let instance_content = await instanceInfo.getContent();
         instance_content.sort((a, b) => {
             if (a.name.toLowerCase() > b.name.toLowerCase()) {
                 return 1;
@@ -7170,8 +6592,8 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                     "desc": e.author ? "by " + e.author : ""
                 },
                 "secondary_column": {
-                    "title": () => firstTime ? e.version : e.refresh().version,
-                    "desc": () => firstTime ? e.version : e.refresh().file_name
+                    "title": async () => firstTime ? e.version : (await e.refresh()).version,
+                    "desc": async () => firstTime ? e.version : (await e.refresh()).file_name
                 },
                 "type": e.type,
                 "class": e.source,
@@ -7181,14 +6603,14 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         let newInfo = await fetch(`https://api.modrinth.com/v2/project/${e.source_info}`);
                         let newInfoJSON = await newInfo.json();
                         let newImage = newInfoJSON.icon_url;
-                        e.setImage(newImage);
+                        await e.setImage(newImage);
                         ele.src = fixPathForImage(newImage ? newImage : getDefaultImage(e.name));
                     } else if (e.source == "curseforge") {
                         let newInfo = await fetch(`https://api.curse.tools/v1/cf/mods/${e.source_info.replace(".0", "")}`);
                         let newInfoJSON = await newInfo.json();
                         let newImage = newInfoJSON.data?.logo?.thumbnailUrl;
                         if (!newImage) newImage = newInfoJSON.data?.logo?.url;
-                        e.setImage(newImage);
+                        await e.setImage(newImage);
                         ele.src = fixPathForImage(newImage ? newImage : getDefaultImage(e.name));
                     }
                 },
@@ -7204,10 +6626,10 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                             "content": translate("app.content.delete.confirm")
                         }
                     ], [], async () => {
-                        let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
+                        let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, (await e.refresh()).file_name);
                         if (success) {
                             displaySuccess(translate("app.content.delete.success").replace("%c", e.name));
-                            e.delete();
+                            await e.delete();
                             contentList.removeElement(ele);
                         } else {
                             displayError(translate("app.content.delete.fail").replace("%c", e.name));
@@ -7219,32 +6641,32 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         {
                             "title": translate("app.content.open"),
                             "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
-                            "func": () => {
-                                e = e.refresh();
+                            "func": async () => {
+                                e = await e.refresh();
                                 window.enderlynx.showContentInFolder(instanceInfo.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                             }
                         },
                         e.source == "modrinth" ? {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
-                            "func": () => {
-                                instanceInfo = instanceInfo.refresh();
+                            "func": async () => {
+                                instanceInfo = await instanceInfo.refresh();
                                 displayContentInfo(e.source, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
                             }
                         } : e.source == "curseforge" ? {
                             "title": translate("app.content.view"),
                             "icon": '<i class="fa-solid fa-circle-info"></i>',
-                            "func": () => {
-                                instanceInfo = instanceInfo.refresh();
+                            "func": async () => {
+                                instanceInfo = await instanceInfo.refresh();
                                 displayContentInfo(e.source, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
                             }
                         } : null,
                         e.source == "vanilla_tweaks" && !instanceInfo.locked ? {
                             "title": translate("app.content.edit_packs"),
                             "icon": '<i class="fa-solid fa-pencil"></i>',
-                            "func": () => {
-                                let refreshed = e.refresh();
-                                displayVanillaTweaksEditor(instanceInfo.instance_id, instanceInfo.vanilla_version, JSON.parse(refreshed.source_info), refreshed.file_name, refreshed);
+                            "func": async () => {
+                                e = await e.refresh();
+                                displayVanillaTweaksEditor(instanceInfo.instance_id, instanceInfo.vanilla_version, JSON.parse(e.source_info), e.file_name, e);
                             }
                         } : null,
                         instanceInfo.locked ? null : e.source == "player_install" ? null : {
@@ -7253,7 +6675,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                             "func_id": "update",
                             "func": async () => {
                                 try {
-                                    let s = await updateContent(instanceInfo, e.refresh());
+                                    let s = await updateContent(instanceInfo, await e.refresh());
                                     if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
                                     contentList.updateSecondaryColumn();
                                 } catch (f) {
@@ -7287,7 +6709,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                                     let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
                                     if (success) {
                                         displaySuccess(translate("app.content.delete.success", "%c", e.name));
-                                        e.delete();
+                                        await e.delete();
                                         contentList.removeElement(ele);
                                     } else {
                                         displayError(translate("app.content.delete.fail", "%c", e.name));
@@ -7338,7 +6760,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         "icon": '<i class="fa-solid fa-trash-can"></i>',
                         "danger": true,
                         "func": async (ele, e) => {
-                            let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.refresh().file_name);
+                            let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, (await e.refresh()).file_name);
                             if (success) {
                                 displaySuccess(translate("app.content.delete.success", "%c", e.name));
                                 e.delete();
@@ -7376,7 +6798,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                 "enabled": instanceInfo.locked ? false : true,
                 "func": async (b) => {
                     b.innerHTML = "<i class='spinner'></i>" + translate("app.content.updating")
-                    let content = instanceInfo.getContent();
+                    let content = await instanceInfo.getContent();
                     let processId = Math.random();
                     let cancel = false;
                     for (let i = 0; i < content.length; i++) {
@@ -7441,7 +6863,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
             contentListWrap.appendChild(currently_installing.element);
         }
     });
-    if (!instanceInfo.refresh().installing) {
+    if (!(await instanceInfo.refresh()).installing) {
         await checkForPlayerContent();
         showContent();
     } else {
@@ -7724,7 +7146,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playSingleplayerWorld(instanceInfo, worlds[i].id);
-                                showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
+                                showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
                         {
@@ -7735,11 +7157,11 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             }
                         },
                         {
-                            "title": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                            "icon": () => isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                            "func": (e) => {
-                                let world_pinned = isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer");
-                                world_pinned ? unpinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id) : pinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id)
+                            "title": async () => await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                            "icon": async () => await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                            "func": async (e) => {
+                                let world_pinned = await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer");
+                                world_pinned ? await unpinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id) : await pinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id)
                                 e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
                                 e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                             }
@@ -7789,7 +7211,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
             });
     }
     for (let i = 0; i < worldsMultiplayer.length; i++) {
-        let last_played = getServerLastPlayed(instanceInfo.instance_id, worldsMultiplayer[i].ip);
+        let last_played = await getServerLastPlayed(instanceInfo.instance_id, worldsMultiplayer[i].ip);
         worldList.push(
             {
                 "primary_column": {
@@ -7831,15 +7253,15 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
-                                showSpecificInstanceContent(instanceInfo.refresh(), 'worlds');
+                                showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
                         {
-                            "title": () => isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                            "icon": () => isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                            "func": (e) => {
-                                let world_pinned = isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer");
-                                world_pinned ? unpinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id) : pinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id)
+                            "title": async () => await isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                            "icon": async () => await isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                            "func": async (e) => {
+                                let world_pinned = await isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer");
+                                world_pinned ? await unpinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id) : await pinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id)
                                 e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
                                 e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                             }
@@ -8045,8 +7467,6 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
                 logs.push({ "element": lineElement, "content": e });
             });
             spacer.style.height = logs.length * 15 + "px";
-            console.log("scrolling to bottom");
-            console.log(logDisplay.scrollHeight);
             setTimeout(() => {
                 logDisplay.scrollTo(0, logDisplay.scrollHeight);
             }, 0);
@@ -8108,9 +7528,9 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
         render();
     }
     if (log_info.length > 9) {
-        let dropdownInfo = new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
+        new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
     } else {
-        let dropdownInfo = new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
+        new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
     }
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
@@ -8192,7 +7612,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
                 "content": translate("app.logs.delete_all.confirm")
             }
         ], [], async () => {
-            let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id, instanceInfo.refresh().current_log_file);
+            let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id, (await instanceInfo.refresh()).current_log_file);
             if (success) {
                 displaySuccess(translate("app.logs.delete_all.success"));
                 setInstanceTabContentLogs(instanceInfo, element);
@@ -8291,10 +7711,11 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
         ], [], async () => {
             let default_options = new DefaultOptions(instanceInfo.vanilla_version);
             try {
-                let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, default_options.getOptionsTXT(), false, true);
-                instanceInfo.setAttemptedOptionsTxtVersion(v);
+                let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, await default_options.getOptionsTXT(), false, true);
+                await instanceInfo.setAttemptedOptionsTxtVersion(v);
                 displaySuccess(translate("app.instances.options.apply.done"));
             } catch (e) {
+                console.error(e);
                 displayError(translate("app.instances.options.apply.fail"));
             }
             setInstanceTabContentOptions(instanceInfo, element);
@@ -8402,9 +7823,9 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
         titleElement.innerHTML = e.key;
         item.appendChild(titleElement);
 
-        let onChange = (v) => {
+        let onChange = async (v) => {
             values[i].value = (type == "text" ? '"' + v + '"' : v);
-            if (defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
+            if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 setDefaultButton.onclick = onRemove;
             } else {
@@ -8525,8 +7946,8 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
         setDefaultButton.className = "option-button";
         setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
 
-        let onSet = () => {
-            defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
+        let onSet = async () => {
+            await defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
             setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
             setDefaultButton.onclick = onRemove;
             displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
@@ -8534,14 +7955,14 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
 
         setDefaultButton.onclick = onSet;
 
-        let onRemove = () => {
-            defaultOptions.deleteDefault(e.key);
+        let onRemove = async () => {
+            await defaultOptions.deleteDefault(e.key);
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
             setDefaultButton.onclick = onSet;
             displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
         }
 
-        if (defaultOptions.getDefault(e.key) == e.value) {
+        if (await defaultOptions.getDefault(e.key) == e.value) {
             setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
             setDefaultButton.onclick = onRemove;
         }
@@ -8854,26 +8275,23 @@ function displaySuccess(success) {
 }
 
 async function playInstance(instInfo, quickPlay = null) {
-    instInfo = new Instance(instInfo.instance_id);
+    instInfo = await instInfo.refresh();
     instInfo.setLastPlayed(new Date());
     let pid;
     try {
-        pid = await window.enderlynx.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, data.getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, data.getDefault("global_env_vars"), data.getDefault("global_pre_launch_hook"), data.getDefault("global_post_launch_hook"), data.getDefault("global_wrapper"), data.getDefault("global_post_exit_hook"), instInfo.name);
+        pid = await window.enderlynx.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, await getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, await getDefault("global_env_vars"), await getDefault("global_pre_launch_hook"), await getDefault("global_post_launch_hook"), await getDefault("global_wrapper"), await getDefault("global_post_exit_hook"), instInfo.name);
         if (!pid) return;
-        console.log(pid);
-        console.log(pid.minecraft.pid);
-        console.log(window.enderlynx.checkForProcess(pid.minecraft.pid));
-        instInfo.setPid(pid.minecraft.pid);
-        instInfo.setCurrentLogFile(pid.minecraft.log);
-        let default_player = data.getDefaultProfile();
-        default_player.setAccessToken(pid.player_info.access_token);
-        default_player.setClientId(pid.player_info.client_id);
-        default_player.setExpires(pid.player_info.expires);
-        default_player.setName(pid.player_info.name);
-        default_player.setRefreshToken(pid.player_info.refresh_token);
-        default_player.setUuid(pid.player_info.uuid);
-        default_player.setXuid(pid.player_info.xuid);
-        default_player.setIsDemo(pid.player_info.is_demo);
+        await instInfo.setPid(pid.minecraft.pid);
+        await instInfo.setCurrentLogFile(pid.minecraft.log);
+        let default_player = await getDefaultProfile();
+        await default_player.setAccessToken(pid.player_info.access_token);
+        await default_player.setClientId(pid.player_info.client_id);
+        await default_player.setExpires(pid.player_info.expires);
+        await default_player.setName(pid.player_info.name);
+        await default_player.setRefreshToken(pid.player_info.refresh_token);
+        await default_player.setUuid(pid.player_info.uuid);
+        await default_player.setXuid(pid.player_info.xuid);
+        await default_player.setIsDemo(pid.player_info.is_demo);
         await updateSkinsAndCapes(pid.player_info);
         await live.findLive();
     } catch (e) {
@@ -8890,7 +8308,7 @@ async function playMultiplayerWorld(instInfo, world_id) {
 }
 
 async function stopInstance(instInfo) {
-    return await window.enderlynx.killProcess(instInfo.refresh().pid);
+    return await window.enderlynx.killProcess((await instInfo.refresh()).pid);
 }
 
 function formatTime(secs) {
@@ -9015,14 +8433,14 @@ async function getInstanceWorldsMulti(instanceInfo) {
 }
 
 async function getInstanceContent(instanceInfo) {
-    return await window.enderlynx.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, instanceInfo.getContent(), data.getDefault("link_with_modrinth") == "true");
+    return await window.enderlynx.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, await instanceInfo.getContent(), await getDefault("link_with_modrinth") == "true");
 }
 
 function translate(key, ...params) {
     if (!lang) {
         lang = getLangFile("en-us");
     }
-    let value = lang[key];
+    let value = lang[key] ?? key;
     for (let i = 0; i < params.length; i += 2) {
         value = value.replace(params[i], params[i + 1]);
     }
@@ -9030,7 +8448,12 @@ function translate(key, ...params) {
     return value;
 }
 
-let accountSwitcher = new MinecraftAccountSwitcher(playerSwitch, data.getProfiles());
+let accountSwitcher;
+
+async function makeAccountSwitcher() {
+    accountSwitcher = new MinecraftAccountSwitcher(playerSwitch, await getProfiles());
+}
+makeAccountSwitcher();
 
 const colorCodes = {
     '0': 'mc-black',
@@ -9106,7 +8529,6 @@ function parseMinecraftFormatting(text) {
 
 let live = new LiveMinecraft(liveMinecraft);
 live.findLive();
-
 
 class NoResultsFound {
     constructor(message = translate("app.no_results_found")) {
@@ -9367,8 +8789,8 @@ window.enderlynx.onErrorMessage((message) => {
 window.enderlynx.onLaunchInstance(async (launch_info) => {
     if (!launch_info.instance_id) return;
     try {
-        let instance = new Instance(launch_info.instance_id);
-        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content", undefined, true);
+        let instance = await Instance.getInstance(launch_info.instance_id);
+        await showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content", undefined, true);
         if (launch_info.world_type == "singleplayer") {
             await playSingleplayerWorld(instance, launch_info.world_id);
         } else if (launch_info.world_type == "multiplayer") {
@@ -9376,7 +8798,7 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
         } else {
             await playInstance(instance);
         }
-        showSpecificInstanceContent(instance.refresh(), launch_info.world_type ? "worlds" : "content");
+        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
     } catch (e) {
         displayError(translate("app.launch_error"));
     }
@@ -9493,8 +8915,8 @@ class VersionList {
             return v;
         }
     }
-    static getLatestRelease() {
-        return data.getDefault("latest_release");
+    static async getLatestRelease() {
+        return await getDefault("latest_release");
     }
 }
 
@@ -10331,7 +9753,6 @@ class Dialog {
                             loaderElement = this.values[j].element;
                         }
                         if (this.values[j].id == info[i].game_version_source) {
-                            // Use a token to ensure only the latest async result is displayed
                             let updateToken = 0;
                             this.values[j].element.addOnChange(async () => {
                                 const currentToken = ++updateToken;
@@ -10343,11 +9764,10 @@ class Dialog {
                                 multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
                                 try {
                                     let list = await getVersions(loaderElement.value, value);
-                                    // Only update if this is the latest request
                                     if (currentToken !== updateToken) return;
                                     if (label.innerHTML != translate("app.dialog.loading")) return;
                                     multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                    label.innerHTML = loaders[loaderElement.value] + " Version";
+                                    label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loaderElement.value]);
                                 } catch (err) {
                                     if (currentToken !== updateToken) return;
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
@@ -10367,7 +9787,7 @@ class Dialog {
                                     let list = await getVersions(loaderElement.value, value);
                                     if (label.innerHTML != translate("app.dialog.loading")) return;
                                     multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                    label.innerHTML = loaders[loaderElement.value] + " Version";
+                                    label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loaderElement.value]);
                                 } catch (err) {
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
                                     label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
@@ -10452,8 +9872,8 @@ function showAddContent(instance_id, vanilla_version, loader, default_tab) {
     let backButton = document.createElement("button");
     backButton.innerHTML = '<i class="fa-solid fa-arrow-left"></i>' + translate("app.discover.back_to_instance");
     backButton.className = "back-button";
-    backButton.onclick = () => {
-        showSpecificInstanceContent(new Instance(instance_id), default_tab == "world" ? "worlds" : "content");
+    backButton.onclick = async () => {
+        showSpecificInstanceContent(await Instance.getInstance(instance_id), default_tab == "world" ? "worlds" : "content");
     }
     let title = document.createElement("h1");
     title.innerHTML = translate("app.discover.add_content");
@@ -10843,7 +10263,7 @@ let added_vt_packs = [];
 
 async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version, page = 1, pageSize = 20, sortBy = "relevance", states) {
     let instance_content = [];
-    if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+    if (instance_id) instance_content = await (await Instance.getInstance(instance_id)).getContent();
     let content_ids = instance_content.map(e => e.source_info);
     element.innerHTML = "";
     let loading = new LoadingContainer();
@@ -11087,7 +10507,7 @@ function displayVanillaTweaksEditor(instance_id, version, packs, file_name, cont
             "content": translate("app.content.edit_packs.confirm")
         }
     ], [], async () => {
-        let instanceInfo = new Instance(instance_id);
+        let instanceInfo = await Instance.getInstance(instance_id);
         let file = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, instanceInfo.vanilla_version, instanceInfo.instance_id, file_name);
         if (!file) {
             displayError(translate("app.discover.vt.fail"));
@@ -11252,16 +10672,16 @@ class VanillaTweaksSelector {
                         "type": "dropdown",
                         "id": "instance",
                         "name": translate("app.discover.datapacks.instance"),
-                        "options": data.getInstances().map(e => ({ "name": e.name, "value": e.instance_id }))
+                        "options": getInstances().map(e => ({ "name": e.name, "value": e.instance_id }))
                     },
                     {
                         "type": "dropdown",
                         "id": "world",
                         "name": translate("app.discover.datapacks.world"),
-                        "options": this.instance_id ? (await getInstanceWorlds(new Instance(this.instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
+                        "options": this.instance_id ? (await getInstanceWorlds(await Instance.getInstance(this.instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
                         "input_source": this.instance_id ? null : "instance",
                         "source": this.instance_id ? null : async (i) => {
-                            return (await getInstanceWorlds(new Instance(i))).map(e => ({ "name": e.name, "value": e.id }));
+                            return (await getInstanceWorlds(await Instance.getInstance(i))).map(e => ({ "name": e.name, "value": e.id }));
                         }
                     }
                 ].filter(e => e), [
@@ -11290,7 +10710,7 @@ class VanillaTweaksSelector {
                         }
                     } else {
                         if (success) {
-                            displaySuccess(translate("app.discover.vt.success", "%i", new Instance(instance).name));
+                            displaySuccess(translate("app.discover.vt.success", "%i", (await Instance.getInstance(instance)).name));
                         } else {
                             displayError(translate("app.discover.vt.fail"));
                         }
@@ -11304,12 +10724,12 @@ class VanillaTweaksSelector {
                     displayError(translate("app.discover.vt.fail"));
                     return;
                 }
-                let instance = new Instance(this.instance_id);
-                instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
+                let instance = await Instance.getInstance(this.instance_id);
+                await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                 submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             } else {
                 let dialog = new Dialog();
-                let instances = data.getInstances();
+                let instances = await getInstances();
 
                 let installGrid = document.createElement("div");
                 installGrid.className = "install-grid";
@@ -11320,7 +10740,7 @@ class VanillaTweaksSelector {
                 let createNewButton = document.createElement("button");
                 createNewButton.className = "install-grid-create";
                 createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
-                createNewButton.onclick = () => {
+                createNewButton.onclick =  async () => {
                     let dialog2 = new Dialog();
                     dialog2.showDialog(translate("app.button.instances.create"), "form", [
                         {
@@ -11353,7 +10773,7 @@ class VanillaTweaksSelector {
                             "id": "game_version",
                             "input_source": "loader",
                             "source": VersionList.getVersions,
-                            "default": VersionList.getLatestRelease()
+                            "default": await VersionList.getLatestRelease()
                         }
                     ], [
                         { "content": translate("app.instances.cancel"), "type": "cancel" },
@@ -11387,23 +10807,23 @@ class VanillaTweaksSelector {
                             displayError(translate("app.instances.failed_to_create"));
                             return;
                         }
-                        let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
-                        instance.setInstalling(true);
-                        showSpecificInstanceContent(instance);
+                        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                        await instance.setInstalling(true);
+                        await showSpecificInstanceContent(instance);
                         let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
                         if (file_name) {
-                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
+                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                         }
-                        instance.setInstalling(false);
+                        await instance.setInstalling(false);
                         let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
                         if (r.error) {
-                            instance.setFailed(true);
+                            await instance.setFailed(true);
                         } else {
-                            instance.setJavaPath(r.java_installation);
-                            instance.setJavaVersion(r.java_version);
-                            instance.setJavaArgs(r.java_args);
-                            instance.setProvidedJavaArgs(r.java_args);
-                            instance.setMcInstalled(true);
+                            await instance.setJavaPath(r.java_installation);
+                            await instance.setJavaVersion(r.java_version);
+                            await instance.setJavaArgs(r.java_args);
+                            await instance.setProvidedJavaArgs(r.java_args);
+                            await instance.setMcInstalled(true);
                         }
                     });
                 }
@@ -11455,7 +10875,7 @@ class VanillaTweaksSelector {
                         }
                         if (success) {
                             let instance = instances[i];
-                            instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
+                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                             installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                         } else {
                             installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
@@ -11634,7 +11054,7 @@ class Details {
 }
 
 async function installContent(source, project_id, instance_id, project_type, title, author, icon_url, data_pack_world) {
-    let instance = new Instance(instance_id);
+    let instance = await Instance.getInstance(instance_id);
     let version_json;
     let max_pages = 10;
     let id;
@@ -11664,7 +11084,7 @@ async function installContent(source, project_id, instance_id, project_type, tit
         }));
     }
     let initialContent = {};
-    if (instance.getContent().map(e => e.source_id).includes(project_id)) {
+    if ((await instance.getContent()).map(e => e.source_id).includes(project_id)) {
         return false;
     }
     for (let j = 0; j < version_json.length; j++) {
@@ -11735,7 +11155,7 @@ async function installSpecificVersion(version_info, source, instance, project_ty
         return initialContent;
     }
     let instance_id = instance.instance_id;
-    let content = instance.getContent();
+    let content = await instance.getContent();
     let modrinth_ids = content.filter(e => e.source == "modrinth").map(e => e.source_info);
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => Number(e.source_info));
     let initialContent = await addContent(instance_id, project_type, version_info.files[0].url, version_info.files[0].filename, data_pack_world, project_id);
@@ -11743,10 +11163,10 @@ async function installSpecificVersion(version_info, source, instance, project_ty
     let version = version_info.version_number ? version_info.version_number : "";
     let version_id = version_info.id;
     let dependencies = version_info.dependencies;
-    if (instance.getContent().map(e => e.source_id).includes(project_id)) {
+    if ((await instance.getContent()).map(e => e.source_id).includes(project_id)) {
         return;
     }
-    if (project_type != "world" && project_type != "datapack") instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false, version_id);
+    if (project_type != "world" && project_type != "datapack") await instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version, project_id, false, version_id);
     if (initialContent.stop_installing_dependencies) return initialContent;
     if (dependencies && source == "modrinth" && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
@@ -11855,36 +11275,17 @@ function sanitize(input) {
         .replace(/'/g, "&#39;");
 }
 
-let defaultpage = data.getDefault("default_page");
-let other_default_page = window.enderlynx.isOtherStartingPage();
-if (other_default_page) defaultpage = other_default_page;
-if (defaultpage == "home") {
-    homeButton.setSelected();
-    homeContent.displayContent();
-} else if (defaultpage == "instances") {
-    instanceButton.setSelected();
-    instanceContent.displayContent();
-} else if (defaultpage == "discover") {
-    setTimeout(() => {
-        discoverButton.setSelected();
-        discoverContent.displayContent();
-    }, 0);
-} else if (defaultpage == "wardrobe") {
-    wardrobeButton.setSelected();
-    wardrobeContent.displayContent();
-}
-
 async function applyCape(profile, cape) {
     try {
         let res = await window.enderlynx.setCape(profile, cape ? cape.cape_id : null);
-        profile.setAccessToken(res.player_info.access_token);
-        profile.setClientId(res.player_info.client_id);
-        profile.setExpires(res.player_info.expires);
-        profile.setName(res.player_info.name);
-        profile.setRefreshToken(res.player_info.refresh_token);
-        profile.setUuid(res.player_info.uuid);
-        profile.setXuid(res.player_info.xuid);
-        profile.setIsDemo(res.player_info.is_demo);
+        await profile.setAccessToken(res.player_info.access_token);
+        await profile.setClientId(res.player_info.client_id);
+        await profile.setExpires(res.player_info.expires);
+        await profile.setName(res.player_info.name);
+        await profile.setRefreshToken(res.player_info.refresh_token);
+        await profile.setUuid(res.player_info.uuid);
+        await profile.setXuid(res.player_info.xuid);
+        await profile.setIsDemo(res.player_info.is_demo);
         await updateSkinsAndCapes(res.skin_info);
         displaySuccess(translate("app.wardrobe.cape.change"));
         return true;
@@ -11897,14 +11298,14 @@ async function applyCape(profile, cape) {
 async function applySkin(profile, skin) {
     try {
         let res = await window.enderlynx.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
-        profile.setAccessToken(res.player_info.access_token);
-        profile.setClientId(res.player_info.client_id);
-        profile.setExpires(res.player_info.expires);
-        profile.setName(res.player_info.name);
-        profile.setRefreshToken(res.player_info.refresh_token);
-        profile.setUuid(res.player_info.uuid);
-        profile.setXuid(res.player_info.xuid);
-        profile.setIsDemo(res.player_info.is_demo);
+        await profile.setAccessToken(res.player_info.access_token);
+        await profile.setClientId(res.player_info.client_id);
+        await profile.setExpires(res.player_info.expires);
+        await profile.setName(res.player_info.name);
+        await profile.setRefreshToken(res.player_info.refresh_token);
+        await profile.setUuid(res.player_info.uuid);
+        await profile.setXuid(res.player_info.xuid);
+        await profile.setIsDemo(res.player_info.is_demo);
         await updateSkinsAndCapes(res.skin_info);
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
@@ -11918,14 +11319,14 @@ async function applySkin(profile, skin) {
 async function applySkinFromURL(profile, skin) {
     try {
         let res = await window.enderlynx.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
-        profile.setAccessToken(res.player_info.access_token);
-        profile.setClientId(res.player_info.client_id);
-        profile.setExpires(res.player_info.expires);
-        profile.setName(res.player_info.name);
-        profile.setRefreshToken(res.player_info.refresh_token);
-        profile.setUuid(res.player_info.uuid);
-        profile.setXuid(res.player_info.xuid);
-        profile.setIsDemo(res.player_info.is_demo);
+        await profile.setAccessToken(res.player_info.access_token);
+        await profile.setClientId(res.player_info.client_id);
+        await profile.setExpires(res.player_info.expires);
+        await profile.setName(res.player_info.name);
+        await profile.setRefreshToken(res.player_info.refresh_token);
+        await profile.setUuid(res.player_info.uuid);
+        await profile.setXuid(res.player_info.xuid);
+        await profile.setIsDemo(res.player_info.is_demo);
         await updateSkinsAndCapes(res.skin_info);
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
@@ -11941,13 +11342,12 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     if (!skin_and_cape_data.skins) return;
     if (!skin_and_cape_data.uuid && !skin_and_cape_data.id) return;
     if (!skin_and_cape_data.uuid) skin_and_cape_data.uuid = skin_and_cape_data.id;
-    let profile = data.getProfileFromUUID(skin_and_cape_data.uuid);
+    let profile = await getProfileFromUUID(skin_and_cape_data.uuid);
     try {
         for (const e of skin_and_cape_data.capes) {
             await window.enderlynx.downloadCape(e.url, e.id);
-            let cape = profile.addCape(e.alias, e.id, e.url);
-            if (e.state == "ACTIVE") cape.setActive();
-            else cape.removeActive();
+            let cape = await profile.addCape(e.alias, e.id, e.url);
+            if (e.state == "ACTIVE") await cape.setActive();
         }
     } catch (e) {
         displayError(translate("app.wardrobe.cape.cache.fail"));
@@ -11955,23 +11355,22 @@ async function updateSkinsAndCapes(skin_and_cape_data) {
     try {
         for (const e of skin_and_cape_data.skins) {
             let hash = await window.enderlynx.downloadSkin(e.url);
-            let skin = data.addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date(), e.textureKey);
-            if (e.state == "ACTIVE") skin.setActive(skin_and_cape_data.uuid);
-            else skin.removeActive(skin_and_cape_data.uuid);
+            let skin = await addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date(), e.textureKey);
+            if (e.state == "ACTIVE") await skin.setActive(skin_and_cape_data.uuid);
         }
     } catch (e) {
         displayError(translate("app.wardrobe.skin.cache.fail"));
         console.error(e);
     }
     if (skin_and_cape_data.name) {
-        profile.setName(skin_and_cape_data.name);
+        await profile.setName(skin_and_cape_data.name);
     }
 }
 
 document.getElementsByClassName("toasts")[0].showPopover();
 
-function duplicateInstance(instanceInfo) {
-    instanceInfo = instanceInfo.refresh();
+async function duplicateInstance(instanceInfo) {
+    instanceInfo = await instanceInfo.refresh();
     let dialog = new Dialog();
     if (!instanceInfo.mc_installed || instanceInfo.installing) {
         dialog.showDialog(translate("app.instances.duplicate.title", "%i", instanceInfo.name), "notice", translate("app.instances.duplicate.installing.notice"), [
@@ -12015,9 +11414,9 @@ function duplicateInstance(instanceInfo) {
         let new_instance_id = window.enderlynx.getInstanceFolderName(info.name);
         try {
             let success = await window.enderlynx.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
-            let oldContent = instanceInfo.getContent();
+            let oldContent = await instanceInfo.getContent();
             if (!success) throw new Error();
-            let newInstance = data.addInstance(
+            let newInstance = await addInstance(
                 info.name,
                 new Date(),
                 new Date(),
@@ -12036,22 +11435,22 @@ function duplicateInstance(instanceInfo) {
                 false,
                 true
             );
-            newInstance.setJavaArgs(instanceInfo.java_args);
-            newInstance.setProvidedJavaArgs(instanceInfo.provided_java_args);
-            newInstance.setUsesCustomJavaArgs(instanceInfo.uses_custom_java_args);
-            newInstance.setJavaPath(instanceInfo.java_path);
-            newInstance.setJavaVersion(instanceInfo.java_version);
-            newInstance.setAllocatedRam(instanceInfo.allocated_ram);
-            newInstance.setEnvVars(instanceInfo.env_vars);
-            newInstance.setPostExitHook(instanceInfo.post_exit_hook);
-            newInstance.setPreLaunchHook(instanceInfo.pre_launch_hook);
-            newInstance.setPostLaunchHook(instanceInfo.post_launch_hook);
-            newInstance.setWrapper(instanceInfo.wrapper);
-            newInstance.setWindowHeight(instanceInfo.window_height);
-            newInstance.setWindowWidth(instanceInfo.window_width);
-            newInstance.setInstalledVersion(instanceInfo.installed_version);
+            await newInstance.setJavaArgs(instanceInfo.java_args);
+            await newInstance.setProvidedJavaArgs(instanceInfo.provided_java_args);
+            await newInstance.setUsesCustomJavaArgs(instanceInfo.uses_custom_java_args);
+            await newInstance.setJavaPath(instanceInfo.java_path);
+            await newInstance.setJavaVersion(instanceInfo.java_version);
+            await newInstance.setAllocatedRam(instanceInfo.allocated_ram);
+            await newInstance.setEnvVars(instanceInfo.env_vars);
+            await newInstance.setPostExitHook(instanceInfo.post_exit_hook);
+            await newInstance.setPreLaunchHook(instanceInfo.pre_launch_hook);
+            await newInstance.setPostLaunchHook(instanceInfo.post_launch_hook);
+            await newInstance.setWrapper(instanceInfo.wrapper);
+            await newInstance.setWindowHeight(instanceInfo.window_height);
+            await newInstance.setWindowWidth(instanceInfo.window_width);
+            await newInstance.setInstalledVersion(instanceInfo.installed_version);
             for (let c of oldContent) {
-                newInstance.addContent(
+                await newInstance.addContent(
                     c.name,
                     c.author,
                     c.image,
@@ -12064,7 +11463,7 @@ function duplicateInstance(instanceInfo) {
                     c.version_id
                 );
             }
-            showSpecificInstanceContent(newInstance);
+            await showSpecificInstanceContent(newInstance);
         } catch (e) {
             displayError(translate("app.instances.duplicate.fail"));
             throw e;
@@ -12073,66 +11472,74 @@ function duplicateInstance(instanceInfo) {
 }
 
 async function getRecentlyPlayedWorlds(ignore_world_ids = []) {
-    let all_servers = await window.enderlynx.getAllServers(data.getInstances().map(e => e.instance_id));
-    all_servers = all_servers.map(server => ({
-        ...server,
-        "last_played": getServerLastPlayed(server.instance_id, server.ip)
-    }))
-    let last_played_worlds = await window.enderlynx.getRecentlyPlayedWorlds(data.getInstances().map(e => e.instance_id));
-    let all = last_played_worlds.concat(all_servers);
+    let all_servers = await window.enderlynx.getAllServers((await getInstances()).map(e => e.instance_id));
+    let allServersMapped = [];
+    for (let i = 0; i < all_servers.length; i++) {
+        allServersMapped.push({
+            ...all_servers[i],
+            "last_played": await getServerLastPlayed(all_servers[i].instance_id, all_servers[i].ip)
+        })
+    }
+    let last_played_worlds = await window.enderlynx.getRecentlyPlayedWorlds((await getInstances()).map(e => e.instance_id));
+    let all = last_played_worlds.concat(allServersMapped);
     all = all.filter(e => !ignore_world_ids.includes((e.id ? e.id : e.ip) + ":" + e.instance_id))
     all.sort((a, b) => b.last_played - a.last_played);
     return all;
 }
 
-function getRecentlyPlayedInstances(ignore_instance_ids = []) {
-    let instances = db.prepare("SELECT * FROM instances").all();
+async function getRecentlyPlayedInstances(ignore_instance_ids = []) {
+    let instances = await window.enderlynx.getInstances();
     instances = instances.filter(e => !ignore_instance_ids.includes(e.instance_id));
     instances.sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
-    return instances.map(e => new Instance(e.instance_id));
+    let instanceList = [];
+    for (let i = 0; i < instances.length; i++) {
+        instanceList.push(await Instance.getInstance(instances[i].instance_id))
+    }
+    return instanceList;
 }
 
-function getPinnedInstances() {
-    let instances = db.prepare("SELECT * FROM pins WHERE type = ?").all("instance");
-    return instances.map(e => {
-        try {
-            return new Instance(e.instance_id)
-        } catch (f) {
-            unpinInstance({ "instance_id": e.instance_id }, true);
-            return null;
+async function getPinnedInstances() {
+    let instances = await window.enderlynx.getPinnedInstances();
+    let instanceList = [];
+    for (let i = 0; i < instances.length; i++) {
+        let instance = await Instance.getInstance(instances[i].instance_id);
+        if (!instance) {
+            await unpinInstance(instance, true);
+            continue;
         }
-    }).filter(e => e);
+        instanceList.push(instance);
+    }
+    return instanceList;
 }
 async function getPinnedWorlds() {
     return (await window.enderlynx.getPinnedWorlds());
 }
-function pinInstance(instanceInfo) {
-    db.prepare("INSERT INTO pins (type, instance_id) VALUES (?, ?)").run("instance", instanceInfo.instance_id);
+async function pinInstance(instanceInfo) {
+    await window.enderlynx.pinInstance(instanceInfo.instance_id);
     displaySuccess(translate("app.instances.pin.success"));
 }
-function unpinInstance(instanceInfo, dontDisplay) {
-    db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ?").run("instance", instanceInfo.instance_id);
+async function unpinInstance(instanceInfo, dontDisplay) {
+    await window.enderlynx.unpinInstance(instanceInfo.instance_id);
     if (!dontDisplay) displaySuccess(translate("app.instances.unpin.success"));
 }
-function pinSingleplayerWorld(world_id, instance_id) {
-    db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, world_id, "singleplayer");
+async function pinSingleplayerWorld(world_id, instance_id) {
+    await window.enderlynx.pinWorld(world_id, instance_id, "singleplayer");
     displaySuccess(translate("app.worlds.pin.success"));
 }
-function unpinSingleplayerWorld(world_id, instance_id) {
-    db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, world_id, "singleplayer");
+async function unpinSingleplayerWorld(world_id, instance_id) {
+    await window.enderlynx.unpinWorld(world_id, instance_id, "singleplayer");
     displaySuccess(translate("app.worlds.unpin.success"));
 }
-function pinMultiplayerWorld(ip, instance_id) {
-    db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, ip, "multiplayer");
+async function pinMultiplayerWorld(ip, instance_id) {
+    await window.enderlynx.pinWorld(ip, instance_id, "multiplayer");
     displaySuccess(translate("app.worlds.pin.success"));
 }
-function unpinMultiplayerWorld(ip, instance_id) {
-    db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, ip, "multiplayer");
+async function unpinMultiplayerWorld(ip, instance_id) {
+    await window.enderlynx.unpinWorld(ip, instance_id, "multiplayer");
     displaySuccess(translate("app.worlds.unpin.success"));
 }
-function isWorldPinned(world_id, instance_id, world_type) {
-    let world = db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type);
-    return Boolean(world);
+async function isWorldPinned(world_id, instance_id, world_type) {
+    return await window.enderlynx.isWorldPinned(world_id, instance_id, world_type);
 }
 
 async function getModpackVersions(source, content_id) {
@@ -12163,7 +11570,7 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         }
     }
     let instance_content = [];
-    if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+    if (instance_id) instance_content = await (await Instance.getInstance(instance_id)).getContent();
     let currentlyInstalling = false;
 
     contentInfo.innerHTML = "";
@@ -12676,16 +12083,16 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
         content.versions?.length ? {
             "name": translate("app.discover.tabs.files"),
             "value": "files",
-            "func": () => {
+            "func": async () => {
                 let installedVersion = "";
-                if (instance_id) instance_content = (new Instance(instance_id)).getContent();
+                if (instance_id) instance_content = await (await Instance.getInstance(instance_id)).getContent();
                 content_ids = instance_content.map(e => e.source_info);
                 if (content.convert_version_ids_to_numbers) content_ids = content_ids.map(Number);
                 if (content_ids.includes(content.id)) {
                     installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
                 }
                 if (content.project_type == "modpack" && instance_id) {
-                    installedVersion = new Instance(instance_id).installed_version;
+                    installedVersion = (await Instance.getInstance(instance_id)).installed_version;
                 }
                 if (content.convert_version_ids_to_numbers) installedVersion = Number(installedVersion);
 
@@ -12958,11 +12365,11 @@ async function displayContentInfo(content_source, content_id, instance_id, vanil
                             if (instance_id & content.project_type != "world" && content.project_type != "datapack") currentlyInstalling = true;
                             if (content.project_type == "modpack") {
                                 contentInfo.close();
-                                runModpackUpdate(new Instance(instance_id), content.source, e.original_version_info);
+                                runModpackUpdate(await Instance.getInstance(instance_id), content.source, e.original_version_info);
                                 return;
                             }
-                            let instanceInfo = new Instance(instance_id);
-                            let contentList = instanceInfo.getContent();
+                            let instanceInfo = await Instance.getInstance(instance_id);
+                            let contentList = await instanceInfo.getContent();
                             installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
                             installButton.classList.add("disabled");
                             installButton.onclick = () => { };
@@ -13458,7 +12865,8 @@ document.addEventListener("scroll", function (e) {
 }, true);
 
 async function addDesktopShortcut(instanceInfo) {
-    let success = await window.enderlynx.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.refresh().name, instanceInfo.refresh().image);
+    instanceInfo = await instanceInfo.refresh();
+    let success = await window.enderlynx.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.name, instanceInfo.image);
     if (success) {
         displaySuccess(translate("app.instances.shortcut.created"));
     } else {
@@ -13650,10 +13058,6 @@ async function openShareDialog(title, url, text) {
 }
 
 async function checkForContentUpdates(source, project_id, version_ids, loaders, game_versions, type) {
-    console.log(type);
-    console.log(version_ids);
-    console.log(loaders);
-    console.log(game_versions);
     let results = [];
     if (source == "modrinth") {
         let res = await fetch(`https://api.modrinth.com/v2/project/${project_id}/version`);
@@ -13743,7 +13147,7 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
 }
 
 async function updateContent(instanceInfo, content, contentversion, forced) {
-    instanceInfo = instanceInfo.refresh();
+    instanceInfo = await instanceInfo.refresh();
     if (content.source == "modrinth") {
         let res = await fetch(`https://api.modrinth.com/v2/project/${content.source_info}/version`);
         let version_json = await res.json();
@@ -13767,46 +13171,46 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         }
 
         if (!foundVersion) {
-            content = content.refresh();
+            content = await content.refresh();
             let alreadyDisabled = content.disabled;
             let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
             }
-            content.setDisabled(true);
-            content.setFileName(new_file_name);
+            await content.setDisabled(true);
+            await content.setFileName(new_file_name);
             displayError(translate("app.content.update.failed", "%c", content.name));
             return false;
         }
 
-        content = content.refresh();
+        content = await content.refresh();
 
         let oldFileName = content.file_name;
         let oldVersion = content.version;
         let oldVersionId = content.version_id;
 
-        content.setFileName(initialContent.file_name);
-        content.setVersion(newVersion);
-        content.setVersionId(newVersionId);
+        await content.setFileName(initialContent.file_name);
+        await content.setVersion(newVersion);
+        await content.setVersionId(newVersionId);
 
         if (content.disabled) {
             let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
-                content.setDisabled(false);
+                await content.setDisabled(false);
                 return false;
             }
-            content.setFileName(new_file_name);
+            await content.setFileName(new_file_name);
         }
 
         if (oldFileName != content.file_name) {
             let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
             if (!success) {
                 displayError(translate("app.content.update.old_file_fail", "%f", oldFileName));
-                content.setVersion(oldVersion);
-                content.setVersionId(oldVersionId);
-                content.setFileName(oldFileName);
+                await content.setVersion(oldVersion);
+                await content.setVersionId(oldVersionId);
+                await content.setFileName(oldFileName);
                 let success2 = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
                 if (!success2) {
                     displayError(translate("app.content.update.new_file_fail", "%f", initialContent.file_name));
@@ -13890,43 +13294,43 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         }
 
         if (!foundVersion) {
-            content = content.refresh();
+            content = await content.refresh();
             let alreadyDisabled = content.disabled;
             let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
             }
-            content.setDisabled(true);
-            content.setFileName(new_file_name);
+            await content.setDisabled(true);
+            await content.setFileName(new_file_name);
             if (!alreadyDisabled) displayError(translate("app.content.update.failed", "%c", content.name));
             return false;
         }
 
-        content = content.refresh();
+        content = await content.refresh();
 
         let oldFileName = content.file_name;
         let oldVersionId = content.version_id;
 
-        content.setFileName(initialContent.file_name);
-        content.setVersionId(newVersionId);
+        await content.setFileName(initialContent.file_name);
+        await content.setVersionId(newVersionId);
 
         if (content.disabled) {
             let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
-                content.setDisabled(false);
+                await content.setDisabled(false);
                 return false;
             }
-            content.setFileName(new_file_name);
+            await content.setFileName(new_file_name);
         }
 
         if (oldFileName != content.file_name) {
             let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, oldFileName);
             if (!success) {
                 displayError(translate("app.content.update.old_file_fail", "%f", oldFileName));
-                content.setVersionId(oldVersionId);
-                content.setFileName(oldFileName);
+                await content.setVersionId(oldVersionId);
+                await content.setFileName(oldFileName);
                 let success2 = await window.enderlynx.deleteContent(instanceInfo.instance_id, content.type, initialContent.file_name);
                 if (!success2) {
                     displayError(translate("app.content.update.new_file_fail", "%f", initialContent.file_name));
@@ -13943,21 +13347,21 @@ function fixPathForImage(path) {
 }
 
 async function repairInstance(instance, whatToRepair) {
-    instance.setMcInstalled(false);
-    instance.setFailed(false);
+    await instance.setMcInstalled(false);
+    await instance.setFailed(false);
     let r = await window.enderlynx.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version, whatToRepair);
     if (r.error) {
-        instance.setFailed(true);
+        await instance.setFailed(true);
     } else {
         if (whatToRepair.includes("java")) {
-            instance.setJavaPath(r.java_installation);
-            instance.setJavaVersion(r.java_version);
+            await instance.setJavaPath(r.java_installation);
+            await instance.setJavaVersion(r.java_version);
         }
-        instance.setMcInstalled(true);
+        await instance.setMcInstalled(true);
     }
-    instance.setProvidedJavaArgs(r.java_args);
+    await instance.setProvidedJavaArgs(r.java_args);
     if (!instance.uses_custom_java_args) {
-        instance.setJavaArgs(r.java_args);
+        await instance.setJavaArgs(r.java_args);
     }
 }
 
@@ -13985,16 +13389,16 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 "type": "dropdown",
                 "id": "instance",
                 "name": translate("app.discover.datapacks.instance"),
-                "options": data.getInstances().map(e => ({ "name": e.name, "value": e.instance_id }))
+                "options": (await getInstances()).map(e => ({ "name": e.name, "value": e.instance_id }))
             },
             {
                 "type": "dropdown",
                 "id": "world",
                 "name": translate("app.discover.datapacks.world"),
-                "options": instance_id ? (await getInstanceWorlds(new Instance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
+                "options": instance_id ? (await getInstanceWorlds(await Instance.getInstance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
                 "input_source": instance_id ? null : "instance",
                 "source": instance_id ? null : async (i) => {
-                    return (await getInstanceWorlds(new Instance(i))).map(e => ({ "name": e.name, "value": e.id }));
+                    return (await getInstanceWorlds(await Instance.getInstance(i))).map(e => ({ "name": e.name, "value": e.id }));
                 }
             }
         ].filter(e => e), [
@@ -14024,7 +13428,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             }
             if (override_version) {
                 if (source == "modrinth") {
-                    success = await installSpecificVersion(override_version, source, new Instance(instance), "datapack", title, author, icon, project_id, false, world);
+                    success = await installSpecificVersion(override_version, source, await Instance.getInstance(instance), "datapack", title, author, icon, project_id, false, world);
                 } else if (source == "curseforge") {
                     success = await installSpecificVersion({
                         "game_versions": game_versions,
@@ -14039,7 +13443,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                         }),
                         "id": override_version.id,
                         "dependencies": []
-                    }, "curseforge", new Instance(instance), "datapack", title, author, icon, project_id, false, world)
+                    }, "curseforge", await Instance.getInstance(instance), "datapack", title, author, icon, project_id, false, world)
                 }
             } else {
                 success = await installContent(source, project_id, instance, "datapack", title, author, icon, world);
@@ -14131,58 +13535,59 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 displayError(translate("app.discover.error_creating_modpack", "%t", title, "%v", info.game_version, "%l", loaders[info.loader]));
                 return;
             }
-            let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
-            instance.setInstalledVersion(version.id);
-            showSpecificInstanceContent(instance);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
+            await instance.setInstalledVersion(version.id);
+            await showSpecificInstanceContent(instance);
             if (source == "modrinth") {
                 await window.enderlynx.downloadModrinthPack(instance_id, version.files[0].url, title);
             } else if (source == "curseforge") {
-                instance.setLoader("");
-                instance.setVanillaVersion("");
+                await instance.setLoader("");
+                await instance.setVanillaVersion("");
                 await window.enderlynx.downloadCurseforgePack(instance_id, (`https://mediafilez.forgecdn.net/files/${Number(version.id.toString().substring(0, 4))}/${Number(version.id.toString().substring(4, 7))}/${encodeURIComponent(version.fileName)}`), title);
             }
             let mr_pack_info = {};
             if (source == "modrinth") {
                 mr_pack_info = await window.enderlynx.processMrPack(instance_id, "pack.mrpack", info.loader, title);
                 let default_options = new DefaultOptions(info.game_version);
-                let v = await window.enderlynx.setOptionsTXT(instance.instance_id, default_options.getOptionsTXT(), false);
-                instance.setAttemptedOptionsTxtVersion(v);
+                let v = await window.enderlynx.setOptionsTXT(instance.instance_id, await default_options.getOptionsTXT(), false);
+                await instance.setAttemptedOptionsTxtVersion(v);
             } else if (source == "curseforge") {
                 mr_pack_info = await window.enderlynx.processCfZip(instance_id, "pack.zip", project_id, title);
                 if (mr_pack_info.error) {
-                    instance.setFailed(true);
-                    instance.setInstalling(false);
+                    await instance.setFailed(true);
+                    await instance.setInstalling(false);
                     return;
                 }
-                instance.setLoader(mr_pack_info.loader);
-                instance.setVanillaVersion(mr_pack_info.vanilla_version);
-                if (mr_pack_info.allocated_ram) instance.setAllocatedRam(mr_pack_info.allocated_ram);
+                await instance.setLoader(mr_pack_info.loader);
+                await instance.setVanillaVersion(mr_pack_info.vanilla_version);
+                if (mr_pack_info.allocated_ram) await instance.setAllocatedRam(mr_pack_info.allocated_ram);
                 info.loader = mr_pack_info.loader;
                 info.game_version = mr_pack_info.vanilla_version;
             }
             if (mr_pack_info.error) {
-                instance.setFailed(true);
-                instance.setInstalling(false);
+                await instance.setFailed(true);
+                await instance.setInstalling(false);
                 return;
             }
             if (!mr_pack_info.loader_version) {
                 displayError(mr_pack_info);
                 return;
             }
-            instance.setLoaderVersion(mr_pack_info.loader_version);
-            mr_pack_info.content.forEach(e => {
-                instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-            });
-            instance.setInstalling(false);
+            await instance.setLoaderVersion(mr_pack_info.loader_version);
+            for (let i = 0; i < mr_pack_info.content.length; i++) {
+                let e = mr_pack_info.content[i];
+                await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+            }
+            await instance.setInstalling(false);
             let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
             if (r.error) {
-                instance.setFailed(true);
+                await instance.setFailed(true);
             } else {
-                instance.setJavaPath(r.java_installation);
-                instance.setJavaVersion(r.java_version);
-                instance.setJavaArgs(r.java_args);
-                instance.setProvidedJavaArgs(r.java_args);
-                instance.setMcInstalled(true);
+                await instance.setJavaPath(r.java_installation);
+                await instance.setJavaVersion(r.java_version);
+                await instance.setJavaArgs(r.java_args);
+                await instance.setProvidedJavaArgs(r.java_args);
+                await instance.setMcInstalled(true);
             }
         })
     } else if (instance_id) {
@@ -14201,7 +13606,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
         let success;
         if (override_version) {
             if (source == "modrinth") {
-                success = await installSpecificVersion(override_version, source, new Instance(instance_id), project_type, title, author, icon, project_id);
+                success = await installSpecificVersion(override_version, source, await Instance.getInstance(instance_id), project_type, title, author, icon, project_id);
             } else if (source == "curseforge") {
                 let dependencies = await fetch(`https://www.curseforge.com/api/v1/mods/${project_id}/dependencies?index=0&pageSize=100`);
                 let dependencies_json = await dependencies.json();
@@ -14219,7 +13624,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     }),
                     "id": override_version.id,
                     "dependencies": dependency_list
-                }, "curseforge", new Instance(instance_id), project_type, title, author, icon, project_id)
+                }, "curseforge", await Instance.getInstance(instance_id), project_type, title, author, icon, project_id)
             }
         } else if (project_type == "server") {
             success = await addContent(instance_id, project_type, project_id, title, icon, project_id);
@@ -14250,7 +13655,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
         button.innerHTML = '<i class="spinner"></i>' + translate("app.discover.loading");
         button.classList.add("disabled");
         let dialog = new Dialog();
-        let instances = data.getInstances();
+        let instances = await getInstances();
         if (source == "modrinth") {
             if (project_type == "mod") {
                 instances = instances.filter(e => content_loaders.includes(e.loader)).filter(e => game_versions.includes(e.vanilla_version));
@@ -14262,9 +13667,12 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
         }
         let installGrid = document.createElement("div");
         installGrid.className = "install-grid";
-        let content = db.prepare("SELECT * FROM content WHERE source_info = ?").all(source == "curseforge" ? project_id.toString() + ".0" : project_id);
+        let content = await window.enderlynx.getContentBySourceInfo(source == "curseforge" ? project_id.toString() + ".0" : project_id);
         let instanceIdsWithContent = content.map(e => e.instance);
-        let instancesWithContent = instanceIdsWithContent.map(e => new Instance(e));
+        let instancesWithContent = [];
+        for (let i = 0; i < instanceIdsWithContent.length; i++) {
+            instancesWithContent.push(await Instance.getInstance(instanceIdsWithContent[i]));
+        }
         let updates = [];
         if (content.length > 0) {
             try {
@@ -14278,7 +13686,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
         let createNewButton = document.createElement("button");
         createNewButton.className = "install-grid-create";
         createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
-        createNewButton.onclick = () => {
+        createNewButton.onclick = async () => {
             let dialog2 = new Dialog();
             dialog2.showDialog(translate("app.button.instances.create"), "form", [
                 {
@@ -14311,7 +13719,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     "id": "game_version",
                     "input_source": "loader",
                     "source": VersionList.getVersions,
-                    "default": VersionList.getLatestRelease()
+                    "default": await VersionList.getLatestRelease()
                 }
             ], [
                 { "content": translate("app.instances.cancel"), "type": "cancel" },
@@ -14345,9 +13753,9 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     displayError(translate("app.instances.failed_to_create"));
                     return;
                 }
-                let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
-                instance.setInstalling(true);
-                showSpecificInstanceContent(instance);
+                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                await instance.setInstalling(true);
+                await showSpecificInstanceContent(instance);
                 if (override_version) {
                     if (source == "modrinth") {
                         success = await installSpecificVersion(override_version, source, instance, project_type, title, author, icon, project_id);
@@ -14375,16 +13783,16 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 } else {
                     success = await installContent(source, project_id, instance_id, project_type, title, author, icon);
                 }
-                instance.setInstalling(false);
+                await instance.setInstalling(false);
                 let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
                 if (r.error) {
-                    instance.setFailed(true);
+                    await instance.setFailed(true);
                 } else {
-                    instance.setJavaPath(r.java_installation);
-                    instance.setJavaVersion(r.java_version);
-                    instance.setJavaArgs(r.java_args);
-                    instance.setProvidedJavaArgs(r.java_args);
-                    instance.setMcInstalled(true);
+                    await instance.setJavaPath(r.java_installation);
+                    await instance.setJavaVersion(r.java_version);
+                    await instance.setJavaArgs(r.java_args);
+                    await instance.setProvidedJavaArgs(r.java_args);
+                    await instance.setMcInstalled(true);
                 }
             });
         }
@@ -14479,7 +13887,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     global_discover_content_states[project_id] = [installButton];
                 }
                 let instanceInfo = instances[i];
-                let contentList = instanceInfo.getContent();
+                let contentList = await instanceInfo.getContent();
                 installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
                 installButton.classList.add("disabled");
                 installButton.onclick = () => { };
@@ -14498,7 +13906,6 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             if (!override_version && updatesIndex != -1 && updates[updatesIndex]) {
                 installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
                 installButton.onclick = () => {
-                    console.log(updates[updatesIndex]);
                     updateToSpecificVersion(updates[updatesIndex]);
                 }
             } else if (override_version && contentForThisInstance[0] && (source == "curseforge" ? Number(contentForThisInstance[0].version_id) != Number(override_version.id) : contentForThisInstance[0].version_id != override_version.id)) {
@@ -14527,14 +13934,14 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
 
 async function runModpackUpdate(instanceInfo, source, modpack_info) {
     closeAllDialogs();
-    instanceInfo.setInstalling(true);
-    instanceInfo.setMcInstalled(false);
+    await instanceInfo.setInstalling(true);
+    await instanceInfo.setMcInstalled(false);
     await window.enderlynx.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
-    instanceInfo.clearContent();
+    await instanceInfo.clearContent();
     if (source == "modrinth") {
         await window.enderlynx.downloadModrinthPack(instanceInfo.instance_id, modpack_info.files[0].url, instanceInfo.name);
-        instanceInfo.setVanillaVersion(modpack_info.game_versions[0], true);
-        instanceInfo.setLoader(modpack_info.loaders[0]);
+        await instanceInfo.setVanillaVersion(modpack_info.game_versions[0], true);
+        await instanceInfo.setLoader(modpack_info.loaders[0]);
     } else if (source == "curseforge") {
         await window.enderlynx.downloadCurseforgePack(instanceInfo.instance_id, (`https://mediafilez.forgecdn.net/files/${Number(modpack_info.id.toString().substring(0, 4))}/${Number(modpack_info.id.toString().substring(4, 7))}/${encodeURIComponent(modpack_info.fileName)}`), instanceInfo.name);
     }
@@ -14542,40 +13949,41 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     if (source == "modrinth") {
         mr_pack_info = await window.enderlynx.processMrPack(instanceInfo.instance_id, "pack.mrpack", instanceInfo.loader, instanceInfo.name);
         if (mr_pack_info.error) {
-            instanceInfo.setFailed(true);
-            instanceInfo.setInstalling(false);
+            await instanceInfo.setFailed(true);
+            await instanceInfo.setInstalling(false);
             return;
         }
     } else if (source == "curseforge") {
         mr_pack_info = await window.enderlynx.processCfZip(instanceInfo.instance_id, "pack.zip", instanceInfo.install_id, instanceInfo.name);
         if (mr_pack_info.error) {
-            instanceInfo.setFailed(true);
-            instanceInfo.setInstalling(false);
+            await instanceInfo.setFailed(true);
+            await instanceInfo.setInstalling(false);
             return;
         }
 
-        instanceInfo.setLoader(mr_pack_info.loader);
-        instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
+        await instanceInfo.setLoader(mr_pack_info.loader);
+        await instanceInfo.setVanillaVersion(mr_pack_info.vanilla_version, true);
     }
     if (!mr_pack_info.loader_version) {
         displayError(mr_pack_info);
         return;
     }
-    instanceInfo.setInstalledVersion(modpack_info.id);
-    instanceInfo.setLoaderVersion(mr_pack_info.loader_version);
-    mr_pack_info.content.forEach(e => {
-        instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-    });
-    instanceInfo.setInstalling(false);
+    await instanceInfo.setInstalledVersion(modpack_info.id);
+    await instanceInfo.setLoaderVersion(mr_pack_info.loader_version);
+    for (let i = 0; i < mr_pack_info.content.length; i++) {
+        let e = mr_pack_info.content[i];
+        await instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+    }
+    await instanceInfo.setInstalling(false);
     let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, instanceInfo.loader, instanceInfo.vanilla_version, mr_pack_info.loader_version);
     if (r.error) {
-        instanceInfo.setFailed(true);
+        await instanceInfo.setFailed(true);
     } else {
-        instanceInfo.setJavaPath(r.java_installation);
-        instanceInfo.setJavaVersion(r.java_version);
-        instanceInfo.setJavaArgs(r.java_args);
-        instanceInfo.setProvidedJavaArgs(r.java_args);
-        instanceInfo.setMcInstalled(true);
+        await instanceInfo.setJavaPath(r.java_installation);
+        await instanceInfo.setJavaVersion(r.java_version);
+        await instanceInfo.setJavaArgs(r.java_args);
+        await instanceInfo.setProvidedJavaArgs(r.java_args);
+        await instanceInfo.setMcInstalled(true);
     }
 }
 
@@ -14665,7 +14073,7 @@ async function checkForUpdates(isManual) {
 checkForUpdates();
 
 async function createElPack(instance, content_list, overrides, pack_version) {
-    instance = instance.refresh();
+    instance = await instance.refresh();
     let manifest = {
         "name": instance.name,
         "icon": instance.image,
@@ -14686,7 +14094,7 @@ async function createElPack(instance, content_list, overrides, pack_version) {
     window.enderlynx.createElPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createMrPack(instance, content_list, overrides, pack_version) {
-    instance = instance.refresh();
+    instance = await instance.refresh();
     let url = `https://api.modrinth.com/v2/versions?ids=["${content_list.map(e => e.version_id).join('","')}"]`;
     let info = [];
     try {
@@ -14742,7 +14150,7 @@ async function createMrPack(instance, content_list, overrides, pack_version) {
     window.enderlynx.createMrPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createCfZip(instance, content_list, overrides, pack_version) {
-    instance = instance.refresh();
+    instance = await instance.refresh();
     let manifest = {
         "minecraft": {
             "version": instance.vanilla_version,
@@ -14782,36 +14190,37 @@ let importInstance = (info, file_path) => {
         }
     ], [], async () => {
         let instance_id = window.enderlynx.getInstanceFolderName(info.name);
-        let instance = data.addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
-        showSpecificInstanceContent(instance);
+        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
+        await showSpecificInstanceContent(instance);
         let packInfo = await window.enderlynx.processPackFile(file_path, instance_id, info.name);
         if (packInfo.error) {
-            instance.setFailed(true);
-            instance.setInstalling(false);
+            await instance.setFailed(true);
+            await instance.setInstalling(false);
             return;
         }
         if (!("loader_version" in packInfo)) {
             displayError(packInfo);
             return;
         }
-        instance.setLoader(packInfo.loader);
-        instance.setVanillaVersion(packInfo.vanilla_version);
-        instance.setLoaderVersion(packInfo.loader_version);
-        if (!instance.image && packInfo.image) instance.setImage(packInfo.image);
-        if (packInfo.allocated_ram) instance.setAllocatedRam(packInfo.allocated_ram);
-        packInfo.content.forEach(e => {
-            instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-        });
-        instance.setInstalling(false);
+        await instance.setLoader(packInfo.loader);
+        await instance.setVanillaVersion(packInfo.vanilla_version);
+        await instance.setLoaderVersion(packInfo.loader_version);
+        if (!instance.image && packInfo.image) await instance.setImage(packInfo.image);
+        if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
+        for (let i = 0; i < packInfo.content.length; i++) {
+            let e = packInfo.content[i];
+            await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+        }
+        await instance.setInstalling(false);
         let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
         if (r.error) {
-            instance.setFailed(true);
+            await instance.setFailed(true);
         } else {
-            instance.setJavaPath(r.java_installation);
-            instance.setJavaVersion(r.java_version);
-            instance.setJavaArgs(r.java_args);
-            instance.setProvidedJavaArgs(r.java_args);
-            instance.setMcInstalled(true);
+            await instance.setJavaPath(r.java_installation);
+            await instance.setJavaVersion(r.java_version);
+            await instance.setJavaArgs(r.java_args);
+            await instance.setProvidedJavaArgs(r.java_args);
+            await instance.setMcInstalled(true);
         }
     });
 }
@@ -14826,7 +14235,7 @@ async function openInstanceShareDialog(instanceInfo) {
     document.body.classList.add("loading");
     let options = await window.enderlynx.getInstanceFiles(instanceInfo.instance_id);
     document.body.classList.remove("loading");
-    let content = instanceInfo.getContent();
+    let content = await instanceInfo.getContent();
     let contentSpecific = [];
     let contentMap = {};
     content.forEach(e => {
@@ -15092,7 +14501,7 @@ document.body.ondrop = (e) => {
     } else if (overlay.dataset.action == "content-import") {
         new Promise(async (resolve) => {
             document.body.classList.add("loading")
-            let instance = new Instance(overlay.dataset.instanceId);
+            let instance = await Instance.getInstance(overlay.dataset.instanceId);
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
                 if (await window.enderlynx.isInstanceFile(file.path)) {
@@ -15120,7 +14529,7 @@ document.body.ondrop = (e) => {
         });
     } else if (overlay.dataset.action == "world-import") {
         new Promise(async (resolve) => {
-            let instance = new Instance(overlay.dataset.instanceId);
+            let instance = await Instance.getInstance(overlay.dataset.instanceId);
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
                 if (await window.enderlynx.isInstanceFile(file.path)) {
@@ -15145,9 +14554,7 @@ document.body.ondrop = (e) => {
                     if (!info) return;
                     importInstance(info, file.path);
                 }
-                console.log(file.path);
                 let dataUrl = await window.enderlynx.pathToDataUrl(file.path);
-                console.log(dataUrl);
                 importSkin({
                     "skin": dataUrl,
                     "name": translate("app.wardrobe.unnamed"),
@@ -15164,50 +14571,3 @@ function getDefaultImage(code) {
     let data = window.enderlynx.getDefaultImage(code);
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
 }
-
-try {
-    switch (data.getDefault("saved_version")) {
-        case "0.0.1":
-        case "0.0.2":
-        case "0.0.3":
-        case "0.0.4":
-        case "0.0.5":
-        case "0.0.6":
-        case "0.0.7":
-            if (data.getDefault("default_page") == "my_account") data.setDefault("default_page", "wardrobe");
-            db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
-            db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
-            db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
-        case "0.0.8":
-        case "0.0.9":
-        case "0.1.0":
-        case "0.1.1":
-            db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
-        case "0.2.0":
-        case "0.3.0":
-        case "0.4.0":
-        case "0.4.1":
-        case "0.4.2":
-        case "0.4.3":
-        case "0.4.4":
-        case "0.5.0":
-            db.prepare("ALTER TABLE skins ADD favorited INTEGER").run();
-            db.prepare("ALTER TABLE skins ADD last_used TEXT").run();
-            db.prepare("ALTER TABLE skins ADD preview TEXT").run();
-            db.prepare("ALTER TABLE skins ADD preview_model TEXT").run();
-            db.prepare("ALTER TABLE skins ADD head TEXT").run();
-        case "0.6.0":
-        case "0.6.1":
-        case "0.6.2":
-        case "0.6.3":
-        case "0.6.4":
-        case "0.6.5":
-            db.prepare("ALTER TABLE instances ADD post_launch_hook TEXT").run();
-            db.prepare("ALTER TABLE instances ADD uses_custom_java_args INTEGER").run();
-            db.prepare("ALTER TABLE instances ADD provided_java_args TEXT").run();
-            let instances = data.getInstances();
-            instances.forEach(e => e.setProvidedJavaArgs(e.java_args));
-    }
-} catch (e) { }
-
-data.setDefault("saved_version", window.enderlynx.version.replace("-dev", ""));

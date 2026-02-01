@@ -25,6 +25,7 @@ const createDesktopShortcut = require("create-desktop-shortcuts");
 const pngToIco = require('png-to-ico').default;
 const readline = require('readline');
 const { JavaSearch, setUserPathAgain } = require('./java_scan.js');
+const Database = require('better-sqlite3');
 
 app.userAgentFallback = `EnderLynx/${version}`;
 
@@ -32,6 +33,7 @@ let userDataPath = path.resolve(app.getPath('userData'), "EnderLynx");
 
 let pathPath = path.resolve(app.getPath('userData'), "path.json");
 let user_path;
+
 
 if (!fs.existsSync(pathPath)) {
     user_path = userDataPath;
@@ -60,6 +62,55 @@ if (!fs.existsSync(user_path)) {
 
 setUserPath(user_path);
 setUserPathAgain(user_path);
+
+const db = new Database(path.resolve(user_path, "app.db"));
+
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT, favorited INTEGER, last_used TEXT, preview TEXT, preview_model TEXT, head TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
+
+db.pragma('journal_mode = WAL');
+
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "none", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false" };
+
+let minecraftVersions = [];
+
+async function moveFiles() {
+    if (!fs.existsSync(path.resolve(user_path, "log_config.xml"))) {
+        const srcConfigPath = path.resolve(__dirname, "log_config.xml");
+        let configData;
+        try {
+            configData = await fsPromises.readFile(srcConfigPath);
+            await fsPromises.writeFile(path.resolve(user_path, "log_config.xml"), configData);
+        } catch (e) {
+            await fsPromises.writeFileSync(path.resolve(user_path, "log_config.xml"), "");
+        }
+    }
+    let srcConfigPath = path.resolve(__dirname, "updater.exe");
+    if (os.platform() != 'win32') srcConfigPath = path.resolve(__dirname, "updater");
+    await fsPromises.mkdir(path.resolve(user_path, "updater"), { recursive: true })
+    let updaterData;
+    try {
+        updaterData = await fsPromises.readFile(srcConfigPath);
+        let updaterName = "updater.exe";
+        if (os.platform() != 'win32') updaterName = "updater";
+        await fsPromises.writeFile(path.resolve(user_path, "updater", updaterName), updaterData);
+        if (os.platform() != 'win32') {
+            await fsPromises.chmod(path.resolve(user_path, "updater", updaterName), 0o755);
+        }
+    } catch (e) {
+    
+    }
+}
+
+moveFiles();
 
 let win;
 
@@ -233,6 +284,9 @@ const rpc = new RPC.Client({ transport: 'ipc' });
 
 rpc.on('ready', () => {
     ipcMain.on('set-discord-activity', (_, activity) => {
+        let rpc_enabled = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("discord_rpc");
+        let enabled = rpc_enabled?.value ? rpc_enabled.value == "true" : true;
+        if (!enabled) return;
         rpc.setActivity(activity);
     });
 
@@ -275,13 +329,13 @@ ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overr
                             if (entry.isDirectory()) {
                                 await addDirToZip(entrySrc, entryDest);
                             } else {
-                                zip.addFile(entryDest.replace(/\\/g, "/"), await fs.promises.readFile(entrySrc));
+                                zip.addFile(entryDest.replace(/\\/g, "/"), await fsPromises.readFile(entrySrc));
                             }
                         }
                     }
                     addDirToZip(srcPath, destPath);
                 } else {
-                    zip.addFile(destPath.replace(/\\/g, "/"), await fs.promises.readFile(srcPath));
+                    zip.addFile(destPath.replace(/\\/g, "/"), await fsPromises.readFile(srcPath));
                 }
             }
         }
@@ -331,13 +385,13 @@ ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overr
                             if (entry.isDirectory()) {
                                 await addDirToZip(entrySrc, entryDest);
                             } else {
-                                zip.addFile(entryDest.replace(/\\/g, "/"), await fs.promises.readFile(entrySrc));
+                                zip.addFile(entryDest.replace(/\\/g, "/"), await fsPromises.readFile(entrySrc));
                             }
                         }
                     }
                     addDirToZip(srcPath, destPath);
                 } else {
-                    zip.addFile(destPath.replace(/\\/g, "/"), await fs.promises.readFile(srcPath));
+                    zip.addFile(destPath.replace(/\\/g, "/"), await fsPromises.readFile(srcPath));
                 }
             }
         }
@@ -387,13 +441,13 @@ ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overri
                             if (entry.isDirectory()) {
                                 await addDirToZip(entrySrc, entryDest);
                             } else {
-                                zip.addFile(entryDest.replace(/\\/g, "/"), await fs.promises.readFile(entrySrc));
+                                zip.addFile(entryDest.replace(/\\/g, "/"), await fsPromises.readFile(entrySrc));
                             }
                         }
                     }
                     addDirToZip(srcPath, destPath);
                 } else {
-                    zip.addFile(destPath.replace(/\\/g, "/"), await fs.promises.readFile(srcPath));
+                    zip.addFile(destPath.replace(/\\/g, "/"), await fsPromises.readFile(srcPath));
                 }
             }
         }
@@ -868,26 +922,27 @@ ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_conten
     }
 });
 
-ipcMain.handle('process-cf-zip-without-id', async (_, instance_id, zip_path, cf_id, title, max_downloads) => {
-    return await processCfZipWithoutID(instance_id, zip_path, title, max_downloads);
+ipcMain.handle('process-cf-zip-without-id', async (_, instance_id, zip_path, cf_id, title) => {
+    return await processCfZipWithoutID(instance_id, zip_path, title);
 });
-ipcMain.handle('process-mr-pack', async (_, instance_id, mrpack_path, loader, title, max_downloads) => {
-    return await processMrPack(instance_id, mrpack_path, loader, title, max_downloads);
+ipcMain.handle('process-mr-pack', async (_, instance_id, mrpack_path, loader, title) => {
+    return await processMrPack(instance_id, mrpack_path, loader, title);
 });
-ipcMain.handle('process-el-pack', async (_, instance_id, elpack_path, loader, title, max_downloads) => {
-    return await processElPack(instance_id, elpack_path, title, max_downloads);
+ipcMain.handle('process-el-pack', async (_, instance_id, elpack_path, loader, title) => {
+    return await processElPack(instance_id, elpack_path, title);
 });
-ipcMain.handle('process-cf-zip', async (_, instance_id, zip_path, cf_id, title, max_downloads) => {
-    return await processCfZip(instance_id, zip_path, cf_id, title, max_downloads);
+ipcMain.handle('process-cf-zip', async (_, instance_id, zip_path, cf_id, title) => {
+    return await processCfZip(instance_id, zip_path, cf_id, title);
 });
 
-async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file", max_downloads) {
+async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file") {
+    let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processCfZipWithoutID(instance_id, zip_path, title, max_downloads);
+        processCfZipWithoutID(instance_id, zip_path, title);
     }
     let signal = abortController.signal;
     try {
@@ -1052,13 +1107,14 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file",
         return { "error": true };
     }
 }
-async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file", max_downloads) {
+async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
+    let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processMrPack(instance_id, mrpack_path, loader, title, max_downloads);
+        processMrPack(instance_id, mrpack_path, loader, title);
     }
     let signal = abortController.signal;
     try {
@@ -1236,13 +1292,14 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         return { "error": true };
     }
 }
-async function processElPack(instance_id, elpack_path, title = ".elpack file", max_downloads) {
+async function processElPack(instance_id, elpack_path, title = ".elpack file") {
+    let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processElPack(instance_id, elpack_path, title, max_downloads);
+        processElPack(instance_id, elpack_path, title);
     }
     let signal = abortController.signal;
     try {
@@ -1464,13 +1521,14 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file", m
         return { "error": true };
     }
 }
-async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file", max_downloads) {
+async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
+    let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processCfZip(instance_id, zip_path, cf_id, title, max_downloads);
+        processCfZip(instance_id, zip_path, cf_id, title);
     }
     let signal = abortController.signal;
     try {
@@ -1850,21 +1908,21 @@ async function downloadCurseforgePack(instance_id, url, title) {
     }
 }
 
-ipcMain.handle('process-pack-file', async (_, file_path, instance_id, title, max_downloads) => {
-    return await processPackFile(file_path, instance_id, title, max_downloads);
+ipcMain.handle('process-pack-file', async (_, file_path, instance_id, title) => {
+    return await processPackFile(file_path, instance_id, title);
 });
 
-async function processPackFile(file_path, instance_id, title, max_downloads) {
+async function processPackFile(file_path, instance_id, title) {
     if (/^https?:\/\//.test(file_path)) {
         await downloadCurseforgePack(instance_id, file_path, title);
     }
     let extension = path.extname(file_path);
     if (extension == ".mrpack") {
-        return await processMrPack(instance_id, file_path, null, title, max_downloads);
+        return await processMrPack(instance_id, file_path, null, title);
     } else if (extension == ".zip") {
-        return await processCfZipWithoutID(instance_id, file_path, title, max_downloads);
+        return await processCfZipWithoutID(instance_id, file_path, title);
     } else if (extension == ".elpack") {
-        return await processElPack(instance_id, file_path, title, max_downloads);
+        return await processElPack(instance_id, file_path, title);
     } else if (extension == "") {
         return;
     }
@@ -2263,7 +2321,7 @@ async function addContent(instance_id, project_type, project_url, filename, data
                 fs.mkdirSync(destPath, { recursive: true });
             } else {
                 fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                await fs.promises.writeFile(destPath, entry.getData());
+                await fsPromises.writeFile(destPath, entry.getData());
             }
         }
 
@@ -2438,7 +2496,7 @@ async function deleteInstanceFiles(instance_id) {
     // Recursively collect all files and folders for progress calculation
     async function getAllFiles(dir) {
         let files = [];
-        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+        const entries = await fsPromises.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name);
             if (entry.isDirectory()) {
@@ -2455,7 +2513,7 @@ async function deleteInstanceFiles(instance_id) {
         const allFiles = await getAllFiles(instancePath);
         let deleted = 0;
         for (const file of allFiles) {
-            await fs.promises.unlink(file);
+            await fsPromises.unlink(file);
             deleted++;
             const percent = Math.round((deleted / allFiles.length) * 100);
             signal.throwIfAborted();
@@ -2463,14 +2521,14 @@ async function deleteInstanceFiles(instance_id) {
         }
         // Remove directories (bottom-up)
         async function removeDirs(dir) {
-            const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+            const entries = await fsPromises.readdir(dir, { withFileTypes: true });
             for (const entry of entries) {
                 const fullPath = path.join(dir, entry.name);
                 if (entry.isDirectory()) {
                     await removeDirs(fullPath);
                 }
             }
-            await fs.promises.rmdir(dir);
+            await fsPromises.rmdir(dir);
         }
         signal.throwIfAborted();
         await removeDirs(instancePath);
@@ -2499,39 +2557,28 @@ async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
         const src = path.resolve(user_path, `minecraft/instances/${old_instance_id}`);
         const dest = path.resolve(user_path, `minecraft/instances/${new_instance_id}`);
         if (!fs.existsSync(src)) return false;
-        await fs.promises.mkdir(dest, { recursive: true });
+        await fsPromises.mkdir(dest, { recursive: true });
         // Get all files and folders in the source directory
-        const entries = await fs.promises.readdir(src, { withFileTypes: true });
+        const entries = await fsPromises.readdir(src, { withFileTypes: true });
         const total = entries.length;
         let completed = 0;
 
         for (const entry of entries) {
+            const percent = Math.round(((completed + 1) / total) * 100);
+            win.webContents.send('progress-update', `Duplicating Instance`, percent, `Copying ${entry.name} (${completed} of ${total})`, processId, "good", cancelId);
             if (entry.name == "logs") continue;
             signal.throwIfAborted();
             const srcPath = path.join(src, entry.name);
             const destPath = path.join(dest, entry.name);
 
             if (entry.isDirectory()) {
-                await fs.promises.mkdir(destPath, { recursive: true });
-                // Recursively copy subdirectory
-                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
-                for (const subEntry of subEntries) {
-                    const subSrcPath = path.join(srcPath, subEntry.name);
-                    const subDestPath = path.join(destPath, subEntry.name);
-                    if (subEntry.isDirectory()) {
-                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
-                    } else {
-                        await fs.promises.copyFile(subSrcPath, subDestPath);
-                    }
-                }
+                await fsPromises.cp(srcPath, destPath, { recursive: true, errorOnExist: false, force: true });
             } else {
-                await fs.promises.copyFile(srcPath, destPath);
+                await fsPromises.copyFile(srcPath, destPath);
             }
 
             completed++;
-            const percent = Math.round((completed / total) * 100);
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Duplicating Instance`, percent, `Copying ${entry.name} (${completed} of ${total})`, processId, "good", cancelId);
         }
         win.webContents.send('progress-update', `Duplicating Instance`, 100, `Done`, processId, "done", cancelId);
         return true;
@@ -2555,8 +2602,8 @@ ipcMain.handle('change-folder', async (_, old_path, new_path) => {
         if (src === dest) return false;
 
         if (!fs.existsSync(src)) return false;
-        await fs.promises.mkdir(dest, { recursive: true });
-        const entries = await fs.promises.readdir(src, { withFileTypes: true });
+        await fsPromises.mkdir(dest, { recursive: true });
+        const entries = await fsPromises.readdir(src, { withFileTypes: true });
         const total = entries.length;
         let completed = 0;
 
@@ -2569,19 +2616,19 @@ ipcMain.handle('change-folder', async (_, old_path, new_path) => {
             win.webContents.send('progress-update', `Moving User Path`, percent, `Copying ${entry.name} (${completed + 1} of ${total})`, processId, "good", cancelId);
 
             if (entry.isDirectory()) {
-                await fs.promises.mkdir(destPath, { recursive: true });
-                const subEntries = await fs.promises.readdir(srcPath, { withFileTypes: true });
+                await fsPromises.mkdir(destPath, { recursive: true });
+                const subEntries = await fsPromises.readdir(srcPath, { withFileTypes: true });
                 for (const subEntry of subEntries) {
                     const subSrcPath = path.join(srcPath, subEntry.name);
                     const subDestPath = path.join(destPath, subEntry.name);
                     if (subEntry.isDirectory()) {
-                        await fs.promises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
+                        await fsPromises.cp(subSrcPath, subDestPath, { recursive: true, errorOnExist: false, force: true });
                     } else {
-                        await fs.promises.copyFile(subSrcPath, subDestPath);
+                        await fsPromises.copyFile(subSrcPath, subDestPath);
                     }
                 }
             } else {
-                await fs.promises.copyFile(srcPath, destPath);
+                await fsPromises.copyFile(srcPath, destPath);
             }
 
             completed++;
@@ -2624,7 +2671,7 @@ async function importWorld(file_path, instance_id, worldName) {
             }
             const destPath = path.join(savesPath, targetName);
             async function collectFiles(dir, base) {
-                const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+                const entries = await fsPromises.readdir(dir, { withFileTypes: true });
                 let files = [];
                 for (const entry of entries) {
                     const full = path.join(dir, entry.name);
@@ -2641,13 +2688,13 @@ async function importWorld(file_path, instance_id, worldName) {
             }
 
             signal.throwIfAborted();
-            await fs.promises.mkdir(destPath, { recursive: true });
+            await fsPromises.mkdir(destPath, { recursive: true });
             const allEntries = await collectFiles(file_path, file_path);
 
             const dirs = allEntries.filter(e => e.isDirectory);
             for (const d of dirs) {
                 const targetDir = path.join(destPath, d.rel);
-                await fs.promises.mkdir(targetDir, { recursive: true });
+                await fsPromises.mkdir(targetDir, { recursive: true });
             }
 
             const files = allEntries.filter(e => !e.isDirectory);
@@ -2657,9 +2704,9 @@ async function importWorld(file_path, instance_id, worldName) {
             for (const fileEntry of files) {
                 const srcFile = fileEntry.full;
                 const destFile = path.join(destPath, fileEntry.rel);
-                await fs.promises.mkdir(path.dirname(destFile), { recursive: true });
+                await fsPromises.mkdir(path.dirname(destFile), { recursive: true });
 
-                await fs.promises.copyFile(srcFile, destFile);
+                await fsPromises.copyFile(srcFile, destFile);
 
                 done++;
                 const percent = Math.round((done / total) * 95);
@@ -2978,13 +3025,19 @@ ipcMain.handle('read-cfzip', async (_, file_path) => {
 });
 
 ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
+    return await setOptionsTXT(instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
+});
+
+async function setOptionsTXT(instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists, callback) {
     const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
     let alreadyExists = fs.existsSync(optionsPath);
     if (dont_complete_if_already_exists && alreadyExists) {
+        if (callback) callback(content.version);
         return content.version;
     }
     if (!alreadyExists) {
         await fsPromises.writeFile(optionsPath, content.content, "utf-8");
+        if (callback) callback(content.version);
         return content.version;
     } else {
         let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
@@ -3008,9 +3061,10 @@ ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_
             }
         }
         await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+        if (callback) callback(version);
         return version;
     }
-});
+}
 
 ipcMain.handle('update-options-txt', async (_, instance_id, key, value) => {
     const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
@@ -3739,6 +3793,10 @@ ipcMain.handle('import-content', async (_, file_path, content_type, instance_id)
 });
 
 ipcMain.handle('download-skin', async (_, url) => {
+    return await downloadSkin(url);
+});
+
+async function downloadSkin(url) {
     let imageBuffer;
     if (url.startsWith("data:")) {
         imageBuffer = Buffer.from(url.split(",")[1], "base64");
@@ -3766,7 +3824,7 @@ ipcMain.handle('download-skin', async (_, url) => {
     const dataUrl = `data:image/png;base64,${base64}`;
 
     return { hash, dataUrl };
-});
+}
 
 ipcMain.handle('path-to-data-url', async (_, file_path) => {
     if (!file_path) return null;
@@ -3849,3 +3907,606 @@ ipcMain.handle('is-instance-file', (_, file_path) => {
     }
     return false;
 });
+
+// Instance management
+function getInstance(instance_id) {
+    return db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
+}
+function getInstances() {
+    return db.prepare("SELECT * FROM instances").all();
+}
+function updateInstance(key, value, instance_id) {
+    if (value instanceof Date) value = value.toISOString();
+    if (typeof value === "boolean") value = Number(value);
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args"];
+    if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
+    return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
+}
+function deleteInstance(instance_id) {
+    db.prepare("DELETE FROM content WHERE instance = ?").run(instance_id);
+    db.prepare("DELETE FROM last_played_servers WHERE instance_id = ?").run(instance_id);
+    db.prepare("DELETE FROM pins WHERE instance_id = ?").run(instance_id);
+    return db.prepare("DELETE FROM instances WHERE instance_id = ?").run(instance_id);
+}
+function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
+    db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(getDefault("default_width")), Number(getDefault("default_height")), Number(getDefault("default_ram")));
+    setOptionsTXT(instance_id, getDefaultOptionsTXT(vanilla_version), true, false, (v) => {
+        updateInstance("attempted_options_txt_version", v);
+    });
+    return getInstance(instance_id);
+}
+
+// Content management
+function getContent(content_id) {
+    return db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(content_id);
+}
+function getInstanceContentDatabase(instance_id) {
+    return db.prepare("SELECT * FROM content WHERE instance = ?").all(instance_id);
+}
+function updateContent(key, value, content_id) {
+    if (value instanceof Date) value = value.toISOString();
+    if (typeof value === "boolean") value = Number(value);
+    let allowedKeys = ["name", "author", "disabled", "image", "file_name", "source", "type", "version", "version_id", "instance", "source_info TEXT"];
+    if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
+    return db.prepare(`UPDATE content SET ${key} = ? WHERE id = ?`).run(value, content_id);
+}
+function addContentDatabase(name, author, image, file_name, source, type, version, instance_id, source_info, disabled, version_id) {
+    let result = db.prepare('INSERT into content (name, author, image, file_name, source, type, version, instance, source_info, disabled, version_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(name, author, image, file_name, source, type, version, instance_id, source_info, Number(disabled), version_id);
+    return getContent(result.lastInsertRowid);
+}
+function deleteContentDatabase(content_id) {
+    return db.prepare("DELETE FROM content WHERE id = ?").run(content_id);
+}
+function getContentBySourceInfo(source_info) {
+    return db.prepare("SELECT * FROM content WHERE source_info = ?").all(source_info);
+}
+
+// Profile management
+function getDefaultProfile() {
+    return db.prepare("SELECT * FROM profiles WHERE is_default = ?").get(1);
+}
+function setDefaultProfile(profile_id) {
+    db.prepare("UPDATE profiles SET is_default = ?").run(0);
+    return db.prepare("UPDATE profiles SET is_default = ? WHERE id = ?").run(1, profile_id);
+}
+function getProfiles() {
+    return db.prepare("SELECT * FROM profiles").all();
+}
+function getProfileDatabase(uuid) {
+    return db.prepare("SELECT * FROM profiles WHERE uuid = ?").get(uuid);
+}
+function getProfileFromId(profile_id) {
+    return db.prepare("SELECT * FROM profiles WHERE id = ?").get(profile_id);
+}
+function addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
+    let result = db.prepare("INSERT INTO profiles (access_token,client_id,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?,?)").run(access_token, client_id, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
+    return getProfileFromId(result.lastInsertRowid);
+}
+function deleteProfile(uuid) {
+    return db.prepare("DELETE FROM profiles WHERE uuid = ?").run(uuid);
+}
+function updateProfile(key, value, profile_id) {
+    if (value instanceof Date) value = value.toISOString();
+    if (typeof value === "boolean") value = Number(value);
+    let allowedKeys = ["access_token", "client_id", "expires", "name", "refresh_token", "uuid", "xuid", "is_demo"];
+    if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
+    return db.prepare(`UPDATE profiles SET ${key} = ? WHERE id = ?`).run(value, profile_id);
+}
+
+// Skin management
+function getSkins() {
+    return db.prepare("SELECT * FROM skins").all();
+}
+function getSkinsNoDefaults() {
+    return db.prepare("SELECT * FROM skins WHERE NOT default_skin = ?").all(1);
+}
+async function getDefaultSkins() {
+    let skins = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
+    let defaultSkins = JSON.parse(await fsPromises.readFile(path.resolve(__dirname, "resources/default_skins.json"), 'utf-8'));
+    if (skins.length != defaultSkins.length) {
+        let texture_keys = skins.map(e => e.texture_key);
+        for (let i = 0; i < defaultSkins.length; i++) {
+            let e = defaultSkins[i];
+            if (!texture_keys.includes(e.texture_key)) {
+                let info = await downloadSkin(e.url);
+                db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, 1, "", e.texture_key);
+            }
+        }
+        let skinsAgain = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
+        return skinsAgain;
+    }
+    return skins;
+}
+function getSkin(skin_id) {
+    return db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(skin_id);
+}
+function updateSkin(key, value, skin_id) {
+    if (value instanceof Date) value = value.toISOString();
+    if (typeof value === "boolean") value = Number(value);
+    let allowedKeys = ["model", "name", "last_used", "favorited", "texture_key", "head", "active_uuid", "preview", "preview_model"];
+    if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
+    return db.prepare(`UPDATE skins SET ${key} = ? WHERE id = ?`).run(value, skin_id);
+}
+function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
+    let skins = getSkins();
+    let previousSkinIds = skins.map(e => e.skin_id);
+    if (previousSkinIds.includes(skin_id) && !overrideCheck) {
+        let id = skins[previousSkinIds.indexOf(skin_id)].id;
+        if (texture_key) updateSkin("texture_key", texture_key, id);
+        return getSkin(id);
+    }
+    let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin, last_used, texture_key) VALUES (?,?,?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false), last_used ? last_used.toISOString() : null, texture_key ? texture_key : null);
+    return getSkin(result.lastInsertRowid);
+}
+function deleteSkin(skin_id) {
+    return db.prepare("DELETE FROM skins WHERE id = ?").run(skin_id);
+}
+function getActiveSkin(uuid) {
+    return db.prepare("SELECT * FROM skins WHERE active_uuid LIKE ? LIMIT 1").get(`%;${uuid};%`);
+}
+function setActiveSkin(uuid, skin_id) {
+    let old = db.prepare("SELECT * FROM skins WHERE active_uuid LIKE ?").all(`%;${uuid};%`);
+    for (let i = 0; i < old.length; i++) {
+        let active = old[i].active_uuid.split(";");
+        updateSkin("active_uuid", active.toSpliced(active.indexOf(uuid), 1).join(";"), old[i].id);
+    }
+    let current = db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(skin_id);
+    let active = current.active_uuid.split(";");
+    if (active.length <= 1) active = ["", ""];
+    active.splice(1, 0, uuid);
+    return updateSkin("active_uuid", active.join(";"), current.id);
+}
+
+// default management
+function getDefault(type) {
+    let default_ = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get(type);
+    if (!default_) {
+        let value = defaults[type];
+        db.prepare("INSERT INTO defaults (default_type, value) VALUES (?, ?)").run(type, value);
+        return value;
+    }
+    return default_.value;
+}
+function setDefault(type, value) {
+    getDefault(type);
+    return db.prepare("UPDATE defaults SET value = ? WHERE default_type = ?").run(value, type);
+}
+
+// cape management
+function getCape(cape_id) {
+    return db.prepare("SELECT * FROM capes WHERE id = ? LIMIT 1").get(cape_id);
+}
+function getCapes(uuid) {
+    return db.prepare("SELECT * FROM capes WHERE uuid = ?").all(uuid);
+}
+function getActiveCape(uuid) {
+    return db.prepare("SELECT * FROM capes WHERE uuid = ? AND active = ?").get(uuid, 1);
+}
+function addCape(cape_name, cape_id, cape_url, uuid) {
+    let capes = getCapes(uuid);
+    let previousCapeIds = capes.map(e => e.cape_id);
+    if (previousCapeIds.includes(cape_id)) {
+        return capes[previousCapeIds.indexOf(cape_id)];
+    }
+    let result = db.prepare("INSERT INTO capes (uuid, cape_name, cape_id, cape_url) VALUES (?,?,?,?)").run(uuid, cape_name, cape_id, cape_url);
+    return getCape(result.lastInsertRowid);
+}
+function setCapeActive(cape_id) {
+    let cape = getCape(cape_id);
+    db.prepare("UPDATE capes SET active = ? WHERE uuid = ?").run(0, cape.uuid);
+    return db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(1, cape_id);
+}
+function removeCapeActive(cape_id) {
+    return db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(0, cape_id);
+}
+
+// default options management
+function getDefaultOptionsVersions() {
+    return db.prepare("SELECT * FROM options_defaults WHERE key = ?").all("version").map(e => e.version).filter(e => e);
+}
+function getDefaultOption(key) {
+    return db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key)?.value;
+}
+function setDefaultOption(key, value) {
+    if (!getDefaultOption(key)) {
+        return db.prepare("INSERT INTO options_defaults (key, value) VALUES (?, ?)").run(key, value);
+    }
+    return db.prepare("UPDATE options_defaults SET value = ? WHERE key = ?").run(value, key);
+}
+function deleteDefaultOption(key) {
+    return db.prepare("DELETE FROM options_defaults WHERE key = ?").run(key);
+}
+let keyToNum = {
+    "key.keyboard.apostrophe": 40,
+    "key.keyboard.backslash": 43,
+    "key.keyboard.backspace": 14,
+    "key.keyboard.caps.lock": 58,
+    "key.keyboard.comma": 51,
+    "key.keyboard.delete": 211,
+    "key.keyboard.down": 208,
+    "key.keyboard.end": 207,
+    "key.keyboard.enter": 28,
+    "key.keyboard.equal": 13,
+    "key.keyboard.f1": 59,
+    "key.keyboard.f2": 60,
+    "key.keyboard.f3": 61,
+    "key.keyboard.f4": 62,
+    "key.keyboard.f5": 63,
+    "key.keyboard.f6": 64,
+    "key.keyboard.f7": 65,
+    "key.keyboard.f8": 66,
+    "key.keyboard.f9": 67,
+    "key.keyboard.f10": 68,
+    "key.keyboard.f11": 87,
+    "key.keyboard.f12": 88,
+    "key.keyboard.f13": 100,
+    "key.keyboard.f14": 101,
+    "key.keyboard.f15": 102,
+    "key.keyboard.f16": 103,
+    "key.keyboard.f17": 104,
+    "key.keyboard.f18": 105,
+    "key.keyboard.f19": 113,
+    "key.keyboard.f20": 114,
+    "key.keyboard.f21": 115,
+    "key.keyboard.f22": 116,
+    "key.keyboard.f23": 117,
+    "key.keyboard.f24": 118,
+    "key.keyboard.f25": 119,
+    "key.keyboard.grave.accent": 41,
+    "key.keyboard.home": 199,
+    "key.keyboard.insert": 210,
+    "key.keyboard.keypad.0": 82,
+    "key.keyboard.keypad.1": 79,
+    "key.keyboard.keypad.2": 80,
+    "key.keyboard.keypad.3": 81,
+    "key.keyboard.keypad.4": 75,
+    "key.keyboard.keypad.5": 76,
+    "key.keyboard.keypad.6": 77,
+    "key.keyboard.keypad.7": 71,
+    "key.keyboard.keypad.8": 72,
+    "key.keyboard.keypad.9": 73,
+    "key.keyboard.keypad.add": 78,
+    "key.keyboard.keypad.decimal": 83,
+    "key.keyboard.keypad.divide": 181,
+    "key.keyboard.keypad.enter": 156,
+    "key.keyboard.keypad.equal": 141,
+    "key.keyboard.keypad.multiply": 55,
+    "key.keyboard.keypad.subtract": 74,
+    "key.keyboard.left": 203,
+    "key.keyboard.left.alt": 56,
+    "key.keyboard.left.bracket": 26,
+    "key.keyboard.left.control": 29,
+    "key.keyboard.left.shift": 42,
+    "key.keyboard.left.win": 219,
+    "key.keyboard.menu": 221,
+    "key.keyboard.minus": 12,
+    "key.keyboard.num.lock": 69,
+    "key.keyboard.page.down": 209,
+    "key.keyboard.page.up": 201,
+    "key.keyboard.pause": 197,
+    "key.keyboard.period": 52,
+    "key.keyboard.print.screen": 183,
+    "key.keyboard.right": 205,
+    "key.keyboard.right.alt": 184,
+    "key.keyboard.right.bracket": 27,
+    "key.keyboard.right.control": 157,
+    "key.keyboard.right.shift": 54,
+    "key.keyboard.right.win": 220,
+    "key.keyboard.scroll.lock": 70,
+    "key.keyboard.semicolon": 39,
+    "key.keyboard.slash": 53,
+    "key.keyboard.space": 57,
+    "key.keyboard.tab": 15,
+    "key.keyboard.unknown": -1,
+    "key.keyboard.up": 200,
+    "key.keyboard.a": 30,
+    "key.keyboard.b": 48,
+    "key.keyboard.c": 46,
+    "key.keyboard.d": 32,
+    "key.keyboard.e": 18,
+    "key.keyboard.f": 33,
+    "key.keyboard.g": 34,
+    "key.keyboard.h": 35,
+    "key.keyboard.i": 23,
+    "key.keyboard.j": 36,
+    "key.keyboard.k": 37,
+    "key.keyboard.l": 38,
+    "key.keyboard.m": 50,
+    "key.keyboard.n": 49,
+    "key.keyboard.o": 24,
+    "key.keyboard.p": 25,
+    "key.keyboard.q": 16,
+    "key.keyboard.r": 19,
+    "key.keyboard.s": 31,
+    "key.keyboard.t": 20,
+    "key.keyboard.u": 22,
+    "key.keyboard.v": 47,
+    "key.keyboard.w": 17,
+    "key.keyboard.x": 45,
+    "key.keyboard.y": 21,
+    "key.keyboard.z": 44,
+    "key.keyboard.0": 11,
+    "key.keyboard.1": 2,
+    "key.keyboard.2": 3,
+    "key.keyboard.3": 4,
+    "key.keyboard.4": 5,
+    "key.keyboard.5": 6,
+    "key.keyboard.6": 7,
+    "key.keyboard.7": 8,
+    "key.keyboard.8": 9,
+    "key.keyboard.9": 10,
+    "key.mouse.left": -100,
+    "key.mouse.right": -99,
+    "key.mouse.middle": -98,
+    "key.mouse.1": -97,
+    "key.mouse.2": -96,
+    "key.mouse.3": -95,
+    "key.mouse.4": -94,
+    "key.mouse.5": -93,
+    "key.mouse.6": -92,
+    "key.mouse.7": -91,
+    "key.mouse.8": -90,
+    "key.mouse.9": -89,
+    "key.mouse.10": -88,
+    "key.mouse.11": -87,
+    "key.mouse.12": -86,
+    "key.mouse.13": -85,
+    "key.mouse.14": -84,
+    "key.mouse.15": -83,
+    "key.mouse.16": -82,
+    "key.mouse.17": -81,
+    "key.mouse.18": -80,
+    "key.mouse.19": -79,
+    "key.mouse.20": -78
+};
+function getDefaultOptionsTXT(version, data_version) {
+    let v;
+    if (!data_version) {
+        let thisIndex = minecraftVersions.indexOf(version);
+        let versions = getDefaultOptionsVersions();
+        let min_distance = 10000;
+        let version_to_use = "something_not_null";
+        if (versions.includes(this.version)) {
+            version_to_use = this.version;
+        } else {
+            versions.forEach(e => {
+                let vIndex = minecraftVersions.indexOf(e);
+                if (vIndex > thisIndex) return;
+                if (thisIndex - vIndex < min_distance) {
+                    min_distance = thisIndex - vIndex;
+                    version_to_use = e;
+                }
+            });
+        }
+        v = db.prepare("SELECT * FROM options_defaults WHERE key = ? AND version = ?").get("version", version_to_use);
+    }
+    let r = db.prepare("SELECT * FROM options_defaults WHERE NOT key = ?").all("version");
+    let content = "";
+    if (!data_version) data_version = v?.value;
+    if (!data_version) data_version = 100;
+    content = "version:" + data_version + "\n";
+    data_version = Number(data_version);
+    r.forEach(e => {
+        if (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && minecraftVersions.indexOf(this.version) != -1 && keyToNum[e.value]) {
+            content += e.key + ":" + keyToNum[e.value] + "\n"
+        } else {
+            content += e.key + ":" + e.value + "\n"
+        }
+    });
+    return { "content": content, "version": data_version, "keys": r.map(e => e.key), "values": r.map(e => e.value).map(e => (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && minecraftVersions.indexOf(this.version) != -1 && keyToNum[e]) ? keyToNum[e] : e) };
+}
+function getDefaultOptions() {
+    return db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version");
+}
+function deleteDefaultOptions() {
+    return db.prepare("DELETE FROM options_defaults WHERE key != ?").all("version");
+}
+
+// mc versions management
+function getMCVersions() {
+    let mcVersions = db.prepare("SELECT * FROM mc_versions_cache").all();
+    mcVersions.sort((a, b) => {
+        return (new Date(a.date_published)).getTime() - (new Date(b.date_published)).getTime();
+    });
+    versionNames = mcVersions.map(e => e.name);
+    minecraftVersions = versionNames;
+    return versionNames;
+}
+async function fetchUpdatedMCVersions() {
+    let result_pre_json = await fetch(`https://launchermeta.mojang.com/mc/game/version_manifest.json`);
+    let result = await result_pre_json.json();
+    setDefault("latest_release", result.latest.release);
+    let mc_versions = db.prepare('SELECT * FROM mc_versions_cache').all();
+    let mc_version_names = mc_versions.map(e => e.name);
+    for (let i = 0; i < result.versions.length; i++) {
+        let e = result.versions[i];
+        if (!mc_version_names.includes(e.id)) {
+            db.prepare("INSERT INTO mc_versions_cache (name, date_published) VALUES (?, ?)").run(e.id, e.releaseTime);
+        } else {
+            mc_version_names.splice(mc_version_names.indexOf(e.id), 1);
+        }
+    }
+    for (let i = 0; i < mc_version_names.length; i++) {
+        let id = mc_version_names[i];
+        db.prepare("DELETE FROM mc_versions_cache WHERE name = ?").run(id);
+    }
+    return getMCVersions();
+}
+
+function getServerLastPlayed(instance_id, ip) {
+    if (!ip.includes(":")) ip += ":25565";
+    let result = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instance_id, ip);
+    return result?.date;
+}
+function setServerLastPlayed(instance_id, ip, date) {
+    if (!ip.includes(":")) ip += ":25565";
+    let existing = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instance_id, ip);
+    if (existing) {
+        return db.prepare("UPDATE last_played_servers SET date = ? WHERE instance_id = ? AND ip = ?").run(date, instance_id, ip);
+    }
+    return db.prepare("INSERT INTO last_played_servers (ip, instance_id, date) VALUES (?, ?, ?)").run(ip, instance_id, date);
+}
+
+function isWorldPinned(world_id, instance_id, world_type) {
+    return Boolean(db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type));
+}
+function isInstancePinned(instance_id) {
+    return Boolean(db.prepare("SELECT * FROM pins WHERE instance_id = ?").get(instance_id));
+}
+function pinInstance(instance_id) {
+    return db.prepare("INSERT INTO pins (type, instance_id) VALUES (?, ?)").run("instance", instance_id);
+}
+function unpinInstance(instance_id) {
+    return db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ?").run("instance", instance_id);
+}
+function pinWorld(world_id, instance_id, world_type) {
+    return db.prepare("INSERT INTO pins (type, instance_id, world_id, world_type) VALUES (?, ?, ?, ?)").run("world", instance_id, world_id, world_type);
+}
+function unpinWorld(world_id, instance_id, world_type) {
+    return db.prepare("DELETE FROM pins WHERE type = ? AND instance_id = ? AND world_id = ? AND world_type = ?").run("world", instance_id, world_id, world_type);
+}
+function getPinnedInstances() {
+    return db.prepare("SELECT * FROM pins WHERE type = ?").all("instance");
+}
+async function getPinnedWorlds() {
+    let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");
+    let allWorlds = [];
+    for (const world of worlds) {
+        if (!world.world_id) continue;
+        if (world.world_type == "singleplayer") {
+            const worldPath = path.resolve(user_path, "minecraft/instances", world.instance_id || "", "saves", world.world_id, "level.dat");
+            if (fs.existsSync(worldPath)) {
+                try {
+                    const worldInfo = await getWorld(worldPath);
+                    allWorlds.push({
+                        ...worldInfo,
+                        pinned: true,
+                        type: "singleplayer",
+                        instance_id: world.instance_id
+                    });
+                } catch (e) { }
+            } else { }
+        } else {
+            const servers = await getMultiplayerWorlds(world.instance_id);
+            const server = servers.find(s => (s.ip) == world.world_id);
+            if (server) {
+                allWorlds.push({
+                    ...server,
+                    pinned: true,
+                    instance_id: world.instance_id,
+                    last_played: await getServerLastPlayed(world.instance_id, server.ip)
+                });
+            }
+        }
+    }
+    return allWorlds;
+}
+
+
+ipcMain.handle('get-instance', (_, ...params) => getInstance(...params));
+ipcMain.handle('get-instances', (_, ...params) => getInstances(...params));
+ipcMain.handle('update-instance', (_, ...params) => updateInstance(...params));
+ipcMain.handle('delete-instance', (_, ...params) => deleteInstance(...params));
+ipcMain.handle('add-instance', (_, ...params) => addInstance(...params));
+ipcMain.handle('get-content', (_, ...params) => getContent(...params));
+ipcMain.handle('get-instance-content-database', (_, ...params) => getInstanceContentDatabase(...params));
+ipcMain.handle('update-content', (_, ...params) => updateContent(...params));
+ipcMain.handle('add-content-database', (_, ...params) => addContentDatabase(...params));
+ipcMain.handle('delete-content-database', (_, ...params) => deleteContentDatabase(...params));
+ipcMain.handle('get-content-by-source-info', (_, ...params) => getContentBySourceInfo(...params));
+ipcMain.handle('get-default-profile', (_, ...params) => getDefaultProfile(...params));
+ipcMain.handle('set-default-profile', (_, ...params) => setDefaultProfile(...params));
+ipcMain.handle('get-profiles', (_, ...params) => getProfiles(...params));
+ipcMain.handle('get-profile-database', (_, ...params) => getProfileDatabase(...params));
+ipcMain.handle('get-profile-from-id', (_, ...params) => getProfileFromId(...params));
+ipcMain.handle('add-profile', (_, ...params) => addProfile(...params));
+ipcMain.handle('delete-profile', (_, ...params) => deleteProfile(...params));
+ipcMain.handle('update-profile', (_, ...params) => updateProfile(...params));
+ipcMain.handle('get-skins', (_, ...params) => getSkins(...params));
+ipcMain.handle('get-skins-no-defaults', (_, ...params) => getSkinsNoDefaults(...params));
+ipcMain.handle('get-default-skins', (_, ...params) => getDefaultSkins(...params));
+ipcMain.handle('get-skin', (_, ...params) => getSkin(...params));
+ipcMain.handle('update-skin', (_, ...params) => updateSkin(...params));
+ipcMain.handle('add-skin', (_, ...params) => addSkin(...params));
+ipcMain.handle('delete-skin', (_, ...params) => deleteSkin(...params));
+ipcMain.handle('get-active-skin', (_, ...params) => getActiveSkin(...params));
+ipcMain.handle('set-active-skin', (_, ...params) => setActiveSkin(...params));
+ipcMain.handle('get-default', (_, ...params) => getDefault(...params));
+ipcMain.handle('set-default', (_, ...params) => setDefault(...params));
+ipcMain.handle('get-cape', (_, ...params) => getCape(...params));
+ipcMain.handle('get-capes', (_, ...params) => getCapes(...params));
+ipcMain.handle('get-active-cape', (_, ...params) => getActiveCape(...params));
+ipcMain.handle('add-cape', (_, ...params) => addCape(...params));
+ipcMain.handle('set-cape-active', (_, ...params) => setCapeActive(...params));
+ipcMain.handle('remove-cape-active', (_, ...params) => removeCapeActive(...params));
+ipcMain.handle('get-default-options-versions', (_, ...params) => getDefaultOptionsVersions(...params));
+ipcMain.handle('get-default-options-txt', (_, ...params) => getDefaultOptionsTXT(...params));
+ipcMain.handle('get-default-options', (_, ...params) => getDefaultOptions(...params));
+ipcMain.handle('delete-default-options', (_, ...params) => deleteDefaultOptions(...params));
+ipcMain.handle('get-default-option', (_, ...params) => getDefaultOption(...params));
+ipcMain.handle('set-default-option', (_, ...params) => setDefaultOption(...params));
+ipcMain.handle('delete-default-option', (_, ...params) => deleteDefaultOption(...params));
+ipcMain.handle('get-mc-versions', (_, ...params) => getMCVersions(...params));
+ipcMain.handle('fetch-updated-mc-versions', async (_, ...params) => await fetchUpdatedMCVersions(...params));
+ipcMain.handle('get-server-last-played', (_, ...params) => getServerLastPlayed(...params));
+ipcMain.handle('set-server-last-played', (_, ...params) => setServerLastPlayed(...params));
+ipcMain.handle('is-world-pinned', (_, ...params) => isWorldPinned(...params));
+ipcMain.handle('is-instance-pinned', (_, ...params) => isInstancePinned(...params));
+ipcMain.handle('pin-instance', (_, ...params) => pinInstance(...params));
+ipcMain.handle('unpin-instance', (_, ...params) => unpinInstance(...params));
+ipcMain.handle('pin-world', (_, ...params) => pinWorld(...params));
+ipcMain.handle('unpin-world', (_, ...params) => unpinWorld(...params));
+ipcMain.handle('get-pinned-instances', (_, ...params) => getPinnedInstances(...params));
+ipcMain.handle('get-pinned-worlds', (_, ...params) => getPinnedWorlds(...params));
+
+function getMaxConcurrentDownloads() {
+    let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
+    if (r?.value) return Number(r.value);
+    return 10;
+}
+
+// update
+try {
+    switch (getDefault("saved_version")) {
+        case "0.0.1":
+        case "0.0.2":
+        case "0.0.3":
+        case "0.0.4":
+        case "0.0.5":
+        case "0.0.6":
+        case "0.0.7":
+            if (getDefault("default_page") == "my_account") setDefault("default_page", "wardrobe");
+            db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
+            db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
+            db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
+        case "0.0.8":
+        case "0.0.9":
+        case "0.1.0":
+        case "0.1.1":
+            db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
+        case "0.2.0":
+        case "0.3.0":
+        case "0.4.0":
+        case "0.4.1":
+        case "0.4.2":
+        case "0.4.3":
+        case "0.4.4":
+        case "0.5.0":
+            db.prepare("ALTER TABLE skins ADD favorited INTEGER").run();
+            db.prepare("ALTER TABLE skins ADD last_used TEXT").run();
+            db.prepare("ALTER TABLE skins ADD preview TEXT").run();
+            db.prepare("ALTER TABLE skins ADD preview_model TEXT").run();
+            db.prepare("ALTER TABLE skins ADD head TEXT").run();
+        case "0.6.0":
+        case "0.6.1":
+        case "0.6.2":
+        case "0.6.3":
+        case "0.6.4":
+        case "0.6.5":
+            db.prepare("ALTER TABLE instances ADD post_launch_hook TEXT").run();
+            db.prepare("ALTER TABLE instances ADD uses_custom_java_args INTEGER").run();
+            db.prepare("ALTER TABLE instances ADD provided_java_args TEXT").run();
+    }
+} catch (e) { }
+
+setDefault("saved_version", version);

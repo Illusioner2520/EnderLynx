@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer, clipboard, shell, webUtils } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
 const os = require('os');
 const MarkdownIt = require('markdown-it');
 const { version } = require('./package.json');
@@ -87,50 +86,7 @@ function processArgs(args) {
 
 processArgs(process.argv.slice(1));
 
-if (!fs.existsSync(userPath)) {
-    fs.mkdirSync(userPath, { recursive: true });
-}
-if (!fs.existsSync(path.resolve(userPath, "log_config.xml"))) {
-    const srcConfigPath = path.resolve(__dirname, "log_config.xml");
-    let configData;
-    try {
-        configData = fs.readFileSync(srcConfigPath);
-        fs.writeFileSync(path.resolve(userPath, "log_config.xml"), configData);
-    } catch (e) {
-        fs.writeFileSync(path.resolve(userPath, "log_config.xml"), "");
-    }
-}
 const svgData = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
-let srcConfigPath = path.resolve(__dirname, "updater.exe");
-if (os.platform() != 'win32') srcConfigPath = path.resolve(__dirname, "updater");
-fs.mkdirSync(path.resolve(userPath, "updater"), { recursive: true })
-let updaterData;
-try {
-    updaterData = fs.readFileSync(srcConfigPath);
-    let updaterName = "updater.exe";
-    if (os.platform() != 'win32') updaterName = "updater";
-    fs.writeFileSync(path.resolve(userPath, "updater", updaterName), updaterData);
-    if (os.platform() != 'win32') {
-        fs.chmodSync(path.resolve(userPath, "updater", updaterName), 0o755);
-    }
-} catch (e) {
-
-}
-
-const db = new Database(path.resolve(userPath, "app.db"));
-
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT, favorited INTEGER, last_used TEXT, preview TEXT, preview_model TEXT, head TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
-
-db.pragma('journal_mode = WAL');
 
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
@@ -172,7 +128,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
             if (info) callback(info, filePath);
         });
     },
-    getMaxConcurrentDownloads,
     version: enableDevMode ? version + "-dev" : version,
     userPath,
     isDev: enableDevMode,
@@ -248,37 +203,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         }
     },
     getPinnedWorlds: async () => {
-        let worlds = db.prepare("SELECT * FROM pins WHERE type = ?").all("world");
-        let allWorlds = [];
-        for (const world of worlds) {
-            if (!world.world_id) continue;
-            if (world.world_type == "singleplayer") {
-                const worldPath = path.resolve(userPath, "minecraft/instances", world.instance_id || "", "saves", world.world_id, "level.dat");
-                if (fs.existsSync(worldPath)) {
-                    try {
-                        const worldInfo = await getWorld(worldPath);
-                        allWorlds.push({
-                            ...worldInfo,
-                            pinned: true,
-                            type: "singleplayer",
-                            instance_id: world.instance_id
-                        });
-                    } catch (e) { }
-                } else { }
-            } else {
-                const servers = await getMultiplayerWorlds(world.instance_id);
-                const server = servers.find(s => (s.ip) == world.world_id);
-                if (server) {
-                    allWorlds.push({
-                        ...server,
-                        pinned: true,
-                        instance_id: world.instance_id,
-                        last_played: getServerLastPlayed(world.instance_id, server.ip)
-                    });
-                }
-            }
-        }
-        return allWorlds;
+        return await ipcRenderer.invoke('get-pinned-worlds');
     },
     getAllServers: async (instance_ids) => {
         return await ipcRenderer.invoke("get-all-servers", instance_ids);
@@ -314,15 +239,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     updateOptionsTXT: async (instance_id, key, value) => {
         return await ipcRenderer.invoke('update-options-txt', instance_id, key, value);
     },
-    databaseGet: (sql, ...params) => {
-        return db.prepare(sql).get(...params);
-    },
-    databaseAll: (sql, ...params) => {
-        return db.prepare(sql).all(...params);
-    },
-    databaseRun: (sql, ...params) => {
-        return db.prepare(sql).run(...params);
-    },
     getLangFile: (locale) => {
         if (!enableDevMode) {
             filePath = path.resolve(process.resourcesPath, 'app.asar', 'resources', 'lang', `${locale}.json`);
@@ -348,9 +264,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     checkForProcess,
     clearActivity: () => ipcRenderer.send('remove-discord-activity'),
     setActivity: (activity) => {
-        let rpc_enabled = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("discord_rpc");
-        let enabled = rpc_enabled?.value ? rpc_enabled.value == "true" : true;
-        if (!enabled) return;
         ipcRenderer.send('set-discord-activity', activity)
     },
     killProcess: async (pid) => {
@@ -762,7 +675,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return await ipcRenderer.invoke('download-curseforge-pack', instance_id, url, title);
     },
     processPackFile: async (file_path, instance_id, title) => {
-        return await ipcRenderer.invoke('process-pack-file', file_path, instance_id, title, getMaxConcurrentDownloads());
+        return await ipcRenderer.invoke('process-pack-file', file_path, instance_id, title);
     },
     processMrPack,
     processCfZip,
@@ -1181,8 +1094,65 @@ contextBridge.exposeInMainWorld('enderlynx', {
     showScreenshotInFolder: (instance_id, file_name) => {
         let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, "screenshots", file_name);
         showFileInFolder(file_path);
-    }
+    },
+    getInstance: async (...params) => ipcRenderer.invoke('get-instance', ...params),
+    getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
+    updateInstance: async (...params) => ipcRenderer.invoke('update-instance', ...params),
+    deleteInstance: async (...params) => ipcRenderer.invoke('delete-instance', ...params),
+    addInstance: async (...params) => ipcRenderer.invoke('add-instance', ...params),
+    getContent: async (...params) => ipcRenderer.invoke('get-content', ...params),
+    getInstanceContentDatabase: async (...params) => ipcRenderer.invoke('get-instance-content-database', ...params),
+    updateContent: async (...params) => ipcRenderer.invoke('update-content', ...params),
+    addContentDatabase: async (...params) => ipcRenderer.invoke('add-content-database', ...params),
+    deleteContentDatabase: async (...params) => ipcRenderer.invoke('delete-content-database', ...params),
+    getContentBySourceInfo: async (...params) => ipcRenderer.invoke('get-content-by-source-info', ...params),
+    getDefaultProfile: async (...params) => ipcRenderer.invoke('get-default-profile', ...params),
+    setDefaultProfile: async (...params) => ipcRenderer.invoke('set-default-profile', ...params),
+    getProfiles: async (...params) => ipcRenderer.invoke('get-profiles', ...params),
+    getProfileDatabase: async (...params) => ipcRenderer.invoke('get-profile-database', ...params),
+    getProfileFromId: async (...params) => ipcRenderer.invoke('get-profile-from-id', ...params),
+    addProfile: async (...params) => ipcRenderer.invoke('add-profile', ...params),
+    deleteProfile: async (...params) => ipcRenderer.invoke('delete-profile', ...params),
+    updateProfile: async (...params) => ipcRenderer.invoke('update-profile', ...params),
+    getSkinsNoDefaults: async (...params) => ipcRenderer.invoke('get-skins-no-defaults', ...params),
+    getDefaultSkins: async (...params) => ipcRenderer.invoke('get-default-skins', ...params),
+    getSkin: async (...params) => ipcRenderer.invoke('get-skin', ...params),
+    updateSkin: async (...params) => ipcRenderer.invoke('update-skin', ...params),
+    addSkin: async (...params) => ipcRenderer.invoke('add-skin', ...params),
+    deleteSkin: async (...params) => ipcRenderer.invoke('delete-skin', ...params),
+    getActiveSkin: async (...params) => ipcRenderer.invoke('get-active-skin', ...params),
+    setActiveSkin: async (...params) => ipcRenderer.invoke('set-active-skin', ...params),
+    getDefault: async (...params) => ipcRenderer.invoke('get-default', ...params),
+    setDefault: async (...params) => ipcRenderer.invoke('set-default', ...params),
+    getCape: async (...params) => ipcRenderer.invoke('get-cape', ...params),
+    getCapes: async (...params) => ipcRenderer.invoke('get-capes', ...params),
+    getActiveCape: async (...params) => ipcRenderer.invoke('get-active-cape', ...params),
+    addCape: async (...params) => ipcRenderer.invoke('add-cape', ...params),
+    setCapeActive: async (...params) => ipcRenderer.invoke('set-cape-active', ...params),
+    removeCapeActive: async (...params) => ipcRenderer.invoke('remove-cape-active', ...params),
+    getDefaultOptionsVersions: async (...params) => ipcRenderer.invoke('get-default-options-versions', ...params),
+    getDefaultOptionsTXT: async (...params) => ipcRenderer.invoke('get-default-options-txt', ...params),
+    getDefaultOptions: async (...params) => ipcRenderer.invoke('get-default-options', ...params),
+    deleteDefaultOptions: async (...params) => ipcRenderer.invoke('delete-default-options', ...params),
+    getDefaultOption: async (...params) => ipcRenderer.invoke('get-default-option', ...params),
+    setDefaultOption: async (...params) => ipcRenderer.invoke('set-default-option', ...params),
+    deleteDefaultOption: async (...params) => ipcRenderer.invoke('delete-default-option', ...params),
+    getMCVersions: async (...params) => ipcRenderer.invoke('get-mc-versions', ...params),
+    fetchUpdatedMCVersions: async (...params) => ipcRenderer.invoke('fetch-updated-mc-versions', ...params),
+    getServerLastPlayed,
+    setServerLastPlayed: async (...params) => ipcRenderer.invoke('set-server-last-played', ...params),
+    isWorldPinned: async (...params) => ipcRenderer.invoke('is-world-pinned', ...params),
+    isInstancePinned: async (...params) => ipcRenderer.invoke('is-instance-pinned', ...params),
+    pinInstance: async (...params) => ipcRenderer.invoke('pin-instance', ...params),
+    unpinInstance: async (...params) => ipcRenderer.invoke('unpin-instance', ...params),
+    pinWorld: async (...params) => ipcRenderer.invoke('pin-world', ...params),
+    unpinWorld: async (...params) => ipcRenderer.invoke('unpin-world', ...params),
+    getPinnedInstances: async (...params) => ipcRenderer.invoke('get-pinned-instances', ...params)
 });
+
+async function getServerLastPlayed(instance_id, ip) {
+    return await ipcRenderer.invoke('get-server-last-played', instance_id, ip);
+}
 
 function hashString(str) {
     let hash = 0;
@@ -1226,19 +1196,19 @@ async function importContent(file_path, content_type, instance_id) {
 
 async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
     zip_path = path.resolve(userPath, "minecraft", "instances", instance_id, zip_path);
-    return await ipcRenderer.invoke('process-cf-zip-without-id', instance_id, zip_path, cf_id, title, getMaxConcurrentDownloads());
+    return await ipcRenderer.invoke('process-cf-zip-without-id', instance_id, zip_path, cf_id, title);
 }
 async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
     mrpack_path = path.resolve(userPath, "minecraft", "instances", instance_id, mrpack_path);
-    return await ipcRenderer.invoke('process-mr-pack', instance_id, mrpack_path, loader, title, getMaxConcurrentDownloads());
+    return await ipcRenderer.invoke('process-mr-pack', instance_id, mrpack_path, loader, title);
 }
 async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
     elpack_path = path.resolve(userPath, "minecraft", "instances", instance_id, elpack_path);
-    return await ipcRenderer.invoke('process-el-pack', instance_id, elpack_path, loader, title, getMaxConcurrentDownloads());
+    return await ipcRenderer.invoke('process-el-pack', instance_id, elpack_path, loader, title);
 }
 async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     zip_path = path.resolve(userPath, "minecraft", "instances", instance_id, zip_path);
-    return await ipcRenderer.invoke('process-cf-zip', instance_id, zip_path, cf_id, title, getMaxConcurrentDownloads());
+    return await ipcRenderer.invoke('process-cf-zip', instance_id, zip_path, cf_id, title);
 }
 
 async function getSkinFromURL(url) {
@@ -1383,16 +1353,4 @@ function compareVersions(v1, v2) {
 
 async function getOptions(optionsPath) {
     return ipcRenderer.invoke('get-options', optionsPath);
-}
-
-function getMaxConcurrentDownloads() {
-    let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
-    if (r?.value) return Number(r.value);
-    return 10;
-}
-
-function getServerLastPlayed(instance_id, ip) {
-    if (!ip.includes(":")) ip += ":25565";
-    let result = db.prepare("SELECT * FROM last_played_servers WHERE instance_id = ? AND ip = ?").get(instance_id, ip);
-    return result ? new Date(result.date) : new Date(null);
 }

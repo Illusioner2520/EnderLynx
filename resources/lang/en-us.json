@@ -401,6 +401,7 @@
     "app.instances.settings.group": "Library Group",
     "app.instances.settings.group.description": "Library Groups help to organize your instance list. Any instances in the same group will be displayed together when instances are grouped by custom groups.",
     "app.instances.settings.loader": "Loader",
+    "app.instances.settings.loader_version": "%l Version",
     "app.instances.settings.game_version": "Game Version",
     "app.instances.settings.update_content": "Update Content",
     "app.instances.settings.update_content.description": "Update all mods, resource packs or shaders to be compatible with the new version. Any content that isn't compatible will be disabled.",
@@ -889,5 +890,9 @@
     "app.settings.options.apply.description": "Are you sure that you want to override your current options for your default options for <u>every</u> instance?",
     "app.settings.options.apply.confirm": "Apply",
     "app.settings.options.apply.cancel": "Cancel",
-    "app.settings.options.apply.done": "Default options applied to every instance"
+    "app.settings.options.apply.done": "Default options applied to every instance",
+    "app.wardrobe.sort_by": "Sort by",
+    "app.wardrobe.sort_by.favorites_first": "Favorites First",
+    "app.wardrobe.sort_by.name": "Name",
+    "app.wardrobe.sort_by.last_used": "Last Used"
 }
