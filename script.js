@@ -5972,7 +5972,7 @@ async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_t
 
 async function getServerLastPlayed(instance_id, ip) {
     let result = await window.enderlynx.getServerLastPlayed(instance_id, ip);
-    return new Date(result);
+    return new Date(result ? result : null);
 }
 
 function showInstanceSettings(instanceInfo, tabsInfo) {
