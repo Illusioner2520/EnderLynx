@@ -755,6 +755,45 @@ ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_conten
                     console.log(e);
                 }
             }
+            const entry_neoforge = admZip.getEntry("META-INF/neoforge.mods.toml");
+            if (entry_neoforge) {
+                const modsTomlData = entry_neoforge.getData().toString('utf-8');
+                let forgeModJson = {};
+                try {
+                    forgeModJson = toml.parse(modsTomlData);
+                    if (Array.isArray(forgeModJson.mods) && forgeModJson.mods.length > 0) {
+                        const mod = forgeModJson.mods[0];
+                        if (mod.logoFile || forgeModJson.logoFile) {
+                            let logoFile = mod.logoFile;
+                            if (!mod.logoFile) logoFile = forgeModJson.logoFile;
+                            let iconPath = Array.isArray(logoFile) ? logoFile[0] : logoFile;
+                            const iconEntry = admZip.getEntry(iconPath);
+                            if (iconEntry) {
+                                const iconBuffer = iconEntry.getData();
+                                let mime = 'image/png';
+                                if (iconPath.endsWith('.jpg') || iconPath.endsWith('.jpeg')) mime = 'image/jpeg';
+                                else if (iconPath.endsWith('.gif')) mime = 'image/gif';
+                                let resizedBuffer = iconBuffer;
+                                try {
+                                    resizedBuffer = sharp(iconBuffer).resize({ width: 40, height: 40, fit: "inside" }).toBufferSync();
+                                } catch (e) {
+                                    resizedBuffer = iconBuffer;
+                                }
+                                modJson.icon = `data:${mime};base64,${resizedBuffer.toString('base64')}`;
+                            }
+                        }
+                        modJson = {
+                            ...modJson,
+                            name: mod.displayName ? mod.displayName : mod.modId ? mod.modId : file.replace(".jar.disabled", ".jar"),
+                            version: (!mod.version?.includes("$") && mod.version) ? mod.version : "",
+                            authors: mod.authors ? [mod.authors] : [],
+                            description: mod.description || "",
+                        };
+                    }
+                } catch (e) {
+                    console.log(e);
+                }
+            }
         } catch (e) { }
         return {
             type: 'mod',
