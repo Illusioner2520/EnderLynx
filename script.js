@@ -2113,7 +2113,7 @@ async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDro
         let e = content[i];
         if (e.file_name == await contentInfo.secondary_column.desc()) {
             if (e.disabled) {
-                let new_file_name = window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                let new_file_name = await window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_enable"));
                     return;
@@ -2123,7 +2123,7 @@ async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDro
                 contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
             } else {
-                let new_file_name = window.enderlynx.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                let new_file_name = await window.enderlynx.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_disable"));
                     return;
@@ -2679,8 +2679,8 @@ settingsButtonEle.onclick = async () => {
 
     let exportButton = document.createElement("button");
     exportButton.innerHTML = '<i class="fa-solid fa-file-export"></i> ' + translate("app.settings.def_opts.export");
-    exportButton.onclick = () => {
-        let file_location = window.enderlynx.generateOptionsTXT(values);
+    exportButton.onclick = async () => {
+        let file_location = await window.enderlynx.generateOptionsTXT(values);
         openShareDialogForFile(file_location);
     }
     exportButton.className = "bug-button";
@@ -2761,14 +2761,14 @@ settingsButtonEle.onclick = async () => {
         "tab": "java",
         "content": translate("app.settings.java.description." + window.enderlynx.ostype())
     }];
-    let java_stuff = window.enderlynx.getJavaInstallations();
+    let java_stuff = await window.enderlynx.getJavaInstallations();
     java_stuff.sort((a, b) => b.version - a.version);
     java_stuff.forEach(e => {
         java_installations.push({
             "type": "text",
             "name": translate("app.settings.java.location").replace("%v", e.version),
             "id": "java_" + e.version,
-            "default": e.path,
+            "default": e.file_path,
             "tab": "java",
             "buttons": [
                 {
@@ -7330,13 +7330,14 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                         for (let i = 0; i < es.length; i++) {
                             let e = es[i];
                             if (e.type == "singleplayer") {
-                                let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id);
-                                if (success) {
-                                    contentList.removeElement(eles[i]);
-                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                                } else {
-                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
-                                }
+                                window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id, (success) => {
+                                    if (success) {
+                                        contentList.removeElement(eles[i]);
+                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                                    } else {
+                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                                    }
+                                });
                             } else if (e.type == "multiplayer") {
                                 ips.push(e.ip);
                                 indexes.push(e.index);
@@ -7439,18 +7440,18 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
             visible.appendChild(showLogs[i].element);
         }
     }
-    let setUpLiveLog = () => {
+    let setUpLiveLog = async () => {
         let log_path = instanceInfo.current_log_file;
         let running = checkForProcess(instanceInfo.pid);
         if (!running) {
-            instanceInfo.setPid(null);
+            await instanceInfo.setPid(null);
             logs = [];
             let lineElement = document.createElement("span");
             lineElement.innerHTML = translate("app.logs.no_live");
             lineElement.classList.add("log-entry");
             logs.push({ "element": lineElement, "content": translate("app.logs.no_live") });
         } else {
-            let logInfo = window.enderlynx.getLog(log_path);
+            let logInfo = await window.enderlynx.getLog(log_path);
             logInfo = logInfo.split("\n");
             logs = [];
             logInfo.forEach((e) => {
@@ -7497,18 +7498,18 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
     }
     let currentLog = "";
     logDisplay.onscroll = render;
-    let onChangeLogDropdown = (e) => {
+    let onChangeLogDropdown = async (e) => {
         try {
             window.enderlynx.stopWatching(instanceInfo.current_log_file);
         } catch (e) { }
 
         if (e == "live_log") {
             deleteButton.style.display = "none";
-            setUpLiveLog();
+            await setUpLiveLog();
         } else {
             deleteButton.style.display = "flex";
             currentLog = e;
-            let logInfo = window.enderlynx.getLog(instanceInfo.instance_id, e);
+            let logInfo = await window.enderlynx.getLog(instanceInfo.instance_id, e);
             logInfo = logInfo.split("\n");
             logs = [];
             logInfo.forEach((e) => {
@@ -7546,7 +7547,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
     logWrapper.appendChild(logTop);
     logWrapper.appendChild(logDisplay);
     deleteButton.style.display = "none";
-    setUpLiveLog();
+    await setUpLiveLog();
     render();
     let copyButton = document.createElement("button");
     let shareButton = document.createElement("button");
@@ -7613,7 +7614,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
                 "content": translate("app.logs.delete_all.confirm")
             }
         ], [], async () => {
-            let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id, (await instanceInfo.refresh()).current_log_file);
+            let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id);
             if (success) {
                 displaySuccess(translate("app.logs.delete_all.success"));
                 setInstanceTabContentLogs(instanceInfo, element);
@@ -8054,8 +8055,8 @@ async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
             {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.screenshots.delete"),
-                "func": () => {
-                    let success = window.enderlynx.deleteScreenshot(instanceInfo.instance_id, e.file_name);
+                "func": async () => {
+                    let success = await window.enderlynx.deleteScreenshot(instanceInfo.instance_id, e.file_name);
                     if (success) {
                         displaySuccess(translate("app.screenshots.delete.success"));
                     } else {
@@ -8113,8 +8114,8 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
             }
         }
         if (instanceInfo) {
-            screenshotAction5.onclick = () => {
-                let success = window.enderlynx.deleteScreenshot(instanceInfo.instance_id, file_name);
+            screenshotAction5.onclick = async () => {
+                let success = await window.enderlynx.deleteScreenshot(instanceInfo.instance_id, file_name);
                 if (success) {
                     screenshotPreview.close();
                     displaySuccess(translate("app.screenshots.custom.delete.success", "%w", word));
@@ -8417,8 +8418,8 @@ function formatDateAndTime(dateString) {
     return translate("app.date_time").replace("%date", formatDate(dateString)).replace("%h", hours).replace("%m", minutes).replace("%s", seconds).replace("%amorpm", amorpm);
 }
 
-function getLangFile(locale) {
-    return JSON.parse(window.enderlynx.getLangFile(locale));
+function getLangFile() {
+    return JSON.parse(window.enderlynx.getLangFile());
 }
 
 function checkForProcess(pid) {
@@ -8439,7 +8440,7 @@ async function getInstanceContent(instanceInfo) {
 
 function translate(key, ...params) {
     if (!lang) {
-        lang = getLangFile("en-us");
+        lang = getLangFile();
     }
     let value = lang[key] ?? key;
     for (let i = 0; i < params.length; i += 2) {
@@ -13173,8 +13174,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
 
         if (!foundVersion) {
             content = await content.refresh();
-            let alreadyDisabled = content.disabled;
-            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
+            let new_file_name = await window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -13196,7 +13196,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         await content.setVersionId(newVersionId);
 
         if (content.disabled) {
-            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
+            let new_file_name = await window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 await content.setDisabled(false);
@@ -13297,7 +13297,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         if (!foundVersion) {
             content = await content.refresh();
             let alreadyDisabled = content.disabled;
-            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
+            let new_file_name = await window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 return false;
@@ -13317,7 +13317,7 @@ async function updateContent(instanceInfo, content, contentversion, forced) {
         await content.setVersionId(newVersionId);
 
         if (content.disabled) {
-            let new_file_name = window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
+            let new_file_name = await window.enderlynx.disableFile(instanceInfo.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
             if (!new_file_name) {
                 displayError(translate("app.error.failure_to_disable"));
                 await content.setDisabled(false);

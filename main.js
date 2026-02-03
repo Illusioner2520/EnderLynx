@@ -65,7 +65,7 @@ setUserPathAgain(user_path);
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -75,6 +75,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY,
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, version INTEGER UNIQUE, file_path TEXT)').run();
 
 db.pragma('journal_mode = WAL');
 
@@ -106,7 +107,7 @@ async function moveFiles() {
             await fsPromises.chmod(path.resolve(user_path, "updater", updaterName), 0o755);
         }
     } catch (e) {
-    
+
     }
 }
 
@@ -119,7 +120,14 @@ const isDev = !app.isPackaged;
 let args = process.argv.slice(1);
 let enableDev = args.includes("--debug") || isDev;
 
-let additionalArguments = [`--userDataPath=${user_path}`].concat(args);
+let svgData = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
+let langInfo = fs.readFileSync(path.resolve(__dirname, "resources", "lang", `en-us.json`), 'utf-8');
+
+ipcMain.on('get-lang', (event) => {
+    event.returnValue = langInfo;
+});
+
+let additionalArguments = [`--userDataPath=${user_path}`, `--svgData=${svgData}`].concat(args);
 if (isDev) additionalArguments.push('--dev');
 
 let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
@@ -256,13 +264,22 @@ ipcMain.on('display-error', (event, message) => {
 });
 
 ipcMain.handle('show-open-dialog', async (event, options) => {
+    if (options?.defaultPath) {
+        if (fs.existsSync(options.defaultPath)) {
+            const stat = await fsPromises.stat(options.defaultPath);
+            if (stat.isFile()) {
+                startDir = path.dirname(options.defaultPath);
+            }
+        }
+    }
     const result = await dialog.showOpenDialog(win, options);
     return result;
 });
 
-ipcMain.handle('show-save-dialog', async (event, options) => {
+ipcMain.handle('show-save-dialog', async (event, options, file_path) => {
     const result = await dialog.showSaveDialog(win, options);
-    return result;
+    if (result.canceled || !result.filePath) return;
+    await fsPromises.copyFile(file_path, result.filePath);
 });
 
 ipcMain.handle('get-app-metrics', (event) => {
@@ -1746,7 +1763,7 @@ async function playMinecraft(loader, version, loaderVersion, instance_id, player
             win.webContents.send('display-error', "Unable to update access token. Launching Minecraft in offline mode.");
         }
     }
-    let mc = new Minecraft(instance_id, name);
+    let mc = new Minecraft(instance_id, name, db);
     try {
         return {
             "minecraft": await mc.launchGame(loader, version, loaderVersion, player_info.name, player_info.uuid, {
@@ -1803,7 +1820,7 @@ ipcMain.handle('repair-minecraft', async (_, instance_id, loader, vanilla_versio
 
 async function downloadMinecraft(instance_id, loader, vanilla_version, loader_version) {
     try {
-        let mc = new Minecraft(instance_id);
+        let mc = new Minecraft(instance_id, undefined, db);
         let r = await mc.downloadGame(loader, vanilla_version);
         if (loader == "fabric") {
             await mc.installFabric(vanilla_version, loader_version);
@@ -1822,7 +1839,7 @@ async function downloadMinecraft(instance_id, loader, vanilla_version, loader_ve
 
 async function repairMinecraft(instance_id, loader, vanilla_version, loader_version, whatToRepair) {
     try {
-        let mc = new Minecraft(instance_id);
+        let mc = new Minecraft(instance_id, undefined, db);
         let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
         if (whatToRepair.includes("mod_loader")) {
             if (loader == "fabric") {
@@ -2472,11 +2489,11 @@ async function addServer(instance_id, ip, title, image) {
 }
 
 ipcMain.handle('get-java-installation', async (_, v) => {
-    return await getJavaInstallation(v).replaceAll("\\", "/");
+    return (await getJavaInstallation(v)).replaceAll("\\", "/");
 })
 
 async function getJavaInstallation(v) {
-    let java = new Java();
+    let java = new Java(db);
     return await java.getJavaInstallation(v);
 }
 
@@ -2485,7 +2502,7 @@ ipcMain.handle('set-java-installation', async (_, v, f) => {
 })
 
 async function setJavaInstallation(v, f) {
-    let java = new Java();
+    let java = new Java(db);
     return await java.setJavaInstallation(v, f);
 }
 
@@ -3945,6 +3962,276 @@ ipcMain.handle('is-instance-file', (_, file_path) => {
         if (zip.getEntry('manifest.json')) return true;
     }
     return false;
+});
+
+ipcMain.handle('delete-world', async (_, instance_id, world_id) => {
+    const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
+    const worldPath = path.join(savesPath, world_id);
+
+    try {
+        if (fs.existsSync(worldPath)) {
+            await fsPromises.rm(worldPath, { recursive: true, force: true });
+            return true;
+        }
+        return false;
+    } catch (err) {
+        return false;
+    }
+});
+
+ipcMain.handle('get-log', async (_, instance_id, file_name) => {
+    let log_path = file_name ? path.resolve(user_path, "minecraft/instances", instance_id, "logs", file_name) : instance_id;
+    return await fsPromises.readFile(log_path, { encoding: 'utf8', flag: 'r' });
+});
+
+ipcMain.handle('delete-log', async (_, instance_id, file_name) => {
+    let log_path = path.resolve(user_path, "minecraft/instances", instance_id, "logs", file_name);
+    try {
+        await fsPromises.unlink(log_path);
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
+
+ipcMain.handle('delete-all-logs', async (_, instance_id) => {
+    let current_log_file = db.prepare("SELECT * FROM instances WHERE instance_id = ?").get(instance_id).current_log_file;
+    let folderPath = path.resolve(user_path, `minecraft/instances/${instance_id}/logs`);
+    if (!fs.existsSync(folderPath)) {
+        console.error('Folder does not exist:', folderPath);
+        return false;
+    }
+
+    const files = await fsPromises.readdir(folderPath);
+
+    for (const file of files) {
+        const filePath = path.join(folderPath, file);
+        if (fs.lstatSync(filePath).isFile() && path.resolve(filePath) !== path.resolve(current_log_file)) {
+            await fsPromises.unlink(filePath);
+        }
+    }
+
+    return true;
+});
+
+ipcMain.handle('delete-content', async (_, instance_id, project_type, filename) => {
+    let install_path = "";
+    if (project_type == "mod") {
+        install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/mods`, filename);
+    } else if (project_type == "resource_pack") {
+        install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`, filename);
+    } else if (project_type == "shader") {
+        install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/shaderpacks`, filename);
+    }
+    if (fs.existsSync(install_path)) {
+        await fsPromises.unlink(install_path);
+        return true;
+    }
+    return false;
+});
+
+ipcMain.handle('delete-screenshot', async (_, instance_id, file_name) => {
+    let file_path = path.resolve(user_path, "minecraft/instances", instance_id, "screenshots", file_name);
+    try {
+        await fsPromises.unlink(file_path);
+        return true;
+    } catch (err) {
+        return false;
+    }
+});
+
+ipcMain.handle('disable-file', async (_, instance_id, type, file_name) => {
+    let file_path = path.resolve(user_path, "minecraft", "instances", instance_id, type, file_name);
+    try {
+        const disabledPath = file_path.endsWith('.disabled') ? file_path : file_path + '.disabled';
+        await fsPromises.rename(file_path, disabledPath);
+        return path.basename(disabledPath);
+    } catch (err) {
+        return false;
+    }
+});
+
+ipcMain.handle('enable-file', async (_, instance_id, type, file_name) => {
+    let file_path = path.resolve(user_path, "minecraft", "instances", instance_id, type, file_name);
+    try {
+        if (file_path.endsWith('.disabled')) {
+            const enabledPath = file_path.slice(0, -9);
+            await fsPromises.rename(file_path, enabledPath);
+            return path.basename(enabledPath);
+        }
+        return false;
+    } catch (err) {
+        return false;
+    }
+});
+
+ipcMain.handle('get-java-installations', async (_) => {
+    return db.prepare("SELECT * FROM java_versions").all();
+});
+
+ipcMain.handle('delete-folders-for-modpack-update', async (_, instance_id) => {
+    let instancePath = path.resolve(user_path, `minecraft/instances/${instance_id}`)
+    let folders = ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "scripts", "kubejs", "overrides", "libraries"];
+    try {
+        for (let i = 0; i < folders.length; i++) {
+            let pathToDelete = path.resolve(instancePath, folders[i]);
+            if (fs.existsSync(pathToDelete)) {
+                await fsPromises.rm(pathToDelete, { recursive: true, force: true });
+            }
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
+
+ipcMain.handle('generate-options-txt', async (_, values) => {
+    const tempDir = path.resolve(user_path, "out");
+    fs.mkdirSync(tempDir, { recursive: true });
+    const filePath = path.join(tempDir, `options_${Date.now()}.txt`);
+    const lines = [];
+    for (const { key, value } of values) {
+        lines.push(`${key}:${value}`);
+    }
+    await fsPromises.writeFile(filePath, lines.join("\n"), "utf-8");
+    return filePath;
+});
+
+ipcMain.handle('get-instance-folder-name', async (_, instance_id) => {
+    instance_id = instance_id.trim();
+    instance_id = instance_id.replace(/[^0-9a-zA-Z\-._ \(\)]/g, "_");
+    instance_id = instance_id.replace(/[. ]+$/, "_");
+    const reserved_names = new Set([
+        "con", "prn", "aux", "nul",
+        "com0", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+        "lpt0", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+    ]);
+    if (reserved_names.has(instance_id.toLowerCase())) {
+        instance_id += "_";
+    }
+    if (!instance_id) {
+        instance_id = "unnamed";
+    }
+    if (instance_id.length > 100) {
+        instance_id = instance_id.substring(0, 100);
+    }
+    const baseInstanceId = instance_id;
+    let counter = 1;
+    while (folderExists(path.resolve(user_path, `minecraft/instances/${instance_id}`))) {
+        instance_id = `${baseInstanceId}_${counter}`;
+        counter++;
+    }
+    fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${instance_id}`), { recursive: true });
+    return instance_id;
+});
+
+function folderExists(folderPath) {
+    try {
+        return fs.statSync(folderPath).isDirectory();
+    } catch (err) {
+        return false;
+    }
+}
+
+ipcMain.handle('get-launcher-instances', async (_, instance_path) => {
+    if (!fs.existsSync(instance_path)) return [{ "name": "Unable to locate Instances", "value": "error" }];
+    return fs.readdirSync(instance_path)
+        .filter(f => {
+            const fullPath = path.join(instance_path, f);
+            return fs.statSync(fullPath).isDirectory();
+        })
+        .map(f => ({
+            name: f,
+            value: path.resolve(instance_path, f)
+        }));
+});
+
+ipcMain.handle('get-launcher-instance-path', async (_, launcher) => {
+    switch (launcher.toLowerCase()) {
+        case "modrinth": {
+            const p = path.join(os.homedir(), "AppData", "Roaming", "com.modrinth.theseus", "profiles");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "curseforge": {
+            const p = path.join(os.homedir(), "curseforge", "minecraft", "Instances");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "vanilla": {
+            const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "multimc": {
+            const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft", "instances");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "prism": {
+            const p = path.join(os.homedir(), "AppData", "Roaming", "PrismLauncher", "instances");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "atlauncher": {
+            const p = path.join(os.homedir(), "AppData", "Roaming", "ATLauncher", "instances");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "gdlauncher": {
+            const p = path.join(os.homedir(), "AppData", "Roaming", "GDLauncher", "instances");
+            return fs.existsSync(p) ? p : "";
+        }
+        case "current": {
+            const p = path.join(userPath, "minecraft/instances");
+            return fs.existsSync(p) ? p : "";
+        }
+        default:
+            return "";
+    }
+});
+
+
+const watchers = new Map();
+
+ipcMain.handle('watch-file', (event, filepath) => {
+    if (watchers.has(filepath)) return;
+
+    let lastSize = 0;
+
+    try {
+        lastSize = fs.statSync(filepath).size;
+    } catch (err) {
+        console.error('Stat failed:', err);
+        return;
+    }
+
+    const watcher = fs.watchFile(filepath, { interval: 500 }, async () => {
+        try {
+            const { size } = fs.statSync(filepath);
+
+            if (size > lastSize) {
+                const stream = fs.createReadStream(filepath, {
+                    start: lastSize,
+                    end: size,
+                    encoding: 'utf8'
+                });
+
+                stream.on('data', chunk => {
+                    console.log(chunk);
+                    event.sender.send('file-data', filepath, chunk);
+                });
+
+                lastSize = size;
+            }
+        } catch (err) {
+            console.error('Watch error:', err);
+        }
+    });
+
+    watchers.set(filepath, watcher);
+});
+
+ipcMain.handle('stop-watching-file', (_, filepath) => {
+    const watcher = watchers.get(filepath);
+    if (watcher) {
+        watcher.close();
+        watchers.delete(filepath);
+    }
 });
 
 // Instance management

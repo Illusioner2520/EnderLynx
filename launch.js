@@ -53,7 +53,7 @@ ipcMain.handle('launch-retry', (_, retryId) => {
 });
 
 class Minecraft {
-    constructor(instance_id, instance_name) {
+    constructor(instance_id, instance_name, db) {
         this.instance_id = instance_id;
         this.instance_name = instance_name;
         const platform = os.platform();
@@ -68,6 +68,7 @@ class Minecraft {
         this.platformString = getPlatformString();
         this.classPathDelimiter = ";";
         if (this.platformString == "linux" || this.platformString == "osx") this.classPathDelimiter = ":";
+        this.db = db;
     }
     async installFabric(mcversion, fabricversion, isRepair) {
         let processId = generateNewProcessId();
@@ -195,7 +196,7 @@ class Minecraft {
             }) : [];
 
             signal.throwIfAborted();
-            let java = new Java();
+            let java = new Java(this.db);
             let installation = await java.getJavaInstallation(21);
 
             fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${this.instance_id}`), { recursive: true });
@@ -543,7 +544,7 @@ class Minecraft {
             }) : [];
             signal.throwIfAborted();
 
-            let java = new Java();
+            let java = new Java(this.db);
             let installation = await java.getJavaInstallation(21);
             signal.throwIfAborted();
 
@@ -855,7 +856,7 @@ class Minecraft {
         if (!fs.existsSync(this.jarfile)) {
             this.jarfile = path.resolve(userPath, `minecraft/instances/${this.instance_id}/versions/${version}/${version}.jar`);
         }
-        let java = new Java();
+        let java = new Java(this.db);
         this.java_installation = javaPath ? javaPath : await java.getJavaInstallation(version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8);
         this.java_version = version_json?.javaVersion?.majorVersion ? version_json.javaVersion.majorVersion : 8;
         if (version_json?.arguments?.game) {
@@ -1266,7 +1267,7 @@ class Minecraft {
                 });
                 this.jarfile = jarFilePath;
             }
-            let java = new Java();
+            let java = new Java(this.db);
             let paths = "";
             if (!isRepair || whatToRepair?.includes("java")) {
                 signal.throwIfAborted();
@@ -1363,18 +1364,16 @@ function extractJar(jarFilePath, extractToPath) {
 }
 
 class Java {
-    constructor() {
+    constructor(db) {
+        this.db = db;
         fs.mkdirSync(path.resolve(userPath, `java`), { recursive: true });
-        try {
-            this.versions = JSON.parse(fs.readFileSync(path.resolve(userPath, `java/versions.json`), 'utf-8'));
-        } catch (e) {
-            if (e.code == "ENOENT") {
-                this.versions = {};
-                fs.writeFileSync(path.resolve(userPath, `java/versions.json`), "{}", 'utf-8');
-            }
+        let versions = db.prepare("SELECT * FROM java_versions").all();
+        this.versions_map = {};
+        for (let i = 0; i < versions.length; i++) {
+            this.versions_map[versions[i].version] = versions[i].file_path;
         }
     }
-    async downloadJava(version, isRepair) {
+    async downloadJava(version) {
         let processId = generateNewProcessId();
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
@@ -1437,16 +1436,16 @@ class Java {
             fs.unlinkSync(downloadPath);
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 98, "Remembering version...", processId, "good", cancelId, true);
-            this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/javaw.exe`);
+            this.versions_map[version] = path.resolve(userPath, `java/java-${version}/${name}/bin/javaw.exe`);
             if (platformString == "linux") {
-                this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/bin/java`);
-                fs.chmodSync(this.versions["java-" + version], 0o755);
+                this.versions_map[version] = path.resolve(userPath, `java/java-${version}/${name}/bin/java`);
+                fs.chmodSync(this.versions_map[version], 0o755);
             }
             if (platformString == "macos") {
-                this.versions["java-" + version] = path.resolve(userPath, `java/java-${version}/${name}/zulu-${version}.jre/Contents/Home/bin/java`);
-                fs.chmodSync(this.versions["java-" + version], 0o755);
+                this.versions_map[version] = path.resolve(userPath, `java/java-${version}/${name}/zulu-${version}.jre/Contents/Home/bin/java`);
+                fs.chmodSync(this.versions_map[version], 0o755);
             }
-            fs.writeFileSync(path.resolve(userPath, "java/versions.json"), JSON.stringify(this.versions), 'utf-8');
+            this.db.prepare("INSERT INTO java_versions (version, file_path) VALUES (?, ?) ON CONFLICT(version) DO UPDATE SET file_path = excluded.file_path").run(version, this.versions_map[version]);
             signal.throwIfAborted();
             win.webContents.send('progress-update', "Downloading Java", 100, "Done", processId, "done", cancelId, true);
         } catch (err) {
@@ -1455,15 +1454,15 @@ class Java {
         }
     }
     async getJavaInstallation(version, isRepair) {
-        if (!this.versions["java-" + version] || isRepair) {
-            await this.downloadJava(version, isRepair);
+        if (!this.versions_map[version] || isRepair) {
+            await this.downloadJava(version);
         }
-        return this.versions["java-" + version];
+        return this.versions_map[version];
     }
     async setJavaInstallation(version, file_path) {
-        if (this.versions["java-" + version] == file_path) return;
-        this.versions["java-" + version] = file_path;
-        fs.writeFileSync(path.resolve(userPath, "java/versions.json"), JSON.stringify(this.versions), 'utf-8');
+        if (this.versions_map[version] == file_path) return;
+        this.versions_map[version] = file_path;
+        this.db.prepare("UPDATE java_versions SET file_path = ? WHERE version = ?").run(file_path, version);
     }
 }
 

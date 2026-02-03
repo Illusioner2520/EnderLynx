@@ -1,5 +1,4 @@
 const { contextBridge, ipcRenderer, clipboard, shell, webUtils } = require('electron');
-const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const MarkdownIt = require('markdown-it');
@@ -8,8 +7,7 @@ const QRCode = require('qrcode');
 
 let cfServerInfo = {};
 
-let userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath='))
-    .split('=')[1]);
+let userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath=')).split('=')[1]);
 
 let enableDevMode = false;
 let launchInstanceCallback = () => { };
@@ -86,7 +84,7 @@ function processArgs(args) {
 
 processArgs(process.argv.slice(1));
 
-const svgData = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
+let svgData = process.argv.find(arg => arg.startsWith('--svgData=')).split('=').slice(1).join('=');
 
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
@@ -216,19 +214,10 @@ contextBridge.exposeInMainWorld('enderlynx', {
         if (callback) callback(result);
         return result;
     },
-    deleteWorld: (instance_id, world_id) => {
-        const savesPath = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
-        const worldPath = path.join(savesPath, world_id);
-
-        try {
-            if (fs.existsSync(worldPath)) {
-                fs.rmSync(worldPath, { recursive: true, force: true });
-                return true;
-            }
-            return false;
-        } catch (err) {
-            return false;
-        }
+    deleteWorld: async (instance_id, world_id, callback) => {
+        let result = await ipcRenderer.invoke('delete-world', instance_id, world_id);
+        if (callback) callback(result);
+        return result;
     },
     deleteInstanceFiles: async (instance_id) => {
         return await ipcRenderer.invoke('delete-instance-files', instance_id);
@@ -239,18 +228,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     updateOptionsTXT: async (instance_id, key, value) => {
         return await ipcRenderer.invoke('update-options-txt', instance_id, key, value);
     },
-    getLangFile: (locale) => {
-        if (!enableDevMode) {
-            filePath = path.resolve(process.resourcesPath, 'app.asar', 'resources', 'lang', `${locale}.json`);
-        } else {
-            filePath = path.resolve(`./resources/lang/${locale}.json`);
-        }
-        try {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            return content;
-        } catch (err) {
-            return `Error reading file: ${err.message}`;
-        }
+    getLangFile: () => {
+        return ipcRenderer.sendSync('get-lang');
     },
     playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
         return await ipcRenderer.invoke('play-minecraft', loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
@@ -283,36 +262,14 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getInstanceLogs: async (instance_id) => {
         return await ipcRenderer.invoke('get-instance-logs', instance_id);
     },
-    getLog: (instance_id, file_name) => {
-        let log_path = file_name ? path.resolve(userPath, "minecraft/instances", instance_id, "logs", file_name) : instance_id;
-        return fs.readFileSync(log_path, { encoding: 'utf8', flag: 'r' });
+    getLog: async (instance_id, file_name) => {
+        return await ipcRenderer.invoke('get-log', instance_id, file_name);
     },
-    deleteLogs: (instance_id, file_name) => {
-        let log_path = path.resolve(userPath, "minecraft/instances", instance_id, "logs", file_name);
-        try {
-            fs.unlinkSync(log_path);
-            return true;
-        } catch (e) {
-            return false;
-        }
+    deleteLogs: async (instance_id, file_name) => {
+        return await ipcRenderer.invoke('delete-log', instance_id, file_name);
     },
-    deleteAllLogs: (instance_id, current_log_file) => {
-        let folderPath = path.resolve(userPath, `minecraft/instances/${instance_id}/logs`);
-        if (!fs.existsSync(folderPath)) {
-            console.error('Folder does not exist:', folderPath);
-            return;
-        }
-
-        const files = fs.readdirSync(folderPath);
-
-        for (const file of files) {
-            const filePath = path.join(folderPath, file);
-            if (fs.lstatSync(filePath).isFile() && path.resolve(filePath) !== path.resolve(current_log_file)) {
-                fs.unlinkSync(filePath);
-            }
-        }
-
-        return true;
+    deleteAllLogs: async (instance_id) => {
+        return await ipcRenderer.invoke('delete-all-logs', instance_id);
     },
     getInstanceContent: async (loader, instance_id, old_content, link_with_modrinth) => {
         return await ipcRenderer.invoke('get-instance-content', loader, instance_id, old_content, link_with_modrinth);
@@ -479,32 +436,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getQuiltVersions: async () => {
         return (await ipcRenderer.invoke('quilt-vanilla-versions'));
     },
-    getInstanceFolderName: (instance_id) => {
-        instance_id = instance_id.trim();
-        instance_id = instance_id.replace(/[^0-9a-zA-Z\-._ \(\)]/g, "_");
-        instance_id = instance_id.replace(/[. ]+$/, "_");
-        const reserved_names = new Set([
-            "con", "prn", "aux", "nul",
-            "com0", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
-            "lpt0", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
-        ]);
-        if (reserved_names.has(instance_id.toLowerCase())) {
-            instance_id += "_";
-        }
-        if (!instance_id) {
-            instance_id = "unnamed";
-        }
-        if (instance_id.length > 100) {
-            instance_id = instance_id.substring(0, 100);
-        }
-        const baseInstanceId = instance_id;
-        let counter = 1;
-        while (folderExists(path.resolve(userPath, `minecraft/instances/${instance_id}`))) {
-            instance_id = `${baseInstanceId}_${counter}`;
-            counter++;
-        }
-        fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${instance_id}`), { recursive: true });
-        return instance_id;
+    getInstanceFolderName: async (instance_id) => {
+        return await ipcRenderer.invoke('get-instance-folder-name', instance_id);
     },
     downloadMinecraft: async (instance_id, loader, vanilla_version, loader_version) => {
         return await ipcRenderer.invoke('download-minecraft', instance_id, loader, vanilla_version, loader_version);
@@ -537,41 +470,17 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return (await ipcRenderer.invoke('quilt-loader-versions', mcversion));
     },
     watchFile: (filepath, callback) => {
-        let lastSize = 0;
+        ipcRenderer.invoke('watch-file', filepath);
 
-        fs.stat(filepath, (err, stats) => {
+        const handler = (_, path, chunk) => {
+            console.log(chunk);
+            if (path === filepath) callback(chunk);
+        };
 
-            if (err) {
-                return console.error('Failed to stat file:', err);
-            }
-
-            lastSize = stats.size;
-
-            fs.watchFile(filepath, { interval: 1000 }, (curr, prev) => {
-                const newSize = curr.size;
-
-                if (newSize > lastSize) {
-                    const stream = fs.createReadStream(filepath, {
-                        start: lastSize,
-                        end: newSize,
-                        encoding: 'utf8'
-                    });
-
-                    stream.on('data', (chunk) => {
-                        callback(chunk);
-                    });
-
-                    stream.on('error', (err) => {
-                        console.error('Error reading file:', err);
-                    });
-
-                    lastSize = newSize;
-                }
-            });
-        });
+        ipcRenderer.on('file-data', handler);
     },
     stopWatching: (filepath) => {
-        fs.unwatchFile(filepath);
+        ipcRenderer.invoke('stop-watching-file', filepath)
     },
     clearProcessWatches: () => {
         let keys = Object.keys(processWatches);
@@ -651,19 +560,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return json;
     },
     deleteContent: async (instance_id, project_type, filename) => {
-        let install_path = "";
-        if (project_type == "mod") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/mods`, filename);
-        } else if (project_type == "resource_pack") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/resourcepacks`, filename);
-        } else if (project_type == "shader") {
-            install_path = path.resolve(userPath, `minecraft/instances/${instance_id}/shaderpacks`, filename);
-        }
-        if (fs.existsSync(install_path)) {
-            fs.unlinkSync(install_path);
-            return true;
-        }
-        return false;
+        return await ipcRenderer.invoke('delete-content', instance_id, project_type, filename);
     },
     addContent: async (instance_id, project_type, project_url, filename, data_pack_world, content_id) => {
         return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, filename, data_pack_world, content_id);
@@ -699,36 +596,13 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return false;
     },
     deleteScreenshot: (instance_id, file_name) => {
-        let file_path = path.resolve(userPath, "minecraft/instances", instance_id, "screenshots", file_name);
-        try {
-            fs.unlinkSync(file_path);
-            return true;
-        } catch (err) {
-            return false;
-        }
+        return ipcRenderer.invoke('delete-screenshot', instance_id, file_name);
     },
     disableFile: (instance_id, type, file_name) => {
-        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, type, file_name);
-        try {
-            const disabledPath = file_path.endsWith('.disabled') ? file_path : file_path + '.disabled';
-            fs.renameSync(file_path, disabledPath);
-            return path.basename(disabledPath);
-        } catch (err) {
-            return false;
-        }
+        return ipcRenderer.invoke('disable-file', instance_id, type, file_name);
     },
     enableFile: (instance_id, type, file_name) => {
-        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, type, file_name);
-        try {
-            if (file_path.endsWith('.disabled')) {
-                const enabledPath = file_path.slice(0, -9);
-                fs.renameSync(file_path, enabledPath);
-                return path.basename(enabledPath);
-            }
-            return false;
-        } catch (err) {
-            return false;
-        }
+        return ipcRenderer.invoke('enable-file', instance_id, type, file_name);
     },
     getSkinFromUsername,
     getSkinFromURL,
@@ -760,12 +634,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     triggerFileImportBrowse: async (file_path, type) => {
         let startDir = file_path;
-        if (fs.existsSync(file_path)) {
-            const stat = fs.statSync(file_path);
-            if (stat.isFile()) {
-                startDir = path.dirname(file_path);
-            }
-        }
         const result = await ipcRenderer.invoke('show-open-dialog', {
             title: type ? "Select Folder to import" : "Select File to import",
             defaultPath: startDir,
@@ -779,12 +647,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     triggerFolderBrowse: async (file_path) => {
         let startDir = file_path;
-        if (fs.existsSync(file_path)) {
-            const stat = fs.statSync(file_path);
-            if (stat.isFile()) {
-                startDir = path.dirname(file_path);
-            }
-        }
         const result = await ipcRenderer.invoke('show-open-dialog', {
             title: "Select Folder",
             defaultPath: startDir,
@@ -797,12 +659,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     triggerFileImportBrowseWithOptions: async (file_path, type, extensions, extName) => {
         let startDir = file_path;
-        if (fs.existsSync(file_path)) {
-            const stat = fs.statSync(file_path);
-            if (stat.isFile()) {
-                startDir = path.dirname(file_path);
-            }
-        }
         const result = await ipcRenderer.invoke('show-open-dialog', {
             title: type ? "Select Folder to import" : "Select File to import",
             defaultPath: startDir,
@@ -819,12 +675,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     triggerFileBrowse: async (file_path) => {
         let startDir = file_path;
-        if (fs.existsSync(file_path)) {
-            const stat = fs.statSync(file_path);
-            if (stat.isFile()) {
-                startDir = path.dirname(file_path);
-            }
-        }
         const result = await ipcRenderer.invoke('show-open-dialog', {
             title: "Select Java Executable",
             defaultPath: startDir,
@@ -839,83 +689,21 @@ contextBridge.exposeInMainWorld('enderlynx', {
     detectJavaInstallations: async (v) => {
         return await ipcRenderer.invoke('detect-java-installations', v);
     },
-    getJavaInstallations: () => {
-        let javaPaths = [];
-        const versionsJsonPath = path.resolve(userPath, "java", "versions.json");
-        if (fs.existsSync(versionsJsonPath)) {
-            try {
-                const versionsData = fs.readFileSync(versionsJsonPath, "utf-8");
-                const paths = JSON.parse(versionsData);
-                if (paths && typeof paths === "object") {
-                    for (const key of Object.keys(paths)) {
-                        const p = paths[key];
-                        if (typeof p === "string") {
-                            javaPaths.push({ "version": key.replace("java-", ""), "path": p });
-                        }
-                    }
-                }
-            } catch (e) { }
-        }
-        return javaPaths;
+    getJavaInstallations: async () => {
+        return await ipcRenderer.invoke('get-java-installations');
     },
     getWorldsFromOtherLauncher: async (instance_path) => {
         let the_path = path.resolve(instance_path, "saves");
-        console.log(the_path)
-        if (!fs.existsSync(the_path)) return [];
         return (await getWorlds(the_path)).map(e => ({ "name": e.name, "value": path.resolve(the_path, e.id) }));
     },
     transferWorld: async (old_world_path, instance_id, delete_previous_files) => {
         return await ipcRenderer.invoke('transfer-world', old_world_path, instance_id, delete_previous_files);
     },
     getLauncherInstances: async (instance_path) => {
-        if (!fs.existsSync(instance_path)) return [{ "name": "Unable to locate Instances", "value": "error" }];
-        return fs.readdirSync(instance_path)
-            .filter(f => {
-                const fullPath = path.join(instance_path, f);
-                return fs.statSync(fullPath).isDirectory();
-            })
-            .map(f => ({
-                name: f,
-                value: path.resolve(instance_path, f)
-            }));
+        return await ipcRenderer.invoke('get-launcher-instances', instance_path);
     },
-    getLauncherInstancePath: (launcher) => {
-        switch (launcher.toLowerCase()) {
-            case "modrinth": {
-                const p = path.join(os.homedir(), "AppData", "Roaming", "com.modrinth.theseus", "profiles");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "curseforge": {
-                const p = path.join(os.homedir(), "curseforge", "minecraft", "Instances");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "vanilla": {
-                const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "multimc": {
-                const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft", "instances");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "prism": {
-                const p = path.join(os.homedir(), "AppData", "Roaming", "PrismLauncher", "instances");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "atlauncher": {
-                const p = path.join(os.homedir(), "AppData", "Roaming", "ATLauncher", "instances");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "gdlauncher": {
-                const p = path.join(os.homedir(), "AppData", "Roaming", "GDLauncher", "instances");
-                return fs.existsSync(p) ? p : "";
-            }
-            case "current": {
-                const p = path.join(userPath, "minecraft/instances");
-                return fs.existsSync(p) ? p : "";
-            }
-            default:
-                return "";
-        }
+    getLauncherInstancePath: async (launcher) => {
+        return await ipcRenderer.invoke('get-launcher-instance-path', launcher);
     },
     getInstanceOptions: async (instance_id) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
@@ -979,7 +767,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     generateQRCode: async (url) => {
         return new Promise((resolve) => {
             QRCode.toDataURL(url, {
-                errorCorrectionLevel: 'H',
+                errorCorrectionLevel: 'L',
                 width: 96,
                 margin: 2,
                 color: {
@@ -997,19 +785,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         })
     },
     deleteFoldersForModpackUpdate: async (instance_id) => {
-        let instancePath = path.resolve(userPath, `minecraft/instances/${instance_id}`)
-        let folders = ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "scripts", "kubejs", "overrides", "libraries"];
-        try {
-            for (let i = 0; i < folders.length; i++) {
-                let pathToDelete = path.resolve(instancePath, folders[i]);
-                if (fs.existsSync(pathToDelete)) {
-                    fs.rmSync(pathToDelete, { recursive: true, force: true });
-                }
-            }
-            return true;
-        } catch (e) {
-            return false;
-        }
+        return await ipcRenderer.invoke('delete-folders-for-modpack-update', instance_id);
     },
     analyzeLogs: async (instance_id, last_log_date, current_log_path) => {
         return await ipcRenderer.invoke('analyze-logs', instance_id, last_log_date, current_log_path);
@@ -1022,9 +798,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
             filters: [
                 { name: 'All Files', extensions: ['*'] }
             ]
-        });
-        if (result.canceled || !result.filePath) return;
-        fs.copyFileSync(file_path, result.filePath);
+        }, file_path);
     },
     checkForUpdates,
     updateEnderLynx,
@@ -1037,16 +811,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
             throw err;
         }
     },
-    generateOptionsTXT: (values) => {
-        const tempDir = path.resolve(userPath, "out");
-        fs.mkdirSync(tempDir, { recursive: true });
-        const filePath = path.join(tempDir, `options_${Date.now()}.txt`);
-        const lines = [];
-        for (const { key, value } of values) {
-            lines.push(`${key}:${value}`);
-        }
-        fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
-        return filePath;
+    generateOptionsTXT: async (values) => {
+        return await ipcRenderer.invoke('generate-options-txt', values);
     },
     createElPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-elpack', id, name, manifest, overrides),
     createMrPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-mrpack', id, name, manifest, overrides),
@@ -1173,18 +939,7 @@ async function getWorlds(patha) {
 
 async function getSinglePlayerWorlds(instance_id) {
     let patha = path.resolve(userPath, `minecraft/instances/${instance_id}/saves`);
-    if (!fs.existsSync(patha)) {
-        fs.mkdirSync(patha, { recursive: true });
-    }
     return await getWorlds(patha);
-}
-
-function folderExists(folderPath) {
-    try {
-        return fs.statSync(folderPath).isDirectory();
-    } catch (err) {
-        return false;
-    }
 }
 
 async function importWorld(file_path, instance_id, worldName) {
