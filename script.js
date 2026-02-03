@@ -511,7 +511,7 @@ class Instance {
     }
 
     async delete() {
-        window.enderlynx.deleteInstance(this.instance_id);
+        await window.enderlynx.deleteInstance(this.instance_id);
     }
 
     async refresh() {
@@ -2663,7 +2663,7 @@ settingsButtonEle.onclick = async () => {
         ], [], async (v) => {
             let info = {};
             v.forEach(e => info[e.id] = e.value);
-            let options = window.enderlynx.getOptions(info.options_txt_location);
+            let options = await window.enderlynx.getOptions(info.options_txt_location);
             await window.enderlynx.deleteDefaultOptions();
             let defaultOptions = new DefaultOptions();
             for (let i = 0; i < options.length; i++) {
@@ -5499,7 +5499,7 @@ async function showCreateInstanceDialog() {
                 displayError(translate("app.instances.no_name"));
                 return;
             }
-            let instance_id = window.enderlynx.getInstanceFolderName(info.name);
+            let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
             let loader_version = "";
             try {
                 if (info.loader == "fabric") {
@@ -5529,7 +5529,7 @@ async function showCreateInstanceDialog() {
             }
         } else if (info.selected_tab == "file") {
             if (!info.name_if) info.name_if = "";
-            let instance_id = window.enderlynx.getInstanceFolderName(info.name_f);
+            let instance_id = await window.enderlynx.getInstanceFolderName(info.name_f);
             let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
             await showSpecificInstanceContent(instance);
             let packInfo = await window.enderlynx.processPackFile(info.file, instance_id, info.name_f);
@@ -5566,7 +5566,7 @@ async function showCreateInstanceDialog() {
         } else if (info.selected_tab == "launcher") {
             // Import from launcher here
         } else if (info.selected_tab == "code") {
-            let instance_id = window.enderlynx.getInstanceFolderName(info.name_c);
+            let instance_id = await window.enderlynx.getInstanceFolderName(info.name_c);
             let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
             await showSpecificInstanceContent(instance);
             let packInfo = await window.enderlynx.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
@@ -6946,7 +6946,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                 "name": translate("app.worlds.import.folder_path"),
                 "default": window.enderlynx.getInstanceFolderPath(),
                 "input_source": "launcher",
-                "source": window.enderlynx.getLauncherInstancePath,
+                "source": async (l) => await window.enderlynx.getLauncherInstancePath(l),
                 "buttons": [
                     {
                         "name": translate("app.worlds.import.folder_path.browse"),
@@ -10793,7 +10793,7 @@ class VanillaTweaksSelector {
                             displayError(translate("app.instances.no_name"));
                             return;
                         }
-                        let instance_id = window.enderlynx.getInstanceFolderName(info.name);
+                        let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
                         let loader_version = "";
                         try {
                             if (info.loader == "fabric") {
@@ -11413,7 +11413,7 @@ async function duplicateInstance(instanceInfo) {
     ], [], async (v) => {
         let info = {};
         v.forEach(e => info[e.id] = e.value);
-        let new_instance_id = window.enderlynx.getInstanceFolderName(info.name);
+        let new_instance_id = await window.enderlynx.getInstanceFolderName(info.name);
         try {
             let success = await window.enderlynx.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
             let oldContent = await instanceInfo.getContent();
@@ -13511,7 +13511,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             if (dialog_to_close) dialog_to_close.close();
             let info = {};
             e.forEach(e => { info[e.id] = e.value });
-            let instance_id = window.enderlynx.getInstanceFolderName(info.name);
+            let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
             let files_url = `https://api.modrinth.com/v2/project/${project_id}/version`;
             if (source == "curseforge") {
                 files_url = `https://www.curseforge.com/api/v1/mods/${project_id}/files?pageIndex=0&pageSize=20&sort=dateCreated&sortDescending=true&removeAlphas=true`
@@ -13738,7 +13738,7 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                     displayError(translate("app.instances.no_name"));
                     return;
                 }
-                let instance_id = window.enderlynx.getInstanceFolderName(info.name);
+                let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
                 let loader_version = "";
                 try {
                     if (info.loader == "fabric") {
@@ -14190,7 +14190,7 @@ let importInstance = (info, file_path) => {
             "content": translate("app.import.elpack.confirm")
         }
     ], [], async () => {
-        let instance_id = window.enderlynx.getInstanceFolderName(info.name);
+        let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
         let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
         await showSpecificInstanceContent(instance);
         let packInfo = await window.enderlynx.processPackFile(file_path, instance_id, info.name);

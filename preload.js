@@ -595,14 +595,14 @@ contextBridge.exposeInMainWorld('enderlynx', {
         }
         return false;
     },
-    deleteScreenshot: (instance_id, file_name) => {
-        return ipcRenderer.invoke('delete-screenshot', instance_id, file_name);
+    deleteScreenshot: async (instance_id, file_name) => {
+        return await ipcRenderer.invoke('delete-screenshot', instance_id, file_name);
     },
-    disableFile: (instance_id, type, file_name) => {
-        return ipcRenderer.invoke('disable-file', instance_id, type, file_name);
+    disableFile: async (instance_id, type, file_name) => {
+        return await ipcRenderer.invoke('disable-file', instance_id, type, file_name);
     },
-    enableFile: (instance_id, type, file_name) => {
-        return ipcRenderer.invoke('enable-file', instance_id, type, file_name);
+    enableFile: async (instance_id, type, file_name) => {
+        return await ipcRenderer.invoke('enable-file', instance_id, type, file_name);
     },
     getSkinFromUsername,
     getSkinFromURL,
