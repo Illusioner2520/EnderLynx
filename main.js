@@ -4212,7 +4212,6 @@ ipcMain.handle('watch-file', (event, filepath) => {
                 });
 
                 stream.on('data', chunk => {
-                    console.log(chunk);
                     event.sender.send('file-data', filepath, chunk);
                 });
 
