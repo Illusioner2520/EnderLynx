@@ -655,11 +655,10 @@ async function getWorld(levelDatPath) {
                 default: return "unknown";
             }
         })(),
-        hardcore: !!levelData.hardcore?.value,
+        hardcore: !!levelData.hardcore?.value || !!levelData.difficulty_settings?.value?.hardcore?.value,
         commands: !!levelData.allowCommands?.value,
-        flat: levelData?.WorldGenSettings?.value?.dimensions?.value["minecraft:overworld"]?.value?.generator?.value?.type?.value == "minecraft:flat",
-        difficulty: (() => {
-            const diffId = levelData.Difficulty?.value ?? 2;
+        difficulty: levelData.difficulty_settings?.value?.difficulty?.value || (() => {
+            const diffId = levelData.Difficulty?.value || 2;
             switch (diffId) {
                 case 0: return "peaceful";
                 case 1: return "easy";

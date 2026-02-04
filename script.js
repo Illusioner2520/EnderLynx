@@ -7106,6 +7106,16 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     let worlds = await getInstanceWorlds(instanceInfo);
     let worldsMultiplayer = await getInstanceWorldsMulti(instanceInfo);
     for (let i = 0; i < worlds.length; i++) {
+        let world_description = translate("app.worlds.description." + worlds[i].mode);
+        if (worlds[i].mode == "survival" && !worlds[i].hardcore) {
+            world_description += " - " + translate("app.worlds.description." + worlds[i].difficulty);
+        }
+        if (worlds[i].hardcore) {
+            world_description += " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>";
+        }
+        if (worlds[i].commands) {
+            world_description += " - " + translate("app.worlds.description.commands");
+        }
         worldList.push(
             {
                 "primary_column": {
@@ -7114,7 +7124,7 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                 },
                 "secondary_column": {
                     "title": () => translate("app.worlds.description.singleplayer"),
-                    "desc": () => translate("app.worlds.description." + worlds[i].mode) + (worlds[i].hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "") + (worlds[i].commands ? " - " + translate("app.worlds.description.commands") : "") + (worlds[i].flat ? " - " + translate("app.worlds.description.flat") : "")
+                    "desc": () => world_description
                 },
                 "type": "singleplayer",
                 "image": worlds[i].icon ?? getDefaultImage(worlds[i].id),
