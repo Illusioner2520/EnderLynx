@@ -4066,7 +4066,7 @@ ipcMain.handle('enable-file', async (_, instance_id, type, file_name) => {
 
 ipcMain.handle('get-java-installations', async (_) => {
     // ran to upgrade from legacy
-    new Java();
+    new Java(db);
     return db.prepare("SELECT * FROM java_versions").all();
 });
 
