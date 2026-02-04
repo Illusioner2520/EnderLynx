@@ -1372,6 +1372,7 @@ class Java {
         for (let i = 0; i < versions.length; i++) {
             this.versions_map[versions[i].version] = versions[i].file_path;
         }
+        this.upgradeLegacy();
     }
     async downloadJava(version) {
         let processId = generateNewProcessId();
@@ -1463,6 +1464,17 @@ class Java {
         if (this.versions_map[version] == file_path) return;
         this.versions_map[version] = file_path;
         this.db.prepare("UPDATE java_versions SET file_path = ? WHERE version = ?").run(file_path, version);
+    }
+    async upgradeLegacy() {
+        let versionPath = path.resolve(userPath, "java/versions.json");
+        if (!fs.existsSync(versionPath)) return;
+        let content = JSON.parse(await fs.promises.readFile(versionPath, 'utf-8'));
+        let entries = Object.entries(content);
+        for (let i = 0; i < entries.length; i++) {
+            let version = Number(entries[i][0].replace("java-", ""));
+            this.db.prepare("INSERT INTO java_versions (version, file_path) VALUES (?, ?) ON CONFLICT(version) DO UPDATE SET file_path = excluded.file_path").run(version, entries[i][1]);
+        }
+        await fs.promises.unlink(versionPath);
     }
 }
 
