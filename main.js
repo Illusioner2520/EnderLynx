@@ -4228,7 +4228,7 @@ ipcMain.handle('watch-file', (event, filepath) => {
 ipcMain.handle('stop-watching-file', (_, filepath) => {
     const watcher = watchers.get(filepath);
     if (watcher) {
-        watcher.close();
+        fs.unwatchFile(filepath);
         watchers.delete(filepath);
     }
 });
