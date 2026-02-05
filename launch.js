@@ -1372,7 +1372,6 @@ class Java {
         for (let i = 0; i < versions.length; i++) {
             this.versions_map[versions[i].version] = versions[i].file_path;
         }
-        this.upgradeLegacy();
     }
     async downloadJava(version) {
         let processId = generateNewProcessId();

@@ -4198,8 +4198,6 @@ ipcMain.handle('enable-file', async (_, instance_id, type, file_name) => {
 });
 
 ipcMain.handle('get-java-installations', async (_) => {
-    // ran to upgrade from legacy
-    new Java(db);
     return db.prepare("SELECT * FROM java_versions").all();
 });
 
@@ -4966,6 +4964,10 @@ try {
             db.prepare("ALTER TABLE instances ADD post_launch_hook TEXT").run();
             db.prepare("ALTER TABLE instances ADD uses_custom_java_args INTEGER").run();
             db.prepare("ALTER TABLE instances ADD provided_java_args TEXT").run();
+        case "0.6.6":
+        case "0.6.7":
+            let java = new Java(db);
+            java.upgradeLegacy();
     }
 } catch (e) { }
 
