@@ -231,8 +231,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getLangFile: () => {
         return ipcRenderer.sendSync('get-lang');
     },
-    playMinecraft: async (loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
-        return await ipcRenderer.invoke('play-minecraft', loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
+    playMinecraft: async (instance_id, player_id, quickPlay) => {
+        return await ipcRenderer.invoke('play-minecraft', instance_id, player_id, quickPlay);
     },
     getJavaInstallation: async (v) => {
         return await ipcRenderer.invoke('get-java-installation', v);
@@ -245,8 +245,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     setActivity: (activity) => {
         ipcRenderer.send('set-discord-activity', activity)
     },
-    killProcess: async (pid) => {
-        return await ipcRenderer.invoke('kill-process', pid);
+    stopInstance: async (instance_id) => {
+        return await ipcRenderer.invoke('stop-instance', instance_id);
     },
     getWorlds,
     getSinglePlayerWorlds,
@@ -271,8 +271,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteAllLogs: async (instance_id) => {
         return await ipcRenderer.invoke('delete-all-logs', instance_id);
     },
-    getInstanceContent: async (loader, instance_id, old_content, link_with_modrinth) => {
-        return await ipcRenderer.invoke('get-instance-content', loader, instance_id, old_content, link_with_modrinth);
+    getInstanceContent: async (instance_id) => {
+        return await ipcRenderer.invoke('get-instance-content', instance_id);
     },
     downloadVanillaTweaksDataPacks: async (packs, version, instance_id, world_id) => {
         return await ipcRenderer.invoke('download-vanilla-tweaks-data-packs', packs, version, instance_id, world_id)
@@ -401,6 +401,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
     onErrorMessage: (callback) => {
         ipcRenderer.on('display-error', (_event, message) => {
             callback(message);
+        });
+    },
+    onInstanceUpdated: (callback) => {
+        ipcRenderer.on('instance-updated', (_event, key, value, instance_id) => {
+            callback(key, value, instance_id);
         });
     },
     isOtherStartingPage: () => {
@@ -620,8 +625,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     setSkin: async (player_info, skin_id, variant) => {
         return await ipcRenderer.invoke('set-skin', player_info, skin_id, variant);
     },
-    getProfile: async (player_info) => {
-        return await ipcRenderer.invoke('get-profile', player_info);
+    getProfile: async (player_id) => {
+        return await ipcRenderer.invoke('get-profile', player_id);
     },
     importSkin: async (dataurl) => {
         return await ipcRenderer.invoke('import-skin', dataurl);

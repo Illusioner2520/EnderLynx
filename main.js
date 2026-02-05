@@ -120,22 +120,66 @@ const isDev = !app.isPackaged;
 let args = process.argv.slice(1);
 let enableDev = args.includes("--debug") || isDev;
 
+let dont_launch = false;
+
+function processArgs(args) {
+    let instance_id_to_launch = "";
+    let world_type_to_launch = "";
+    let world_id_to_launch = "";
+
+    const instanceArg = args.find(arg => arg.startsWith('--instance='));
+    const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
+    const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
+
+    if (instanceArg) {
+        if (instanceArg) instance_id_to_launch = instanceArg.split('=').slice(1).join('=');
+        if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').slice(1).join('=');
+        if (worldIdArg) world_id_to_launch = worldIdArg.split('=').slice(1).join('=');
+    }
+
+    let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
+    if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
+    else argsFromUrl = [];
+    if (argsFromUrl.includes("debug")) {
+        enableDev = true;
+    }
+
+    if (argsFromUrl[0] == "launch") {
+        if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
+        if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
+        if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
+    }
+
+    dont_launch = args.includes("--noLaunch");
+
+    if (!instance_id_to_launch) return;
+    if (world_type_to_launch) {
+        playMinecraft(instance_id_to_launch, getDefaultProfile().id, { "type": world_type_to_launch, "info": world_id_to_launch });
+    } else {
+        playMinecraft(instance_id_to_launch, getDefaultProfile().id, {});
+    }
+}
+
+processArgs(args);
+
 let svgData = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
-let langInfo = fs.readFileSync(path.resolve(__dirname, "resources", "lang", `en-us.json`), 'utf-8');
+let lang = JSON.parse(fs.readFileSync(path.resolve(__dirname, "resources", "lang", `en-us.json`), 'utf-8'));
 
 ipcMain.on('get-lang', (event) => {
-    event.returnValue = langInfo;
+    event.returnValue = lang;
 });
+
+function translate(key, ...params) {
+    let value = lang[key] ?? key;
+    for (let i = 0; i < params.length; i += 2) {
+        value = value.replace(params[i], params[i + 1]);
+    }
+    if (!value) return key;
+    return value;
+}
 
 let additionalArguments = [`--userDataPath=${user_path}`, `--svgData=${svgData}`].concat(args);
 if (isDev) additionalArguments.push('--dev');
-
-let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
-if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
-else argsFromUrl = [];
-if (argsFromUrl.includes("debug")) {
-    enableDev = true;
-}
 
 const createWindow = () => {
     let state = windowStateKeeper({
@@ -221,10 +265,14 @@ if (!gotTheLock) {
                 win.webContents.send('open-file', openedFile);
             }
         }
-        win.webContents.send('new-args', commandLine);
+        processArgs(commandLine);
+        if (win && win.webContents) win.webContents.send('new-args', commandLine);
     });
 
     app.whenReady().then(() => {
+        if (dont_launch) {
+            return;
+        }
         app.setAppUserModelId('me.illusioner.enderlynx');
         createWindow();
         rpc.login({ clientId }).catch(console.error);
@@ -670,7 +718,11 @@ async function getWorld(levelDatPath) {
     })
 }
 
-ipcMain.handle('get-instance-content', async (_, loader, instance_id, old_content, link_with_modrinth) => {
+ipcMain.handle('get-instance-content', async (_, instance_id) => {
+    let instance = getInstance(instance_id);
+    let loader = instance.loader;
+    let old_content = getInstanceContentDatabase(instance_id);
+    let link_with_modrinth = getDefault("link_with_modrinth") == "true";
     let old_files = old_content.map((e) => e.file_name);
     let patha = path.resolve(user_path, `minecraft/instances/${instance_id}/mods`);
     let pathb = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`);
@@ -1746,34 +1798,73 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     }
 }
 
-ipcMain.handle('play-minecraft', async (_, loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) => {
-    return await playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name);
+ipcMain.handle('play-minecraft', async (_, instance_id, player_id) => {
+    return await playMinecraft(instance_id, player_id);
 });
 
-async function playMinecraft(loader, version, loaderVersion, instance_id, player_info, quickPlay, customResolution, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalEnvVars, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, name) {
-    if (!player_info) throw new Error("Please sign in to your Microsoft account to play Minecraft.");
+async function playMinecraft(instance_id, player_id, quickPlay) {
+    let player_info = getProfileFromId(player_id);
+    let instance_info = getInstance(instance_id);
+    if (!instance_info) {
+        throw new Error("Unable to find instance");
+    }
+    updateInstance("last_played", new Date(), instance_id);
+    if (!player_id) throw new Error("Please sign in to your Microsoft account to play Minecraft.");
 
-    let date = new Date();
-    date.setHours(date.getHours() - 1);
-    if (new Date(player_info.expires) < date) {
+    if (new Date(player_info.expires) < new Date()) {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
             win.webContents.send('display-error', "Unable to update access token. Launching Minecraft in offline mode.");
         }
     }
-    let mc = new Minecraft(instance_id, name, db);
+    let mc = new Minecraft(instance_id, instance_info.name, db);
+    let globalEnvVars = getDefault("global_env_vars");
+    let globalPreLaunch = getDefault("global_pre_launch_hook");
+    let globalPostLaunch = getDefault("global_post_launch_hook");
+    let globalWrapper = getDefault("global_wrapper");
+    let globalPostExit = getDefault("global_post_exit_hook");
     try {
-        return {
-            "minecraft": await mc.launchGame(loader, version, loaderVersion, player_info.name, player_info.uuid, {
-                "accessToken": player_info.access_token,
-                "xuid": player_info.xuid,
-                "clientId": player_info.client_id
-            }, customResolution, quickPlay, false, allocatedRam, javaPath, parseJavaArgs(javaArgs), { ...parseEnvString(globalEnvVars), ...parseEnvString(envVars) }, preLaunch, postLaunch, parseJavaArgs(wrapper), postExit, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit), "player_info": player_info
-        };
+        await fixProfile(player_info);
+        let minecraft = await mc.launchGame(instance_info.loader, instance_info.vanilla_version, instance_info.loader_version, player_info.name, player_info.uuid, {
+            "accessToken": player_info.access_token,
+            "xuid": player_info.xuid,
+            "clientId": player_info.client_id
+        }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, quickPlay, false, instance_info.allocated_ram || 4096, instance_info.java_installation, parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+        db.prepare("UPDATE instances SET pid = ?, current_log_file = ? WHERE instance_id = ?").run(minecraft.pid, minecraft.log, instance_id);
+        if (dont_launch) app.quit();
+        return { minecraft, player_info }
     } catch (err) {
         console.error(err);
+        if (dont_launch) app.quit();
         throw new Error("Unable to launch Minecraft");
+    }
+}
+
+async function fixProfile(player_info) {
+    if (player_info.expires instanceof Date) {
+        player_info.expires = player_info.expires.toISOString();
+    }
+    db.prepare("UPDATE profiles SET access_token = ?, client_id = ?, expires = ?, name = ?, refresh_token = ?, xuid = ?, is_demo = ? WHERE uuid = ?").run(player_info.access_token, player_info.client_id, player_info.expires, player_info.name, player_info.refresh_token, player_info.xuid, Number(player_info.is_demo), player_info.uuid);
+    if (!player_info.capes || !player_info.skins) return;
+    try {
+        for (const e of player_info.capes) {
+            await downloadCape(e.url, e.id);
+            let cape = addCape(e.alias, e.id, e.url, player_info.uuid);
+            if (e.state == "ACTIVE") setCapeActive(cape.id);
+        }
+    } catch (e) {
+        win.webContents.send('display-error', translate("app.wardrobe.cape.cache.fail"));
+    }
+    try {
+        for (const e of player_info.skins) {
+            let hash = await downloadSkin(e.url);
+            let skin = addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date(), e.textureKey);
+            if (e.state == "ACTIVE") setActiveSkin(player_info.uuid, skin.id);
+        }
+    } catch (e) {
+        win.webContents.send('display-error', translate("app.wardrobe.skin.cache.fail"));
+        console.error(e);
     }
 }
 
@@ -1873,7 +1964,7 @@ async function getNewAccessToken(refresh_token) {
         "is_demo": token.profile.demo,
         "xuid": token.xuid,
         "client_id": getUUID(),
-        "expires": date
+        "expires": date.toISOString()
     }
 }
 
@@ -2403,9 +2494,14 @@ async function addContent(instance_id, project_type, project_url, filename, data
 }
 
 ipcMain.handle('download-cape', async (_, url, id) => {
-    if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
-    await urlToFile(url, path.resolve(user_path, `minecraft/capes/${id}.png`));
+    return await downloadCape(url, id);
 });
+async function downloadCape(url, id) {
+    let capePath = path.resolve(user_path, `minecraft/capes/${id}.png`);
+    if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
+    if (fs.existsSync(capePath)) return;
+    await urlToFile(url, capePath);
+}
 
 ipcMain.handle('query-server', async (_, host, port) => {
     return await queryServer(host, port);
@@ -2970,7 +3066,7 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         suppress: true
     });
     const token = await xboxManager.getMinecraft();
-    return {
+    let info = {
         "access_token": token.mcToken,
         "uuid": token.profile.id,
         "refresh_token": token.parent.msToken.refresh_token,
@@ -2982,6 +3078,24 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         "client_id": getUUID(),
         "expires": date
     }
+    let players = getProfiles().map(e => e.uuid);
+    if (!info.access_token) throw new Error();
+    if (!info.refresh_token) throw new Error();
+    if (!info.client_id) throw new Error();
+    if (players.includes(info.uuid)) {
+        let player = getProfileDatabase(info.uuid);
+        setDefaultProfile(player.id);
+        await fixProfile(info);
+    } else {
+        if (!info.name) {
+            win.webContents.send('display-error', translate("app.login_error.no_username"));
+            return;
+        }
+        let newPlayer = addProfile(info.access_token, info.client_id, info.expires, info.name, info.refresh_token, info.uuid, info.xuid, info.is_demo, false);
+        setDefaultProfile(newPlayer.id);
+        await fixProfile(info);
+    }
+    return info;
 });
 
 ipcMain.handle('get-instance-files', async (_, instance_id) => {
@@ -3141,11 +3255,13 @@ ipcMain.handle('update-options-txt', async (_, instance_id, key, value) => {
     await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
 });
 
-ipcMain.handle('kill-process', async (_, pid) => {
+ipcMain.handle('stop-instance', async (_, instance_id) => {
+    let instance = getInstance(instance_id);
+    let pid = instance.pid;
     if (!pid) return false;
     pid = Number(pid);
 
-    return new Promise((resolve, reject) => {
+    let done = await new Promise((resolve, reject) => {
         exec(os.platform() == 'win32' ? `taskkill /PID ${pid} /T` : `kill -TERM -${pid}`, (error) => {
             let elapsed = 0;
             const interval = setInterval(() => {
@@ -3169,6 +3285,9 @@ ipcMain.handle('kill-process', async (_, pid) => {
             }, 500);
         });
     });
+
+    if (done) updateInstance("pid", null, instance_id);
+    return done;
 });
 
 function checkForProcess(pid) {
@@ -3281,10 +3400,13 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
             }
         );
 
+        let skin_info = await res.json();
+        await fixProfile({ ...player_info, ...skin_info })
+
         if (!res.ok) {
             throw new Error("Unable to set cape");
         }
-        return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
+        return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
     } else {
         const res = await fetch(
             'https://api.minecraftservices.com/minecraft/profile/capes/active',
@@ -3296,10 +3418,13 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
             }
         );
 
+        let skin_info = await res.json();
+        await fixProfile({ ...player_info, ...skin_info })
+
         if (!res.ok) {
             throw new Error("Unable to set cape");
         }
-        return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
+        return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
     }
 });
 
@@ -3325,10 +3450,13 @@ ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) =>
         }
     );
 
+    let skin_info = await res.json();
+    await fixProfile({ ...player_info, ...skin_info })
+
     if (!res.ok) {
         throw new Error("Unable to set skin");
     }
-    return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
+    return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
 });
 
 ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
@@ -3370,7 +3498,7 @@ ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
             res.on('data', (chunk) => {
                 data += chunk;
             });
-            res.on('end', () => {
+            res.on('end', async () => {
                 if (res.statusCode < 200 || res.statusCode >= 300) {
                     let errorMsg = `Unable to set skin (status ${res.statusCode})`;
                     try {
@@ -3381,8 +3509,10 @@ ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
                     } catch (e) { }
                     reject(new Error(errorMsg));
                 } else {
+                    let skin_info = JSON.parse(data);
+                    await fixProfile({ ...player_info, ...skin_info })
                     try {
-                        resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": JSON.parse(data) });
+                        resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": skin_info });
                     } catch (e) {
                         reject(new Error("Unable to parse skin info response"));
                     }
@@ -3399,10 +3529,9 @@ ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
     });
 });
 
-ipcMain.handle('get-profile', async (_, player_info) => {
-    let date = new Date();
-    date.setHours(date.getHours() - 1);
-    if (new Date(player_info.expires) < date) {
+ipcMain.handle('get-profile', async (_, player_id) => {
+    let player_info = getProfileFromId(player_id);
+    if (new Date(player_info.expires) < new Date()) {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
@@ -3413,12 +3542,16 @@ ipcMain.handle('get-profile', async (_, player_info) => {
     const res = await fetch('https://api.minecraftservices.com/minecraft/profile', {
         headers: {
             Authorization: `Bearer ${player_info.access_token}`,
-        },
+        }
     });
+
+    let skin_and_capes = await res.json();
+
+    await fixProfile({ ...player_info, ...skin_and_capes });
 
     if (!res.ok) throw new Error("Unable to fetch profile");
 
-    return { "status": res.status, "player_info": player_info, "skin_info": await res.json() };
+    return { "status": res.status, "player_info": player_info, "skin_info": skin_and_capes };
 });
 
 ipcMain.handle('import-skin', async (_, dataurl) => {
@@ -3578,7 +3711,7 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
                 comment: `Launch Minecraft instance "${instance_name}"`,
                 icon: iconPath,
                 arguments: args,
-                // VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
+                VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
             },
             linux: {
                 filePath: target,
@@ -4246,6 +4379,7 @@ function updateInstance(key, value, instance_id) {
     if (typeof value === "boolean") value = Number(value);
     let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
+    if (win && win.webContents) win.webContents.send('instance-updated', key, value, instance_id);
     return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
 }
 function deleteInstance(instance_id) {

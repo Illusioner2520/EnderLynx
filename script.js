@@ -242,7 +242,13 @@ class Content {
 }
 
 let instance_watches = {};
-let content_watches = {}
+let content_watches = {};
+
+window.enderlynx.onInstanceUpdated((key, value, instance_id) => {
+    if (instance_watches[instance_id]["onchange" + key]) {
+        instance_watches[instance_id]["onchange" + key](value);
+    }
+});
 
 class Instance {
     constructor(content) {
@@ -296,113 +302,78 @@ class Instance {
     async setLastAnalyzedLog(last_analyzed_log) {
         await window.enderlynx.updateInstance("last_analyzed_log", last_analyzed_log, this.instance_id);
         this.last_analyzed_log = last_analyzed_log;
-        if (instance_watches[this.instance_id].onchangelast_analyzed_log) {
-            instance_watches[this.instance_id].onchangelast_analyzed_log(last_analyzed_log);
-        }
     }
     async setInstalledVersion(installed_version) {
         await window.enderlynx.updateInstance("installed_version", installed_version, this.instance_id);
         this.installed_version = installed_version;
-        if (instance_watches[this.instance_id].onchangeinstalled_version) {
-            instance_watches[this.instance_id].onchangeinstalled_version(installed_version);
-        }
     }
     async setJavaArgs(java_args) {
         await window.enderlynx.updateInstance("java_args", java_args, this.instance_id);
         this.java_args = java_args;
-        if (instance_watches[this.instance_id].onchangejava_args) {
-            instance_watches[this.instance_id].onchangejava_args(java_args);
-        }
     }
     async setEnvVars(env_vars) {
         await window.enderlynx.updateInstance("env_vars", env_vars, this.instance_id);
         this.env_vars = env_vars;
-        if (instance_watches[this.instance_id].onchangeenv_vars) {
-            instance_watches[this.instance_id].onchangeenv_vars(env_vars);
-        }
     }
     async setPreLaunchHook(pre_launch_hook) {
         await window.enderlynx.updateInstance("pre_launch_hook", pre_launch_hook, this.instance_id);
         this.pre_launch_hook = pre_launch_hook;
-        if (instance_watches[this.instance_id].onchangepre_launch_hook) {
-            instance_watches[this.instance_id].onchangepre_launch_hook(pre_launch_hook);
-        }
     }
     async setPostLaunchHook(post_launch_hook) {
         await window.enderlynx.updateInstance("post_launch_hook", post_launch_hook, this.instance_id);
         this.post_launch_hook = post_launch_hook;
-        if (instance_watches[this.instance_id].onchangepost_launch_hook) {
-            instance_watches[this.instance_id].onchangepost_launch_hook(post_launch_hook);
-        }
     }
     async setWrapper(wrapper) {
         await window.enderlynx.updateInstance("wrapper", wrapper, this.instance_id);
         this.wrapper = wrapper;
-        if (instance_watches[this.instance_id].onchangewrapper) {
-            instance_watches[this.instance_id].onchangewrapper(wrapper);
-        }
     }
     async setPostExitHook(post_exit_hook) {
         await window.enderlynx.updateInstance("post_exit_hook", post_exit_hook, this.instance_id);
         this.post_exit_hook = post_exit_hook;
-        if (instance_watches[this.instance_id].onchangepost_exit_hook) {
-            instance_watches[this.instance_id].onchangepost_exit_hook(post_exit_hook);
-        }
     }
     async setJavaVersion(java_version) {
         await window.enderlynx.updateInstance("java_version", java_version, this.instance_id);
         this.java_version = java_version;
-        if (instance_watches[this.instance_id].onchangejava_version) instance_watches[this.instance_id].onchangejava_version(java_version);
     }
     async setJavaPath(java_path) {
         await window.enderlynx.updateInstance("java_path", java_path, this.instance_id);
         this.java_path = java_path;
-        if (instance_watches[this.instance_id].onchangejava_path) instance_watches[this.instance_id].onchangejava_path(java_path);
     }
     async setWindowWidth(window_width) {
         await window.enderlynx.updateInstance("window_width", window_width, this.instance_id);
         this.window_width = window_width;
-        if (instance_watches[this.instance_id].onchangewindow_width) instance_watches[this.instance_id].onchangewindow_width(window_width);
     }
     async setWindowHeight(window_height) {
         await window.enderlynx.updateInstance("window_height", window_height, this.instance_id);
         this.window_height = window_height;
-        if (instance_watches[this.instance_id].onchangewindow_height) instance_watches[this.instance_id].onchangewindow_height(window_height);
     }
     async setAllocatedRam(allocated_ram) {
         await window.enderlynx.updateInstance("allocated_ram", allocated_ram, this.instance_id);
         this.allocated_ram = allocated_ram;
-        if (instance_watches[this.instance_id].onchangeallocated_ram) instance_watches[this.instance_id].onchangeallocated_ram(allocated_ram);
     }
     async setName(name) {
         await window.enderlynx.updateInstance("name", name, this.instance_id);
         this.name = name;
-        if (instance_watches[this.instance_id].onchangename) instance_watches[this.instance_id].onchangename(name);
     }
     async setLastPlayed(last_played) {
         await window.enderlynx.updateInstance("last_played", last_played, this.instance_id);
         this.last_played = last_played;
-        if (instance_watches[this.instance_id].onchangelast_played) instance_watches[this.instance_id].onchangelast_played(last_played);
     }
     async setDateCreated(date_created) {
         await window.enderlynx.updateInstance("date_created", date_created, this.instance_id);
         this.date_created = date_created;
-        if (instance_watches[this.instance_id].onchangedate_created) instance_watches[this.instance_id].onchangedate_created(date_created);
     }
     async setDateModified(date_modified) {
         await window.enderlynx.updateInstance("date_modified", date_modified, this.instance_id);
         this.date_modified = date_modified;
-        if (instance_watches[this.instance_id].onchangedate_modified) instance_watches[this.instance_id].onchangedate_modified(date_modified);
     }
     async setLoader(loader) {
         await window.enderlynx.updateInstance("loader", loader, this.instance_id);
         this.loader = loader;
-        if (instance_watches[this.instance_id].onchangeloader) instance_watches[this.instance_id].onchangeloader(loader);
     }
     async setVanillaVersion(vanilla_version, do_not_set_options_txt) {
         await window.enderlynx.updateInstance("vanilla_version", vanilla_version, this.instance_id);
         this.vanilla_version = vanilla_version;
-        if (instance_watches[this.instance_id].onchangevanilla_version) instance_watches[this.instance_id].onchangevanilla_version(vanilla_version);
         if (do_not_set_options_txt) return;
         let default_options = new DefaultOptions(vanilla_version);
         window.enderlynx.setOptionsTXT(this.instance_id, await default_options.getOptionsTXT(), false, false, (v) => {
@@ -416,77 +387,62 @@ class Instance {
     async setLoaderVersion(loader_version) {
         await window.enderlynx.updateInstance("loader_version", loader_version, this.instance_id);
         this.loader_version = loader_version;
-        if (instance_watches[this.instance_id].onchangeloader_version) instance_watches[this.instance_id].onchangeloader_version(loader_version);
     }
     async setPlaytime(playtime) {
         await window.enderlynx.updateInstance("playtime", playtime, this.instance_id);
         this.playtime = playtime;
-        if (instance_watches[this.instance_id].onchangeplaytime) instance_watches[this.instance_id].onchangeplaytime(playtime);
     }
     async setLocked(locked) {
         await window.enderlynx.updateInstance("locked", locked, this.instance_id);
         this.locked = locked;
-        if (instance_watches[this.instance_id].onchangelocked) instance_watches[this.instance_id].onchangelocked(locked);
     }
     async setDownloaded(downloaded) {
         await window.enderlynx.updateInstance("downloaded", downloaded, this.instance_id);
         this.downloaded = downloaded;
-        if (instance_watches[this.instance_id].onchangedownloaded) instance_watches[this.instance_id].onchangedownloaded(downloaded);
     }
     async setGroup(group) {
         await window.enderlynx.updateInstance("group_id", group, this.instance_id);
         this.group = group;
-        if (instance_watches[this.instance_id].onchangegroup) instance_watches[this.instance_id].onchangegroup(group);
     }
     async setImage(image) {
         await window.enderlynx.updateInstance("image", image, this.instance_id);
         this.image = image;
-        if (instance_watches[this.instance_id].onchangeimage) instance_watches[this.instance_id].onchangeimage(image);
     }
     async setPid(pid) {
         await window.enderlynx.updateInstance("pid", pid, this.instance_id);
         this.pid = pid;
-        if (instance_watches[this.instance_id].onchangepid) instance_watches[this.instance_id].onchangepid(pid);
     }
     async setCurrentLogFile(current_log_file) {
         await window.enderlynx.updateInstance("current_log_file", current_log_file, this.instance_id);
         this.current_log_file = current_log_file;
-        if (instance_watches[this.instance_id].onchangecurrent_log_file) instance_watches[this.instance_id].onchangecurrent_log_file(current_log_file);
     }
     async setInstallSource(install_source) {
         await window.enderlynx.updateInstance("install_source", install_source, this.instance_id);
         this.install_source = install_source;
-        if (instance_watches[this.instance_id].onchangeinstall_source) instance_watches[this.instance_id].onchangeinstall_source(install_source);
     }
     async setInstallId(install_id) {
         await window.enderlynx.updateInstance("install_id", install_id, this.instance_id);
         this.install_id = install_id;
-        if (instance_watches[this.instance_id].onchangeinstall_id) instance_watches[this.instance_id].onchangeinstall_id(install_id);
     }
     async setInstalling(installing) {
         await window.enderlynx.updateInstance("installing", installing, this.instance_id);
         this.installing = installing;
-        if (instance_watches[this.instance_id].onchangeinstalling) instance_watches[this.instance_id].onchangeinstalling(installing);
     }
     async setMcInstalled(mc_installed) {
         await window.enderlynx.updateInstance("mc_installed", mc_installed, this.instance_id);
         this.mc_installed = mc_installed;
-        if (instance_watches[this.instance_id].onchangemc_installed) instance_watches[this.instance_id].onchangemc_installed(mc_installed);
     }
     async setFailed(failed) {
         await window.enderlynx.updateInstance("failed", failed, this.instance_id);
         this.failed = failed;
-        if (instance_watches[this.instance_id].onchangefailed) instance_watches[this.instance_id].onchangefailed(failed);
     }
     async setUsesCustomJavaArgs(uses_custom_java_args) {
         await window.enderlynx.updateInstance("uses_custom_java_args", uses_custom_java_args, this.instance_id);
         this.uses_custom_java_args = uses_custom_java_args;
-        if (instance_watches[this.instance_id].onchangeuses_custom_java_args) instance_watches[this.instance_id].onchangeuses_custom_java_args(uses_custom_java_args);
     }
     async setProvidedJavaArgs(provided_java_args) {
         await window.enderlynx.updateInstance("provided_java_args", provided_java_args, this.instance_id);
         this.provided_java_args = provided_java_args;
-        if (instance_watches[this.instance_id].onchangeprovided_java_args) instance_watches[this.instance_id].onchangeprovided_java_args(provided_java_args);
     }
 
     watchForChange(name, func) {
@@ -531,7 +487,8 @@ async function getProfiles() {
     return profiles.map(e => new Profile(e));
 }
 async function getDefaultProfile() {
-    return new Profile(await window.enderlynx.getDefaultProfile());
+    let profile = await window.enderlynx.getDefaultProfile();
+    return profile ? new Profile(profile) : null;
 }
 async function deleteProfile(uuid) {
     await window.enderlynx.deleteProfile(uuid);
@@ -789,6 +746,9 @@ class MinecraftAccountSwitcher {
         }
     }
     selectPlayer(newPlayerInfo) {
+        if (!this.players.map(e => e.uuid).includes(newPlayerInfo.uuid)) {
+            this.addPlayer(newPlayerInfo);
+        }
         this.default_player = newPlayerInfo;
         newPlayerInfo.setDefault();
         this.element.innerHTML = ``;
@@ -3321,30 +3281,9 @@ let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
 
 async function toggleMicrosoftSignIn() {
     try {
-        let newData = await window.enderlynx.triggerMicrosoftLogin();
-        let players = (await getProfiles()).map(e => e.uuid);
-        if (!newData.access_token) throw new Error();
-        if (!newData.refresh_token) throw new Error();
-        if (!newData.client_id) throw new Error();
-        if (players.includes(newData.uuid)) {
-            let player = await getProfileFromUUID(newData.uuid);
-            await player.setDefault();
-            accountSwitcher.selectPlayer(player);
-            await updateSkinsAndCapes(newData);
-            accountSwitcher.selectPlayer(player);
-            accountSwitcher.reloadHeads();
-        } else {
-            if (!newData.name) {
-                displayError(translate("app.login_error.no_username"));
-                return;
-            }
-            let newPlayer = await addProfile(newData.access_token, newData.client_id, newData.expires, newData.name, newData.refresh_token, newData.uuid, newData.xuid, newData.is_demo, false);
-            await newPlayer.setDefault();
-            accountSwitcher.addPlayer(newPlayer);
-            await updateSkinsAndCapes(newData);
-            accountSwitcher.selectPlayer(newPlayer);
-            accountSwitcher.reloadHeads();
-        }
+        let player = await window.enderlynx.triggerMicrosoftLogin();
+        accountSwitcher.selectPlayer(await getProfileFromUUID(player.uuid));
+        accountSwitcher.reloadHeads();
     } catch (e) {
         if (e.message.includes("error.gui.closed")) return;
         displayError(translate("app.login_error"));
@@ -3986,6 +3925,7 @@ async function showHomeContent(oldEle) {
 
 let home_modpacks = {};
 let mc_news = {};
+let dont_override_my_page = false;
 
 async function applyDefaults() {
     if (await getDefault("default_mode") == "light") {
@@ -4008,6 +3948,7 @@ async function applyDefaults() {
         document.body.classList.add("hide_ip");
     }
     let defaultpage = await getDefault("default_page");
+    if (dont_override_my_page) return;
     let other_default_page = window.enderlynx.isOtherStartingPage();
     if (other_default_page) defaultpage = other_default_page;
     if (defaultpage == "home") {
@@ -4418,16 +4359,7 @@ async function showWardrobeContent() {
         refreshButtonIcon.classList.add("spinning");
         let profile = await getDefaultProfile();
         try {
-            let res = await window.enderlynx.getProfile(profile);
-            await profile.setAccessToken(res.player_info.access_token);
-            await profile.setClientId(res.player_info.client_id);
-            await profile.setExpires(res.player_info.expires);
-            await profile.setName(res.player_info.name);
-            await profile.setRefreshToken(res.player_info.refresh_token);
-            await profile.setUuid(res.player_info.uuid);
-            await profile.setXuid(res.player_info.xuid);
-            await profile.setIsDemo(res.player_info.is_demo);
-            await updateSkinsAndCapes(res.skin_info);
+            await window.enderlynx.getProfile(profile.id);
             refreshButtonIcon.classList.remove("spinning");
             showContent();
         } catch (e) {
@@ -8292,24 +8224,10 @@ function displaySuccess(success) {
 }
 
 async function playInstance(instInfo, quickPlay = null) {
-    instInfo = await instInfo.refresh();
-    instInfo.setLastPlayed(new Date());
     let pid;
     try {
-        pid = await window.enderlynx.playMinecraft(instInfo.loader, instInfo.vanilla_version, instInfo.loader_version, instInfo.instance_id, await getDefaultProfile(), quickPlay, { "width": instInfo.window_width ? instInfo.window_width : 854, "height": instInfo.window_height ? instInfo.window_height : 480 }, instInfo.allocated_ram ? instInfo.allocated_ram : 4096, instInfo.java_path, instInfo.java_args ? instInfo.java_args : null, instInfo.env_vars, instInfo.pre_launch_hook, instInfo.post_launch_hook, instInfo.wrapper, instInfo.post_exit_hook, await getDefault("global_env_vars"), await getDefault("global_pre_launch_hook"), await getDefault("global_post_launch_hook"), await getDefault("global_wrapper"), await getDefault("global_post_exit_hook"), instInfo.name);
-        if (!pid) return;
-        await instInfo.setPid(pid.minecraft.pid);
-        await instInfo.setCurrentLogFile(pid.minecraft.log);
-        let default_player = await getDefaultProfile();
-        await default_player.setAccessToken(pid.player_info.access_token);
-        await default_player.setClientId(pid.player_info.client_id);
-        await default_player.setExpires(pid.player_info.expires);
-        await default_player.setName(pid.player_info.name);
-        await default_player.setRefreshToken(pid.player_info.refresh_token);
-        await default_player.setUuid(pid.player_info.uuid);
-        await default_player.setXuid(pid.player_info.xuid);
-        await default_player.setIsDemo(pid.player_info.is_demo);
-        await updateSkinsAndCapes(pid.player_info);
+        let profile = await getDefaultProfile();
+        pid = await window.enderlynx.playMinecraft(instInfo.instance_id, profile.id, quickPlay);
         await live.findLive();
     } catch (e) {
         console.log(e);
@@ -8325,7 +8243,7 @@ async function playMultiplayerWorld(instInfo, world_id) {
 }
 
 async function stopInstance(instInfo) {
-    return await window.enderlynx.killProcess((await instInfo.refresh()).pid);
+    return await window.enderlynx.stopInstance(instInfo.instance_id);
 }
 
 function formatTime(secs) {
@@ -8434,7 +8352,7 @@ function formatDateAndTime(dateString) {
 }
 
 function getLangFile() {
-    return JSON.parse(window.enderlynx.getLangFile());
+    return window.enderlynx.getLangFile();
 }
 
 function checkForProcess(pid) {
@@ -8450,7 +8368,7 @@ async function getInstanceWorldsMulti(instanceInfo) {
 }
 
 async function getInstanceContent(instanceInfo) {
-    return await window.enderlynx.getInstanceContent(instanceInfo.loader, instanceInfo.instance_id, await instanceInfo.getContent(), await getDefault("link_with_modrinth") == "true");
+    return await window.enderlynx.getInstanceContent(instanceInfo.instance_id);
 }
 
 function translate(key, ...params) {
@@ -8807,14 +8725,7 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
     if (!launch_info.instance_id) return;
     try {
         let instance = await Instance.getInstance(launch_info.instance_id);
-        await showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content", undefined, true);
-        if (launch_info.world_type == "singleplayer") {
-            await playSingleplayerWorld(instance, launch_info.world_id);
-        } else if (launch_info.world_type == "multiplayer") {
-            await playMultiplayerWorld(instance, launch_info.world_id);
-        } else {
-            await playInstance(instance);
-        }
+        dont_override_my_page = true;
         showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
     } catch (e) {
         displayError(translate("app.launch_error"));
@@ -10757,7 +10668,7 @@ class VanillaTweaksSelector {
                 let createNewButton = document.createElement("button");
                 createNewButton.className = "install-grid-create";
                 createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
-                createNewButton.onclick =  async () => {
+                createNewButton.onclick = async () => {
                     let dialog2 = new Dialog();
                     dialog2.showDialog(translate("app.button.instances.create"), "form", [
                         {
@@ -11294,16 +11205,7 @@ function sanitize(input) {
 
 async function applyCape(profile, cape) {
     try {
-        let res = await window.enderlynx.setCape(profile, cape ? cape.cape_id : null);
-        await profile.setAccessToken(res.player_info.access_token);
-        await profile.setClientId(res.player_info.client_id);
-        await profile.setExpires(res.player_info.expires);
-        await profile.setName(res.player_info.name);
-        await profile.setRefreshToken(res.player_info.refresh_token);
-        await profile.setUuid(res.player_info.uuid);
-        await profile.setXuid(res.player_info.xuid);
-        await profile.setIsDemo(res.player_info.is_demo);
-        await updateSkinsAndCapes(res.skin_info);
+        await window.enderlynx.setCape(profile, cape ? cape.cape_id : null);
         displaySuccess(translate("app.wardrobe.cape.change"));
         return true;
     } catch (e) {
@@ -11314,16 +11216,7 @@ async function applyCape(profile, cape) {
 
 async function applySkin(profile, skin) {
     try {
-        let res = await window.enderlynx.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
-        await profile.setAccessToken(res.player_info.access_token);
-        await profile.setClientId(res.player_info.client_id);
-        await profile.setExpires(res.player_info.expires);
-        await profile.setName(res.player_info.name);
-        await profile.setRefreshToken(res.player_info.refresh_token);
-        await profile.setUuid(res.player_info.uuid);
-        await profile.setXuid(res.player_info.xuid);
-        await profile.setIsDemo(res.player_info.is_demo);
-        await updateSkinsAndCapes(res.skin_info);
+        await window.enderlynx.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
         return true;
@@ -11335,52 +11228,13 @@ async function applySkin(profile, skin) {
 
 async function applySkinFromURL(profile, skin) {
     try {
-        let res = await window.enderlynx.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
-        await profile.setAccessToken(res.player_info.access_token);
-        await profile.setClientId(res.player_info.client_id);
-        await profile.setExpires(res.player_info.expires);
-        await profile.setName(res.player_info.name);
-        await profile.setRefreshToken(res.player_info.refresh_token);
-        await profile.setUuid(res.player_info.uuid);
-        await profile.setXuid(res.player_info.xuid);
-        await profile.setIsDemo(res.player_info.is_demo);
-        await updateSkinsAndCapes(res.skin_info);
+        await window.enderlynx.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
         return true;
     } catch (e) {
         displayError(e.message);
         return false;
-    }
-}
-
-async function updateSkinsAndCapes(skin_and_cape_data) {
-    if (!skin_and_cape_data.capes) return;
-    if (!skin_and_cape_data.skins) return;
-    if (!skin_and_cape_data.uuid && !skin_and_cape_data.id) return;
-    if (!skin_and_cape_data.uuid) skin_and_cape_data.uuid = skin_and_cape_data.id;
-    let profile = await getProfileFromUUID(skin_and_cape_data.uuid);
-    try {
-        for (const e of skin_and_cape_data.capes) {
-            await window.enderlynx.downloadCape(e.url, e.id);
-            let cape = await profile.addCape(e.alias, e.id, e.url);
-            if (e.state == "ACTIVE") await cape.setActive();
-        }
-    } catch (e) {
-        displayError(translate("app.wardrobe.cape.cache.fail"));
-    }
-    try {
-        for (const e of skin_and_cape_data.skins) {
-            let hash = await window.enderlynx.downloadSkin(e.url);
-            let skin = await addSkin(translate("app.wardrobe.unnamed"), e.variant == "CLASSIC" ? "wide" : "slim", "", hash.hash, hash.dataUrl, false, new Date(), e.textureKey);
-            if (e.state == "ACTIVE") await skin.setActive(skin_and_cape_data.uuid);
-        }
-    } catch (e) {
-        displayError(translate("app.wardrobe.skin.cache.fail"));
-        console.error(e);
-    }
-    if (skin_and_cape_data.name) {
-        await profile.setName(skin_and_cape_data.name);
     }
 }
 
