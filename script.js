@@ -6865,7 +6865,7 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
     });
     if (!(await instanceInfo.refresh()).installing) {
         await checkForPlayerContent();
-        showContent();
+        await showContent();
     } else {
         contentListWrap.innerHTML = "";
         contentListWrap.appendChild(currently_installing.element);
@@ -7222,7 +7222,6 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
     }
     for (let i = 0; i < worldsMultiplayer.length; i++) {
         let last_played = await getServerLastPlayed(instanceInfo.instance_id, worldsMultiplayer[i].ip);
-        console.log(last_played.getFullYear());
         worldList.push(
             {
                 "primary_column": {
@@ -7547,11 +7546,11 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
     typeDropdown.style.minWidth = "300px";
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
-    element.innerHTML = "";
-    element.appendChild(searchAndFilter);
+    let fragment = document.createDocumentFragment();
+    fragment.appendChild(searchAndFilter);
     let logWrapper = document.createElement("div");
     logWrapper.className = "logs";
-    element.appendChild(logWrapper);
+    fragment.appendChild(logWrapper);
     let logTop = document.createElement("div");
     logTop.className = "logs-top";
     logWrapper.appendChild(logTop);
@@ -7638,6 +7637,8 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
     logTop.appendChild(deleteButton);
     logTop.appendChild(deleteAllButton);
     logDisplay.className = "logs-display";
+    element.innerHTML = "";
+    element.appendChild(fragment);
 }
 
 function setInstanceTabContentOptions(instanceInfo, element) {
@@ -7736,21 +7737,21 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
     searchAndFilter.appendChild(contentSearch);
     searchAndFilter.appendChild(typeDropdown);
     searchAndFilter.appendChild(applyDefaults);
-    element.innerHTML = "";
-    element.appendChild(searchAndFilter);
+    let fragment = document.createDocumentFragment();
+    fragment.appendChild(searchAndFilter);
     let info = document.createElement("div");
     info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.options.notice_1");
     info.className = "info";
     info.style.marginTop = "10px";
-    element.appendChild(info);
+    fragment.appendChild(info);
     let info2 = document.createElement("div");
     info2.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.options.notice_2");
     info2.className = "info";
     info2.style.marginTop = "10px";
-    element.appendChild(info2);
+    fragment.appendChild(info2);
     let optionList = document.createElement("div");
     optionList.className = "option-list";
-    element.appendChild(optionList);
+    fragment.appendChild(optionList);
     let selectedKeySelect;
     let selectedKeySelectFunction;
 
@@ -7994,13 +7995,15 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
         }
 
         optionList.appendChild(item);
-    };
+    }
     if (!values.length) {
         let nofound = new NoResultsFound(translate("app.options.not_found"));
         nofound.element.style.background = "transparent";
         nofound.element.style.gridColumn = "span 3";
         optionList.appendChild(nofound.element);
     }
+    element.innerHTML = "";
+    element.appendChild(fragment);
 }
 
 function setInstanceTabContentScreenshots(instanceInfo, element) {
@@ -8014,10 +8017,10 @@ function setInstanceTabContentScreenshots(instanceInfo, element) {
 
 async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
     currentSubTab = "screenshots";
-    element.innerHTML = "";
+    let fragment = document.createDocumentFragment();
     let galleryElement = document.createElement("div");
     galleryElement.className = "gallery";
-    element.appendChild(galleryElement);
+    fragment.appendChild(galleryElement);
     let screenshots = (await window.enderlynx.getScreenshots(instanceInfo.instance_id)).reverse();
     screenshots.forEach(e => {
         let screenshotElement = document.createElement("button");
@@ -8087,6 +8090,8 @@ async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
         nofound.element.style.gridColumn = "1 / -1";
         galleryElement.appendChild(nofound.element);
     }
+    element.innerHTML = "";
+    element.appendChild(fragment);
 }
 
 function displayScreenshot(name, desc, file, file_name, instanceInfo, element, list, currentIndex, word = translate("app.screenshot")) {
