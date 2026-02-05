@@ -5752,6 +5752,11 @@ async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_t
     instanceInfo.watchForChange("failed", async (v) => {
         calculatePlayButtonState((await instanceInfo.refresh()).mc_installed, v);
     });
+    instanceInfo.watchForChange("pid", async (v) => {
+        instanceInfo = await instanceInfo.refresh();
+        running = checkForProcess(v);
+        calculatePlayButtonState(instanceInfo.mc_installed, instanceInfo.failed);
+    });
     let threeDots = document.createElement("button");
     threeDots.classList.add("instance-top-more");
     threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
@@ -8726,7 +8731,12 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
     try {
         let instance = await Instance.getInstance(launch_info.instance_id);
         dont_override_my_page = true;
-        showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+        let pid = instance.pid;
+        if (checkForProcess(pid)) {
+            showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+        } else {
+            showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content", undefined, true);
+        }
     } catch (e) {
         displayError(translate("app.launch_error"));
     }

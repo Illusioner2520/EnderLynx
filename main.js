@@ -1831,7 +1831,8 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
             "xuid": player_info.xuid,
             "clientId": player_info.client_id
         }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, quickPlay, false, instance_info.allocated_ram || 4096, instance_info.java_installation, parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
-        db.prepare("UPDATE instances SET pid = ?, current_log_file = ? WHERE instance_id = ?").run(minecraft.pid, minecraft.log, instance_id);
+        updateInstance("pid", minecraft.pid, instance_id);
+        updateInstance("current_log_file", minecraft.log, instance_id);
         if (dont_launch) app.quit();
         return { minecraft, player_info }
     } catch (err) {
