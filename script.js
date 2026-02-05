@@ -3492,7 +3492,7 @@ async function showHomeContent(oldEle) {
             }
             let itemDesc2 = document.createElement("span");
             itemDesc2.className = "instance-desc";
-            itemDesc2.innerHTML = (e.type == "singleplayer" ? (translate("app.worlds.description." + e.mode) + (e.hardcore ? " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : "")) : e.ip);
+            itemDesc2.innerHTML = (e.type == "singleplayer" ? (e.hardcore ? "<span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : translate("app.worlds.description." + e.mode)) : e.ip);
             if (e.type == "multiplayer") {
                 itemDesc2.style.width = "fit-content";
                 itemDesc2.classList.add("hidden-text");
