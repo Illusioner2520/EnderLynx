@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, clipboard, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
@@ -118,7 +118,7 @@ let win;
 const isDev = !app.isPackaged;
 
 let args = process.argv.slice(1);
-let enableDev = args.includes("--debug") || isDev;
+let enableDev = args.includes("--debug") || args.find(arg => arg.startsWith('enderlynx://'))?.split("/")?.includes("debug") || isDev;
 
 let dont_launch = false;
 
@@ -126,41 +126,104 @@ function processArgs(args) {
     let instance_id_to_launch = "";
     let world_type_to_launch = "";
     let world_id_to_launch = "";
+    let uuid_to_launch = "";
 
     const instanceArg = args.find(arg => arg.startsWith('--instance='));
     const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
     const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
+    const uuidArg = args.find(arg => arg.startsWith("--profile="));
 
     if (instanceArg) {
         if (instanceArg) instance_id_to_launch = instanceArg.split('=').slice(1).join('=');
         if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').slice(1).join('=');
         if (worldIdArg) world_id_to_launch = worldIdArg.split('=').slice(1).join('=');
+        if (uuidArg) uuid_to_launch = uuidArg.split('=').slice(1).join('=');
     }
 
     let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
     if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
     else argsFromUrl = [];
+    argsFromUrl = argsFromUrl.map(decodeURIComponent);
     if (argsFromUrl.includes("debug")) {
-        enableDev = true;
+        argsFromUrl.splice(argsFromUrl.indexOf("debug"), 1);
+    }
+
+    dont_launch = args.includes("--noLaunch");
+    if (argsFromUrl.includes("noLaunch")) {
+        dont_launch = true;
+        argsFromUrl.splice(argsFromUrl.indexOf("noLaunch"), 1);
     }
 
     if (argsFromUrl[0] == "launch") {
         if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
         if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
         if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
+        if (argsFromUrl[4]) uuid_to_launch = argsFromUrl[4];
     }
 
-    dont_launch = args.includes("--noLaunch");
+    launchGameFromArgs(instance_id_to_launch, world_type_to_launch, world_id_to_launch, uuid_to_launch);
 
-    if (!instance_id_to_launch) return;
-    if (world_type_to_launch) {
-        playMinecraft(instance_id_to_launch, getDefaultProfile().id, { "type": world_type_to_launch, "info": world_id_to_launch });
-    } else {
-        playMinecraft(instance_id_to_launch, getDefaultProfile().id, {});
+    const installArg = args.find(arg => arg.startsWith("--install="));
+    const installSourceArg = args.find(arg => arg.startsWith("--source="));
+
+    let installInfo = {};
+
+    if (installArg) {
+        let id = installArg.split("=").slice(1).join('=');
+        installInfo = {
+            id,
+            source: installSourceArg ? installSourceArg.split("=").slice(1).join("=") : (isNaN(Number(id)) ? "modrinth" : "curseforge")
+        }
     }
+
+    if (argsFromUrl[0] == "install") {
+        let id = argsFromUrl[1];
+        installInfo = {
+            id,
+            source: argsFromUrl[2] ? argsFromUrl[2] : (isNaN(Number(id)) ? "modrinth" : "curseforge")
+        }
+    }
+
+    let startingPage = args.find(arg => arg.startsWith('--page='));
+    if (startingPage) startingPage = startingPage.split("=")[1];
+
+    if (argsFromUrl[0] == "page") {
+        if (argsFromUrl[1]) startingPage = argsFromUrl[1];
+    }
+
+    let sendToWindow = {
+        instance_id: instance_id_to_launch,
+        world: Boolean(world_type_to_launch),
+        installInfo,
+        page: startingPage
+    }
+    return sendToWindow;
 }
 
-processArgs(args);
+async function launchGameFromArgs(instance_id_to_launch, world_type_to_launch, world_id_to_launch, uuid_to_launch) {
+    if (!instance_id_to_launch) return;
+    try {
+        let profile;
+        if (uuid_to_launch) {
+            profile = getProfileDatabase(uuid_to_launch);
+        } else {
+            profile = getDefaultProfile();
+        }
+        if (!profile) {
+            throw new Error(uuid_to_launch ? "Unable to find profile; Invalid uuid: " + uuid_to_launch : "Unable to find profile; No default profile set");
+        }
+        let profile_id = profile.id;
+        if (world_type_to_launch) {
+            await playMinecraft(instance_id_to_launch, profile_id, { "type": world_type_to_launch, "info": world_id_to_launch });
+        } else {
+            await playMinecraft(instance_id_to_launch, profile_id, {});
+        }
+        if (dont_launch) app.quit();
+    } catch (e) {
+        dialog.showErrorBox("Unable to launch Minecraft", "An error occured when trying to launch Minecraft. " + e.message);
+        if (dont_launch) app.quit();
+    }
+}
 
 let svgData = fs.readFileSync(path.resolve(__dirname, "resources/default.svg"), 'utf8');
 let lang = JSON.parse(fs.readFileSync(path.resolve(__dirname, "resources", "lang", `en-us.json`), 'utf-8'));
@@ -178,10 +241,9 @@ function translate(key, ...params) {
     return value;
 }
 
-let additionalArguments = [`--userDataPath=${user_path}`, `--svgData=${svgData}`].concat(args);
-if (isDev) additionalArguments.push('--dev');
-
-const createWindow = () => {
+const createWindow = (sendToWindow = {}) => {
+    let additionalArguments = [`--userDataPath=${user_path}`, `--svgData=${svgData}`];
+    if (isDev) additionalArguments.push('--dev');
     let state = windowStateKeeper({
         defaultWidth: 1000,
         defaultHeight: 600,
@@ -241,6 +303,7 @@ const createWindow = () => {
     if (!enableDev) {
         Menu.setApplicationMenu(null);
     }
+    win.webContents.send('arg-info', sendToWindow);
 }
 
 let openedFile = null;
@@ -265,16 +328,17 @@ if (!gotTheLock) {
                 win.webContents.send('open-file', openedFile);
             }
         }
-        processArgs(commandLine);
-        if (win && win.webContents) win.webContents.send('new-args', commandLine);
+        let sendToWindow = processArgs(commandLine);
+        if (win && win.webContents) win.webContents.send('arg-info', sendToWindow);
     });
 
     app.whenReady().then(() => {
+        let sendToWindow = processArgs(process.argv);
         if (dont_launch) {
             return;
         }
         app.setAppUserModelId('me.illusioner.enderlynx');
-        createWindow();
+        createWindow(sendToWindow);
         rpc.login({ clientId }).catch(console.error);
         if (!app.isDefaultProtocolClient('enderlynx') && !isDev) {
             app.setAsDefaultProtocolClient('enderlynx', process.execPath, []);
@@ -349,7 +413,7 @@ const rpc = new RPC.Client({ transport: 'ipc' });
 
 rpc.on('ready', () => {
     ipcMain.on('set-discord-activity', (_, activity) => {
-        let rpc_enabled = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("discord_rpc");
+        let rpc_enabled = getDefault("discord_rpc");
         let enabled = rpc_enabled?.value ? rpc_enabled.value == "true" : true;
         if (!enabled) return;
         rpc.setActivity(activity);
@@ -1833,12 +1897,10 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
         }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, quickPlay, false, instance_info.allocated_ram || 4096, instance_info.java_installation, parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("pid", minecraft.pid, instance_id);
         updateInstance("current_log_file", minecraft.log, instance_id);
-        if (dont_launch) app.quit();
         return { minecraft, player_info }
     } catch (err) {
         console.error(err);
-        if (dont_launch) app.quit();
-        throw new Error("Unable to launch Minecraft");
+        throw new Error("Unable to launch Minecraft: " + err.message);
     }
 }
 

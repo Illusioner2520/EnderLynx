@@ -252,7 +252,7 @@ window.enderlynx.onInstanceUpdated((key, value, instance_id) => {
 
 class Instance {
     constructor(content) {
-        if (!content) return;
+        if (!content) throw new Error("Instance not found");
         this.name = content.name;
         this.date_created = new Date(content.date_created);
         this.date_modified = new Date(content.date_modified);
@@ -3949,20 +3949,27 @@ async function applyDefaults() {
     }
     let defaultpage = await getDefault("default_page");
     if (dont_override_my_page) return;
-    let other_default_page = window.enderlynx.isOtherStartingPage();
-    if (other_default_page) defaultpage = other_default_page;
-    if (defaultpage == "home") {
+    setPage(defaultpage);
+}
+
+window.enderlynx.onPage((page) => setPage(page));
+
+function setPage(page) {
+    for (let i = 0; i < navButtons.length; i++) {
+        navButtons[i].removeSelected();
+    }
+    if (page == "home") {
         homeButton.setSelected();
         homeContent.displayContent();
-    } else if (defaultpage == "instances") {
+    } else if (page == "instances") {
         instanceButton.setSelected();
         instanceContent.displayContent();
-    } else if (defaultpage == "discover") {
+    } else if (page == "discover") {
         setTimeout(() => {
             discoverButton.setSelected();
             discoverContent.displayContent();
         }, 0);
-    } else if (defaultpage == "wardrobe") {
+    } else if (page == "wardrobe") {
         wardrobeButton.setSelected();
         wardrobeContent.displayContent();
     }
@@ -5551,7 +5558,6 @@ async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_t
     }
     instanceButton.setSelected();
     let running = checkForProcess(instanceInfo.pid);
-    if (!running) instanceInfo.setPid(null);
     content.innerHTML = "";
     let ele = document.createElement("div");
     content.appendChild(ele);
@@ -8733,9 +8739,9 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
         dont_override_my_page = true;
         let pid = instance.pid;
         if (checkForProcess(pid)) {
-            showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content");
+            showSpecificInstanceContent(instance, launch_info.world ? "worlds" : "content");
         } else {
-            showSpecificInstanceContent(instance, launch_info.world_type ? "worlds" : "content", undefined, true);
+            showSpecificInstanceContent(instance, launch_info.world ? "worlds" : "content", undefined, true);
         }
     } catch (e) {
         displayError(translate("app.launch_error"));

@@ -9,80 +9,26 @@ let cfServerInfo = {};
 
 let userPath = path.resolve(process.argv.find(arg => arg.startsWith('--userDataPath=')).split('=')[1]);
 
-let enableDevMode = false;
+let enableDevMode = process.argv.includes("--dev");
+let pageCallback = () => { };
 let launchInstanceCallback = () => { };
 let installInstanceCallback = () => { }
-let instance_id_to_launch = "";
-let world_type_to_launch = "";
-let world_id_to_launch = "";
 let startingPage = null;
 let installInfo = {};
+let launchInfo = {};
 
-function processArgs(args) {
-    const instanceArg = args.find(arg => arg.startsWith('--instance='));
-    const worldTypeArg = args.find(arg => arg.startsWith('--worldType='));
-    const worldIdArg = args.find(arg => arg.startsWith('--worldId='));
-
-    const installArg = args.find(arg => arg.startsWith("--install="));
-    const installSourceArg = args.find(arg => arg.startsWith("--source="));
-
-    enableDevMode = args.includes("--dev");
-
-    let argsFromUrl = args.find(arg => arg.startsWith('enderlynx://'));
-    if (argsFromUrl) argsFromUrl = argsFromUrl.split("/").slice(2);
-    else argsFromUrl = [];
-    if (argsFromUrl.includes("debug")) argsFromUrl.splice(argsFromUrl.indexOf("debug"), 1);
-    argsFromUrl = argsFromUrl.map(decodeURIComponent);
-
-    if (instanceArg) {
-        if (instanceArg) instance_id_to_launch = instanceArg.split('=').slice(1).join('=');
-        if (worldTypeArg) world_type_to_launch = worldTypeArg.split('=').slice(1).join('=');
-        if (worldIdArg) world_id_to_launch = worldIdArg.split('=').slice(1).join('=');
+function processInfo(info) {
+    launchInfo = {
+        instance_id: info.instance_id,
+        world: info.world
     }
+    startingPage = info.page;
+    installInfo = info.installInfo;
 
-    if (argsFromUrl[0] == "launch") {
-        if (argsFromUrl[1]) instance_id_to_launch = argsFromUrl[1];
-        if (argsFromUrl[2]) world_type_to_launch = argsFromUrl[2];
-        if (argsFromUrl[3]) world_id_to_launch = argsFromUrl[3];
-    }
-
-    if (installArg) {
-        let id = installArg.split("=").slice(1).join('=');
-        installInfo = {
-            id,
-            source: installSourceArg ? installSourceArg.split("=").slice(1).join("=") : (isNaN(Number(id)) ? "modrinth" : "curseforge")
-        }
-    }
-
-    if (argsFromUrl[0] == "install") {
-        let id = argsFromUrl[1];
-        installInfo = {
-            id,
-            source: argsFromUrl[2] ? argsFromUrl[2] : (isNaN(Number(id)) ? "modrinth" : "curseforge")
-        }
-    }
-
-    startingPage = args.find(arg => arg.startsWith('--page='));
-    if (startingPage) startingPage = startingPage.split("=")[1];
-
-    if (argsFromUrl[0] == "page") {
-        if (argsFromUrl[1]) startingPage = argsFromUrl[1];
-    }
-
-    if (launchInstanceCallback) {
-        launchInstanceCallback({
-            instance_id: instance_id_to_launch,
-            world_type: world_type_to_launch,
-            world_id: world_id_to_launch
-        });
-    }
-
-    if (installInstanceCallback) {
-        installInstanceCallback(installInfo);
-    }
+    if (installInstanceCallback) installInstanceCallback(installInfo);
+    if (launchInstanceCallback) launchInstanceCallback(launchInfo);
+    if (pageCallback) pageCallback(info.page);
 }
-
-processArgs(process.argv.slice(1));
 
 let svgData = process.argv.find(arg => arg.startsWith('--svgData=')).split('=').slice(1).join('=');
 
@@ -107,8 +53,8 @@ async function readCfZip(file_path) {
     return await ipcRenderer.invoke('read-cfzip', file_path);
 }
 
-ipcRenderer.on('new-args', (event, newargs) => {
-    processArgs(newargs.slice(1));
+ipcRenderer.on('arg-info', (event, info) => {
+    processInfo(info);
 });
 
 contextBridge.exposeInMainWorld('enderlynx', {
@@ -408,17 +354,13 @@ contextBridge.exposeInMainWorld('enderlynx', {
             callback(key, value, instance_id);
         });
     },
-    isOtherStartingPage: () => {
-        if (startingPage) return startingPage;
-        return false;
+    onPage: async (callback) => {
+        pageCallback = callback;
+        if (startingPage) callback (startingPage);
     },
     onLaunchInstance: async (callback) => {
         launchInstanceCallback = callback;
-        if (instance_id_to_launch) callback({
-            instance_id: instance_id_to_launch,
-            world_type: world_type_to_launch,
-            world_id: world_id_to_launch
-        });
+        if (launchInfo) callback(launchInfo);
     },
     onInstallInstance: async (callback) => {
         installInstanceCallback = callback;
