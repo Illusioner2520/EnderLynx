@@ -709,8 +709,8 @@ ipcMain.handle('get-worlds', async (_, savesPath) => {
     return await getWorlds(savesPath);
 });
 
-ipcMain.handle('get-world', async (_, levelDatPath) => {
-    return await getWorld(levelDatPath);
+ipcMain.handle('get-world', async (_, instance_id, world_id) => {
+    return await getWorld(path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id, "level.dat"));
 });
 
 async function getWorlds(savesPath) {
@@ -3164,25 +3164,63 @@ ipcMain.handle('trigger-microsoft-login', async () => {
 ipcMain.handle('get-instance-files', async (_, instance_id) => {
     const dirPath = path.resolve(user_path, "minecraft", "instances", instance_id);
     if (!fs.existsSync(dirPath)) return [];
-    async function getAllFilesRecursive(baseDir, relDir = "") {
-        const absDir = path.join(baseDir, relDir);
-        let results = [];
-        const entries = await fsPromises.readdir(absDir, { withFileTypes: true });
-        if (entries.length == 0) {
-            results.push(relDir.replace(/\\/g, "/"));
-        }
-        for (const entry of entries) {
-            const relPath = path.join(relDir, entry.name);
-            if (entry.isDirectory()) {
-                results = results.concat(await getAllFilesRecursive(baseDir, relPath));
-            } else {
-                results.push(relPath.replace(/\\/g, "/"));
-            }
-        }
-        return results;
-    }
-    return await getAllFilesRecursive(dirPath);
+    return (await getAllFilesRecursive(dirPath)).results;
 });
+
+async function getAllFilesRecursive(baseDir, relDir = "", processDatFiles) {
+    const absDir = path.join(baseDir, relDir);
+    let results = [];
+    const entries = await fsPromises.readdir(absDir, { withFileTypes: true });
+    if (entries.length == 0) {
+        results.push(relDir.replace(/\\/g, "/"));
+    }
+    let datFileData = {};
+    for (const entry of entries) {
+        const relPath = path.join(relDir, entry.name);
+        if (entry.isDirectory()) {
+            let newResults = await getAllFilesRecursive(baseDir, relPath, processDatFiles);
+            datFileData = {
+                ...datFileData,
+                ...newResults.datFileData
+            }
+            results = results.concat(newResults.results);
+        } else {
+            try {
+                if (processDatFiles && (path.extname(relPath) == ".dat" || path.extname(relPath) == ".dat_old")) {
+                    let buffer = await fsPromises.readFile(path.resolve(absDir, entry.name));
+                    let data = await nbt.parse(buffer);
+                    datFileData[relPath.replace(/\\/g, "/")] = data.parsed;
+                }
+            } catch (e) { }
+            results.push(relPath.replace(/\\/g, "/"));
+        }
+    }
+    console.log(relDir);
+    console.log(Object.keys(datFileData));
+    return { results, datFileData };
+}
+
+ipcMain.handle('get-world-files', async (_, instance_id, world_id) => {
+    const dirPath = path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id);
+    if (!fs.existsSync(dirPath)) return [];
+    return await getAllFilesRecursive(dirPath, undefined, true);
+});
+
+ipcMain.handle('set-world-dat', async (_, instance_id, world_id, datInfo) => {
+    let files = Object.keys(datInfo);
+    const worldPath = path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id);
+    try {
+        for (let i = 0; i < files.length; i++) {
+            let filePath = path.resolve(worldPath, files[i]);
+            const newBuffer = nbt.writeUncompressed(datInfo[files[i]]);
+            const newerBuffer = zlib.gzipSync(newBuffer);
+            await fsPromises.writeFile(filePath, newerBuffer);
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+})
 
 function readElPack(file_path) {
     try {

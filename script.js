@@ -3483,6 +3483,19 @@ async function showHomeContent(oldEle) {
                         window.enderlynx.openWorldFolder(instanceInfo.instance_id, e.id);
                     }
                 } : null,
+                e.type == "singleplayer" ? {
+                    "title": translate("app.worlds.edit"),
+                    "icon": '<i class="fa-solid fa-pencil"></i>',
+                    "func": () => {
+                        openWorldEditDialog(instanceInfo.instance_id, worlds[i].id, async () => {
+                            e = {
+                                ...e,
+                                ...(await window.enderlynx.getWorld(instanceInfo.instance_id, e.id))
+                            }
+                            itemDesc2.innerHTML = (e.type == "singleplayer" ? (e.hardcore ? "<span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : translate("app.worlds.description." + e.mode)) : e.ip);
+                        });
+                    }
+                } : null,
                 {
                     "title": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
                     "icon": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
@@ -7110,6 +7123,13 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             }
                         },
                         {
+                            "title": translate("app.worlds.edit"),
+                            "icon": '<i class="fa-solid fa-pencil"></i>',
+                            "func": () => {
+                                openWorldEditDialog(instanceInfo.instance_id, worlds[i].id, () => setInstanceTabContentWorlds(instanceInfo, element));
+                            }
+                        },
+                        {
                             "title": async () => await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
                             "icon": async () => await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
                             "func": async (e) => {
@@ -8997,16 +9017,9 @@ class MultipleFileSelect {
                 chevron = document.createElement("button");
                 chevron.className = "multiple-file-select-chevron";
                 chevron.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
-                chevron.style.cursor = "pointer";
                 chevron.onclick = (e) => {
                     e.stopPropagation();
                     this.toggleExpand(fullPath, childContainer, chevron);
-                };
-                chevron.onkeydown = (e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        chevron.click();
-                    }
                 };
                 item.appendChild(chevron);
             } else {
@@ -9151,6 +9164,665 @@ class MultipleFileSelect {
     }
 }
 
+class WorldNBTEditor {
+    static numberTypes = ["byte", "int", "short", "float", "double"];
+    static arrayTypes = ["byteArray", "intArray", "shortArray", "longArray"];
+
+    constructor(element, options) {
+        element.className = "multiple-file-select-wrapper";
+        this.expanded = new Set();
+        this.options = options;
+
+        this.datState = structuredClone(options.datFileData);
+
+        this.itemList = document.createElement("div");
+        this.itemList.className = "multiple-file-select";
+        element.appendChild(this.itemList);
+
+        this.tree = this.buildTree(options.results);
+        this.renderTree(this.tree, this.itemList);
+    }
+
+    buildTree(paths) {
+        const root = {};
+        for (const path of paths) {
+            const parts = path.split(/\/\/|\/|\\/);
+            let node = root;
+
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (!node[part]) {
+                    node[part] = {
+                        children: {},
+                        isFile: false,
+                        isDat: Boolean(this.datState[parts.slice(0, i + 1).join("/")]),
+                        path: parts.slice(0, i + 1).join("/")
+                    };
+                }
+                node = node[part].children;
+            }
+        }
+        return root;
+    }
+
+    renderTree(node, container, parentPath = "") {
+        for (const key of Object.keys(node)) {
+            const data = node[key];
+            const fullPath = parentPath ? `${parentPath}/${key}` : key;
+
+            const item = document.createElement("div");
+            item.className = "multiple-file-select-item";
+
+            let chevron = null;
+            if (Object.keys(data.children).length || data.isDat) {
+                chevron = document.createElement("button");
+                chevron.className = "multiple-file-select-chevron";
+                chevron.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+                chevron.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleExpand(fullPath, childContainer, chevron);
+                };
+                item.appendChild(chevron);
+            } else {
+                const spacer = document.createElement("span");
+                spacer.style.display = "inline-block";
+                spacer.style.width = "20px";
+                item.appendChild(spacer);
+            }
+
+            const label = document.createElement("span");
+            label.className = "multiple-file-select-title";
+            label.textContent = key;
+            item.appendChild(label);
+
+            if (data.isDat) {
+                const addBtn = document.createElement("button");
+                addBtn.className = "nbt-button";
+                addBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                addBtn.onclick = () => {
+                    this.addPropertyUI(this.datState[fullPath].value, childContainer);
+                    this.expanded.add(fullPath);
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                };
+                item.appendChild(addBtn);
+            }
+
+            container.appendChild(item);
+
+            const childContainer = document.createElement("div");
+            childContainer.className = "multiple-file-select-child-container";
+            childContainer.style.paddingLeft = "20px";
+
+            if (this.expanded.has(fullPath)) {
+                childContainer.classList.add("shown");
+            }
+
+            container.appendChild(childContainer);
+
+            if (Object.keys(data.children).length) {
+                this.renderTree(data.children, childContainer, fullPath);
+            }
+
+            if (data.isDat) {
+                console.log(this.datState[fullPath]);
+                console.log(fullPath);
+                this.renderCompound(
+                    this.datState[fullPath].value,
+                    childContainer,
+                    fullPath
+                );
+            }
+        }
+    }
+
+    processLongA(arr) {
+        let a = BigInt(arr[0]);
+        let b = BigInt(arr[1]);
+        return (a << 32n) | b;
+    }
+
+    processLongB(num) {
+        let a = Number(num >> 32n);
+        let b = Number(num & ((1n << 32n) - 1n));
+        return [a, b];
+    }
+
+    validateInput(input, type) {
+        type = type.replace("Array", "");
+        let wholeNumbers = ["byte", "int", "short"];
+        if (wholeNumbers.includes(type) && input % 1 != 0) {
+            return "Value must be whole";
+        }
+        let max = {
+            "byte": 127,
+            "int": 2147483647,
+            "short": 32767,
+            "float": 3.4028235e+38,
+            "double": Number.MAX_VALUE
+        }
+        let min = {
+            "byte": -128,
+            "int": -2147483648,
+            "short": -32768,
+            "float": -3.4028235e+38,
+            "double": Number.MIN_VALUE
+        }
+        if (max[type] && input > max[type]) {
+            return "Value cannot be greater than " + max[type];
+        }
+        if (min[type] && input < min[type]) {
+            return "Value cannot be less than " + min[type];
+        }
+        if (type != "long") return;
+        let n;
+        try {
+            n = BigInt(input);
+            this.processLongB(n);
+        } catch (e) {
+            return "Unable to parse number";
+        }
+        if (n > 9223372036854775807n) {
+            return "Value cannot be greater than 9223372036854775807";
+        }
+        if (n < -9223372036854775808n) {
+            return "Value cannot be less than -9223372036854775808";
+        }
+    }
+
+    renderCompound(compound, container, parentPath = "") {
+        [...container.children].forEach(e => {
+            if (e.matches(".nbt-item, .multiple-file-select-child-container")) {
+                e.remove();
+            }
+        });
+        let keys = Object.keys(compound);
+        keys.sort();
+        for (const key of keys) {
+            const tag = compound[key];
+            const nbtPath = parentPath ? `${parentPath}/${key}` : key;
+
+            const item = document.createElement("div");
+            item.className = "multiple-file-select-item nbt-item";
+
+            const isCompound = tag.type === "compound";
+            const isList = tag.type === "list";
+            const isArray = WorldNBTEditor.arrayTypes.includes(tag.type);
+
+            let chevron = null;
+            if (isCompound || isList || isArray) {
+                chevron = document.createElement("button");
+                chevron.className = "multiple-file-select-chevron";
+                chevron.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+                item.appendChild(chevron);
+            } else {
+                const spacer = document.createElement("span");
+                spacer.style.width = "20px";
+                spacer.style.display = "inline-block";
+                item.appendChild(spacer);
+            }
+
+            item.appendChild(document.createTextNode(key + ":"));
+
+            const childContainer = document.createElement("div");
+            childContainer.className = "multiple-file-select-child-container";
+            childContainer.style.paddingLeft = "20px";
+
+            if (isCompound) {
+                const addBtn = document.createElement("button");
+                addBtn.className = "nbt-button";
+                addBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                addBtn.onclick = () => {
+                    this.addPropertyUI(tag.value, childContainer, nbtPath);
+                    this.expanded.add(nbtPath);
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                };
+                item.appendChild(addBtn);
+
+                chevron.onclick = () => this.toggleExpand(nbtPath, childContainer, chevron);
+
+                container.appendChild(item);
+                container.appendChild(childContainer);
+
+                if (this.expanded.has(nbtPath)) {
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                }
+
+                const del = document.createElement("button");
+                del.className = "nbt-button";
+                del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                del.onclick = () => {
+                    delete compound[key];
+                    item.remove();
+                    childContainer.remove();
+                };
+                item.appendChild(del);
+
+                this.renderCompound(tag.value, childContainer, nbtPath);
+                continue;
+            }
+
+            if (isList) {
+                const listPath = `${nbtPath}[]`;
+
+                if (tag.value.type != "end") {
+                    const addBtn = document.createElement("button");
+                    addBtn.className = "nbt-button";
+                    addBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                    addBtn.onclick = () => {
+                        this.addListItemUI(tag, childContainer, listPath);
+                        this.expanded.add(listPath);
+                        childContainer.classList.add("shown");
+                        chevron.style.rotate = "90deg";
+                    };
+                    item.appendChild(addBtn);
+                }
+
+                chevron.onclick = () => this.toggleExpand(listPath, childContainer, chevron);
+
+                container.appendChild(item);
+                container.appendChild(childContainer);
+
+                if (this.expanded.has(listPath)) {
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                }
+
+                const del = document.createElement("button");
+                del.className = "nbt-button";
+                del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                del.onclick = () => {
+                    delete compound[key];
+                    item.remove();
+                    childContainer.remove();
+                };
+                item.appendChild(del);
+
+                this.renderList(tag, childContainer, listPath);
+                continue;
+            }
+
+            if (isArray) {
+                const listPath = `${nbtPath}[]`;
+
+                const addBtn = document.createElement("button");
+                addBtn.className = "nbt-button";
+                addBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                addBtn.onclick = () => {
+                    this.addListItemUI(tag, childContainer, listPath, "array");
+                    this.expanded.add(listPath);
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                };
+                item.appendChild(addBtn);
+
+                chevron.onclick = () => this.toggleExpand(nbtPath, childContainer, chevron);
+
+                container.appendChild(item);
+                container.appendChild(childContainer);
+
+                if (this.expanded.has(nbtPath)) {
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                }
+
+                const del = document.createElement("button");
+                del.className = "nbt-button";
+                del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                del.onclick = () => {
+                    delete compound[key];
+                    item.remove();
+                    childContainer.remove();
+                };
+                item.appendChild(del);
+
+                this.renderList(tag, childContainer, listPath, "array");
+                continue;
+            }
+
+            const valueInput = document.createElement("input");
+            valueInput.className = "nbt-value";
+            valueInput.type = WorldNBTEditor.numberTypes.includes(tag.type) ? "number" : "text";
+            valueInput.value = Array.isArray(tag.value) ? this.processLongA(tag.value) : tag.value;
+            valueInput.oninput = () => {
+                let message = this.validateInput(valueInput.value, tag.type);
+                if (message) {
+                    item.classList.add("danger");
+                    item.title = message;
+                } else {
+                    item.classList.remove("danger");
+                    item.title = "";
+                }
+                tag.value = valueInput.type === "number" ? Number(valueInput.value) : tag.type == "long" ? this.processLongB(BigInt(valueInput.value)) : valueInput.value;
+            };
+            item.appendChild(valueInput);
+
+            const del = document.createElement("button");
+            del.className = "nbt-button";
+            del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            del.onclick = () => {
+                delete compound[key];
+                item.remove();
+            };
+            item.appendChild(del);
+
+            container.appendChild(item);
+        }
+    }
+
+    renderList(tag, container, parentPath, type) {
+        [...container.children].forEach(e => {
+            if (e.matches(".nbt-item, .multiple-file-select-child-container")) {
+                e.remove();
+            }
+        });
+
+        const elementType = type == "array" ? tag.type : tag.value.type;
+        const values = type == "array" ? tag.value : tag.value.value;
+
+        values.forEach((val, index) => {
+            const itemPath = `${parentPath}/${index}`;
+
+            const row = document.createElement("div");
+            row.className = "multiple-file-select-item nbt-item";
+
+            let chevron = null;
+
+            if (elementType === "compound") {
+                chevron = document.createElement("button");
+                chevron.className = "multiple-file-select-chevron";
+                chevron.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+                row.appendChild(chevron);
+            } else {
+                const spacer = document.createElement("span");
+                spacer.style.width = "20px";
+                spacer.style.display = "inline-block";
+                row.appendChild(spacer);
+            }
+
+            const indexLabel = document.createElement("span");
+            indexLabel.className = "nbt-list-index";
+            indexLabel.textContent = `[${index}]`;
+            row.appendChild(indexLabel);
+
+            const childContainer = document.createElement("div");
+            childContainer.className = "multiple-file-select-child-container";
+            childContainer.style.paddingLeft = "20px";
+
+            if (elementType === "compound") {
+                const addBtn = document.createElement("button");
+                addBtn.className = "nbt-button";
+                addBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+                addBtn.onclick = () => {
+                    this.addPropertyUI(val, childContainer, itemPath);
+                    this.expanded.add(itemPath);
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                };
+                row.appendChild(addBtn);
+
+                const del = document.createElement("button");
+                del.className = "nbt-button";
+                del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                del.onclick = () => {
+                    values.splice(index, 1);
+                    row.remove();
+                    childContainer.remove();
+                    this.renderList(tag, container, parentPath, type);
+                };
+                row.appendChild(del);
+
+                chevron.onclick = () =>
+                    this.toggleExpand(itemPath, childContainer, chevron);
+
+                container.appendChild(row);
+                container.appendChild(childContainer);
+
+                if (this.expanded.has(itemPath)) {
+                    childContainer.classList.add("shown");
+                    chevron.style.rotate = "90deg";
+                }
+
+                this.renderCompound(val, childContainer, itemPath);
+                return;
+            }
+
+            const valueInput = document.createElement("input");
+            valueInput.className = "nbt-value";
+            valueInput.type = WorldNBTEditor.numberTypes.includes(elementType) ? "number" : "text";
+            valueInput.value = elementType == "long" || elementType == "longArray" ? this.processLongA(val) : val;
+            valueInput.oninput = () => {
+                let message = this.validateInput(valueInput.value, elementType);
+                if (message) {
+                    row.classList.add("danger");
+                    row.title = message;
+                } else {
+                    row.classList.remove("danger");
+                    row.title = "";
+                }
+                values[index] = valueInput.type === "number" ? Number(valueInput.value) : elementType == "long" || elementType == "longArray" ? this.processLongB(BigInt(valueInput.value)) : valueInput.value;
+            };
+            row.appendChild(valueInput);
+
+            const del = document.createElement("button");
+            del.className = "nbt-button";
+            del.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            del.onclick = () => {
+                values.splice(index, 1);
+                this.renderList(tag, container, parentPath, type);
+            };
+            row.appendChild(del);
+
+            container.appendChild(row);
+        });
+    }
+
+    addPropertyUI(targetCompound, container, parentPath) {
+        const row = document.createElement("div");
+        row.className = "multiple-file-select-item nbt-add-row";
+
+        const spacer = document.createElement("span");
+        spacer.style.display = "inline-block";
+        spacer.style.width = "20px";
+        row.appendChild(spacer);
+
+        const nameInput = document.createElement("input");
+        nameInput.className = "nbt-key";
+        nameInput.placeholder = translate("app.worlds.edit.key");
+        row.appendChild(nameInput);
+
+        row.appendChild(document.createTextNode(":\u00A0"));
+
+        let dropdownElement = document.createElement("div");
+        dropdownElement.className = "nbt-dropdown";
+        row.appendChild(dropdownElement);
+
+        const valueInput = document.createElement("input");
+        valueInput.className = "nbt-value";
+        valueInput.placeholder = translate("app.worlds.edit.value");
+        valueInput.type = "number";
+
+        const dropdown = new SearchDropdown(
+            "",
+            [
+                { name: translate("app.worlds.edit.type.string"), value: "string" },
+                { name: translate("app.worlds.edit.type.int"), value: "int" },
+                { name: translate("app.worlds.edit.type.double"), value: "double" },
+                { name: translate("app.worlds.edit.type.compound"), value: "compound" },
+                { name: translate("app.worlds.edit.type.byte"), value: "byte" },
+                { name: translate("app.worlds.edit.type.short"), value: "short" },
+                { name: translate("app.worlds.edit.type.long"), value: "long" },
+                { name: translate("app.worlds.edit.type.float"), value: "float" },
+                { name: translate("app.worlds.edit.type.list_string"), value: "list_string" },
+                { name: translate("app.worlds.edit.type.list_int"), value: "list_int" },
+                { name: translate("app.worlds.edit.type.list_double"), value: "list_double" },
+                { name: translate("app.worlds.edit.type.list_compound"), value: "list_compound" },
+                { name: translate("app.worlds.edit.type.list_byte"), value: "list_byte" },
+                { name: translate("app.worlds.edit.type.list_short"), value: "list_short" },
+                { name: translate("app.worlds.edit.type.list_long"), value: "list_long" },
+                { name: translate("app.worlds.edit.type.list_float"), value: "list_float" },
+                { name: translate("app.worlds.edit.type.intArray"), value: "intArray" },
+                { name: translate("app.worlds.edit.type.byteArray"), value: "byteArray" },
+                { name: translate("app.worlds.edit.type.shortArray"), value: "shortArray" },
+                { name: translate("app.worlds.edit.type.longArray"), value: "longArray" }
+            ],
+            dropdownElement,
+            "int",
+            (selected) => {
+                valueInput.type = WorldNBTEditor.numberTypes.includes(selected) ? "number" : "text";
+                if (selected === "compound" || selected.startsWith("list_") || WorldNBTEditor.arrayTypes.includes(selected)) {
+                    valueInput.style.display = "none";
+                } else {
+                    valueInput.style.display = "";
+                }
+            }
+        );
+
+        row.appendChild(valueInput);
+
+        const addBtn = document.createElement("button");
+        addBtn.className = "nbt-button";
+        addBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        addBtn.onclick = () => {
+            let type = dropdown.value;
+            if (type.startsWith("list_")) type = "list";
+            let vals = {
+                "compound": {},
+                "list": {
+                    type: dropdown.value.replace("list_", ""),
+                    value: []
+                },
+                "intArray": [],
+                "byteArray": [],
+                "longArray": [],
+                "shortArray": [],
+                "string": valueInput?.value,
+                "int": Number(valueInput?.value),
+                "byte": Number(valueInput?.value),
+                "short": Number(valueInput?.value),
+                "long": () => {
+                    try {
+                        return this.processLongB(BigInt(valueInput?.value))
+                    } catch (e) {
+                        return [0, 0];
+                    }
+                },
+                "float": Number(valueInput?.value),
+                "double": Number(valueInput?.value)
+            }
+            targetCompound[nameInput.value] = {
+                type,
+                value: typeof vals[type] == 'function' ? vals[type]() : vals[type]
+            };
+
+            // auto-open compound
+            this.expanded.add(parentPath);
+            container.classList.add("shown");
+
+            row.remove();
+            this.renderCompound(targetCompound, container, parentPath);
+        };
+
+        const remBtn = document.createElement("button");
+        remBtn.className = "nbt-button";
+        remBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        remBtn.onclick = () => {
+            row.remove();
+        }
+
+        row.appendChild(addBtn);
+        row.appendChild(remBtn);
+        container.prepend(row);
+    }
+
+    addListItemUI(tag, container, parentPath, type) {
+        const row = document.createElement("div");
+        row.className = "multiple-file-select-item nbt-add-row";
+
+        const spacer = document.createElement("span");
+        spacer.style.width = "20px";
+        spacer.style.display = "inline-block";
+        row.appendChild(spacer);
+
+        let o = type == "array" ? tag : tag.value;
+        let elementType = type == "array" ? o.type.replace("Array", "") : o.type;
+
+        let valueInput = null;
+
+        let addFunction = () => {
+            let vals = {
+                "compound": {},
+                "intArray": [],
+                "byteArray": [],
+                "longArray": [],
+                "shortArray": [],
+                "string": valueInput?.value,
+                "int": Number(valueInput?.value),
+                "byte": Number(valueInput?.value),
+                "short": Number(valueInput?.value),
+                "long": () => {
+                    try {
+                        return this.processLongB(BigInt(valueInput?.value))
+                    } catch (e) {
+                        return [0, 0];
+                    }
+                },
+                "float": Number(valueInput?.value),
+                "double": Number(valueInput?.value)
+            }
+
+            o.value.push(typeof vals[elementType] == 'function' ? vals[elementType]() : vals[elementType]);
+
+            row.remove();
+            this.renderList(tag, container, parentPath, type);
+        }
+
+        if (elementType !== "compound" && !WorldNBTEditor.arrayTypes.includes(elementType)) {
+            valueInput = document.createElement("input");
+            valueInput.placeholder = translate("app.worlds.edit.value");
+            valueInput.className = "nbt-value";
+            valueInput.type = WorldNBTEditor.numberTypes.includes(elementType) ? "number" : "text";
+            row.appendChild(valueInput);
+        } else {
+            addFunction();
+            return;
+        }
+
+        const addBtn = document.createElement("button");
+        addBtn.className = "nbt-button";
+        addBtn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        addBtn.onclick = addFunction;
+
+        const remBtn = document.createElement("button");
+        remBtn.className = "nbt-button";
+        remBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        remBtn.onclick = () => {
+            row.remove();
+        }
+
+        row.appendChild(addBtn);
+        row.appendChild(remBtn);
+        container.prepend(row);
+    }
+
+    toggleExpand(path, container, chevron) {
+        if (this.expanded.has(path)) {
+            this.expanded.delete(path);
+            container.classList.remove("shown");
+            chevron.style.rotate = "0deg";
+        } else {
+            this.expanded.add(path);
+            container.classList.add("shown");
+            chevron.style.rotate = "90deg";
+        }
+    }
+
+    getDatState() {
+        return this.datState;
+    }
+}
 
 class MultipleSelect {
     constructor(element, options) {
@@ -14456,4 +15128,23 @@ document.body.ondrop = (e) => {
 function getDefaultImage(code) {
     let data = window.enderlynx.getDefaultImage(code);
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
+}
+
+async function openWorldEditDialog(instance_id, world_id, refresh) {
+    let content = await window.enderlynx.getWorldFiles(instance_id, world_id);
+    let editElement = document.createElement("div");
+    let editor = new WorldNBTEditor(editElement, content);
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.worlds.edit.title"), "notice", editElement, [
+        { "type": "cancel", "content": translate("app.worlds.edit.cancel") },
+        { "type": "confirm", "content": translate("app.worlds.edit.confirm") }
+    ], [], async () => {
+        let success = await window.enderlynx.setWorldDat(instance_id, world_id, editor.getDatState());
+        if (success) {
+            displaySuccess(translate("app.worlds.edit.success"));
+        } else {
+            displayError(translate("app.worlds.edit.fail"));
+        }
+        refresh();
+    });
 }

@@ -124,6 +124,12 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getInstanceFiles: async (instance_id) => {
         return await ipcRenderer.invoke('get-instance-files', instance_id);
     },
+    getWorldFiles: async (instance_id, world_id) => {
+        return await ipcRenderer.invoke('get-world-files', instance_id, world_id);
+    },
+    setWorldDat: async (instance_id, world_id, datInfo) => {
+        return await ipcRenderer.invoke('set-world-dat', instance_id, world_id, datInfo);
+    },
     parseMarkdown: (md) => {
         const mkd = new MarkdownIt('default', {
             html: true,
@@ -194,6 +200,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     stopInstance: async (instance_id) => {
         return await ipcRenderer.invoke('stop-instance', instance_id);
     },
+    getWorld,
     getWorlds,
     getSinglePlayerWorlds,
     deleteServer: async (instance_id, ip, index) => {
@@ -876,8 +883,8 @@ function hashString(str) {
     return Math.abs(hash);
 }
 
-async function getWorld(levelDatPath) {
-    return await ipcRenderer.invoke('get-world', levelDatPath);
+async function getWorld(instance_id, world_id) {
+    return await ipcRenderer.invoke('get-world', instance_id, world_id);
 }
 
 async function getWorlds(patha) {
