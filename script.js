@@ -7112,7 +7112,6 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playSingleplayerWorld(instanceInfo, worlds[i].id);
-                                showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
                         {
@@ -7226,7 +7225,6 @@ async function setInstanceTabContentWorldsReal(instanceInfo, element) {
                             "icon": '<i class="fa-solid fa-play"></i>',
                             "func": async () => {
                                 await playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
-                                showSpecificInstanceContent(instanceInfo, 'worlds');
                             }
                         } : null,
                         {
