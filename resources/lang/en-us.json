@@ -126,6 +126,7 @@
     "app.worlds.edit.type.longArray": "long[]",
     "app.worlds.edit.value": "Value",
     "app.worlds.edit.key": "Key",
+    "app.worlds.edit.warning": "Editing this information has a high chance of corrupting your world. Thus, it is recommended that you do not modify .dat_old files in the event you need to replace .dat files with them.",
     "app.worlds.share": "Share World",
     "app.worlds.delete": "Delete World",
     "app.worlds.play": "Play World",

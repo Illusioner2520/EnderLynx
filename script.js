@@ -9263,8 +9263,6 @@ class WorldNBTEditor {
             }
 
             if (data.isDat) {
-                console.log(this.datState[fullPath]);
-                console.log(fullPath);
                 this.renderCompound(
                     this.datState[fullPath].value,
                     childContainer,
@@ -15130,10 +15128,17 @@ function getDefaultImage(code) {
 
 async function openWorldEditDialog(instance_id, world_id, refresh) {
     let content = await window.enderlynx.getWorldFiles(instance_id, world_id);
+    let wrapper = document.createElement("div");
+    wrapper.className = "world-edit-wrapper";
+    let info = document.createElement("div");
+    info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.worlds.edit.warning");
+    info.className = "info";
+    wrapper.appendChild(info);
     let editElement = document.createElement("div");
     let editor = new WorldNBTEditor(editElement, content);
+    wrapper.appendChild(editElement);
     let dialog = new Dialog();
-    dialog.showDialog(translate("app.worlds.edit.title"), "notice", editElement, [
+    dialog.showDialog(translate("app.worlds.edit.title"), "notice", wrapper, [
         { "type": "cancel", "content": translate("app.worlds.edit.cancel") },
         { "type": "confirm", "content": translate("app.worlds.edit.confirm") }
     ], [], async () => {

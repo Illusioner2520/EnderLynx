@@ -5661,3 +5661,8 @@ body.thin-scrollbars *,
 body.loading * {
     cursor: progress !important;
 }
+
+.world-edit-wrapper {
+    display: grid;
+    gap: 10px;
+}
