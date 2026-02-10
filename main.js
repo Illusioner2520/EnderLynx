@@ -4354,7 +4354,7 @@ ipcMain.handle('get-instance-folder-name', async (_, instance_id) => {
         instance_id = `${baseInstanceId}_${counter}`;
         counter++;
     }
-    fs.mkdirSync(path.resolve(userPath, `minecraft/instances/${instance_id}`), { recursive: true });
+    fs.mkdirSync(path.resolve(user_path, `minecraft/instances/${instance_id}`), { recursive: true });
     return instance_id;
 });
 
@@ -4410,7 +4410,7 @@ ipcMain.handle('get-launcher-instance-path', async (_, launcher) => {
             return fs.existsSync(p) ? p : "";
         }
         case "current": {
-            const p = path.join(userPath, "minecraft/instances");
+            const p = path.join(user_path, "minecraft/instances");
             return fs.existsSync(p) ? p : "";
         }
         default:
