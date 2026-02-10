@@ -1862,8 +1862,8 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     }
 }
 
-ipcMain.handle('play-minecraft', async (_, instance_id, player_id) => {
-    return await playMinecraft(instance_id, player_id);
+ipcMain.handle('play-minecraft', async (_, instance_id, player_id, quickPlay) => {
+    return await playMinecraft(instance_id, player_id, quickPlay);
 });
 
 async function playMinecraft(instance_id, player_id, quickPlay) {
