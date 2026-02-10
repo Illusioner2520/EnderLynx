@@ -7981,8 +7981,8 @@ async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
     let fragment = document.createDocumentFragment();
     let galleryElement = document.createElement("div");
     galleryElement.className = "gallery";
-    fragment.appendChild(galleryElement);
     let screenshots = (await window.enderlynx.getScreenshots(instanceInfo.instance_id)).reverse();
+    let screenshotElements = [];
     screenshots.forEach(e => {
         let screenshotElement = document.createElement("button");
         screenshotElement.className = "gallery-screenshot";
@@ -8044,15 +8044,58 @@ async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
         screenshotElement.oncontextmenu = (e) => {
             contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
-        galleryElement.appendChild(screenshotElement);
+        screenshotElements.push(screenshotElement);
     });
+    let setPage = (page) => {
+        currentPage = page;
+        paginationTop.setPage(page);
+        paginationBottom.setPage(page);
+        let fragment = document.createDocumentFragment();
+        for (let i = 0; i < screenshotElements.length; i++) {
+            screenshotElements[i].remove();
+        }
+        for (let i = pageSize * (page - 1); i < Math.min(screenshotElements.length, pageSize * page); i++) {
+            fragment.appendChild(screenshotElements[i]);
+        }
+        galleryElement.appendChild(fragment);
+    }
+    let paginationTop = new Pagination(1, Math.ceil(screenshots.length / 25), setPage);
+    let paginationBottom = new Pagination(1, Math.ceil(screenshots.length / 25), setPage);
+    paginationTop.element.style.marginBottom = "10px";
+    paginationBottom.element.style.marginTop = "10px";
+    fragment.appendChild(paginationTop.element);
+    fragment.appendChild(galleryElement);
+    fragment.appendChild(paginationBottom.element);
+    element.innerHTML = "";
+    element.appendChild(fragment);
+    let currentPage = 1;
+    let computePageSize = () => {
+        let styles = getComputedStyle(galleryElement);
+        let columns = styles.gridTemplateColumns.split(" ").length;
+        for (let i = 29; i >= 1; i--) {
+            if (i % columns == 0) {
+                let totalPages = Math.ceil(screenshots.length / i);
+                paginationTop.setTotalPages(totalPages);
+                paginationBottom.setTotalPages(totalPages);
+                if (currentPage > totalPages && totalPages != 0) {
+                    setPage(totalPages);
+                }
+                return i;
+            }
+        }
+        return screenshotElements.length;
+    }
+    document.body.onresize = () => {
+        pageSize = computePageSize();
+        setPage(currentPage);
+    }
+    let pageSize = computePageSize();
+    setPage(1);
     if (!screenshots.length) {
         let nofound = new NoResultsFound(translate("app.screenshots.not_found"));
         nofound.element.style.gridColumn = "1 / -1";
         galleryElement.appendChild(nofound.element);
     }
-    element.innerHTML = "";
-    element.appendChild(fragment);
 }
 
 function displayScreenshot(name, desc, file, file_name, instanceInfo, element, list, currentIndex, word = translate("app.screenshot")) {
