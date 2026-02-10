@@ -245,7 +245,7 @@ let instance_watches = {};
 let content_watches = {};
 
 window.enderlynx.onInstanceUpdated((key, value, instance_id) => {
-    if (instance_watches[instance_id]["onchange" + key]) {
+    if (instance_watches[instance_id] && instance_watches[instance_id]["onchange" + key]) {
         instance_watches[instance_id]["onchange" + key](value);
     }
 });
