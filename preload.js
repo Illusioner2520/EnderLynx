@@ -330,8 +330,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     onProgressUpdate: (callback) => {
         ipcRenderer.on('progress-update', (_event, title, progress, desc, id, status, cancel_id, from_launch) => {
-            callback(title, progress, desc, id, status, from_launch ? () => {
-                ipcRenderer.invoke('launch-cancel', cancel_id);
+            callback(title, progress, desc, id, status, from_launch ? async () => {
+                ipcRenderer.invoke('launch-cancel', cancel_id, await translate("app.user.canceled"));
             } : () => {
                 ipcRenderer.invoke('cancel', cancel_id);
             }, from_launch ? () => {
@@ -589,10 +589,10 @@ contextBridge.exposeInMainWorld('enderlynx', {
     triggerFileImportBrowse: async (file_path, type) => {
         let startDir = file_path;
         const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: type ? "Select Folder to import" : "Select File to import",
+            title: await translate(type ? "app.import.select.folder" : "app.import.select.file"),
             defaultPath: startDir,
             properties: [type ? 'openDirectory' : 'openFile'],
-            filters: [{ name: 'Pack Files', extensions: ['mrpack', 'elpack', 'zip'] }]
+            filters: [{ name: await translate("app.import.select.pack_files"), extensions: ['mrpack', 'elpack', 'zip'] }]
         });
         if (result.canceled || !result.filePaths || !result.filePaths[0]) {
             return null;
@@ -602,7 +602,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     triggerFolderBrowse: async (file_path) => {
         let startDir = file_path;
         const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: "Select Folder",
+            title: await translate("app.select.folder"),
             defaultPath: startDir,
             properties: ['openDirectory']
         });
@@ -614,7 +614,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     triggerFileImportBrowseWithOptions: async (file_path, type, extensions, extName) => {
         let startDir = file_path;
         const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: type ? "Select Folder to import" : "Select File to import",
+            title: await translate(type ? "app.import.select.folder" : "app.import.select.file"),
             defaultPath: startDir,
             properties: [type ? 'openDirectory' : 'openFile'],
             filters: [{ name: extName, extensions: extensions }]
@@ -630,10 +630,10 @@ contextBridge.exposeInMainWorld('enderlynx', {
     triggerFileBrowse: async (file_path) => {
         let startDir = file_path;
         const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: "Select Java Executable",
+            title: await translate("app.import.select.java_executable"),
             defaultPath: startDir,
             properties: ['openFile'],
-            filters: os.platform() == "win32" ? [{ name: 'Executables', extensions: ['exe'] }] : []
+            filters: os.platform() == "win32" ? [{ name: await translate("app.import.select.executables"), extensions: ['exe'] }] : []
         });
         if (result.canceled || !result.filePaths || !result.filePaths[0]) {
             return null;
@@ -746,11 +746,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     saveToDisk: async (file_path) => {
         let result = await ipcRenderer.invoke('show-save-dialog', {
-            title: 'Save file',
+            title: await translate("app.save.file"),
             defaultPath: file_path,
-            buttonLabel: 'Save',
+            buttonLabel: await translate("app.save.save"),
             filters: [
-                { name: 'All Files', extensions: ['*'] }
+                { name: await translate("app.save.all"), extensions: ['*'] }
             ]
         }, file_path);
     },
@@ -1062,4 +1062,8 @@ function compareVersions(v1, v2) {
 
 async function getOptions(optionsPath) {
     return ipcRenderer.invoke('get-options', optionsPath);
+}
+
+async function translate(key, ...params) {
+    return await ipcRenderer.invoke('translate', key, ...params);
 }

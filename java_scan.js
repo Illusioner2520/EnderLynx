@@ -7,12 +7,6 @@ const os = require('os');
 
 const execFileAsync = promisify(execFile);
 
-let userPath;
-
-function setUserPathAgain(user_path) {
-    userPath = user_path;
-}
-
 const JAVA_REGISTRY_PATHS = [
     "SOFTWARE\\JavaSoft\\Java Runtime Environment",
     "SOFTWARE\\JavaSoft\\Java Development Kit",
@@ -32,13 +26,13 @@ const COMMON_JAVA_DIRS_WINDOWS = [
     "C:\\Program Files (x86)\\Java",
     "C:\\Program Files\\Eclipse Adoptium",
     "C:\\Program Files (x86)\\Eclipse Adoptium",
-    () => path.resolve(userPath, "java")
+    (userPath) => path.resolve(userPath, "java")
 ];
 
 const COMMON_JAVA_DIRS_UNIX = [
     "/usr/local/java",
     "/usr/lib/jvm",
-    () => path.resolve(userPath, "java")
+    (userPath) => path.resolve(userPath, "java")
 ]
 
 async function getJavaVersion(javawPath) {
@@ -82,7 +76,7 @@ function getJavaFromRegistry(hive, arch) {
     });
 }
 
-async function findJavaInstallations(v) {
+async function findJavaInstallations(v, userPath) {
     const jrePaths = new Set();
 
     let platform = os.platform();
@@ -103,7 +97,7 @@ async function findJavaInstallations(v) {
 
     // From known install locations
     for (const javaDir of platformString == "windows" ? COMMON_JAVA_DIRS_WINDOWS : COMMON_JAVA_DIRS_UNIX) {
-        let dir = typeof javaDir == 'string' ? javaDir : javaDir();
+        let dir = typeof javaDir == 'string' ? javaDir : javaDir(userPath);
         if (fs.existsSync(dir)) {
             const subdirs = fs.readdirSync(dir, { withFileTypes: true });
             for (const dirent of subdirs) {
@@ -156,9 +150,12 @@ async function findJavaInstallations(v) {
 }
 
 class JavaSearch {
+    constructor(userPath) {
+        this.userPath = userPath;
+    }
     async findJavaInstallations(v) {
         return await new Promise((resolve, reject) => {
-            findJavaInstallations(v).then((e) => {
+            findJavaInstallations(v, this.userPath).then((e) => {
                 resolve(e);
             }).catch((e) => {
                 reject(e);
@@ -168,6 +165,5 @@ class JavaSearch {
 }
 
 module.exports = {
-    JavaSearch,
-    setUserPathAgain
+    JavaSearch
 }

@@ -9,7 +9,7 @@ const nbt = require('prismarine-nbt');
 const zlib = require('zlib');
 const toml = require('toml');
 const pLimit = require('p-limit').default;
-const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt, setUserPath, setWindow } = require('./launch.js');
+const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
 const { queryServer } = require('./servers.js');
 const { Auth } = require('msmc');
 const querystring = require('querystring');
@@ -24,7 +24,7 @@ const FormData = require('form-data');
 const createDesktopShortcut = require("create-desktop-shortcuts");
 const pngToIco = require('png-to-ico').default;
 const readline = require('readline');
-const { JavaSearch, setUserPathAgain } = require('./java_scan.js');
+const { JavaSearch } = require('./java_scan.js');
 const Database = require('better-sqlite3');
 
 app.userAgentFallback = `EnderLynx/${version}`;
@@ -59,9 +59,6 @@ if (!fs.existsSync(pathPath)) {
 if (!fs.existsSync(user_path)) {
     fs.mkdirSync(user_path);
 }
-
-setUserPath(user_path);
-setUserPathAgain(user_path);
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
@@ -241,6 +238,10 @@ function translate(key, ...params) {
     return value;
 }
 
+ipcMain.on('translate', (_, key, ...params) => {
+    return translate(key, ...params);
+});
+
 const createWindow = (sendToWindow = {}) => {
     let additionalArguments = [`--userDataPath=${user_path}`, `--svgData=${svgData}`];
     if (isDev) additionalArguments.push('--dev');
@@ -299,7 +300,6 @@ const createWindow = (sendToWindow = {}) => {
     });
 
     state.manage(win);
-    setWindow(win);
     if (!enableDev) {
         Menu.setApplicationMenu(null);
     }
@@ -363,7 +363,6 @@ app.on('open-file', (event, path) => {
 function setUserPathMain(new_path, old_path) {
     user_path = new_path;
     fs.writeFileSync(pathPath, JSON.stringify({ user_path, old_path }), 'utf8');
-    setUserPath(new_path);
     return true;
 }
 
@@ -1881,7 +1880,7 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
             win.webContents.send('display-error', translate("app.launch.access_token.offline"));
         }
     }
-    let mc = new Minecraft(instance_id, instance_info.name, db);
+    let mc = new Minecraft(instance_id, instance_info.name, db, user_path, win, translate);
     let globalEnvVars = getDefault("global_env_vars");
     let globalPreLaunch = getDefault("global_pre_launch_hook");
     let globalPostLaunch = getDefault("global_post_launch_hook");
@@ -1972,7 +1971,7 @@ ipcMain.handle('repair-minecraft', async (_, instance_id, loader, vanilla_versio
 
 async function downloadMinecraft(instance_id, loader, vanilla_version, loader_version) {
     try {
-        let mc = new Minecraft(instance_id, undefined, db);
+        let mc = new Minecraft(instance_id, undefined, db, user_path, win, translate);
         let r = await mc.downloadGame(loader, vanilla_version);
         if (loader == "fabric") {
             await mc.installFabric(vanilla_version, loader_version);
@@ -1991,7 +1990,7 @@ async function downloadMinecraft(instance_id, loader, vanilla_version, loader_ve
 
 async function repairMinecraft(instance_id, loader, vanilla_version, loader_version, whatToRepair) {
     try {
-        let mc = new Minecraft(instance_id, undefined, db);
+        let mc = new Minecraft(instance_id, undefined, db, user_path, win, translate);
         let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
         if (whatToRepair.includes("mod_loader")) {
             if (loader == "fabric") {
@@ -2646,7 +2645,7 @@ ipcMain.handle('get-java-installation', async (_, v) => {
 })
 
 async function getJavaInstallation(v) {
-    let java = new Java(db);
+    let java = new Java(db, user_path, win, translate);
     return await java.getJavaInstallation(v);
 }
 
@@ -2655,7 +2654,7 @@ ipcMain.handle('set-java-installation', async (_, v, f) => {
 })
 
 async function setJavaInstallation(v, f) {
-    let java = new Java(db);
+    let java = new Java(db, user_path, win, translate);
     return await java.setJavaInstallation(v, f);
 }
 
@@ -5059,7 +5058,7 @@ try {
             db.prepare("ALTER TABLE instances ADD provided_java_args TEXT").run();
         case "0.6.6":
         case "0.6.7":
-            let java = new Java(db);
+            let java = new Java(db, user_path, win, translate);
             java.upgradeLegacy();
     }
 } catch (e) { }
