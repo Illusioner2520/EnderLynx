@@ -581,12 +581,12 @@ class Minecraft {
                 for (let i = 0; i < Object.keys(install_profile_json.data).length; i++) {
                     let key = Object.keys(install_profile_json.data)[i];
                     let entry = Object.entries(install_profile_json.data)[i][1];
-                    async function extract_data(file_path) {
+                    async function extract_data(file_path, userPath) {
                         let extract_file = zip.getEntry(file_path.slice(1));
                         let parsed_path = path.parse(file_path);
                         let file_name = parsed_path.name;
                         let ext = parsed_path.ext;
-                        let out_path = path.resolve(this.userPath, `minecraft/meta/libraries/me/illusioner/enderlynx/neoforge-installer-extracts/${mcversion}-${neoforgeversion}/neoforge-installer-extracts-${mcversion}-${neoforgeversion}-${file_name}.${ext}`);
+                        let out_path = path.resolve(userPath, `minecraft/meta/libraries/me/illusioner/enderlynx/neoforge-installer-extracts/${mcversion}-${neoforgeversion}/neoforge-installer-extracts-${mcversion}-${neoforgeversion}-${file_name}.${ext}`);
                         if (!extract_file) {
                             throw new Error(`Missing entry in installer zip: ${file_path}`);
                         }
@@ -598,8 +598,8 @@ class Minecraft {
                         let maven_path = `me.illusioner.enderlynx:neoforge-installer-extracts:${mcversion}-${neoforgeversion}:${file_name}@${ext}`;
                         return `[${maven_path}]`;
                     }
-                    let client = entry.client.startsWith("/") ? await extract_data(entry.client) : entry.client;
-                    let server = entry.server.startsWith("/") ? await extract_data(entry.server) : entry.server;
+                    let client = entry.client.startsWith("/") ? await extract_data(entry.client, this.userPath) : entry.client;
+                    let server = entry.server.startsWith("/") ? await extract_data(entry.server, this.userPath) : entry.server;
                     new_data[key] = {
                         client,
                         server
