@@ -1644,7 +1644,7 @@ class Fabric {
         const fabric_json = await fetch(`https://meta.fabricmc.net/v2/versions/game`);
         const data = await fabric_json.json();
         let versions = data.map((e) => e.version);
-        versions = versions.filter((e) => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original"));
+        versions = versions.filter((e) => !e.includes("combat") && !e.includes(" ") && !e.includes("experiment") && !e.includes("original") && !e.includes("unobfuscated"));
         return versions;
     }
     static async getVersions(v) {
