@@ -210,7 +210,7 @@ async function launchGameFromArgs(instance_id_to_launch, world_type_to_launch, w
             profile = getDefaultProfile();
         }
         if (!profile) {
-            throw new Error(uuid_to_launch ? "Unable to find profile; Invalid uuid: " + uuid_to_launch : "Unable to find profile; No default profile set");
+            throw new Error(uuid_to_launch ? translate("app.launch.profile.invalid.uuid", "%u", uuid_to_launch) : translate("app.launch.profile.no.default"));
         }
         let profile_id = profile.id;
         if (world_type_to_launch) {
@@ -220,7 +220,7 @@ async function launchGameFromArgs(instance_id_to_launch, world_type_to_launch, w
         }
         if (dont_launch) app.quit();
     } catch (e) {
-        dialog.showErrorBox("Unable to launch Minecraft", "An error occured when trying to launch Minecraft. " + e.message);
+        dialog.showErrorBox(translate("app.launch.error"), translate("app.launch.error.description", "%e", e.message));
         if (dont_launch) app.quit();
     }
 }
@@ -254,7 +254,7 @@ const createWindow = (sendToWindow = {}) => {
     win = new BrowserWindow({
         x: state.x,
         y: state.y,
-        title: "EnderLynx",
+        title: translate("app.name"),
         width: state.width,
         height: state.height,
         minWidth: 500,
@@ -432,7 +432,7 @@ ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overr
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Creating .elpack`, 0, `Creating manifest...`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.elpack"), 0, translate("app.export.manifest"), processId, "good", cancelId);
         const tempDir = path.resolve(user_path, "out");
         fs.mkdirSync(tempDir, { recursive: true });
         const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.elpack`);
@@ -443,7 +443,7 @@ ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overr
 
         for (let i = 0; i < overrides.length; i++) {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Creating .elpack`, (i + 1) / overrides.length * 100, `Moving Override ${i + 1} of ${overrides.length}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.export.create.elpack"), (i + 1) / overrides.length * 100, translate("app.export.override", "%a", i + 1, "%b", overrides.length), processId, "good", cancelId);
             let override = overrides[i];
             const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
             const destPath = "overrides/" + override;
@@ -473,10 +473,10 @@ ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overr
         zip.writeZip(zipPath);
         signal.throwIfAborted();
 
-        win.webContents.send('progress-update', `Creating .elpack`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.elpack"), 100, translate("app.done"), processId, "done", cancelId);
         win.webContents.send('open-file-share', zipPath);
     } catch (err) {
-        win.webContents.send('progress-update', `Creating .elpack`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.elpack"), 100, err, processId, "error", cancelId);
     }
 });
 ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overrides) => {
@@ -487,7 +487,7 @@ ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overr
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Creating .mrpack`, 0, `Creating manifest...`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.mrpack"), 0, translate("app.export.manifest"), processId, "good", cancelId);
         const tempDir = path.resolve(user_path, "out");
         fs.mkdirSync(tempDir, { recursive: true });
         const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.mrpack`);
@@ -499,7 +499,7 @@ ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overr
 
         for (let i = 0; i < overrides.length; i++) {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Creating .mrpack`, (i + 1) / overrides.length * 100, `Moving Override ${i + 1} of ${overrides.length}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.export.create.mrpack"), (i + 1) / overrides.length * 100, translate("app.export.override", "%a", i + 1, "%b", overrides.length), processId, "good", cancelId);
             let override = overrides[i];
             const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
             const destPath = "overrides/" + override;
@@ -529,10 +529,10 @@ ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overr
         zip.writeZip(zipPath);
         signal.throwIfAborted();
 
-        win.webContents.send('progress-update', `Creating .mrpack`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.mrpack"), 100, translate("app.done"), processId, "done", cancelId);
         win.webContents.send('open-file-share', zipPath);
     } catch (err) {
-        win.webContents.send('progress-update', `Creating .mrpack`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.mrpack"), 100, err, processId, "error", cancelId);
     }
 });
 ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overrides) => {
@@ -543,7 +543,7 @@ ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overri
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Creating .zip`, 0, `Creating manifest...`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.zip"), 0, translate("app.export.manifest"), processId, "good", cancelId);
         const tempDir = path.resolve(user_path, "out");
         fs.mkdirSync(tempDir, { recursive: true });
         const zipPath = path.join(tempDir, `${name.replace(/[<>:"/\\|?*]/g, '_')}_${Date.now()}.zip`);
@@ -555,7 +555,7 @@ ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overri
 
         for (let i = 0; i < overrides.length; i++) {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Creating .zip`, (i + 1) / overrides.length * 100, `Moving Override ${i + 1} of ${overrides.length}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.export.create.zip"), (i + 1) / overrides.length * 100, translate("app.export.override", "%a", i + 1, "%b", overrides.length), processId, "good", cancelId);
             let override = overrides[i];
             const srcPath = path.resolve(user_path, "minecraft", "instances", instance_id, override);
             const destPath = "overrides/" + override;
@@ -585,10 +585,10 @@ ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overri
         zip.writeZip(zipPath);
         signal.throwIfAborted();
 
-        win.webContents.send('progress-update', `Creating .zip`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.export.create.zip"), 100, translate("app.done"), processId, "done", cancelId);
         win.webContents.send('open-file-share', zipPath);
     } catch (err) {
-        win.webContents.send('progress-update', `Creating .zip`, 100, err, processId, "error", cancelId)
+        win.webContents.send('progress-update', translate("app.export.create.zip"), 100, err, processId, "error", cancelId)
     }
 });
 
@@ -1117,7 +1117,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
     }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(zip_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1141,7 +1141,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
 
         for (const file of files) {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -1153,7 +1153,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                return "Unable to enable overrides for folder " + file;
+                throw new(translate("app.installing.override.fail", "%o", file));
             }
         }
 
@@ -1168,13 +1168,13 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
         let allocated_ram = manifest_json.minecraft?.recommendedRam;
 
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 10, translate("app.installing.downloading", "%a", 1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
         let count = 0;
 
         const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Installing ${title}`, ((i + 1) / manifest_json.files.length) * 84 + 10, `Downloading file ${i + 1} of ${manifest_json.files.length}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), ((i + 1) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", i+1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
             let project_id = file.projectID;
             let file_id = file.fileID;
@@ -1230,9 +1230,9 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
 
             signal.throwIfAborted();
             if (count == manifest_json.files.length - 1) {
-                win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
             } else {
-                win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`, processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", count + 1, "%b", manifest_json.files.length), processId, "good", cancelId);
             }
             count++;
         }));
@@ -1264,7 +1264,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
         });
 
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
             "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
             "content": cfData.length ? content : [],
@@ -1274,7 +1274,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
             "name": manifest_json.name
         });
     } catch (err) {
-        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
@@ -1289,7 +1289,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
     }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(mrpack_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1316,7 +1316,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         files = files.concat((await fsPromises.readdir(srcDir2)).map(e => ({ dir: srcDir2, name: e })));
 
         for (const file of files) {
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file.name}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file.name), processId, "good", cancelId);
             const srcPath = path.join(file.dir, file.name);
             const destPath = path.join(destDir, file.name);
 
@@ -1329,7 +1329,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                return "Unable to enable overrides for folder " + file.name;
+                throw new(translate("app.installing.override.fail", "%o", file.name));
             }
             signal.throwIfAborted();
         }
@@ -1347,7 +1347,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         const limit = pLimit(max_downloads);
         signal.throwIfAborted();
 
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${modrinth_index_json.files.length}`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 10, translate("app.installing.downloading", "%a", 1, "%b", modrinth_index_json.files.length), processId, "good", cancelId);
 
         let count = 0;
 
@@ -1363,9 +1363,9 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                 });
                 signal.throwIfAborted();
                 if (count == modrinth_index_json.files.length - 1) {
-                    win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
+                    win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
                 } else {
-                    win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / modrinth_index_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${modrinth_index_json.files.length}`, processId, "good", cancelId);
+                    win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / modrinth_index_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", count + 1, "%b", modrinth_index_json.files.length), processId, "good", cancelId);
                 }
                 count++;
             })
@@ -1449,7 +1449,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
             if (loader == "quilt") loader = "quilt-loader";
         }
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
             "loader_version": modrinth_index_json.dependencies[loader],
             "content": content,
@@ -1459,7 +1459,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         })
     } catch (err) {
         console.log(err);
-        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
@@ -1474,7 +1474,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
     }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(elpack_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1498,7 +1498,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
 
         for (const file of files) {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -1511,7 +1511,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                return "Unable to enable overrides for folder " + file;
+                throw new(translate("app.installing.override.fail", "%o", file));
             }
         }
 
@@ -1530,7 +1530,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
         const limit = pLimit(max_downloads);
 
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 10, translate("app.installing.downloading", "%a", 1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
         let count = 0;
 
@@ -1583,9 +1583,9 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
                 }
                 signal.throwIfAborted();
                 if (count == manifest_json.files.length - 1) {
-                    win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
+                    win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
                 } else {
-                    win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 1} of ${manifest_json.files.length}`, processId, "good", cancelId);
+                    win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", count + 1, "%b", manifest_json.files.length), processId, "good", cancelId);
                 }
                 count++;
             })
@@ -1598,8 +1598,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
                 const res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${mr_project_ids.join('","')}"]`, { signal });
                 const res_json = await res.json();
                 res_json.forEach(e => {
-                    // Find all content items with matching source and source_info
-                    content.forEach((item, idx) => {
+                    content.forEach((item) => {
                         if (item.source === "modrinth" && item.source_id === e.id) {
                             item.name = e.title;
                             item.image = e.icon_url;
@@ -1676,7 +1675,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
         }
 
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
             "loader_version": manifest_json.loader_version,
             "content": content,
@@ -1688,7 +1687,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
         })
     } catch (err) {
         console.error(err);
-        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
@@ -1703,7 +1702,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
     }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Installing ${title}`, 0, "Beginning install...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(zip_path);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
@@ -1727,7 +1726,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
 
         for (const file of files) {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Installing ${title}`, 5, `Moving override ${file}`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
             const destPath = path.join(destDir, file);
 
@@ -1739,7 +1738,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                return "Unable to enable overrides for folder " + file;
+                throw new(translate("app.installing.override.fail", "%o", file));
             }
         }
 
@@ -1759,7 +1758,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         let allocated_ram = manifest_json.minecraft?.recommendedRam;
 
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 10, `Downloading file 1 of ${manifest_json.files.length}`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 10, translate("app.installing.downloading", "%a", 1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
         let count = 0;
 
@@ -1810,9 +1809,9 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
             }
             signal.throwIfAborted();
             if (count == manifest_json.files.length - 1) {
-                win.webContents.send('progress-update', `Installing ${title}`, 95, "Finishing metadata...", processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
             } else {
-                win.webContents.send('progress-update', `Installing ${title}`, ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`, processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`, processId, "good", cancelId);
             }
             count++;
         }));
@@ -1847,7 +1846,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         }
 
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Installing ${title}`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
             "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
             "content": content,
@@ -1857,7 +1856,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
             "name": manifest_json.name
         })
     } catch (err) {
-        win.webContents.send('progress-update', `Installing ${title}`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
         return { "error": true };
     }
 }
@@ -1870,16 +1869,16 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
     let player_info = getProfileFromId(player_id);
     let instance_info = getInstance(instance_id);
     if (!instance_info) {
-        throw new Error("Unable to find instance");
+        throw new Error(translate("app.launch.unable_to_find_instance"));
     }
     updateInstance("last_played", new Date(), instance_id);
-    if (!player_id) throw new Error("Please sign in to your Microsoft account to play Minecraft.");
+    if (!player_id) throw new Error(translate("app.launch.sign_in"));
 
     if (new Date(player_info.expires) < new Date()) {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            win.webContents.send('display-error', "Unable to update access token. Launching Minecraft in offline mode.");
+            win.webContents.send('display-error', translate("app.launch.access_token.offline"));
         }
     }
     let mc = new Minecraft(instance_id, instance_info.name, db);
@@ -1900,7 +1899,7 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
         return { minecraft, player_info }
     } catch (err) {
         console.error(err);
-        throw new Error("Unable to launch Minecraft: " + err.message);
+        throw new Error(translate("app.launch.unable", err.message));
     }
 }
 
@@ -2050,13 +2049,12 @@ function parseEnvString(input) {
 
     if (!input) return env;
 
-    // Supports both space-separated or newline-separated input
     const lines = input.split(/\s+|\n/);
 
     for (const line of lines) {
         if (!line || !line.includes('=')) continue;
         const [key, ...rest] = line.split('=');
-        const value = rest.join('='); // Rejoin in case value had '='
+        const value = rest.join('=');
         env[key.trim()] = value.trim();
     }
 
@@ -2080,16 +2078,16 @@ async function downloadModrinthPack(instance_id, url, title) {
         downloadModrinthPack(instance_id, url, title);
     }
     let signal = abortController.signal;
-    win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...", processId, "good", cancelId);
+    win.webContents.send('progress-update', translate("app.downloading", "%t", title), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
     try {
         await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`), {
             signal, onProgress: (v) => {
-                win.webContents.send('progress-update', `Downloading ${title}`, v, "Downloading...", processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.downloading", "%t", title), v, translate("app.downloading.downloading"), processId, "good", cancelId);
             }
         });
-        win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
     } catch (err) {
-        win.webContents.send('progress-update', `Downloading ${title}`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
@@ -2103,16 +2101,16 @@ async function downloadCurseforgePack(instance_id, url, title) {
         downloadCurseforgePack(instance_id, url, title);
     }
     let signal = abortController.signal;
-    win.webContents.send('progress-update', `Downloading ${title}`, 0, "Beginning download...", processId, "good", cancelId);
+    win.webContents.send('progress-update', translate("app.downloading", "%t", title), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
     try {
         await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`), {
             signal, onProgress: (v) => {
-                win.webContents.send('progress-update', `Downloading ${title}`, v, "Downloading...", processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.downloading", "%t", title), v, translate("app.downloading.downloading"), processId, "good", cancelId);
             }
         });
-        win.webContents.send('progress-update', `Downloading ${title}`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
     } catch (err) {
-        win.webContents.send('progress-update', `Downloading ${title}`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
@@ -2494,7 +2492,6 @@ async function addContent(instance_id, project_type, project_url, filename, data
         fs.mkdirSync(savesPath, { recursive: true });
         const zip = new AdmZip(install_path);
 
-        // Get all top-level folders in the zip
         const entries = zip.getEntries();
         const topLevelFolders = new Set();
         entries.forEach(entry => {
@@ -2504,7 +2501,6 @@ async function addContent(instance_id, project_type, project_url, filename, data
             }
         });
 
-        // For each top-level folder, check for conflicts and rename if needed
         const folderRenameMap = {};
         for (const folder of topLevelFolders) {
             let targetFolder = folder;
@@ -2516,7 +2512,6 @@ async function addContent(instance_id, project_type, project_url, filename, data
             folderRenameMap[folder] = targetFolder;
         }
 
-        // Extract each entry, renaming top-level folders if needed
         for (let i = 0; i < entries.length; i++) {
             let entry = entries[i];
             let entryName = entry.entryName;
@@ -2571,7 +2566,7 @@ ipcMain.handle('query-server', async (_, host, port) => {
 });
 
 async function addServer(instance_id, ip, title, image) {
-    if (!title) title = "Minecraft Server";
+    if (!title) title = translate("app.server.name.default");
     let patha = path.resolve(user_path, `minecraft/instances/${instance_id}`);
     let serversDatPath = path.resolve(patha, 'servers.dat');
     let data = {};
@@ -2681,7 +2676,7 @@ function generateNewProcessId() {
 
 ipcMain.handle('cancel', (_, cancelId) => {
     try {
-        cancelFunctions[cancelId].abort("Canceled by User");
+        cancelFunctions[cancelId].abort(translate("app.user.canceled"));
         delete cancelFunctions[cancelId];
     } catch (e) { }
 });
@@ -2707,7 +2702,6 @@ async function deleteInstanceFiles(instance_id) {
     if (!fs.existsSync(instancePath)) {
         return false;
     }
-    // Recursively collect all files and folders for progress calculation
     async function getAllFiles(dir) {
         let files = [];
         const entries = await fsPromises.readdir(dir, { withFileTypes: true });
@@ -2731,9 +2725,8 @@ async function deleteInstanceFiles(instance_id) {
             deleted++;
             const percent = Math.round((deleted / allFiles.length) * 100);
             signal.throwIfAborted();
-            win.webContents.send('progress-update', 'Deleting Instance', percent, `Deleting ${path.basename(file)} (${deleted} of ${allFiles.length})`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.instance.deleting"), percent, translate("app.instances.deleting.progress", "%f", path.basename(file), "%a", deleted, "%b", allFiles.length), processId, "good", cancelId);
         }
-        // Remove directories (bottom-up)
         async function removeDirs(dir) {
             const entries = await fsPromises.readdir(dir, { withFileTypes: true });
             for (const entry of entries) {
@@ -2747,10 +2740,10 @@ async function deleteInstanceFiles(instance_id) {
         signal.throwIfAborted();
         await removeDirs(instancePath);
         signal.throwIfAborted();
-        win.webContents.send('progress-update', 'Deleting Instance', 100, 'Instance deleted', processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.instance.deleting"), 100, translate("app.instance.deleting.done"), processId, "done", cancelId);
         return true;
     } catch (err) {
-        win.webContents.send('progress-update', 'Deleting Instance', 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.instance.deleting"), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
@@ -2767,19 +2760,18 @@ async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Duplicating Instance`, 0, `Beginning Duplication...`, processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.instance.duplicating"), 0, translate("app.instance.duplicating.beginning"), processId, "good", cancelId);
         const src = path.resolve(user_path, `minecraft/instances/${old_instance_id}`);
         const dest = path.resolve(user_path, `minecraft/instances/${new_instance_id}`);
         if (!fs.existsSync(src)) return false;
         await fsPromises.mkdir(dest, { recursive: true });
-        // Get all files and folders in the source directory
         const entries = await fsPromises.readdir(src, { withFileTypes: true });
         const total = entries.length;
         let completed = 0;
 
         for (const entry of entries) {
             const percent = Math.round(((completed + 1) / total) * 100);
-            win.webContents.send('progress-update', `Duplicating Instance`, percent, `Copying ${entry.name} (${completed} of ${total})`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.instance.duplicating"), percent, translate("app.instance.duplicating.progress", "%f", entry.name, "%a", completed, "%b", total), processId, "good", cancelId);
             if (entry.name == "logs") continue;
             signal.throwIfAborted();
             const srcPath = path.join(src, entry.name);
@@ -2794,10 +2786,10 @@ async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
             completed++;
             signal.throwIfAborted();
         }
-        win.webContents.send('progress-update', `Duplicating Instance`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.instance.duplicating"), 100, translate("app.done"), processId, "done", cancelId);
         return true;
     } catch (err) {
-        win.webContents.send('progress-update', `Duplicating Instance`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.instance.duplicating"), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
@@ -2827,7 +2819,7 @@ ipcMain.handle('change-folder', async (_, old_path, new_path) => {
 
             const percent = Math.round((completed / total) * 100);
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Moving User Path`, percent, `Copying ${entry.name} (${completed + 1} of ${total})`, processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.user_path.moving"), percent, translate("app.user_path.moving.progress", "%f", entry.name, "%a", completed + 1, "%b", total), processId, "good", cancelId);
 
             if (entry.isDirectory()) {
                 await fsPromises.mkdir(destPath, { recursive: true });
@@ -2848,12 +2840,12 @@ ipcMain.handle('change-folder', async (_, old_path, new_path) => {
             completed++;
         }
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Moving User Path`, 100, `Done`, processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.user_path.moving"), 100, translate("app.done"), processId, "done", cancelId);
 
         setUserPathMain(dest, src);
         return true;
     } catch (err) {
-        win.webContents.send('progress-update', `Moving User Path`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.user_path.moving"), 100, err, processId, "error", cancelId);
         throw err;
     }
 });
@@ -2870,7 +2862,7 @@ async function importWorld(file_path, instance_id, worldName) {
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Importing ${worldName}`, 0, "Beginning...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 0, translate("app.world.importing.beginning"), processId, "good", cancelId);
         const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
         fs.mkdirSync(savesPath, { recursive: true });
         signal.throwIfAborted();
@@ -2925,11 +2917,11 @@ async function importWorld(file_path, instance_id, worldName) {
                 done++;
                 const percent = Math.round((done / total) * 95);
                 signal.throwIfAborted();
-                win.webContents.send('progress-update', `Importing ${worldName}`, percent, `Copying ${done} of ${total}...`, processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), percent, translate("app.world.importing.progress", "%a", done, "%b", total), processId, "good", cancelId);
             }
 
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+            win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 100, translate("app.done"), processId, "done", cancelId);
             return { new_world_path: destPath };
         }
 
@@ -2961,13 +2953,13 @@ async function importWorld(file_path, instance_id, worldName) {
                         fs.mkdirSync(dest, { recursive: true });
                     } else {
                         signal.throwIfAborted();
-                        win.webContents.send('progress-update', `Importing ${worldName}`, count / entries.length * 95, `Moving file ${count} of ${entries.length}...`, processId, "good", cancelId);
+                        win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), count / entries.length * 95, translate("app.world.importing.progress", "%a", count, "%b", entries.length), processId, "good", cancelId);
                         fs.mkdirSync(path.dirname(dest), { recursive: true });
                         await fsPromises.writeFile(dest, entry.getData());
                     }
                 }
                 signal.throwIfAborted();
-                win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+                win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 100, translate("app.done"), processId, "done", cancelId);
                 return { new_world_path: destPath };
             }
 
@@ -3002,7 +2994,7 @@ async function importWorld(file_path, instance_id, worldName) {
                                 fs.mkdirSync(dest, { recursive: true });
                             } else {
                                 signal.throwIfAborted();
-                                win.webContents.send('progress-update', `Importing ${worldName}`, outerCount / candidateTopFolders.size * 95 * count / entries.length, `Moving file ${count} of ${entries.length} (${outerCount} of ${candidateTopFolders.size})...`, processId, "good", cancelId);
+                                win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), outerCount / candidateTopFolders.size * 95 * count / entries.length, translate("app.world.importing.multiple.progress", "%a", count, "%b", entries.length, "%c", outerCount, "%d", candidateTopFolders.size), processId, "good", cancelId);
                                 fs.mkdirSync(path.dirname(dest), { recursive: true });
                                 await fsPromises.writeFile(dest, entry.getData());
                             }
@@ -3012,18 +3004,18 @@ async function importWorld(file_path, instance_id, worldName) {
                     imported.push(destPath);
                 }
                 signal.throwIfAborted();
-                win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Done", processId, "done", cancelId);
+                win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 100, translate("app.done"), processId, "done", cancelId);
                 return { imported };
             }
             signal.throwIfAborted();
-            win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
+            win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 100, "Error", processId, "error", cancelId);
             return null;
         }
         signal.throwIfAborted();
-        win.webContents.send('progress-update', `Importing ${worldName}`, 100, "Error", processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 100, "Error", processId, "error", cancelId);
         return null;
     } catch (e) {
-        win.webContents.send('progress-update', `Importing ${worldName}`, 100, e, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 100, e, processId, "error", cancelId);
         return null;
     }
 }
@@ -3040,7 +3032,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
     retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
-        win.webContents.send('progress-update', `Downloading Update`, 0, "Beginning download...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading.update"), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
         let tempDir = path.resolve(user_path, "temp", new_version);
         fs.mkdirSync(tempDir, { recursive: true });
 
@@ -3049,7 +3041,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         await urlToFile(download_url, zipPath, {
             signal, onProgress: (percentCompleted) => {
-                win.webContents.send('progress-update', `Downloading Update`, percentCompleted, "Downloading .zip file...", processId, "good", cancelId);
+                win.webContents.send('progress-update', translate("app.downloading.update"), percentCompleted, translate("app.downloading.update.zip"), processId, "good", cancelId);
             }
         });
 
@@ -3062,7 +3054,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
             if ("sha256:" + hash != checksum) throw new Error();
         } catch (e) {
             await fsPromises.unlink(zipPath);
-            win.webContents.send('progress-update', `Downloading Update`, 100, "Failed to verify download.", processId, "error", cancelId);
+            win.webContents.send('progress-update', translate("app.downloading.update"), 100, translate("app.downloading.update.verify.fail"), processId, "error", cancelId);
             throw new Error("Failed to verify download. Stopping update.");
         }
 
@@ -3072,7 +3064,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
         const prev = process.noAsar;
         process.noAsar = true;
 
-        win.webContents.send('progress-update', `Downloading Update`, 80, "Extracting .zip file...", processId, "good", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading.update"), 80, translate("app.downloading.update.extracting"), processId, "good", cancelId);
 
         await new Promise((resolve, reject) => {
             zip.extractAllToAsync(tempDir, true, false, (v) => {
@@ -3087,7 +3079,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
         await fsPromises.unlink(zipPath);
         signal.throwIfAborted();
 
-        win.webContents.send('progress-update', `Downloading Update`, 100, "Done!", processId, "done", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading.update"), 100, translate("app.done"), processId, "done", cancelId);
 
         let updaterPath = path.join(user_path, "updater", "updater.exe");
         if (os.platform() != 'win32') updaterPath = path.join(user_path, "updater", "updater");
@@ -3104,7 +3096,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
             stdio: "ignore"
         }).unref();
     } catch (err) {
-        win.webContents.send('progress-update', `Downloading Update`, 100, err, processId, "error", cancelId);
+        win.webContents.send('progress-update', translate("app.downloading.update"), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
@@ -3485,7 +3477,7 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            throw new Error("Unable to update access token.");
+            throw new Error(translate("app.access_token.unable"));
         }
     }
     if (cape_id) {
@@ -3505,7 +3497,7 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
         await fixProfile({ ...player_info, ...skin_info })
 
         if (!res.ok) {
-            throw new Error("Unable to set cape");
+            throw new Error(translate("app.cape.unable"));
         }
         return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
     } else {
@@ -3523,7 +3515,7 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
         await fixProfile({ ...player_info, ...skin_info })
 
         if (!res.ok) {
-            throw new Error("Unable to set cape");
+            throw new Error(translate("app.cape.unable"));
         }
         return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
     }
@@ -3535,7 +3527,7 @@ ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) =>
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            throw new Error("Unable to update access token.");
+            throw new Error(translate("app.access_token.unable"));
         }
     }
 
@@ -3555,7 +3547,7 @@ ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) =>
     await fixProfile({ ...player_info, ...skin_info })
 
     if (!res.ok) {
-        throw new Error("Unable to set skin");
+        throw new Error(translate("app.skin.unable"));
     }
     return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
 });
@@ -3566,12 +3558,12 @@ ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            throw new Error("Unable to update access token.");
+            throw new Error(translate("app.access_token.unable"));
         }
     }
     let filePath = path.resolve(user_path, `minecraft/skins/${skin_id}.png`);
     if (!fs.existsSync(filePath)) {
-        throw new Error(`Skin file not found at ${filePath}`);
+        throw new Error(translate("app.skin.file_not_found"));
     }
     const form = new FormData();
     form.append('variant', variant);
@@ -3636,7 +3628,7 @@ ipcMain.handle('get-profile', async (_, player_id) => {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            throw new Error("Unable to update access token.");
+            throw new Error(translate("app.access_token.unable"));
         }
     }
 
@@ -3650,7 +3642,7 @@ ipcMain.handle('get-profile', async (_, player_id) => {
 
     await fixProfile({ ...player_info, ...skin_and_capes });
 
-    if (!res.ok) throw new Error("Unable to fetch profile");
+    if (!res.ok) throw new Error(translate("app.profile.unable"));
 
     return { "status": res.status, "player_info": player_info, "skin_info": skin_and_capes };
 });
@@ -3744,12 +3736,12 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
     if (os.platform() == 'win32') shortcutExt = "lnk";
     let iconExt = "png";
     if (os.platform() == 'win32') iconExt = "ico";
-    let shortcutPath = path.join(desktopPath, `${safeName} - EnderLynx.${shortcutExt}`);
+    let shortcutPath = path.join(desktopPath, `${safeName} - ${translate("app.name")}.${shortcutExt}`);
 
-    let base_shortcut = safeName + " - EnderLynx";
+    let base_shortcut = safeName + " - " + translate("app.name");
     let count_shortcut = 1;
 
-    let name = `${safeName} - EnderLynx`;
+    let name = `${safeName} - ${translate("app.name")}`;
 
     while (fs.existsSync(shortcutPath)) {
         shortcutPath = path.join(desktopPath, `${base_shortcut} (${count_shortcut}).${shortcutExt}`);
@@ -3809,7 +3801,7 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
                 filePath: target,
                 outputPath: desktopPath,
                 name,
-                comment: `Launch Minecraft instance "${instance_name}"`,
+                comment: translate("app.desktop_shortcut.description", "%n", instance_name),
                 icon: iconPath,
                 arguments: args,
                 VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
@@ -3818,7 +3810,7 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
                 filePath: target,
                 outputPath: desktopPath,
                 name,
-                description: `Launch Minecraft instance "${instance_name}"`,
+                description: translate("app.desktop_shortcut.description", "%n", instance_name),
                 icon: iconPath,
                 arguments: args,
                 type: 'Application'
@@ -4367,7 +4359,7 @@ function folderExists(folderPath) {
 }
 
 ipcMain.handle('get-launcher-instances', async (_, instance_path) => {
-    if (!fs.existsSync(instance_path)) return [{ "name": "Unable to locate Instances", "value": "error" }];
+    if (!fs.existsSync(instance_path)) return [{ "name": translate("app.launchers.instance.unable_to_locate"), "value": "error" }];
     return fs.readdirSync(instance_path)
         .filter(f => {
             const fullPath = path.join(instance_path, f);
