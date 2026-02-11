@@ -350,6 +350,10 @@ class Minecraft {
                             if (fs.existsSync(path.resolve(this.userPath, `minecraft/meta/libraries/${e.downloads.artifact.path}`))) {
                                 no_need_to_process = true;
                             }
+                            let zipEntry = zip.getEntry(path.join("maven", e.downloads.artifact.path).replaceAll("\\", "/"));
+                            if (zipEntry) {
+                                zip.extractEntryTo(path.join("maven", e.downloads.artifact.path).replaceAll("\\", "/"), path.resolve(this.userPath, `minecraft/meta/libraries/${path.dirname(e.downloads.artifact.path)}`), false, true);
+                            }
                             continue;
                         }
                         signal.throwIfAborted();
