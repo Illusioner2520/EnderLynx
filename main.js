@@ -238,7 +238,7 @@ function translate(key, ...params) {
     return value;
 }
 
-ipcMain.on('translate', (_, key, ...params) => {
+ipcMain.handle('translate', (_, key, ...params) => {
     return translate(key, ...params);
 });
 
@@ -4125,7 +4125,7 @@ ipcMain.handle('path-to-data-url', async (_, file_path) => {
 });
 
 ipcMain.handle('detect-java-installations', async (_, v) => {
-    let javaSearch = new JavaSearch();
+    let javaSearch = new JavaSearch(user_path);
     return javaSearch.findJavaInstallations(v);
 });
 
