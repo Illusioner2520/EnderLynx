@@ -409,7 +409,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return (await ipcRenderer.invoke('neoforge-loader-versions', mcversion))[0];
     },
     getQuiltVersion: async (mcversion) => {
-        return (await ipcRenderer.invoke('fabric-loader-versions', mcversion))[0];
+        return (await ipcRenderer.invoke('quilt-loader-versions', mcversion))[0];
     },
     getForgeLoaderVersions: async (mcversion) => {
         return (await ipcRenderer.invoke('forge-loader-versions', mcversion));
