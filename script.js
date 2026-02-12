@@ -864,6 +864,7 @@ class NavigationButton {
 let currentTab = "";
 let currentSubTab = "";
 let currentInstanceId = "";
+let currentSubTabElement;
 
 function resetDiscordStatus(bypassLock) {
     if (!rpcLocked || bypassLock) {
@@ -3598,12 +3599,18 @@ async function showHomeContent(oldEle) {
             let icon = document.createElement("img");
             icon.className = "instance-image";
             icon.src = e.image ? e.image : getDefaultImage(e.instance_id);
+            instances[i].watchForChange("image", (image) => {
+                icon.src = image ? image : getDefaultImage(e.instance_id);
+            });
             item.appendChild(icon);
             let itemInfo = document.createElement("div");
             itemInfo.className = "instance-info";
             let itemTitle = document.createElement("div");
             itemTitle.className = "instance-name";
-            itemTitle.innerHTML = e.name;
+            itemTitle.textContent = e.name;
+            instances[i].watchForChange("name", (name) => {
+                itemTitle.textContent = name;
+            });
             let itemDesc = document.createElement("div");
             itemDesc.className = "instance-desc";
             itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
@@ -3616,6 +3623,14 @@ async function showHomeContent(oldEle) {
                     itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
                 }, 3600000);
             }
+            instances[i].watchForChange("loader", (loader) => {
+                e.loader = loader;
+                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            });
+            instances[i].watchForChange("vanilla_version", (vanilla_version) => {
+                e.vanilla_version = vanilla_version;
+                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            });
             itemInfo.appendChild(itemTitle);
             itemInfo.appendChild(itemDesc);
             item.appendChild(itemInfo);
@@ -5136,8 +5151,8 @@ async function showInstanceContent(e) {
         } else {
             instanceImage.src = getDefaultImage(instances[i].instance_id);
         }
-        instances[i].watchForChange("image", (i) => {
-            instanceImage.src = i ? i : getDefaultImage(instances[i].instance_id);
+        instances[i].watchForChange("image", (image) => {
+            instanceImage.src = image ? image : getDefaultImage(instances[i].instance_id);
         });
         instanceElement.appendChild(instanceImage);
         let instanceInfoEle = document.createElement("div");
@@ -5819,7 +5834,7 @@ async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_t
             "icon": '<i class="fa-solid fa-gear"></i>',
             "title": translate("app.button.instances.open_settings"),
             "func": async (e) => {
-                showInstanceSettings(await instanceInfo.refresh(), tabsInfo);
+                showInstanceSettings(await instanceInfo.refresh());
             }
         },
         {
@@ -5884,6 +5899,7 @@ async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_t
     ele.appendChild(tabContent);
     let tabsInfo = document.createElement("div");
     tabsInfo.classList.add("tab-info");
+    currentSubTabElement = tabsInfo;
     ele.appendChild(tabsInfo);
     let tabs = new TabContent(tabContent, [
         {
@@ -5931,7 +5947,7 @@ async function getServerLastPlayed(instance_id, ip) {
     return new Date(result ? result : null);
 }
 
-function showInstanceSettings(instanceInfo, tabsInfo) {
+function showInstanceSettings(instanceInfo) {
     let dialog = new Dialog();
     let resettingJavaArgs = false;
     dialog.showDialog(translate("app.instances.settings.title"), "form", [
@@ -6284,7 +6300,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                             "retry": () => { }
                         }]);
                         if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                            setInstanceTabContentContent(instanceInfo, tabsInfo);
+                            if (currentSubTabElement) setInstanceTabContentContent(instanceInfo, currentSubTabElement);
                         }
                         return;
                     }
@@ -6300,7 +6316,7 @@ function showInstanceSettings(instanceInfo, tabsInfo) {
                 }]);
                 displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
                 if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                    setInstanceTabContentContent(instanceInfo, tabsInfo);
+                    if (currentSubTabElement) setInstanceTabContentContent(instanceInfo, currentSubTabElement);
                 }
             }
             await instanceInfo.setMcInstalled(true);

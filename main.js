@@ -4481,7 +4481,7 @@ function deleteInstance(instance_id) {
 function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
     db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(getDefault("default_width")), Number(getDefault("default_height")), Number(getDefault("default_ram")));
     setOptionsTXT(instance_id, getDefaultOptionsTXT(vanilla_version), true, false, (v) => {
-        updateInstance("attempted_options_txt_version", v);
+        updateInstance("attempted_options_txt_version", v, instance_id);
     });
     return getInstance(instance_id);
 }
