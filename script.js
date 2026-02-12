@@ -1259,6 +1259,7 @@ class SearchBar {
         }
         searchClear.onclick = (e) => {
             searchInput.value = "";
+            this.value = "";
             if (this.oninput) this.oninput("");
             if (this.onenter) this.onenter("");
             searchInput.focus();
@@ -4607,6 +4608,9 @@ class SkinEntry {
                         await e.setName(info.name);
                         if (!info.name) await e.setName(translate("app.wardrobe.unnamed"));
                         await e.setModel(info.model);
+                        if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
+                            await equipSkin();
+                        }
                         showContent(true);
                     });
                 }

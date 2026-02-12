@@ -4583,6 +4583,7 @@ function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, las
     if (previousSkinIds.includes(skin_id) && !overrideCheck) {
         let id = skins[previousSkinIds.indexOf(skin_id)].id;
         if (texture_key) updateSkin("texture_key", texture_key, id);
+        if (model) updateSkin("model", model, id);
         return getSkin(id);
     }
     let result = db.prepare("INSERT INTO skins (name, model, active_uuid, skin_id, skin_url, default_skin, last_used, texture_key) VALUES (?,?,?,?,?,?,?,?)").run(name, model, `;${active_uuid};`, skin_id, skin_url, Number(false), last_used ? last_used.toISOString() : null, texture_key ? texture_key : null);
