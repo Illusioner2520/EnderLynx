@@ -5203,7 +5203,6 @@ async function showInstanceContent(e) {
                 } : async (e) => {
                     await showSpecificInstanceContent(instances[i], undefined, undefined, true);
                     await playInstance(instances[i]);
-                    showSpecificInstanceContent(instances[i]);
                 }
             },
             instances[i].locked ? null : {
