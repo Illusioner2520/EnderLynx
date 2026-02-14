@@ -3885,11 +3885,11 @@ async function showHomeContent(oldEle) {
             itemAuthor.className = "home-discover-author";
             itemInfo.appendChild(itemTitle);
             itemInfo.appendChild(itemAuthor);
-            item.appendChild(itemInfo);
             let itemDownloadCount = document.createElement("div");
             itemDownloadCount.className = "home-discover-downloads";
             itemDownloadCount.innerHTML = translate("app.home.modpack.downloads").replace("%d", formatNumber(e.downloads));
-            item.appendChild(itemDownloadCount);
+            itemInfo.appendChild(itemDownloadCount);
+            item.appendChild(itemInfo);
             discoverModsContainer.appendChild(item);
         })
     }
