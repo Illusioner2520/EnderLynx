@@ -4675,7 +4675,7 @@ dialog {
     translate: -50% -100%;
     pointer-events: none;
     width: max-content;
-    transition: opacity .2s, display allow-discrete .2s, overlay allow-discrete .2s, .1s left, .1s top, transform .2s;
+    transition: opacity .2s .2s, display allow-discrete .2s .2s, overlay allow-discrete .2s .2s, .1s left, .1s top, transform .2s .2s;
     opacity: 0;
     overflow: visible;
     border: none;
