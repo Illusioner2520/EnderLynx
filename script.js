@@ -3859,6 +3859,12 @@ async function showHomeContent(oldEle) {
     discoverModsWrapper.appendChild(discoverModsTop);
     let discoverModsContainer = document.createElement("div");
     discoverModsContainer.className = "home-discover-container";
+    discoverModsContainer.addEventListener("wheel", e => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            discoverModsContainer.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
     discoverModsWrapper.appendChild(discoverModsContainer);
 
     let updateHomeModpacksList = (e) => {
@@ -3913,6 +3919,12 @@ async function showHomeContent(oldEle) {
     mcNewsWrapper.appendChild(mcNewsTitle);
     let mcNewsContainer = document.createElement("div");
     mcNewsContainer.className = "home-discover-container";
+    mcNewsContainer.addEventListener("wheel", e => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            mcNewsContainer.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
     mcNewsWrapper.appendChild(mcNewsContainer);
 
     let updateMCNews = (e) => {
