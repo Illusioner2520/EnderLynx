@@ -1877,7 +1877,7 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
         try {
             player_info = await getNewAccessToken(player_info.refresh_token);
         } catch (err) {
-            win.webContents.send('display-error', translate("app.launch.access_token.offline"));
+            if (win) win.webContents.send('display-error', translate("app.launch.access_token.offline"));
         }
     }
     let mc = new Minecraft(instance_id, instance_info.name, db, user_path, win, translate);
