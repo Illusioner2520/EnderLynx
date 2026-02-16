@@ -1007,5 +1007,8 @@
     "app.downloading.java.version_info": "Fetching java version info...",
     "app.downloading.java.zip": "Downloading java zip...",
     "app.downloading.java.zip.extracting": "Extracting java zip...",
-    "app.downloading.java.zip.deleting": "Deleting old zip..."
+    "app.downloading.java.zip.deleting": "Deleting old zip...",
+    "app.settings.clear_cache": "Clear Network Cache",
+    "app.settings.clear_cache.success": "Successfully cleared network cache",
+    "app.settings.clear_cache.fail": "Failed to clear network cache"
 }

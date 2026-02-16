@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, session } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
@@ -5015,6 +5015,15 @@ function getMaxConcurrentDownloads() {
     if (r?.value) return Number(r.value);
     return 10;
 }
+
+ipcMain.handle('clear-network-cache', async (_) => {
+    try {
+        await session.defaultSession.clearCache();
+        return true;
+    } catch (e) {
+        return false;
+    }
+})
 
 // update
 try {

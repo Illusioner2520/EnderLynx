@@ -2877,6 +2877,18 @@ settingsButtonEle.onclick = async () => {
     }
     updatesButton.onclick = updateButtonClick;
     app_info.appendChild(updatesButton);
+    let clearCacheButton = document.createElement("button");
+    clearCacheButton.innerHTML = '<i class="fa-solid fa-trash-can"></i> ' + translate("app.settings.clear_cache");
+    clearCacheButton.className = "bug-button";
+    clearCacheButton.onclick = async () => {
+        let success = await window.enderlynx.clearNetworkCache();
+        if (success) {
+            displaySuccess(translate("app.settings.clear_cache.success"))
+        } else {
+            displayError(translate("app.settings.clear_cache.fail"))
+        }
+    }
+    app_info.appendChild(clearCacheButton);
     dialog.showDialog(translate("app.settings"), "form", [
         {
             "type": "dropdown",

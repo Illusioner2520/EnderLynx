@@ -867,7 +867,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     unpinInstance: async (...params) => ipcRenderer.invoke('unpin-instance', ...params),
     pinWorld: async (...params) => ipcRenderer.invoke('pin-world', ...params),
     unpinWorld: async (...params) => ipcRenderer.invoke('unpin-world', ...params),
-    getPinnedInstances: async (...params) => ipcRenderer.invoke('get-pinned-instances', ...params)
+    getPinnedInstances: async (...params) => ipcRenderer.invoke('get-pinned-instances', ...params),
+    clearNetworkCache: async () => ipcRenderer.invoke('clear-network-cache')
 });
 
 async function getServerLastPlayed(instance_id, ip) {
