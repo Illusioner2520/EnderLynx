@@ -3048,7 +3048,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         try {
             let hash = crypto.createHash('sha256')
-                .update(data)
+                .update(await fsPromises.readFile(zipPath))
                 .digest('hex');
             if ("sha256:" + hash != checksum) throw new Error();
         } catch (e) {
