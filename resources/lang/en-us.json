@@ -460,7 +460,7 @@
     "app.instances.settings.java_installation.test.testing": "Testing...",
     "app.instances.settings.java_installation.test.success": "Test Successful",
     "app.instances.settings.java_installation.test.fail": "Test Failed",
-    "app.instances.settings.java_installation.test.reset": "Reset",
+    "app.instances.settings.java_installation.test.reset": "Reset To Default",
     "app.instances.settings.java_installation.test.reset.resetting": "Resetting...",
     "app.instances.settings.java_args.reset": "Reset To Default",
     "app.instances.settings.custom_args": "Custom Java Arguments",

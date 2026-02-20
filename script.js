@@ -288,8 +288,9 @@ class Instance {
         this.installed_version = content.installed_version;
         this.last_analyzed_log = content.last_analyzed_log;
         this.failed = Boolean(content.failed);
-        this.uses_custom_java_args = content.uses_custom_java_args;
+        this.uses_custom_java_args = Boolean(content.uses_custom_java_args);
         this.provided_java_args = content.provided_java_args;
+        this.uses_custom_java_installation = Boolean(content.uses_custom_java_installation);
         if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
     }
 
@@ -443,6 +444,10 @@ class Instance {
     async setProvidedJavaArgs(provided_java_args) {
         await window.enderlynx.updateInstance("provided_java_args", provided_java_args, this.instance_id);
         this.provided_java_args = provided_java_args;
+    }
+    async setUsesCustomJavaInstallation(uses_custom_java_installation) {
+        await window.enderlynx.updateInstance("uses_custom_java_installation", uses_custom_java_installation, this.instance_id);
+        this.uses_custom_java_installation = uses_custom_java_installation;
     }
 
     watchForChange(name, func) {
@@ -5515,7 +5520,6 @@ async function showCreateInstanceDialog() {
             if (r.error) {
                 await instance.setFailed(true);
             } else {
-                await instance.setJavaPath(r.java_installation);
                 await instance.setJavaVersion(r.java_version);
                 await instance.setJavaArgs(r.java_args);
                 await instance.setProvidedJavaArgs(r.java_args);
@@ -5551,7 +5555,6 @@ async function showCreateInstanceDialog() {
             if (r.error) {
                 await instance.setFailed(true);
             } else {
-                await instance.setJavaPath(r.java_installation);
                 await instance.setJavaVersion(r.java_version);
                 await instance.setJavaArgs(r.java_args);
                 await instance.setProvidedJavaArgs(r.java_args);
@@ -5588,7 +5591,6 @@ async function showCreateInstanceDialog() {
             if (r.error) {
                 await instance.setFailed(true);
             } else {
-                await instance.setJavaPath(r.java_installation);
                 await instance.setJavaVersion(r.java_version);
                 await instance.setJavaArgs(r.java_args);
                 await instance.setProvidedJavaArgs(r.java_args);
@@ -5974,9 +5976,11 @@ async function getServerLastPlayed(instance_id, ip) {
     return new Date(result ? result : null);
 }
 
-function showInstanceSettings(instanceInfo) {
+async function showInstanceSettings(instanceInfo) {
     let dialog = new Dialog();
     let resettingJavaArgs = false;
+    let resettingJavaInstallation = false;
+    let default_java_installation = await window.enderlynx.getJavaInstallation(instanceInfo.java_version);
     dialog.showDialog(translate("app.instances.settings.title"), "form", [
         {
             "type": "image-upload",
@@ -6109,7 +6113,7 @@ function showInstanceSettings(instanceInfo) {
             "type": "text",
             "name": translate("app.instances.settings.java_installation"),
             "id": "java_path",
-            "default": instanceInfo.java_path,
+            "default": instanceInfo.uses_custom_java_installation ? instanceInfo.java_path : default_java_installation,
             "tab": "java",
             "desc": translate("app.instances.settings.java_installation.description." + window.enderlynx.ostype()).replace("%v", instanceInfo.java_version),
             "buttons": [
@@ -6174,8 +6178,9 @@ function showInstanceSettings(instanceInfo) {
                     "icon": '<i class="fa-solid fa-rotate-left"></i>',
                     "func": async (v, b, i) => {
                         b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.reset.resetting");
-                        let java_path = await window.enderlynx.getJavaInstallation(instanceInfo.java_version);
+                        let java_path = default_java_installation;
                         i.value = java_path;
+                        resettingJavaInstallation = true;
                         b.innerHTML = '<i class="fa-solid fa-rotate-left"></i>' + translate("app.instances.settings.java_installation.test.reset")
                     }
                 }
@@ -6254,13 +6259,19 @@ function showInstanceSettings(instanceInfo) {
         await instanceInfo.setWindowWidth(info.width);
         await instanceInfo.setWindowHeight(info.height);
         await instanceInfo.setAllocatedRam(info.allocated_ram);
-        await instanceInfo.setJavaPath(info.java_path);
+        if (resettingJavaInstallation && info.java_path == default_java_installation) {
+            await instanceInfo.setUsesCustomJavaInstallation(false);
+            await instanceInfo.setJavaPath(null);
+        } else if (info.java_path != instanceInfo.java_path && info.java_path != default_java_installation) {
+            await instanceInfo.setUsesCustomJavaInstallation(true);
+            await instanceInfo.setJavaPath(info.java_path);
+        }
         if (resettingJavaArgs && info.java_args == instanceInfo.provided_java_args) {
             await instanceInfo.setUsesCustomJavaArgs(false);
-        } else if (info.java_args != instanceInfo.java_args) {
+        } else if (info.java_args != instanceInfo.java_args && info.java_args != instanceInfo.provided_java_args) {
             await instanceInfo.setUsesCustomJavaArgs(true);
-            await instanceInfo.setJavaArgs(info.java_args);
         }
+        await instanceInfo.setJavaArgs(info.java_args);
         await instanceInfo.setEnvVars(info.env_vars);
         await instanceInfo.setPreLaunchHook(info.pre_launch_hook);
         await instanceInfo.setPostLaunchHook(info.post_launch_hook);
@@ -6286,10 +6297,7 @@ function showInstanceSettings(instanceInfo) {
         if (r.error) {
             await instanceInfo.setFailed(true);
         } else {
-            if (instanceInfo.java_version != r.java_version) {
-                await instanceInfo.setJavaPath(r.java_installation);
-                await instanceInfo.setJavaVersion(r.java_version);
-            }
+            await instanceInfo.setJavaVersion(r.java_version);
             await instanceInfo.setProvidedJavaArgs(r.java_args);
             if (!instanceInfo.uses_custom_java_args) {
                 await instanceInfo.setJavaArgs(r.java_args);
@@ -11517,7 +11525,6 @@ class VanillaTweaksSelector {
                         if (r.error) {
                             await instance.setFailed(true);
                         } else {
-                            await instance.setJavaPath(r.java_installation);
                             await instance.setJavaVersion(r.java_version);
                             await instance.setJavaArgs(r.java_args);
                             await instance.setProvidedJavaArgs(r.java_args);
@@ -12079,6 +12086,7 @@ async function duplicateInstance(instanceInfo) {
             await newInstance.setJavaArgs(instanceInfo.java_args);
             await newInstance.setProvidedJavaArgs(instanceInfo.provided_java_args);
             await newInstance.setUsesCustomJavaArgs(instanceInfo.uses_custom_java_args);
+            await newInstance.setUsesCustomJavaInstallation(instanceInfo.uses_custom_java_installation);
             await newInstance.setJavaPath(instanceInfo.java_path);
             await newInstance.setJavaVersion(instanceInfo.java_version);
             await newInstance.setAllocatedRam(instanceInfo.allocated_ram);
@@ -13994,7 +14002,6 @@ async function repairInstance(instance, whatToRepair) {
         await instance.setFailed(true);
     } else {
         if (whatToRepair.includes("java")) {
-            await instance.setJavaPath(r.java_installation);
             await instance.setJavaVersion(r.java_version);
         }
         await instance.setMcInstalled(true);
@@ -14223,7 +14230,6 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
             if (r.error) {
                 await instance.setFailed(true);
             } else {
-                await instance.setJavaPath(r.java_installation);
                 await instance.setJavaVersion(r.java_version);
                 await instance.setJavaArgs(r.java_args);
                 await instance.setProvidedJavaArgs(r.java_args);
@@ -14428,7 +14434,6 @@ async function installButtonClick(project_type, source, content_loaders, icon, t
                 if (r.error) {
                     await instance.setFailed(true);
                 } else {
-                    await instance.setJavaPath(r.java_installation);
                     await instance.setJavaVersion(r.java_version);
                     await instance.setJavaArgs(r.java_args);
                     await instance.setProvidedJavaArgs(r.java_args);
@@ -14619,7 +14624,6 @@ async function runModpackUpdate(instanceInfo, source, modpack_info) {
     if (r.error) {
         await instanceInfo.setFailed(true);
     } else {
-        await instanceInfo.setJavaPath(r.java_installation);
         await instanceInfo.setJavaVersion(r.java_version);
         await instanceInfo.setJavaArgs(r.java_args);
         await instanceInfo.setProvidedJavaArgs(r.java_args);
@@ -14856,7 +14860,6 @@ let importInstance = (info, file_path) => {
         if (r.error) {
             await instance.setFailed(true);
         } else {
-            await instance.setJavaPath(r.java_installation);
             await instance.setJavaVersion(r.java_version);
             await instance.setJavaArgs(r.java_args);
             await instance.setProvidedJavaArgs(r.java_args);
