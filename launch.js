@@ -1374,7 +1374,7 @@ class Java {
             this.versions_map[versions[i].version] = versions[i].file_path;
         }
     }
-    async downloadJava(version) {
+    async downloadJava(version, isRepair) {
         let processId = generateNewProcessId();
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
@@ -1403,8 +1403,14 @@ class Java {
 
             const binary = data[0];
             const downloadUrl = binary.download_url;
+            const package_uuid = binary.package_uuid;
             const fileName = path.basename(downloadUrl);
             const downloadPath = path.resolve(this.userPath, "java/" + fileName);
+            let check = this.db.prepare("SELECT * FROM java_versions WHERE version = ? AND package_uuid = ?").get(version, package_uuid);
+            if (check) {
+                this.win.webContents.send('progress-update', this.translate("app.downloading.java"), 100, this.translate("app.done"), processId, "done", cancelId, true);
+                return true;
+            }
             signal.throwIfAborted();
             this.win.webContents.send('progress-update', this.translate("app.downloading.java"), 10, this.translate("app.downloading.java.zip"), processId, "good", cancelId, true);
             await urlToFile(downloadUrl, downloadPath, {
@@ -1444,9 +1450,10 @@ class Java {
                 this.versions_map[version] = path.resolve(this.userPath, `java/java-${version}/${name}/zulu-${version}.jre/Contents/Home/bin/java`);
                 fs.chmodSync(this.versions_map[version], 0o755);
             }
-            this.db.prepare("INSERT INTO java_versions (version, file_path) VALUES (?, ?) ON CONFLICT(version) DO UPDATE SET file_path = excluded.file_path").run(version, this.versions_map[version]);
+            this.db.prepare("INSERT INTO java_versions (version, file_path, package_uuid) VALUES (?, ?, ?) ON CONFLICT(version) DO UPDATE SET file_path = excluded.file_path, package_uuid = excluded.package_uuid").run(version, this.versions_map[version], package_uuid);
             signal.throwIfAborted();
             this.win.webContents.send('progress-update', this.translate("app.downloading.java"), 100, this.translate("app.done"), processId, "done", cancelId, true);
+            return this.versions_map[version];
         } catch (err) {
             this.win.webContents.send('progress-update', this.translate("app.downloading.java"), 100, err, processId, "error", cancelId, true);
             throw err;
@@ -1454,7 +1461,7 @@ class Java {
     }
     async getJavaInstallation(version, isRepair) {
         if (!this.versions_map[version] || isRepair) {
-            await this.downloadJava(version);
+            await this.downloadJava(version, isRepair);
         }
         return this.versions_map[version];
     }

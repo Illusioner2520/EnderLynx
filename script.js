@@ -2793,6 +2793,26 @@ settingsButtonEle.onclick = async () => {
                             }
                         }, 3000);
                     }
+                },
+                {
+                    "name": translate("app.settings.java.update"),
+                    "icon": '<i class="fa-solid fa-download"></i>',
+                    "func": async (v, b, i) => {
+                        b.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.update.updating");
+                        b.onclick = () => {}
+                        let file_path = await window.enderlynx.downloadLatestJava(e.version);
+                        if (file_path) {
+                            b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.settings.java.update.success");
+                            if (typeof file_path == 'boolean') {
+                                displaySuccess(translate("app.settings.java.update.latest_installed"));
+                                return;
+                            }
+                            i.value = file_path;
+                        } else {
+                            b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.settings.java.update.fail");
+                            b.classList.add("failed");
+                        }
+                    }
                 }
             ]
         });
