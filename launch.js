@@ -1,7 +1,6 @@
 const fs = require('fs');
 const https = require('https');
 const http = require('http');
-const urlModule = require('url');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const os = require('os');
@@ -1499,7 +1498,7 @@ function urlToFile(url, filepath, {
             return reject(new Error("Too many redirects"));
         }
 
-        const parsedUrl = urlModule.parse(url);
+        const parsedUrl = new URL(url);
         const protocol = parsedUrl.protocol === "https:" ? https : http;
 
         fs.mkdirSync(path.dirname(filepath), { recursive: true });
@@ -1598,7 +1597,7 @@ function urlToFolder(url, folder, redirectCount = 0) {
             return reject(new Error('Too many redirects'));
         }
 
-        const parsedUrl = urlModule.parse(url);
+        const parsedUrl = new URL(url);
         const protocol = parsedUrl.protocol === 'https:' ? https : http;
         const fileName = path.basename(decodeURIComponent(parsedUrl.pathname));
         const filepath = path.join(folder, fileName);
