@@ -692,6 +692,7 @@ class MinecraftAccountSwitcher {
                 playerDelete.classList.add("player-delete");
                 playerDelete.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
                 playerDelete.setAttribute("tabindex", "0");
+                playerDelete.role = "button";
                 playerDelete.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.onPlayerClickDelete(this.players[i]);
@@ -3625,6 +3626,7 @@ async function showHomeContent(oldEle) {
                 if (event.target.matches("i")) return;
                 showSpecificInstanceContent(e);
             }
+            item.role = "button";
             item.setAttribute("tabindex", "0");
             item.onkeydown = (event) => {
                 if (event.target.matches("button")) return;
@@ -4826,6 +4828,7 @@ class SkinEntry {
         if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
             skinEle.classList.add("selected");
         }
+        skinEle.role = "button";
         skinEle.onclick = (e) => {
             if (e.target.matches(".skin-more")) return;
             if (e.target.matches("i")) return;
@@ -10695,7 +10698,7 @@ class ContentSearchEntry {
             displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type, states);
         }
         element.setAttribute("tabindex", "0");
-        element.setAttribute("role", "button");
+        element.role = "button";
         element.onkeydown = (e) => {
             if (e.key == "Enter" || e.key == " ") {
                 displayContentInfo(source, source_id, instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, null, infoData, project_type, states);
