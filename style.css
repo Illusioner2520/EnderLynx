@@ -5143,7 +5143,6 @@ body.offline #offline-notice {
     transition: display allow-discrete .1s, opacity .1s, height .1s;
     height: 0px;
     opacity: .4;
-    overflow: hidden;
     interpolate-size: allow-keywords;
 }
 
