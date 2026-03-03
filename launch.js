@@ -1407,7 +1407,7 @@ class Java {
             const fileName = path.basename(downloadUrl);
             const downloadPath = path.resolve(this.userPath, "java/" + fileName);
             let check = this.db.prepare("SELECT * FROM java_versions WHERE version = ? AND package_uuid = ?").get(version, package_uuid);
-            if (check) {
+            if (check && !isRepair) {
                 this.win.webContents.send('progress-update', this.translate("app.downloading.java"), 100, this.translate("app.done"), processId, "done", cancelId, true);
                 return true;
             }
