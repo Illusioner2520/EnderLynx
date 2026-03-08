@@ -4965,12 +4965,51 @@ body.hide_ip .hidden-text.shown::after {
     overflow: hidden;
 }
 
+.server-address {
+    color: var(--text-color);
+    padding: 12px;
+    min-width: 300px;
+    width: fit-content;
+    border: 0;
+    border-radius: 8px;
+    background-color: var(--color-1);
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: scale .1s, background-color .25s;
+    margin-inline: auto;
+}
+
+.server-address:hover {
+    background-color: var(--color-2);
+}
+
+.server-address:active {
+    scale: .95;
+}
+
 .share-link-text {
     font-weight: bold;
     white-space: nowrap;
     text-overflow: ellipsis;
     margin-right: 8px;
     overflow: hidden;
+}
+
+.server-address-text {
+    font-weight: bold;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+    overflow: hidden;
+}
+
+.server-address-copy {
+    color: var(--subtle-text-color);
+    font-size: 1rem;
+    margin-left: auto;
 }
 
 .share-link-copy {

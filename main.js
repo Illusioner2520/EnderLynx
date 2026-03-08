@@ -62,7 +62,7 @@ if (!fs.existsSync(user_path)) {
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -1239,7 +1239,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
 
         let cfData = [];
         try {
-            const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+            const response = await fetch("https://api.curse.tools/v1/mods", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
@@ -1651,7 +1651,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
 
         if (cf_project_ids.length) {
             try {
-                const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+                const response = await fetch("https://api.curse.tools/v1/mods", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false }),
@@ -1819,7 +1819,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
         if (project_ids.filter(e => e).length) {
             let cfData = [];
             try {
-                const response = await fetch("https://api.curse.tools/v1/cf/mods", {
+                const response = await fetch("https://api.curse.tools/v1/mods", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false }),
@@ -1888,6 +1888,9 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
     let globalPostExit = getDefault("global_post_exit_hook");
     try {
         await fixProfile(player_info);
+        if (!quickPlay && instance_info.source_server) {
+            quickPlay = { "type": "multiplayer", "info": instance_info.source_server };
+        }
         let minecraft = await mc.launchGame(instance_info.loader, instance_info.vanilla_version, instance_info.loader_version, player_info.name, player_info.uuid, {
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid,
@@ -2724,7 +2727,7 @@ async function deleteInstanceFiles(instance_id) {
             deleted++;
             const percent = Math.round((deleted / allFiles.length) * 100);
             signal.throwIfAborted();
-            win.webContents.send('progress-update', translate("app.instance.deleting"), percent, translate("app.instances.deleting.progress", "%f", path.basename(file), "%a", deleted, "%b", allFiles.length), processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.instance.deleting"), percent, translate("app.instance.deleting.progress", "%f", path.basename(file), "%a", deleted, "%b", allFiles.length), processId, "good", cancelId);
         }
         async function removeDirs(dir) {
             const entries = await fsPromises.readdir(dir, { withFileTypes: true });
@@ -4467,7 +4470,7 @@ function getInstances() {
 function updateInstance(key, value, instance_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
     if (win && win.webContents) win.webContents.send('instance-updated', key, value, instance_id);
     return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
@@ -5081,6 +5084,7 @@ try {
             java.upgradeLegacy();
         case "0.7.0":
         case "0.7.1":
+            db.prepare("ALTER TABLE instances ADD source_server TEXT").run();
             db.prepare("ALTER TABLE java_versions ADD package_uuid TEXT").run();
             db.prepare("ALTER TABLE instances ADD uses_custom_java_installation INTEGER").run();
             db.prepare("UPDATE instances SET uses_custom_java_installation = ?").run(1);

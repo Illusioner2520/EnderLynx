@@ -68,6 +68,7 @@
         requestAnimationFrame(() => {
             const script = document.createElement("script");
             script.src = "script.js";
+            script.type = "module";
             const script2 = document.createElement("script");
             script2.src = "node_modules/skinview3d/bundles/skinview3d.bundle.js";
             document.body.appendChild(script);
