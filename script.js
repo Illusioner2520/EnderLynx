@@ -3993,7 +3993,7 @@ async function showHomeContent(oldEle) {
     }
 
     let getMCNews = async () => {
-        mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/_jcr_content.articles.page-0.json")).json();
+        mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/_jcr_content.articles.json")).json();
         updateMCNews(mc_news);
     }
 
