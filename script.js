@@ -6651,7 +6651,6 @@ async function setInstanceTabContentContentReal(instanceInfo, element) {
                         await e.setImage(project.icon);
                         ele.src = fixPathForImage(project.icon || getDefaultImage(e.name));
                     } else {
-                        await e.setImage("");
                         ele.src = fixPathForImage(getDefaultImage(e.name));
                     }
                 },
