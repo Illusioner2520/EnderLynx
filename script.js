@@ -11414,7 +11414,7 @@ class VanillaTweaksSelector {
                         "type": "dropdown",
                         "id": "instance",
                         "name": translate("app.discover.datapacks.instance"),
-                        "options": getInstances().map(e => ({ "name": e.name, "value": e.instance_id }))
+                        "options": (await getInstances()).map(e => ({ "name": e.name, "value": e.instance_id }))
                     },
                     {
                         "type": "dropdown",
