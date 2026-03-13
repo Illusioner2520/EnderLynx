@@ -4905,7 +4905,7 @@ function isWorldPinned(world_id, instance_id, world_type) {
     return Boolean(db.prepare("SELECT * FROM pins WHERE world_id = ? AND instance_id = ? AND world_type = ?").get(world_id, instance_id, world_type));
 }
 function isInstancePinned(instance_id) {
-    return Boolean(db.prepare("SELECT * FROM pins WHERE instance_id = ?").get(instance_id));
+    return Boolean(db.prepare("SELECT * FROM pins WHERE type = ? AND instance_id = ?").get("instance", instance_id));
 }
 function pinInstance(instance_id) {
     return db.prepare("INSERT INTO pins (type, instance_id) VALUES (?, ?)").run("instance", instance_id);
