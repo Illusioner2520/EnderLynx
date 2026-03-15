@@ -419,7 +419,7 @@ class Modrinth {
         if (loader && ["modpack", "mod"].includes(project_type)) facets.push("categories IN [\"" + loader + "\"]");
         if (loader && ["minecraft_java_server"].includes(project_type)) facets.push("minecraft_java_server.content.kind IN [\"" + loader + "\"]");
         if (version) facets.push("(game_versions IN [\"" + version + "\"] OR minecraft_java_server.content.supported_game_versions IN [\"" + version + "\"])");
-        facets.push("project_types IN [\"" + project_type + "\"]");
+        facets.push("project_types = " + project_type);
         let url = `https://api.modrinth.com/v3/search?query=${query}&limit=${pageSize}&index=${sort}&new_filters=${facets.join("%20AND%20")}&offset=${(page - 1) * pageSize}`;
         let urlInfo = await (await fetch(url)).json();
         let projects = [];
