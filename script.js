@@ -3456,6 +3456,9 @@ async function showHomeContent(oldEle) {
             let icon = document.createElement("img");
             icon.className = "instance-image";
             icon.src = fixPathForImage(e.icon ? e.icon : getDefaultImage(e.type == "singleplayer" ? e.id : e.ip));
+            icon.onerror = () => {
+                icon.src = getDefaultImage(e.type == "singleplayer" ? e.id : e.ip);
+            }
             item.appendChild(icon);
             let itemInfo = document.createElement("div");
             itemInfo.className = "instance-info";
@@ -3649,6 +3652,9 @@ async function showHomeContent(oldEle) {
             instances[i].watchForChange("image", (image) => {
                 icon.src = image ? image : getDefaultImage(e.instance_id);
             });
+            icon.onerror = () => {
+                icon.src = getDefaultImage(e.instance_id);
+            }
             item.appendChild(icon);
             let itemInfo = document.createElement("div");
             itemInfo.className = "instance-info";
@@ -5214,6 +5220,9 @@ async function showInstanceContent(e) {
         } else {
             instanceImage.src = getDefaultImage(instances[i].instance_id);
         }
+        instanceImage.onerror = () => {
+            instanceImage.src = getDefaultImage(instances[i].instance_id);
+        }
         instances[i].watchForChange("image", (image) => {
             instanceImage.src = image ? image : getDefaultImage(instances[i].instance_id);
         });
@@ -5656,6 +5665,9 @@ async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_t
     if (instanceInfo.image) {
         instImg.src = instanceInfo.image;
     } else {
+        instImg.src = getDefaultImage(instanceInfo.instance_id);
+    }
+    instImg.onerror = () => {
         instImg.src = getDefaultImage(instanceInfo.instance_id);
     }
     instanceInfo.watchForChange("image", (i) => {
@@ -11582,6 +11594,9 @@ class VanillaTweaksSelector {
                     let image = document.createElement("img");
                     image.src = instances[i].image ? instances[i].image : getDefaultImage(instances[i].instance_id);
                     image.className = "instance-image";
+                    image.onerror = () => {
+                        image.src = getDefaultImage(instances[i].instance_id);
+                    }
 
                     let info = document.createElement("div");
                     info.className = "instance-info";
@@ -14022,6 +14037,9 @@ async function installButtonClick(content, version, instance_id, button, dialog_
             let image = document.createElement("img");
             image.src = instances[i].image ? instances[i].image : getDefaultImage(instances[i].instance_id);
             image.className = "instance-image";
+            image.onerror = () => {
+                image.src = getDefaultImage(instances[i].instance_id);
+            }
 
             let info = document.createElement("div");
             info.className = "instance-info";
