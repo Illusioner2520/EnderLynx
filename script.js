@@ -10806,6 +10806,9 @@ class ContentSearchEntry {
 }
 
 function formatNumber(num) {
+    if (typeof num != 'number') {
+        return "";
+    }
     if (num < 1000) return num.toString();
     if (num < 100000) return Math.round(num / 100) / 10 + "k";
     if (num < 1000000) return Math.round(num / 1000) + "k";

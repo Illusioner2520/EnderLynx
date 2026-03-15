@@ -53,8 +53,8 @@ class Project {
         this.gallery = urlInfo.gallery.map(e => new GalleryImage(e, "modrinth"));
         this.loaders = urlInfo.project_loader_fields ? urlInfo.project_loader_fields.mrpack_loaders : [...new Set((urlInfo.mrpack_loaders || []).concat(urlInfo.loaders || []))];
         this.game_versions = urlInfo.minecraft_java_server?.content?.kind == "vanilla" ? urlInfo.minecraft_java_server.content.supported_game_versions : urlInfo.project_loader_fields ? urlInfo.project_loader_fields.game_versions : urlInfo.game_versions;
-        this.online_players = urlInfo.minecraft_java_server?.ping?.data?.players_online || null;
-        this.max_players = urlInfo.minecraft_java_server?.ping?.data?.players_max || null;
+        this.online_players = urlInfo.minecraft_java_server?.ping?.data?.players_online ?? null;
+        this.max_players = urlInfo.minecraft_java_server?.ping?.data?.players_max ?? null;
         this.ip_address = urlInfo.minecraft_java_server?.address || null;
         this.server_modpack = urlInfo.minecraft_java_server?.content;
         if (urlInfo.minecraft_java_server) {
