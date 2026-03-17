@@ -3421,7 +3421,7 @@ async function showHomeContent(oldEle) {
     lastPlayedInstanceGrid.className = "home-list-section";
     lastPlayedInstanceGrid.dataset.id = "ui:last_played_instance_grid";
     let updateHomeGrid = async () => {
-        animateGridReorder(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
+        animateGridReorderStart(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
 
         let pinnedWorlds = pinnedWorldsList;
         let pinnedInstances = pinnedInstancesList;
@@ -3877,6 +3877,7 @@ async function showHomeContent(oldEle) {
         column1.appendChild(lastPlayedWorlds.length ? lastPlayedWorldGrid : noPlayedWorlds);
         column2.appendChild(lastPlayedInstanceTitle);
         column2.appendChild(lastPlayedInstances.length ? lastPlayedInstanceGrid : noPlayedInstances);
+        animateGridReorderEnd(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
     }
 
     updateHomeGrid();
@@ -4070,69 +4071,78 @@ function setPage(page) {
 
 applyDefaults();
 
-function animateGridReorder(querySelector, pseudoElements) {
+let first = new Map();
+let first2 = new Map();
+let last = new Map();
+let last2 = new Map();
+
+function animateGridReorderStart(querySelector, pseudoElements) {
     const cards = [...document.querySelectorAll(querySelector)];
     const cards2 = [...document.querySelectorAll(pseudoElements)];
 
-    const first = new Map();
-    const first2 = new Map();
+    first.clear();
+    first2.clear();
     cards.forEach(card => {
         first.set(card.dataset.id, card.getBoundingClientRect());
     });
     cards2.forEach(card => {
         first2.set(card.dataset.id, card.getBoundingClientRect());
+    });
+}
+
+function animateGridReorderEnd(querySelector, pseudoElements) {
+    const cards = [...document.querySelectorAll(querySelector)];
+    const cards2 = [...document.querySelectorAll(pseudoElements)];
+    last.clear();
+    last2.clear();
+    cards.forEach(card => {
+        last.set(card.dataset.id, card.getBoundingClientRect());
+    });
+    cards2.forEach(card => {
+        last2.set(card.dataset.id, card.getBoundingClientRect());
     })
 
-    requestAnimationFrame(() => {
-        const cards = [...document.querySelectorAll(querySelector)];
-        const cards2 = [...document.querySelectorAll(pseudoElements)];
-        const last = new Map();
-        const last2 = new Map();
-        cards.forEach(card => {
-            last.set(card.dataset.id, card.getBoundingClientRect());
-        });
-        cards2.forEach(card => {
-            last2.set(card.dataset.id, card.getBoundingClientRect());
-        })
+    cards.forEach(card => {
+        const f = first.get(card.dataset.id);
+        const l = last.get(card.dataset.id);
+        if (!f || !l) return;
 
-        cards.forEach(card => {
-            const f = first.get(card.dataset.id);
-            const l = last.get(card.dataset.id);
-            if (!f || !l) return;
+        const dx = f.left - l.left;
+        const dy = f.top - l.top;
 
-            const dx = f.left - l.left;
-            const dy = f.top - l.top;
+        if (dx || dy) {
+            card.style.transform = `translate(${dx}px, ${dy}px)`;
+            card.style.transition = 'none';
 
-            if (dx || dy) {
-                card.style.transform = `translate(${dx}px, ${dy}px)`;
-                card.style.transition = 'none';
-
-                requestAnimationFrame(() => {
-                    card.style.transform = '';
-                    card.style.transition = '';
-                });
-            }
-        });
-
-        cards2.forEach(card => {
-            const f = first2.get(card.dataset.id);
-            const l = last2.get(card.dataset.id);
-            if (!f || !l) return;
-
-            const dx = f.left - l.left;
-            const dy = f.top - l.top;
-
-            if (dx || dy) {
-                card.style.setProperty("--pseudo-transform", `translate(${dx}px, ${dy}px)`);
-                card.style.setProperty("--pseudo-transition", "none");
-
-                requestAnimationFrame(() => {
-                    card.style.setProperty("--pseudo-transform", ``);
-                    card.style.setProperty("--pseudo-transition", "");
-                });
-            }
-        });
+            requestAnimationFrame(() => {
+                card.style.transform = '';
+                card.style.transition = ''; 
+            });
+        }
     });
+
+    cards2.forEach(card => {
+        const f = first2.get(card.dataset.id);
+        const l = last2.get(card.dataset.id);
+        if (!f || !l) return;
+
+        const dx = f.left - l.left;
+        const dy = f.top - l.top;
+
+        if (dx || dy) {
+            card.style.setProperty("--pseudo-transform", `translate(${dx}px, ${dy}px)`);
+            card.style.setProperty("--pseudo-transition", "none");
+
+            requestAnimationFrame(() => {
+                card.style.setProperty("--pseudo-transform", ``);
+                card.style.setProperty("--pseudo-transition", "");
+            });
+        }
+    });
+    first.clear();
+    first2.clear();
+    last.clear();
+    last2.clear();
 }
 
 let skinViewer;
@@ -4373,7 +4383,7 @@ async function showWardrobeContent() {
     }
     let skinEntries = [];
     let filterSkins = (noAnimate) => {
-        if (!noAnimate) animateGridReorder(".skin");
+        if (!noAnimate) animateGridReorderStart(".skin");
         let search = searchbar.value.toLowerCase().trim();
         let sort = sortdropdown.value;
         skinEntries.forEach(e => e.element.remove());
@@ -4405,9 +4415,10 @@ async function showWardrobeContent() {
         filteredEntries.forEach(e => {
             skinList.appendChild(e.element);
         });
+        if (!noAnimate) animateGridReorderEnd(".skin");
     }
     let showContent = async (noAnimate) => {
-        if (!noAnimate) animateGridReorder(".skin");
+        if (!noAnimate) animateGridReorderStart(".skin");
         skinEntries = [];
         let activeSkin = await default_profile.getActiveSkin();
         skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
@@ -4437,6 +4448,7 @@ async function showWardrobeContent() {
             detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
         }
         filterSkins(true);
+        if (!noAnimate) animateGridReorderEnd(".skin");
     }
     showContent(true);
     refreshWardrobe = showContent;
@@ -5062,7 +5074,7 @@ async function sortInstances(how) {
 }
 
 async function groupInstances(how, noAnimate) {
-    if (!noAnimate) animateGridReorder(".instance-item");
+    if (!noAnimate) animateGridReorderStart(".instance-item");
     if (!document.getElementsByClassName("group-list")[0]) return;
     await setDefault("default_group", how);
     let attrhow = how.toLowerCase().replaceAll("_", "-");
@@ -5110,7 +5122,8 @@ async function groupInstances(how, noAnimate) {
         newElement.appendChild(frag);
         groupList.appendChild(newElement);
     });
-    sortInstances(sortBy.getSelected);
+    await sortInstances(sortBy.getSelected);
+    if (!noAnimate) animateGridReorderEnd(".instance-item");
 }
 function searchInstances(query) {
     query = query.toLowerCase().trim();
@@ -5350,7 +5363,7 @@ async function showInstanceContent(e) {
                         }
                     ], [], async (v) => {
                         instances[i].delete();
-                        animateGridReorder(".instance-item");
+                        animateGridReorderStart(".instance-item");
                         instanceContent.displayContent();
                         if (v[0].value) {
                             try {
@@ -5359,6 +5372,7 @@ async function showInstanceContent(e) {
                                 displayError(translate("app.instances.delete.files.fail"));
                             }
                         }
+                        animateGridReorderEnd(".instance-item");
                     });
                 },
                 "danger": true
