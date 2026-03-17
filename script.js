@@ -8923,18 +8923,8 @@ window.enderlynx.onInstallInstance(async (install_info) => {
     if (!install_info.id) return;
     if (!install_info.source) return;
     let project = await Project.getFromId(install_info.id, install_info.source);
-    await project.getAuthors();
-    let info = {
-        "project_type": project.project_type,
-        "source": project.source,
-        "loaders": project.loaders,
-        "icon": project.icon,
-        "name": project.name,
-        "author": project.authors.map(e => e.name).join(", "),
-        "game_versions": project.game_versions,
-        "project_id": project.id
-    }
-    importInstanceFromContentProvider(info);
+    console.log(JSON.stringify(project));
+    importInstanceFromContentProvider(project);
 });
 
 class MultiSelect {
@@ -13660,11 +13650,15 @@ async function installButtonClick(content, version, instance_id, button, dialog_
     let source = content.source;
     let content_loaders = version?.loaders || content.loaders;
     console.log(content);
+    console.log(JSON.stringify(content))
     let icon = content.icon;
     let title = content.name;
-    let author = content.authors.map(e => e.name).join(", ");
     let game_versions = version?.game_versions || content.game_versions;
     let project_id = content.id;
+    console.log(content.loaders);
+    console.log(title);
+    console.log(version);
+    console.log(content_loaders);
     content_loaders.forEach(e => {
         if (plugin_loaders.includes(e)) count++;
     });
@@ -14440,7 +14434,7 @@ let importInstance = (info, file_path) => {
 }
 
 let importInstanceFromContentProvider = (info) => {
-    installButtonClick(info.project_type, info.source, info.loaders, info.icon, info.name, info.author, info.game_versions, info.project_id, undefined, document.createElement("button"), undefined, undefined, () => { }, undefined);
+    installButtonClick(info, undefined, undefined, document.createElement("button"), undefined, () => { }, undefined);
 }
 
 window.enderlynx.onOpenFile(importInstance);

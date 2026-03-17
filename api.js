@@ -206,12 +206,12 @@ class Project {
     }
     static async getFromId(id, source) {
         let project = new Project();
-        project.getInfoFromId(id, source);
+        await project.getInfoFromId(id, source);
         return project;
     }
     static async getFromSlug(slug, source, class_id) {
         let project = new Project();
-        project.getInfoFromSlug(slug, source, class_id);
+        await project.getInfoFromSlug(slug, source, class_id);
         return project;
     }
 }
