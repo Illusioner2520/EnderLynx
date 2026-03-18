@@ -4116,7 +4116,7 @@ function animateGridReorderEnd(querySelector, pseudoElements) {
 
             requestAnimationFrame(() => {
                 card.style.transform = '';
-                card.style.transition = ''; 
+                card.style.transition = '';
             });
         }
     });
@@ -5090,16 +5090,7 @@ async function groupInstances(how, noAnimate) {
     while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
     let groups = Object.keys(groupMap);
     if (how == "game_version") {
-        groups.sort((a, b) => {
-            const aIndex = minecraftVersions.indexOf(a);
-            const bIndex = minecraftVersions.indexOf(b);
-            if (aIndex === -1 && bIndex === -1) {
-                return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
-            }
-            if (aIndex === -1) return -1;
-            if (bIndex === -1) return 1;
-            return bIndex - aIndex;
-        });
+        sortByVersion(groups, true);
     } else if (how == "pinned") {
         groups.sort((a, b) => {
             if (a === "" && b !== "") return -1;
@@ -12586,15 +12577,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                     )
                 );
                 if (Array.isArray(minecraftVersions) && minecraftVersions.length > 0) {
-                    allGameVersions.sort((a, b) => {
-                        const ia = minecraftVersions.indexOf(a);
-                        const ib = minecraftVersions.indexOf(b);
-                        if (ia === -1 && ib === -1) return 0;
-                        if (ia === -1) return -1;
-                        if (ib === -1) return 1;
-                        return ia - ib;
-                    });
-                    allGameVersions.reverse();
+                    sortByVersion(allGameVersions, true);
                 }
 
                 let versionDropdown = new SearchDropdown(
@@ -13781,16 +13764,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 "type": "dropdown",
                 "name": translate("app.instances.game_version"),
                 "id": "game_version",
-                "options": game_versions.sort((a, b) => {
-                    const aIndex = minecraftVersions.indexOf(a);
-                    const bIndex = minecraftVersions.indexOf(b);
-                    if (aIndex === -1 && bIndex === -1) {
-                        return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
-                    }
-                    if (aIndex === -1) return -1;
-                    if (bIndex === -1) return 1;
-                    return bIndex - aIndex;
-                }).map(e => ({ "name": e, "value": e }))
+                "options": sortByVersion(game_versions, true).map(e => ({ "name": e, "value": e }))
             },
             {
                 "type": "dropdown",
@@ -14804,4 +14778,18 @@ async function openWorldEditDialog(instance_id, world_id, refresh) {
         }
         refresh();
     });
+}
+
+function sortByVersion(list, reverse) {
+    list.sort((a, b) => {
+        const aIndex = minecraftVersions.indexOf(a);
+        const bIndex = minecraftVersions.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+        }
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return reverse ? bIndex - aIndex : aIndex - bIndex;
+    });
+    return list;
 }
