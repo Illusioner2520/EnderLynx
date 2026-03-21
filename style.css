@@ -1107,7 +1107,7 @@ h1 {
     cursor: pointer;
     color: var(--text-color);
     font-size: 1.5rem;
-    transition: background-color .25s, scale .1s;
+    transition: background-color .25s;
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -1115,10 +1115,6 @@ h1 {
 
 .instance-top-more:hover {
     background-color: var(--color-2t);
-}
-
-.instance-top-more:active {
-    scale: .95;
 }
 
 .instance-top-title {
@@ -1394,11 +1390,7 @@ i {
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: background-color .25s, scale .1s;
-}
-
-.content-list-more:active {
-    scale: .95;
+    transition: background-color .25s;
 }
 
 .content-list-more:hover {
@@ -3784,11 +3776,7 @@ dialog[open]::backdrop {
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: background-color .25s, scale .1s;
-}
-
-.home-list-more:active {
-    scale: .95;
+    transition: background-color .25s;
 }
 
 .home-list-more:hover {
@@ -4180,7 +4168,7 @@ dialog[open]::backdrop {
     cursor: pointer;
     color: var(--text-color);
     font-size: 1.5rem;
-    transition: background-color .25s, scale .1s;
+    transition: background-color .25s;
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -4188,10 +4176,6 @@ dialog[open]::backdrop {
 
 .content-top-more:hover {
     background-color: var(--color-2t);
-}
-
-.content-top-more:active {
-    scale: .95;
 }
 
 .markdown-body {
