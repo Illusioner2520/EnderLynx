@@ -4643,7 +4643,6 @@ dialog[open]::backdrop {
     margin-bottom: 10px;
 }
 
-dialog *,
 dialog {
     overscroll-behavior: contain;
 }
