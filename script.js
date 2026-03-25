@@ -11308,7 +11308,7 @@ class VanillaTweaksSelector {
         if (this.version && !this.vt_version) {
             this.vt_version = this.version.split(".").splice(0, 2).join(".");
         }
-        if (!this.vt_version) this.vt_version = "1.21";
+        if (!this.vt_version) this.vt_version = "26.1";
         try {
             if (this.type == "resourcepack") {
                 result = await window.enderlynx.getVanillaTweaksResourcePacks(this.query, this.vt_version);
@@ -11352,6 +11352,10 @@ class VanillaTweaksSelector {
         }
         let dropdownElement = document.createElement("div");
         new Dropdown(translate("app.discover.vt.version"), [
+            {
+                "name": "26.1",
+                "value": "26.1"
+            },
             {
                 "name": "1.21",
                 "value": "1.21"
