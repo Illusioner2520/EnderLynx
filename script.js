@@ -6350,6 +6350,7 @@ async function showInstanceSettings(instanceInfo) {
         await instanceInfo.setVanillaVersion(info.game_version, true);
         await instanceInfo.setLoaderVersion(info.loader_version);
         await instanceInfo.setMcInstalled(false);
+        await instanceInfo.setFailed(false);
         let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
         if (r.error) {
             await instanceInfo.setFailed(true);
@@ -14125,6 +14126,7 @@ async function runModpackUpdate(instanceInfo, source, version) {
     closeAllDialogs();
     await instanceInfo.setInstalling(true);
     await instanceInfo.setMcInstalled(false);
+    await instanceInfo.setFailed(false);
     await window.enderlynx.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
     await instanceInfo.clearContent();
     if (source == "modrinth") {
