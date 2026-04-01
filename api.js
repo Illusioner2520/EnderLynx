@@ -105,30 +105,30 @@ class Project {
         this.description = description;
     }
     async getInfoFromId(id, source) {
-        this.id = id;
-        this.source = source;
         if (source == "modrinth") {
-            let url = `https://api.modrinth.com/v3/project/${this.id}`;
+            let url = `https://api.modrinth.com/v3/project/${id}`;
             let urlInfo = await (await fetch(url)).json();
             this.applyInfoFromModrinth(urlInfo);
         } else if (source == "curseforge") {
-            this.id = Number(this.id);
-            let url = `https://api.curse.tools/v1/mods/${this.id}`;
+            let url = `https://api.curse.tools/v1/mods/${id}`;
             let urlInfo = await (await fetch(url)).json();
             urlInfo = urlInfo.data;
             this.applyInfoFromCurseForge(urlInfo);
             this.setDescription((await (await fetch(url + "/description")).json()).data);
         }
     }
-    async getInfoFromSlug(slug, source, class_id) {
+    async getInfoFromSlug(slug, source) {
         if (source == "modrinth") {
             let url = `https://api.modrinth.com/v3/project/${slug}`;
             let urlInfo = await (await fetch(url)).json();
             this.applyInfoFromModrinth(urlInfo);
         } else if (source == "curseforge") {
+            let class_id = Number(slug.split(":")[1]);
+            slug = slug.split(":")[0];
             let url = `https://api.curse.tools/v1/cf/mods/search?gameId=432&slug=${slug}&classId=${class_id}`;
             let urlInfo = await (await fetch(url)).json();
             this.applyInfoFromCurseForge(urlInfo.data[0]);
+            this.setDescription((await (await fetch(`https://api.curse.tools/v1/mods/${urlInfo.data[0].id}/description`)).json()).data);
         }
     }
     applyInfoFromCurseForgeServers(urlInfo) {

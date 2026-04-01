@@ -1,7 +1,7 @@
 import { Project, ProjectVersion, ProjectList, ProjectVersionList, Author, GalleryImage, Modrinth, CurseForge } from './api.js';
 
 let lang = null;
-document.getElementsByTagName("title")[0].innerHTML = sanitize(translate("app.name"));
+document.getElementsByTagName("title")[0].textContent = translate("app.name");
 
 history.scrollRestoration = "manual"
 
@@ -16,25 +16,10 @@ fetchUpdatedMCVersions();
 
 let accent_colors = ["red", "orange", "yellow", "lime", "green", "light_blue", "cyan", "blue", "purple", "magenta", "pink", "brown", "light_gray", "gray"];
 
-let page_log = [];
-let page_index = -1;
-
-function pageForward() {
-    if (!page_log[page_index + 1]) return;
-    page_index++;
-    page_log[page_index]();
-}
-
-function pageBackward() {
-    if (!page_log[page_index - 1]) return;
-    page_index--;
-    page_log[page_index]();
-}
-
 document.body.onmousedown = (e) => {
     if (document.querySelector("dialog[open]")) return;
-    if (e.button == 3) pageBackward();
-    else if (e.button == 4) pageForward();
+    if (e.button == 3) Display.pageBackward();
+    else if (e.button == 4) Display.pageForward();
 }
 
 class DefaultOptions {
@@ -159,8 +144,11 @@ class Cape {
 }
 
 class Content {
+    static content = new Map();
+
     constructor(content) {
         if (!content) return;
+        this.listeners = new Map();
         this.id = content.id;
         this.name = content.name;
         this.author = content.author;
@@ -173,12 +161,14 @@ class Content {
         this.instance = content.instance;
         this.source_info = content.source_info;
         this.version_id = content.version_id;
-        if (!content_watches[this.id]) content_watches[this.id] = {};
     }
 
     static async getContent(content_id) {
-        let content = await window.enderlynx.getContent(content_id);
-        return new Content(content);
+        if (!this.content.has(content_id)) {
+            let newContent = new Content(await window.enderlynx.getContent(content_id));
+            this.content.set(content_id, newContent);
+        }
+        return this.content.get(content_id);
     }
 
     async refresh() {
@@ -187,74 +177,73 @@ class Content {
 
     async setName(name) {
         await window.enderlynx.updateContent("name", name, this.id);
-        this.name = name;
     }
     async setAuthor(author) {
         await window.enderlynx.updateContent("author", author, this.id);
-        this.author = author;
     }
     async setDisabled(disabled) {
         await window.enderlynx.updateContent("disabled", disabled, this.id);
-        this.disabled = disabled;
-        if (content_watches[this.id].onchangedisabled) {
-            content_watches[this.id].onchangedisabled(disabled);
-        }
     }
     async setImage(image) {
         await window.enderlynx.updateContent("image", image, this.id);
-        this.image = image;
     }
     async setFileName(file_name) {
         await window.enderlynx.updateContent("file_name", file_name, this.id);
-        this.file_name = file_name;
     }
     async setSource(source) {
         await window.enderlynx.updateContent("source", source, this.id);
-        this.source = source;
     }
     async setType(type) {
         await window.enderlynx.updateContent("type", type, this.id);
-        this.type = type;
     }
     async setVersion(version) {
         await window.enderlynx.updateContent("version", version, this.id);
-        this.version = version;
     }
     async setVersionId(version_id) {
         await window.enderlynx.updateContent("version_id", version_id, this.id);
-        this.version_id = version_id;
     }
     async setInstance(instance) {
         await window.enderlynx.updateContent("instance", instance, this.id);
-        this.instance = instance;
     }
     async setSourceInfo(source_info) {
         await window.enderlynx.updateContent("source_info", source_info, this.id);
-        this.source_info = source_info;
     }
 
     async delete() {
         await window.enderlynx.deleteContentDatabase(this.id);
     }
 
-    watchForChange(name, func) {
-        if (!content_watches[this.id]) content_watches[this.id] = {};
-        content_watches[this.id]["onchange" + name] = func;
+    watchForChange(key, callback) {
+        this.listeners.set(key, callback);
     }
 }
 
-let instance_watches = {};
-let content_watches = {};
+window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
+    let instance = await Instance.getInstance(instance_id);
+    if (instance[key] instanceof Date) value = Date(value);
+    if (typeof instance[key] == 'boolean') value = Boolean(value);
+    instance[key] = value;
+    if (instance?.listeners?.get(key)) {
+        instance.listeners.get(key)(value);
+    }
+});
 
-window.enderlynx.onInstanceUpdated((key, value, instance_id) => {
-    if (instance_watches[instance_id] && instance_watches[instance_id]["onchange" + key]) {
-        instance_watches[instance_id]["onchange" + key](value);
+window.enderlynx.onContentUpdated(async (key, value, content_id) => {
+    let content = await Content.getContent(content_id);
+    if (content[key] instanceof Date) value = Date(value);
+    if (typeof content[key] == 'boolean') value = Boolean(value);
+    content[key] = value;
+    if (content?.listeners?.get(key)) {
+        content.listeners.get(key)(value);
     }
 });
 
 class Instance {
+    static instances = new Map();
+
     constructor(content) {
         if (!content) throw new Error("Instance not found");
+        this.listeners = new Map();
         this.name = content.name;
         this.date_created = new Date(content.date_created);
         this.date_modified = new Date(content.date_modified);
@@ -265,7 +254,7 @@ class Instance {
         this.playtime = content.playtime;
         this.locked = Boolean(content.locked);
         this.downloaded = Boolean(content.downloaded);
-        this.group = content.group_id;
+        this.group_id = content.group_id;
         this.image = content.image;
         this.instance_id = content.instance_id;
         this.pid = content.pid;
@@ -294,90 +283,75 @@ class Instance {
         this.provided_java_args = content.provided_java_args;
         this.uses_custom_java_installation = Boolean(content.uses_custom_java_installation);
         this.source_server = content.source_server;
-        if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
+        this.instanceScreen = new InstanceScreen(this);
     }
 
     static async getInstance(instance_id) {
-        return new Instance(await window.enderlynx.getInstance(instance_id));
+        if (!this.instances.has(instance_id)) {
+            let newInstance = new Instance(await window.enderlynx.getInstance(instance_id));
+            this.instances.set(instance_id, newInstance);
+        }
+        return this.instances.get(instance_id);
     }
     async isPinned() {
         return await window.enderlynx.isInstancePinned(this.instance_id);
     }
     async setLastAnalyzedLog(last_analyzed_log) {
         await window.enderlynx.updateInstance("last_analyzed_log", last_analyzed_log, this.instance_id);
-        this.last_analyzed_log = last_analyzed_log;
     }
     async setInstalledVersion(installed_version) {
         await window.enderlynx.updateInstance("installed_version", installed_version, this.instance_id);
-        this.installed_version = installed_version;
     }
     async setJavaArgs(java_args) {
         await window.enderlynx.updateInstance("java_args", java_args, this.instance_id);
-        this.java_args = java_args;
     }
     async setEnvVars(env_vars) {
         await window.enderlynx.updateInstance("env_vars", env_vars, this.instance_id);
-        this.env_vars = env_vars;
     }
     async setPreLaunchHook(pre_launch_hook) {
         await window.enderlynx.updateInstance("pre_launch_hook", pre_launch_hook, this.instance_id);
-        this.pre_launch_hook = pre_launch_hook;
     }
     async setPostLaunchHook(post_launch_hook) {
         await window.enderlynx.updateInstance("post_launch_hook", post_launch_hook, this.instance_id);
-        this.post_launch_hook = post_launch_hook;
     }
     async setWrapper(wrapper) {
         await window.enderlynx.updateInstance("wrapper", wrapper, this.instance_id);
-        this.wrapper = wrapper;
     }
     async setPostExitHook(post_exit_hook) {
         await window.enderlynx.updateInstance("post_exit_hook", post_exit_hook, this.instance_id);
-        this.post_exit_hook = post_exit_hook;
     }
     async setJavaVersion(java_version) {
         await window.enderlynx.updateInstance("java_version", java_version, this.instance_id);
-        this.java_version = java_version;
     }
     async setJavaPath(java_path) {
         await window.enderlynx.updateInstance("java_path", java_path, this.instance_id);
-        this.java_path = java_path;
     }
     async setWindowWidth(window_width) {
         await window.enderlynx.updateInstance("window_width", window_width, this.instance_id);
-        this.window_width = window_width;
     }
     async setWindowHeight(window_height) {
         await window.enderlynx.updateInstance("window_height", window_height, this.instance_id);
-        this.window_height = window_height;
     }
     async setAllocatedRam(allocated_ram) {
         await window.enderlynx.updateInstance("allocated_ram", allocated_ram, this.instance_id);
-        this.allocated_ram = allocated_ram;
     }
     async setName(name) {
         await window.enderlynx.updateInstance("name", name, this.instance_id);
-        this.name = name;
     }
     async setLastPlayed(last_played) {
         await window.enderlynx.updateInstance("last_played", last_played, this.instance_id);
-        this.last_played = last_played;
     }
     async setDateCreated(date_created) {
         await window.enderlynx.updateInstance("date_created", date_created, this.instance_id);
-        this.date_created = date_created;
     }
     async setDateModified(date_modified) {
         await window.enderlynx.updateInstance("date_modified", date_modified, this.instance_id);
-        this.date_modified = date_modified;
     }
     async setLoader(loader) {
         await window.enderlynx.updateInstance("loader", loader, this.instance_id);
-        this.loader = loader;
     }
     async setVanillaVersion(vanilla_version, do_not_set_options_txt) {
         await window.enderlynx.updateInstance("vanilla_version", vanilla_version, this.instance_id);
-        this.vanilla_version = vanilla_version;
         if (do_not_set_options_txt) return;
         let default_options = new DefaultOptions(vanilla_version);
         window.enderlynx.setOptionsTXT(this.instance_id, await default_options.getOptionsTXT(), false, false, (v) => {
@@ -386,80 +360,57 @@ class Instance {
     }
     async setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
         await window.enderlynx.updateInstance("attempted_options_txt_version", attempted_options_txt_version, this.instance_id);
-        this.attempted_options_txt_version = attempted_options_txt_version;
     }
     async setLoaderVersion(loader_version) {
         await window.enderlynx.updateInstance("loader_version", loader_version, this.instance_id);
-        this.loader_version = loader_version;
     }
     async setPlaytime(playtime) {
         await window.enderlynx.updateInstance("playtime", playtime, this.instance_id);
-        this.playtime = playtime;
     }
     async setLocked(locked) {
         await window.enderlynx.updateInstance("locked", locked, this.instance_id);
-        this.locked = locked;
     }
     async setDownloaded(downloaded) {
         await window.enderlynx.updateInstance("downloaded", downloaded, this.instance_id);
-        this.downloaded = downloaded;
     }
     async setGroup(group) {
         await window.enderlynx.updateInstance("group_id", group, this.instance_id);
-        this.group = group;
     }
     async setImage(image) {
         await window.enderlynx.updateInstance("image", image, this.instance_id);
-        this.image = image;
     }
     async setPid(pid) {
         await window.enderlynx.updateInstance("pid", pid, this.instance_id);
-        this.pid = pid;
     }
     async setCurrentLogFile(current_log_file) {
         await window.enderlynx.updateInstance("current_log_file", current_log_file, this.instance_id);
-        this.current_log_file = current_log_file;
     }
     async setInstallSource(install_source) {
         await window.enderlynx.updateInstance("install_source", install_source, this.instance_id);
-        this.install_source = install_source;
     }
     async setInstallId(install_id) {
         await window.enderlynx.updateInstance("install_id", install_id, this.instance_id);
-        this.install_id = install_id;
     }
     async setInstalling(installing) {
         await window.enderlynx.updateInstance("installing", installing, this.instance_id);
-        this.installing = installing;
     }
     async setMcInstalled(mc_installed) {
         await window.enderlynx.updateInstance("mc_installed", mc_installed, this.instance_id);
-        this.mc_installed = mc_installed;
     }
     async setFailed(failed) {
         await window.enderlynx.updateInstance("failed", failed, this.instance_id);
-        this.failed = failed;
     }
     async setUsesCustomJavaArgs(uses_custom_java_args) {
         await window.enderlynx.updateInstance("uses_custom_java_args", uses_custom_java_args, this.instance_id);
-        this.uses_custom_java_args = uses_custom_java_args;
     }
     async setProvidedJavaArgs(provided_java_args) {
         await window.enderlynx.updateInstance("provided_java_args", provided_java_args, this.instance_id);
-        this.provided_java_args = provided_java_args;
     }
     async setUsesCustomJavaInstallation(uses_custom_java_installation) {
         await window.enderlynx.updateInstance("uses_custom_java_installation", uses_custom_java_installation, this.instance_id);
-        this.uses_custom_java_installation = uses_custom_java_installation;
     }
     async setSourceServer(source_server) {
         await window.enderlynx.updateInstance("source_server", source_server, this.instance_id);
-        this.source_server = source_server;
-    }
-
-    watchForChange(name, func) {
-        if (!instance_watches[this.instance_id]) instance_watches[this.instance_id] = {};
-        instance_watches[this.instance_id]["onchange" + name] = func;
     }
 
     async addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
@@ -468,7 +419,11 @@ class Instance {
 
     async getContent() {
         let content = await window.enderlynx.getInstanceContentDatabase(this.instance_id);
-        return content.map(e => new Content(e));
+        let contentList = [];
+        for (let i = 0; i < content.length; i++) {
+            contentList.push(await Content.getContent(content[i].id));
+        }
+        return contentList;
     }
 
     async clearContent() {
@@ -482,17 +437,26 @@ class Instance {
         await window.enderlynx.deleteInstance(this.instance_id);
     }
 
-    async refresh() {
-        return Instance.getInstance(this.instance_id);
+    watchForChange(key, callback) {
+        this.listeners.set(key, callback);
+    }
+
+    display(default_tab, make_button_loading) {
+        this.instanceScreen.display(false, default_tab, make_button_loading);
     }
 }
 
 async function getInstances() {
     let instances = await window.enderlynx.getInstances();
-    return instances.map(e => new Instance(e));
+    let instanceList = [];
+    for (let i = 0; i < instances.length; i++) {
+        instanceList.push(await Instance.getInstance(instances[i].instance_id));
+    }
+    return instanceList;
 }
 async function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
-    return new Instance(await window.enderlynx.addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed));
+    await window.enderlynx.addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed);
+    return await Instance.getInstance(instance_id);
 }
 async function getProfiles() {
     let profiles = await window.enderlynx.getProfiles();
@@ -501,12 +465,6 @@ async function getProfiles() {
 async function getDefaultProfile() {
     let profile = await window.enderlynx.getDefaultProfile();
     return profile ? new Profile(profile) : null;
-}
-async function deleteProfile(uuid) {
-    await window.enderlynx.deleteProfile(uuid);
-}
-async function addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
-    return new Profile(await window.enderlynx.addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default));
 }
 async function getProfileFromUUID(uuid) {
     return new Profile(await window.enderlynx.getProfileDatabase(uuid));
@@ -650,7 +608,7 @@ class MinecraftAccountSwitcher {
             this.element.appendChild(pInfo);
             let pName = document.createElement("div");
             pName.className = "player-name";
-            pName.innerHTML = sanitize(default_player.name);
+            pName.textContent = default_player.name;
             pInfo.appendChild(pName);
             let pDesc = document.createElement("div");
             pDesc.className = "player-desc";
@@ -688,11 +646,11 @@ class MinecraftAccountSwitcher {
                 playerInfoEle.classList.add("player-info");
                 let playerName = document.createElement("div");
                 playerName.classList.add("player-name");
-                playerName.innerHTML = sanitize(this.players[i].name);
+                playerName.textContent = this.players[i].name;
                 playerInfoEle.appendChild(playerName);
                 let playerDesc = document.createElement("div");
                 playerDesc.classList.add("player-desc");
-                playerDesc.innerHTML = sanitize(translate("app.players.selected"));
+                playerDesc.textContent = translate("app.players.selected");
                 playerInfoEle.appendChild(playerDesc);
                 playerElement.appendChild(playerInfoEle);
                 let playerDelete = document.createElement("div");
@@ -719,7 +677,7 @@ class MinecraftAccountSwitcher {
             }
             let addPlayerButton = document.createElement("button");
             addPlayerButton.classList.add("add-player");
-            addPlayerButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + sanitize(translate("app.button.players.add"));
+            addPlayerButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.players.add");
             addPlayerButton.onclick = toggleMicrosoftSignIn;
             dropdownElement.appendChild(addPlayerButton);
             if (!alreadyThere) document.body.appendChild(dropdownElement);
@@ -751,11 +709,11 @@ class MinecraftAccountSwitcher {
         this.players.push(newPlayerInfo);
         newPlayerInfo.setDefault();
         this.setPlayerInfo();
-        if (currentTab == "wardrobe") {
+        if (Display.currentScreen.tabName == "wardrobe") {
             wardrobeContent.displayContent();
         }
-        if (currentTab == 'home' && changehomewelcome) {
-            changehomewelcome();
+        if (Display.currentScreen.tabName == 'home') {
+            homeScreen.changeHomeWelcome();
         }
     }
     selectPlayer(newPlayerInfo) {
@@ -774,7 +732,7 @@ class MinecraftAccountSwitcher {
         this.element.appendChild(pInfo);
         let pName = document.createElement("div");
         pName.className = "player-name";
-        pName.innerHTML = sanitize(newPlayerInfo.name);
+        pName.textContent = newPlayerInfo.name;
         pInfo.appendChild(pName);
         let pDesc = document.createElement("div");
         pDesc.className = "player-desc";
@@ -791,11 +749,11 @@ class MinecraftAccountSwitcher {
                 this.playerElements[i].classList.remove("not-selected");
             }
         }
-        if (currentTab == "wardrobe") {
+        if (Display.currentScreen.tabName == "wardrobe") {
             wardrobeContent.displayContent();
         }
-        if (currentTab == "home" && changehomewelcome) {
-            changehomewelcome();
+        if (Display.currentScreen.tabName == "home") {
+            homeScreen.changeHomeWelcome();
         }
     }
     onPlayerClick(e) {
@@ -820,11 +778,11 @@ class MinecraftAccountSwitcher {
             }
         }
         this.setPlayerInfo();
-        if (currentTab == "wardrobe") {
+        if (Display.currentScreen.tabName == "wardrobe") {
             wardrobeContent.displayContent();
         }
-        if (currentTab == "home" && changehomewelcome) {
-            changehomewelcome();
+        if (Display.currentScreen.tabName == "home") {
+            homeScreen.changeHomeWelcome();
         }
     }
 }
@@ -849,11 +807,7 @@ class NavigationButton {
         this.title = title;
         if (content) {
             element.onclick = (e) => {
-                for (let i = 0; i < navButtons.length; i++) {
-                    navButtons[i].removeSelected();
-                }
-                this.setSelected();
-                content.displayContent();
+                content.display();
             }
         }
         element.classList.add("menu-button");
@@ -862,7 +816,7 @@ class NavigationButton {
         navIcon.innerHTML = icon;
         let navTitle = document.createElement("div");
         navTitle.classList.add("menu-title");
-        navTitle.innerHTML = sanitize(title);
+        navTitle.textContent = title;
         element.appendChild(navIcon);
         element.appendChild(navTitle);
     }
@@ -874,66 +828,16 @@ class NavigationButton {
     }
 }
 
-let currentTab = "";
-let currentSubTab = "";
-let currentInstanceId = "";
-let currentSubTabElement;
-
 function resetDiscordStatus(bypassLock) {
     if (!rpcLocked || bypassLock) {
         window.enderlynx.setActivity({
-            "details": currentTab == "home" ? translate("app.discord_rpc.home") : currentTab == "instances" || currentTab == "instance" ? translate("app.discord_rpc.instances") : currentTab == "discover" ? translate("app.discord_rpc.discover") : currentTab == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
+            "details": Display.currentScreen.tabName == "home" ? translate("app.discord_rpc.home") : Display.currentScreen.tabName == "instances" || Display.currentScreen.tabName == "instance" ? translate("app.discord_rpc.instances") : Display.currentScreen.tabName == "discover" ? translate("app.discord_rpc.discover") : Display.currentScreen.tabName == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
             "state": translate("app.discord_rpc.not_playing"),
             startTimestamp: new Date(),
             largeImageKey: 'icon',
             largeImageText: translate("app.discord_rpc.logo"),
             instance: false
         });
-    }
-}
-
-class PageContent {
-    constructor(func, title) {
-        this.func = func;
-        this.title = title;
-    }
-    async displayContent(dont_add_to_log) {
-        if (!dont_add_to_log) {
-            page_log = page_log.slice(0, page_index + 1).concat([() => {
-                for (let i = 0; i < navButtons.length; i++) {
-                    navButtons[i].removeSelected();
-                }
-                if (this.title == "home") {
-                    homeButton.setSelected();
-                } else if (this.title == "instances") {
-                    instanceButton.setSelected();
-                } else if (this.title == "discover") {
-                    discoverButton.setSelected();
-                } else if (this.title == "wardrobe") {
-                    wardrobeButton.setSelected();
-                }
-                this.displayContent(true);
-            }]);
-            page_index++;
-        }
-        if (this.title == "discover") {
-            showAddContent();
-            currentTab = "discover";
-            return;
-        }
-        if (this.title == "wardrobe") {
-            showWardrobeContent();
-            currentTab = "wardrobe";
-            return;
-        }
-        content.innerHTML = "";
-        content.appendChild(await this.func());
-        if (this.title == "instances") {
-            groupInstances(await getDefault("default_group"), true);
-        }
-        currentTab = this.title;
-        resetDiscordStatus();
-        clearMoreMenus();
     }
 }
 
@@ -948,7 +852,7 @@ class LiveMinecraft {
         let name = document.createElement("div");
         name.className = "live-name";
         let innerName = document.createElement("div");
-        innerName.innerHTML = sanitize(translate("app.instances.no_running"));
+        innerName.textContent = translate("app.instances.no_running");
         name.appendChild(innerName);
         this.nameElement = innerName;
         let stopButton = document.createElement("div");
@@ -967,28 +871,28 @@ class LiveMinecraft {
         element.appendChild(logButton);
     }
     setLive(instanceInfo) {
-        this.nameElement.innerHTML = sanitize(instanceInfo.name);
+        this.nameElement.textContent = instanceInfo.name;
         this.element.classList.add("minecraft-live");
         this.stopButton.onclick = () => {
             stopInstance(instanceInfo);
             this.findLive();
         }
         this.logButton.onclick = () => {
-            showSpecificInstanceContent(instanceInfo, 'logs');
+            instanceInfo.display("logs");
         }
         let buttons = new ContextMenuButtons([
             {
                 "title": translate("app.live.context.view"),
                 "icon": '<i class="fa-solid fa-eye"></i>',
                 "func": () => {
-                    showSpecificInstanceContent(instanceInfo);
+                    instanceInfo.display();
                 }
             },
             {
                 "title": translate("app.live.context.logs"),
                 "icon": '<i class="fa-solid fa-terminal"></i>',
                 "func": () => {
-                    showSpecificInstanceContent(instanceInfo, 'logs');
+                    instanceInfo.display("logs");
                 }
             },
             {
@@ -1014,7 +918,7 @@ class LiveMinecraft {
         rpcLocked = true;
     }
     removeLive() {
-        this.nameElement.innerHTML = sanitize(translate("app.instances.no_running"));
+        this.nameElement.textContent = translate("app.instances.no_running");
         this.element.classList.remove("minecraft-live");
         this.element.oncontextmenu = () => { };
         this.stopButton.onclick = () => { };
@@ -1040,7 +944,7 @@ class TabContent {
         for (let i = 0; i < options.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("tab-button");
-            buttonElement.innerHTML = sanitize(options[i].name);
+            buttonElement.textContent = options[i].name;
             buttonElement.setAttribute("data-color", options[i].color);
             buttonElement.onclick = (e) => {
                 let oldLeft = this.offset_left;
@@ -1070,6 +974,9 @@ class TabContent {
     }
     get getSelected() {
         return this.selected;
+    }
+    figureOutBackgroundPosition() {
+        this.selectOptionAdvanced(this.selected);
     }
     selectOption(val) {
         let opt;
@@ -1321,7 +1228,7 @@ class Dropdown {
         dropdownInfo.classList.add("dropdown-info");
         let dropdownTitle = document.createElement("div");
         dropdownTitle.classList.add("dropdown-title");
-        dropdownTitle.innerHTML = sanitize(title);
+        dropdownTitle.textContent = title;
         let dropdownSelected = document.createElement("div");
         dropdownSelected.classList.add("dropdown-selected");
         dropdownInfo.appendChild(dropdownTitle);
@@ -1357,12 +1264,12 @@ class Dropdown {
                 break;
             }
         }
-        this.selectedElement.innerHTML = sanitize(name ? name : initial);
+        this.selectedElement.textContent = name || initial;
         this.popover.innerHTML = "";
         for (let i = 0; i < options.length; i++) {
             let optEle = document.createElement("button");
             optEle.classList.add("dropdown-item");
-            optEle.innerHTML = sanitize(options[i].name);
+            optEle.textContent = options[i].name;
             optEle.onclick = (e) => {
                 this.selectOption(options[i].value);
             }
@@ -1382,7 +1289,7 @@ class Dropdown {
                 break;
             }
         }
-        this.selectedElement.innerHTML = sanitize(name ? name : initial);
+        this.selectedElement.textContent = name || initial;
         for (let i = 0; i < this.optEles.length; i++) {
             if (this.optEles[i].dataset.value == option) {
                 this.optEles[i].classList.add("selected");
@@ -1476,11 +1383,11 @@ class Slider {
 
         let lowerBound = document.createElement("div");
         lowerBound.className = "slider-label-left";
-        lowerBound.innerHTML = sanitize(min + " " + unit);
+        lowerBound.textContent = min + " " + unit;
 
         let upperBound = document.createElement("div");
         upperBound.className = "slider-label-right";
-        upperBound.innerHTML = sanitize(max + " " + unit);
+        upperBound.textContent = max + " " + unit;
 
         slider.appendChild(lowerBound);
         slider.appendChild(upperBound);
@@ -1630,15 +1537,14 @@ class ContentList {
             "func": () => {}
         }
     } */
-    constructor(element, content, searchBar, features, filter, notFoundMessage = translate("app.list.no_results_found")) {
+    constructor(element, content, searchBar, features, filter, notFoundMessage = translate("app.list.no_results_found"), scrollElement) {
+        this.scrollElement = scrollElement;
         const fragment = document.createDocumentFragment();
         let notFoundElement = new NoResultsFound(notFoundMessage).element;
         notFoundElement.style.background = "transparent";
         element.classList.add("content-list-wrapper");
         let contentListTop = document.createElement("div");
         contentListTop.className = "content-list-top";
-        let contentListBottom = document.createElement("div");
-        contentListBottom.className = "content-list-bottom";
         fragment.appendChild(contentListTop);
         if (features?.checkbox?.enabled) {
             let checkboxElement = document.createElement("input");
@@ -1753,16 +1659,16 @@ class ContentList {
         }
         let primaryColumnTitle = document.createElement("div");
         primaryColumnTitle.className = "content-list-title";
-        primaryColumnTitle.innerHTML = sanitize(features?.primary_column_name);
+        primaryColumnTitle.textContent = features?.primary_column_name;
         contentListTop.appendChild(primaryColumnTitle);
         let secondaryColumnTitle = document.createElement("div");
         secondaryColumnTitle.className = "content-list-title";
-        secondaryColumnTitle.innerHTML = sanitize(features?.secondary_column_name);
+        secondaryColumnTitle.textContent = features?.secondary_column_name;
         contentListTop.appendChild(secondaryColumnTitle);
         if (features?.refresh?.enabled) {
             let refreshButton = document.createElement("button");
             refreshButton.className = "content-list-refresh";
-            refreshButton.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + sanitize(translate("app.button.content.refresh"));
+            refreshButton.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.button.content.refresh");
             refreshButton.onclick = features.refresh.func;
             contentListTop.appendChild(refreshButton);
         }
@@ -1784,25 +1690,14 @@ class ContentList {
         this.notFoundElement = notFoundElement;
         contentListTop.appendChild(totalText);
 
-
-        this.paginationTop = new Pagination(1, Math.ceil(content.length / 25), (new_page) => {
-            this.applyFilters(searchBar.value, filter.value, new_page);
-        });
-        contentListTop.appendChild(this.paginationTop.element);
-
-        this.paginationBottom = new Pagination(1, Math.ceil(content.length / 25), (new_page) => {
-            this.applyFilters(searchBar.value, filter.value, new_page);
-        });
-        contentListBottom.appendChild(this.paginationBottom.element);
-
         searchBar.setOnInput((v) => {
-            this.applyFilters(v, filter.value, 1);
+            this.applyFilters(v, filter.value);
         });
         this.searchBar = searchBar;
         this.filter = filter;
 
         filter.setOnChange((v) => {
-            this.applyFilters(searchBar.value, v, 1);
+            this.applyFilters(searchBar.value, v);
         });
 
         let contentMainElement = document.createElement("div");
@@ -1817,19 +1712,43 @@ class ContentList {
         this.items = [];
         this.second_column_elements = [];
 
-        this.renderEntries(features, content, contentMainElement, contentListBottom, fragment, element);
+        let spacer = document.createElement("div");
+        contentMainElement.appendChild(spacer);
+        this.spacer = spacer;
+
+        this.renderEntries(features, content, contentMainElement, fragment, element);
     }
 
-    async renderEntries(features, content, contentMainElement, contentListBottom, fragment, element) {
+    async renderEntries(features, content, contentMainElement, fragment, element) {
         let renderEntry = async (contentInfo) => {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
+            if (contentInfo.onclick) {
+                contentEle.role = "button";
+                contentEle.tabIndex = 0;
+                contentEle.classList.add("content-list-button");
+                contentEle.onclick = (event) => {
+                    if (event.target.matches("button")) return;
+                    if (event.target.matches("i")) return;
+                    if (event.target.matches("input")) return;
+                    contentInfo.onclick();
+                }
+                contentEle.onkeydown = (event) => {
+                    if (event.target.matches("button")) return;
+                    if (event.target.matches("i")) return;
+                    if (event.target.matches("input")) return;
+                    if (event.key == "Enter" || event.key == " ") {
+                        contentInfo.onclick();
+                    }
+                }
+            }
             if (contentInfo.class) contentEle.classList.add(contentInfo.class);
             if (contentInfo.type) contentEle.setAttribute("data-type", contentInfo.type);
             let item = {
                 "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title(), contentInfo.secondary_column.desc()].join("!!!!!!!!!!"),
                 "element": contentEle,
-                "type": contentInfo.type
+                "type": contentInfo.type,
+                "height": contentInfo.icon ? 53 : 61
             }
             this.items.push(item);
             let checkboxElement;
@@ -1842,16 +1761,23 @@ class ContentList {
                 }
                 contentEle.appendChild(checkboxElement);
             }
-            let imageElement = document.createElement("img");
-            imageElement.className = "content-list-image";
-            imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : getDefaultImage(contentInfo.primary_column.title));
-            imageElement.loading = "lazy";
-            imageElement.onerror = () => {
-                if (navigator.onLine && contentInfo.onimagefail) {
-                    contentInfo.onimagefail(imageElement);
+            if (contentInfo.icon) {
+                let iconElement = document.createElement("span");
+                iconElement.className = "content-list-icon";
+                iconElement.innerHTML = contentInfo.icon;
+                contentEle.appendChild(iconElement);
+            } else {
+                let imageElement = document.createElement("img");
+                imageElement.className = "content-list-image";
+                imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : getDefaultImage(contentInfo.primary_column.title));
+                imageElement.loading = "lazy";
+                imageElement.onerror = () => {
+                    if (navigator.onLine && contentInfo.onimagefail) {
+                        contentInfo.onimagefail(imageElement);
+                    }
                 }
+                contentEle.appendChild(imageElement);
             }
-            contentEle.appendChild(imageElement);
             let infoElement1 = document.createElement("div");
             infoElement1.className = "content-list-info";
             contentEle.appendChild(infoElement1);
@@ -1861,14 +1787,14 @@ class ContentList {
             infoElement1.appendChild(infoElement1Title);
             let infoElement1Desc = document.createElement("div");
             infoElement1Desc.className = "content-list-info-desc-1";
-            infoElement1Desc.innerHTML = sanitize(contentInfo.primary_column.desc);
+            infoElement1Desc.textContent = contentInfo.primary_column.desc;
             infoElement1.appendChild(infoElement1Desc);
             let infoElement2 = document.createElement("div");
             infoElement2.className = "content-list-info";
             contentEle.appendChild(infoElement2);
             let infoElement2Title = document.createElement("div");
             infoElement2Title.className = "content-list-info-title-2";
-            infoElement2Title.innerHTML = sanitize(await contentInfo.secondary_column.title());
+            infoElement2Title.textContent = await contentInfo.secondary_column.title();
             infoElement2.appendChild(infoElement2Title);
             let infoElement2Desc = document.createElement("div");
             infoElement2Desc.className = "content-list-info-desc-2";
@@ -1898,9 +1824,9 @@ class ContentList {
                         return;
                     }
                     if (infoElement2Desc.innerHTML.endsWith(".disabled")) {
-                        infoElement2Desc.innerHTML = sanitize(infoElement2Desc.innerHTML.slice(0, -9));
+                        infoElement2Desc.textContent = infoElement2Desc.innerHTML.slice(0, -9);
                     } else {
-                        infoElement2Desc.innerHTML = sanitize(infoElement2Desc.innerHTML + ".disabled");
+                        infoElement2Desc.textContent = infoElement2Desc.innerHTML + ".disabled";
                     }
                 }, !contentInfo.disabled);
                 contentInfo.pass_to_checkbox.watchForChange("disabled", (v) => {
@@ -1964,13 +1890,15 @@ class ContentList {
         }
         this.contentElement = contentMainElement;
         fragment.appendChild(contentMainElement);
-        fragment.appendChild(contentListBottom);
         element.appendChild(fragment);
-        this.applyFilters("", "all", 1);
+        this.applyFilters("", "all");
+        // instanceScrollFunction = () => {
+        //     this.render();
+        // }
     }
 
     reApplyFilters() {
-        this.applyFilters(this.searchBar.value, this.filter.value, this.paginationBottom.currentPage);
+        this.applyFilters(this.searchBar.value, this.filter.value);
     }
 
     isCheckboxVisible(element) {
@@ -2000,10 +1928,14 @@ class ContentList {
         this.reApplyFilters();
     }
 
-    applyFilters(search, dropdown, page) {
+    render() {
+        let scrollTop = this.scrollElement.scrollY;
+        let top = this.contentElement
+    }
+
+    applyFilters(search, dropdown) {
+        let height = 0;
         let count = 0;
-        this.paginationBottom.setPage(page);
-        this.paginationTop.setPage(page);
         const fragment = document.createDocumentFragment();
         for (let i = 0; i < this.items.length; i++) {
             let ele = this.items[i].element;
@@ -2016,15 +1948,12 @@ class ContentList {
                 continue;
             }
             count++;
-            if (count <= (page * 25 - 25) || count > page * 25) {
-                ele.remove();
-                continue;
-            }
             fragment.appendChild(ele);
+            height += this.items[i].height;
         }
+        height--;
         this.contentElement.appendChild(fragment);
-        this.paginationBottom.setTotalPages(Math.ceil(count / 25));
-        this.paginationTop.setTotalPages(Math.ceil(count / 25));
+        this.contentElement.style.height = height + "px";
         this.totalText.innerHTML = translate("app.list.total", "%c", count);
         this.notFoundElement.style.display = count ? "none" : "";
         this.figureOutMainCheckedState();
@@ -2033,8 +1962,8 @@ class ContentList {
     updateSecondaryColumn() {
         let list = this.second_column_elements;
         list.forEach(async (e) => {
-            e.infoElement2Title.innerHTML = sanitize(await e.title_func());
-            e.infoElement2Desc.innerHTML = sanitize(await e.desc_func());
+            e.infoElement2Title.textContent = await e.title_func();
+            e.infoElement2Desc.textContent = await e.desc_func();
         });
     }
 
@@ -2392,16 +2321,3176 @@ let codeToKey = {
     "PrintScreen": "key.keyboard.print.screen"
 }
 
-let homeContent = new PageContent(showHome, "home");
-let instanceContent = new PageContent(showInstanceContent, "instances");
-let discoverContent = new PageContent(null, "discover");
-let wardrobeContent = new PageContent(showWardrobeContent, "wardrobe");
+class Screen {
+    constructor(tabName, navButton) {
+        this.tabName = tabName;
+        this.navButton = navButton;
+        this.content = document.getElementById("content");
+        this.contentElement = document.createElement("div");
+    }
+    calculateContent() { }
+    async display(dont_add_to_log, ...args) {
+        await this.calculateContent(...args);
+        if (!dont_add_to_log) {
+            Display.pageLog = Display.pageLog.slice(0, Display.pageIndex + 1).concat([() => {
+                this.display(true);
+            }]);
+            Display.pageIndex++;
+        }
+        for (let i = 0; i < navButtons.length; i++) {
+            navButtons[i].removeSelected();
+        }
+        this.navButton.setSelected();
+        Display.currentScreen = this;
+        this.content.innerHTML = "";
+        this.content.appendChild(this.contentElement);
+    }
+
+    async requestFrame() {
+        return new Promise((resolve) => {
+            requestAnimationFrame(() => {
+                resolve();
+            });
+        });
+    }
+
+    setNavButton(button) {
+        this.navButton = button;
+    }
+}
+
+class InstanceScreen extends Screen {
+    constructor(instance) {
+        super("instance", instancesButton);
+        this.instance = instance;
+    }
+
+    calculateContent(default_tab, make_button_loading) {
+        this.contentElement.innerHTML = "";
+        this.contentElement.className = "instance-content";
+        let topBar = createElement("div", "instance-top");
+        let instanceImage = createElement("img", "instance-top-image", { src: this.instance.image || getDefaultImage(this.instance.instance_id) });
+        instanceImage.onerror = () => {
+            instanceImage.src = getDefaultImage(this.instance.instance_id)
+        };
+        this.instance.watchForChange("image", (image) => [
+            instanceImage.src = image || getDefaultImage(this.instance.instance_id)
+        ]);
+        topBar.appendChild(instanceImage);
+        let instanceInfo = createElement("div", "instance-top-info");
+        let instanceTitle = createElement("h1", "instance-top-title", { textContent: this.instance.name });
+        this.instance.watchForChange("name", (name) => {
+            instanceTitle.textContent = name;
+        });
+        instanceInfo.appendChild(instanceTitle);
+        let instanceSubInfo = createElement("div", "instance-top-sub-info");
+        this.loader_text = loaders[this.instance.loader];
+        this.version_text = this.instance.vanilla_version;
+        let instanceTopVersions = createElement("div", "instance-top-sub-info-specific", { innerHTML: `<i class="fa-solid fa-gamepad"></i>${sanitize(this.loader_text + " " + this.version_text)}` });
+        this.instance.watchForChange("loader", (loader) => {
+            this.loader_text = loaders[loader];
+            instanceTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(this.loader_text + " " + this.version_text)}`;
+        });
+        this.instance.watchForChange("vanilla_version", (version) => {
+            this.version_text = version;
+            instanceTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(this.loader_text + " " + this.version_text)}`;
+        });
+        this.last_played = this.instance.last_played;
+        this.playtime = this.instance.playtime + (this.running ? Math.floor((new Date().getTime() - this.last_played.getTime()) / 1000) : 0);
+        let instanceTopPlaytime = createElement("div", "instance-top-sub-info-specific", { title: translate("app.instances.play_time"), innerHTML: `<i class="fa-solid fa-clock"></i>${formatTime(this.playtime)}` });
+        this.instance.watchForChange("playtime", (time) => {
+            if (!this.running) instanceTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(time)}`
+            this.playtime = time;
+        });
+        this.playtimeInterval = setInterval(() => {
+            if (!document.body.contains(instanceTopPlaytime)) clearInterval(this.playtimeInterval);
+            if (!this.running) return;
+            instanceTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(this.playtime + Math.floor((new Date().getTime() - this.last_played.getTime()) / 1000))}`;
+        }, 1000);
+        let instanceTopLastPlayed = createElement("div", "instance-top-sub-info-specific", { title: translate("app.instances.last_played", "%t", formatDate(this.last_played, 2000)), innerHTML: `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}` });
+        if (howLongAgo(this.last_played) < 3600000) {
+            this.lastPlayedInterval = setInterval(() => {
+                instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
+            }, 60000);
+        } else if (howLongAgo(this.last_played) < 86400000) {
+            this.lastPlayedInterval = setInterval(() => {
+                instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
+            }, 3600000);
+        }
+        this.instance.watchForChange("last_played", (date) => {
+            this.last_played = date;
+            instanceTopLastPlayed.title = translate("app.instances.last_played", "%t", formatDate(this.last_played, 2000));
+            instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
+            clearInterval(this.lastPlayedInterval);
+            if (howLongAgo(v) < 3600000) {
+                this.lastPlayedInterval = setInterval(() => {
+                    instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
+                }, 60000);
+            } else if (howLongAgo(v) < 86400000) {
+                this.lastPlayedInterval = setInterval(() => {
+                    instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
+                }, 3600000);
+            }
+        });
+        instanceSubInfo.appendChild(instanceTopVersions);
+        instanceSubInfo.appendChild(instanceTopPlaytime);
+        instanceSubInfo.appendChild(instanceTopLastPlayed);
+        instanceInfo.appendChild(instanceSubInfo);
+        topBar.appendChild(instanceInfo);
+        this.playButton = createElement("button");
+        this.calculatePlayButtonState(make_button_loading);
+        this.instance.watchForChange("mc_installed", () => {
+            this.calculatePlayButtonState();
+        });
+        this.instance.watchForChange("failed", () => {
+            this.calculatePlayButtonState();
+        });
+        this.instance.watchForChange("pid", () => {
+            this.calculatePlayButtonState();
+        });
+        let threeDots = createElement("button", "instance-top-more", { innerHTML: '<i class="fa-solid fa-ellipsis-vertical"></i>' });
+        let buttons = new ContextMenuButtons([
+            this.instance.locked ? null : {
+                "icon": '<i class="fa-solid fa-plus"></i>',
+                "title": translate("app.button.content.add"),
+                "func": (e) => {
+                    discoverScreen.display(false, instanceInfo, instanceInfo.vanilla_version, instanceInfo.loader);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "title": translate("app.button.instances.duplicate"),
+                "func": (e) => {
+                    duplicateInstance(instanceInfo);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-folder"></i>',
+                "title": translate("app.button.instances.open_folder"),
+                "func": (e) => {
+                    window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "title": translate("app.button.instances.share"),
+                "func": (e) => {
+                    openInstanceShareDialog(instanceInfo);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-wrench"></i>',
+                "title": translate("app.button.instances.repair"),
+                "func": () => {
+                    showRepairDialog(instanceInfo);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-gear"></i>',
+                "title": translate("app.button.instances.open_settings"),
+                "func": async (e) => {
+                    showInstanceSettings(this.instance);
+                }
+            },
+            {
+                "icon": async () => await this.instance.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": async () => await this.instance.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                "func": async (e) => {
+                    await this.instance.isPinned() ? await unpinInstance(this.instance) : await pinInstance(this.instance);
+                    e.setTitle(await this.instance.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                    e.setIcon(await this.instance.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-desktop"></i>',
+                "title": translate("app.instances.desktop_shortcut"),
+                "func": () => {
+                    addDesktopShortcut(this.instance);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "title": translate("app.button.instances.delete"),
+                "func": (e) => {
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
+                        "content": translate("app.instances.delete.confirm.description").replace("%i", instanceInfo.name),
+                        "type": "notice"
+                    }, {
+                        "type": "toggle",
+                        "name": translate("app.instances.delete.files"),
+                        "default": false,
+                        "id": "delete"
+                    }], [
+                        {
+                            "type": "cancel",
+                            "content": translate("app.instances.delete.cancel")
+                        },
+                        {
+                            "type": "confirm",
+                            "content": translate("app.instances.delete.confirm")
+                        }
+                    ], [], async (v) => {
+                        this.instance.delete();
+                        instanceContent.displayContent();
+                        if (v[0].value) {
+                            try {
+                                await window.enderlynx.deleteInstanceFiles(this.instance.instance_id);
+                            } catch (e) {
+                                displayError(translate("app.instances.delete.files.fail"));
+                            }
+                        }
+                    });
+                },
+                "danger": true
+            }
+        ].filter(e => e));
+        let moreMenu = new MoreMenu(threeDots, buttons);
+        topBar.appendChild(this.playButton);
+        topBar.appendChild(threeDots);
+        topBar.appendChild(moreMenu.element);
+        this.contentElement.appendChild(topBar);
+        let tabContent = createElement("div");
+        this.contentElement.appendChild(tabContent);
+        let tabsInfo = createElement("div", "tab-info");
+        this.contentElement.appendChild(tabsInfo);
+        this.tabElement = tabsInfo;
+        this.tabs = new TabContent(tabContent, [
+            {
+                "name": translate("app.instances.tabs.content"), "value": "content", "func": () => {
+                    this.showContent();
+                }
+            },
+            {
+                "name": translate("app.instances.tabs.worlds"), "value": "worlds", "func": () => {
+                    this.showWorlds();
+                }
+            },
+            {
+                "name": translate("app.instances.tabs.logs"), "value": "logs", "func": async () => {
+                    this.showLogs();
+                }
+            },
+            {
+                "name": translate("app.instances.tabs.options"), "value": "options", "func": () => {
+                    this.showOptions();
+                }
+            },
+            {
+                "name": translate("app.instances.tabs.files"), "value": "files", "func": () => {
+                    this.showFiles();
+                }
+            },
+            {
+                "name": translate("app.instances.tabs.screenshots"), "value": "screenshots", "func": () => {
+                    this.showScreenshots();
+                }
+            }
+        ]);
+        this.tabs.selectOptionAdvanced(default_tab || "content");
+    }
+
+    async display(dont_add_to_log, ...args) {
+        await super.display(dont_add_to_log, ...args);
+        this.tabs.figureOutBackgroundPosition();
+        this.calculatePlayButtonState();
+    }
+
+    async calculatePlayButtonState(make_loading) {
+        this.running = checkForProcess(this.instance.pid);
+        if (make_loading) {
+            this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+            this.playButton.className = "instance-top-loading-button";
+            this.playButton.onclick = () => { };
+        } else if (this.instance.failed) {
+            this.playButton.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
+            this.playButton.title = translate("app.instances.failed.tooltip");
+            this.playButton.className = "instance-top-loading-button";
+            this.playButton.onclick = () => { };
+        } else if (!this.instance.mc_installed) {
+            this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+            this.playButton.title = "";
+            this.playButton.className = "instance-top-loading-button";
+            this.playButton.onclick = () => { };
+        } else if (!this.running) {
+            this.playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            this.playButton.title = "";
+            this.playButton.className = "instance-top-play-button";
+            this.playButton.onclick = async () => {
+                this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+                this.playButton.className = "instance-top-loading-button";
+                this.playButton.onclick = () => { };
+                await this.play();
+                this.calculatePlayButtonState();
+                if (this.currentTab == "logs") {
+                    this.showLogs();
+                }
+            }
+        } else {
+            this.playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
+            this.playButton.title = "";
+            this.playButton.className = "instance-top-stop-button";
+            this.playButton.onclick = async () => {
+                this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
+                this.playButton.classList.add("instance-top-loading-button");
+                this.playButton.onclick = () => { };
+                let success = await this.stop();
+                if (!success) this.calculatePlayButtonState();
+            }
+            window.enderlynx.clearProcessWatches();
+            window.enderlynx.watchProcessForExit(this.instance.pid, () => {
+                this.calculatePlayButtonState();
+                live.findLive();
+            });
+        }
+        this.analyzeLogs();
+    }
+
+    async play() {
+        return await playInstance(this.instance);
+    }
+
+    async stop() {
+        return await stopInstance(this.instance);
+    }
+
+    async analyzeLogs() {
+        let info = await window.enderlynx.analyzeLogs(this.instance.instance_id, this.instance.last_analyzed_log, this.running ? this.instance.current_log_file : "");
+        await this.instance.setPlaytime(info.total_playtime + this.instance.playtime);
+        if (info.most_recent_log) await this.instance.setLastAnalyzedLog(info.most_recent_log);
+        for (let i = 0; i < info.last_played_servers.length; i++) {
+            let entry = info.last_played_servers[i];
+            await window.enderlynx.setServerLastPlayed(this.instance.instance_id, entry[1] + ":" + entry[2], entry[0]);
+        }
+    }
+
+    async showContent() {
+        this.currentTab = "content";
+        let loading = new LoadingContainer();
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(loading.element);
+        await this.requestFrame();
+        clearMoreMenus();
+        let fileDrop = createElement("div", "small-drop-overlay drop-overlay");
+        fileDrop.dataset.action = "content-import";
+        fileDrop.dataset.instanceId = this.instance.instance_id;
+        let fileDropInner = createElement("div", "drop-overlay-inner", { innerHTML: translate("app.import.content.drop") });
+        fileDrop.appendChild(fileDropInner);
+        let instanceLockedBanner = createElement("div", "instance-locked-banner");
+        let instanceLockedText = createElement("span", undefined, { innerHTML: translate("app.instance.locked", "%c", translate("app.discover." + this.instance.install_source)) });
+        let instanceLockedButton = createElement("button", "instance-locked-button", { innerHTML: '<i class="fa-solid fa-unlock"></i>' + translate("app.instance.unlock") });
+        instanceLockedButton.onclick = async () => {
+            await this.instance.setLocked(false);
+            await this.instance.setInstallSource("custom");
+            await this.instance.setInstallId("");
+            await this.instance.setInstalledVersion("");
+            this.display();
+        }
+        instanceLockedBanner.appendChild(instanceLockedText);
+        instanceLockedBanner.appendChild(instanceLockedButton);
+        let searchAndFilter = createElement("div", "search-and-filter-v2");
+        let importContent = createElement("button", "add-content-button", { innerHTML: '<i class="fa-solid fa-plus"></i>' + translate("app.content.import") });
+        importContent.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.content.import.title"), "form", [
+                {
+                    "type": "text",
+                    "id": "file_path",
+                    "name": translate("app.content.import.file_path"),
+                    "buttons": [
+                        {
+                            "name": translate("app.content.import.file_path.browse"),
+                            "icon": '<i class="fa-solid fa-folder"></i>',
+                            "func": async (v, b, i) => {
+                                let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["zip", "jar", "disabled"], translate("app.content.import.file_path.browse.types"));
+                                if (newValue) i.value = newValue;
+                                if (i.onchange) i.onchange();
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "dropdown",
+                    "name": translate("app.content.import.type"),
+                    "options": [
+                        {
+                            "name": translate("app.content.auto"),
+                            "value": "auto"
+                        },
+                        {
+                            "name": translate("app.content.mod"),
+                            "value": "mod"
+                        },
+                        {
+                            "name": translate("app.content.resource_pack"),
+                            "value": "resource_pack"
+                        },
+                        {
+                            "name": translate("app.content.shader"),
+                            "value": "shader"
+                        }
+                    ],
+                    "id": "content_type",
+                    "default": "auto"
+                }
+            ], [
+                {
+                    "type": "cancel",
+                    "content": translate("app.content.import.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.content.import.confirm")
+                }
+            ], [], async (v) => {
+                let info = {};
+                v.forEach(e => info[e.id] = e.value);
+                document.body.classList.add("loading");
+                let success = await window.enderlynx.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
+                document.body.classList.remove("loading");
+                if (success) {
+                    displaySuccess(translate("app.content.import.complete"));
+                } else {
+                    displayError(translate("app.content.import.failed"));
+                }
+                if (this.currentTab == "content") this.showContent();
+            })
+        }
+        let addContent = createElement("button", "add-content-button", { innerHTML: '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add") });
+        addContent.onclick = async () => {
+            discoverScreen.display(false, this.instance, this.instance.vanilla_version, this.instance.loader);
+        }
+        if (this.instance.locked) {
+            importContent.onclick = () => { };
+            importContent.style.opacity = ".5";
+            importContent.style.cursor = "not-allowed";
+            importContent.title = translate("app.instances.locked.tooltip");
+            addContent.onclick = () => { };
+            addContent.style.opacity = ".5";
+            addContent.style.cursor = "not-allowed";
+            addContent.title = translate("app.instances.locked.tooltip");
+        }
+        let contentSearch = createElement("div");
+        contentSearch.style.flexGrow = 2;
+        let searchBar = new SearchBar(contentSearch, () => { }, null);
+        let typeDropdown = createElement("div");
+        let dropdownInfo = new Dropdown(translate("app.button.content.type"), [
+            {
+                "name": translate("app.content.all"),
+                "value": "all"
+            },
+            {
+                "name": translate("app.content.mods"),
+                "value": "mod"
+            },
+            {
+                "name": translate("app.content.resource_packs"),
+                "value": "resource_pack"
+            },
+            {
+                "name": translate("app.content.shaders"),
+                "value": "shader"
+            }
+        ], typeDropdown, "all", () => { });
+        typeDropdown.style.minWidth = "200px";
+        searchAndFilter.appendChild(contentSearch);
+        searchAndFilter.appendChild(typeDropdown);
+        searchAndFilter.appendChild(importContent);
+        searchAndFilter.appendChild(addContent);
+        let contentListWrap = createElement("div");
+        let checkForPlayerContent = async () => {
+            let instanceContent = await this.instance.getContent();
+            let old_file_names = instanceContent.map((e) => e.file_name);
+            let newContent = await getInstanceContent(this.instance);
+            let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
+            for (let i = 0; i < newContentAdd.length; i++) {
+                let e = newContentAdd[i];
+                await this.instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
+            }
+            let deleteContent = newContent.deleteContent;
+            for (let i = 0; i < deleteContent.length; i++) {
+                let e = deleteContent[i];
+                let index = old_file_names.indexOf(e);
+                await instanceContent[index].delete();
+            }
+        }
+        let showContent = async () => {
+            contentListWrap.innerHTML = '';
+            let content = [];
+            let instance_content = await this.instance.getContent();
+            instance_content.sort((a, b) => {
+                if (a.name.toLowerCase() > b.name.toLowerCase()) {
+                    return 1;
+                }
+                if (a.name.toLowerCase() < b.name.toLowerCase()) {
+                    return -1;
+                }
+                return 0;
+            });
+            for (let i = 0; i < instance_content.length; i++) {
+                let e = instance_content[i];
+                content.push({
+                    "primary_column": {
+                        "title": e.name,
+                        "desc": e.author ? "by " + e.author : ""
+                    },
+                    "secondary_column": {
+                        "title": () => e.version,
+                        "desc": () => e.file_name
+                    },
+                    "type": e.type,
+                    "class": e.source,
+                    "image": e.image,
+                    "onimagefail": async (ele) => {
+                        if (e.source == "modrinth" || e.source == "curseforge") {
+                            let project = Project.getFromId(e.source_info, e.source);
+                            await e.setImage(project.icon);
+                            ele.src = fixPathForImage(project.icon || getDefaultImage(e.name));
+                        } else {
+                            ele.src = fixPathForImage(getDefaultImage(e.name));
+                        }
+                    },
+                    "onremove": (ele) => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.content.delete.title"), "notice", translate("app.content.delete.notice").replace("%c", e.name), [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.content.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.content.delete.confirm")
+                            }
+                        ], [], async () => {
+                            let success = await window.enderlynx.deleteContent(this.instance.instance_id, e.type, e.file_name);
+                            if (success) {
+                                displaySuccess(translate("app.content.delete.success").replace("%c", e.name));
+                                await e.delete();
+                                contentList.removeElement(ele);
+                            } else {
+                                displayError(translate("app.content.delete.fail").replace("%c", e.name));
+                            }
+                        });
+                    },
+                    "more": {
+                        "actionsList": [
+                            {
+                                "title": translate("app.content.open"),
+                                "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
+                                "func": async () => {
+                                    window.enderlynx.showContentInFolder(this.instance.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                                }
+                            },
+                            e.source == "modrinth" ? {
+                                "title": translate("app.content.view"),
+                                "icon": '<i class="fa-solid fa-circle-info"></i>',
+                                "func": async () => {
+                                    displayContentInfo(e.source, undefined, e.source_info, this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList);
+                                }
+                            } : e.source == "curseforge" ? {
+                                "title": translate("app.content.view"),
+                                "icon": '<i class="fa-solid fa-circle-info"></i>',
+                                "func": async () => {
+                                    displayContentInfo(e.source, undefined, parseInt(e.source_info), this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList);
+                                }
+                            } : null,
+                            e.source == "vanilla_tweaks" && !this.instance.locked ? {
+                                "title": translate("app.content.edit_packs"),
+                                "icon": '<i class="fa-solid fa-pencil"></i>',
+                                "func": async () => {
+                                    displayVanillaTweaksEditor(this.instance.instance_id, this.instance.vanilla_version, JSON.parse(e.source_info), e.file_name, e);
+                                }
+                            } : null,
+                            this.instance.locked ? null : e.source == "player_install" ? null : {
+                                "title": translate("app.content.update"),
+                                "icon": '<i class="fa-solid fa-download"></i>',
+                                "func_id": "update",
+                                "func": async () => {
+                                    try {
+                                        let s = await updateContent(e.source, e, new Project(), undefined, this.instance);
+                                        if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
+                                        if (contentList?.updateSecondaryColumn) contentList.updateSecondaryColumn();
+                                    } catch (f) {
+                                        displayError(translate("app.content.update_failed", "%c", e.name));
+                                        throw f;
+                                    }
+                                }
+                            },
+                            this.instance.locked ? null : {
+                                "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
+                                "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
+                                "func_id": "toggle"
+                            },
+                            this.instance.locked ? null : {
+                                "title": translate("app.content.delete"),
+                                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                                "danger": true,
+                                "func_id": "delete",
+                                "func": (ele) => {
+                                    let dialog = new Dialog();
+                                    dialog.showDialog(translate("app.content.delete.title"), "notice", translate("app.content.delete.notice", "%c", e.name), [
+                                        {
+                                            "type": "cancel",
+                                            "content": translate("app.content.delete.cancel")
+                                        },
+                                        {
+                                            "type": "confirm",
+                                            "content": translate("app.content.delete.confirm")
+                                        }
+                                    ], [], async () => {
+                                        let success = await window.enderlynx.deleteContent(this.instance.instance_id, e.type, e.file_name);
+                                        if (success) {
+                                            displaySuccess(translate("app.content.delete.success", "%c", e.name));
+                                            await e.delete();
+                                            contentList.removeElement(ele);
+                                        } else {
+                                            displayError(translate("app.content.delete.fail", "%c", e.name));
+                                        }
+                                    });
+                                }
+                            }
+                        ].filter(e => e)
+                    },
+                    "disabled": e.disabled,
+                    "instance_info": this.instance,
+                    "pass_to_checkbox": e
+                });
+            }
+            let contentList = new ContentList(contentListWrap, content, searchBar, {
+                "checkbox": {
+                    "enabled": this.instance.locked ? false : true,
+                    "actionsList": [
+                        this.instance.locked ? null : {
+                            "title": translate("app.content.selection.update"),
+                            "icon": '<i class="fa-solid fa-download"></i>',
+                            "func": async (ele, e) => {
+                                try {
+                                    let s = await updateContent(e.source, e, new Project(), undefined, this.instance);
+                                    if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
+                                    if (contentList?.updateSecondaryColumn) contentList.updateSecondaryColumn();
+                                } catch (f) {
+                                    displayError(translate("app.content.update_failed", "%c", e.name));
+                                    throw f;
+                                }
+                            }
+                        },
+                        this.instance.locked ? null : {
+                            "title": translate("app.content.selection.enable"),
+                            "icon": '<i class="fa-solid fa-eye"></i>',
+                            "func_id": "enable",
+                            "func": () => { }
+                        },
+                        this.instance.locked ? null : {
+                            "title": translate("app.content.selection.disable"),
+                            "icon": '<i class="fa-solid fa-eye-slash"></i>',
+                            "func_id": "disable",
+                            "func": () => { }
+                        },
+                        this.instance.locked ? null : {
+                            "title": translate("app.content.selection.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "func": async (ele, e) => {
+                                let success = await window.enderlynx.deleteContent(this.instance.instance_id, e.type, e.file_name);
+                                if (success) {
+                                    displaySuccess(translate("app.content.delete.success", "%c", e.name));
+                                    e.delete();
+                                    contentList.removeElement(ele);
+                                } else {
+                                    displayError(translate("app.content.delete.fail", "%c", e.name));
+                                }
+                            },
+                            "show_confirmation_dialog": true,
+                            "dialog_title": translate("app.content.delete.title"),
+                            "dialog_content": translate("app.content.delete.selection_notice"),
+                            "dialog_button": translate("app.content.delete.confirm")
+                        }
+                    ].filter(e => e)
+                },
+                "disable": {
+                    "enabled": this.instance.locked ? false : true
+                },
+                "remove": {
+                    "enabled": this.instance.locked ? false : true
+                },
+                "more": {
+                    "enabled": true
+                },
+                "second_column_centered": false,
+                "primary_column_name": translate("app.content.name"),
+                "secondary_column_name": translate("app.content.file_info"),
+                "refresh": {
+                    "enabled": true,
+                    "func": () => {
+                        this.showContent();
+                    }
+                },
+                "update_all": {
+                    "enabled": this.instance.locked ? false : true,
+                    "func": async (b) => {
+                        b.innerHTML = "<i class='spinner'></i>" + translate("app.content.updating")
+                        let content = await this.instance.getContent();
+                        let processId = Math.random();
+                        let cancel = false;
+                        for (let i = 0; i < content.length; i++) {
+                            log.sendData([{
+                                "title": "Updating Content",
+                                "progress": i / content.length * 100,
+                                "desc": `Updating ${i + 1} of ${content.length}`,
+                                "id": processId,
+                                "status": "good",
+                                "cancel": () => {
+                                    cancel = true;
+                                },
+                                "retry": () => { }
+                            }]);
+                            let c = content[i];
+                            try {
+                                await updateContent(c.source, c, new Project(), undefined, this.instance);
+                            } catch (e) {
+                                displayError(translate("app.content.update_failed").replace("%c", c.name));
+                            }
+                            if (cancel) {
+                                log.sendData([{
+                                    "title": "Updating Content",
+                                    "progress": 100,
+                                    "desc": "Canceled by User",
+                                    "id": processId,
+                                    "status": "error",
+                                    "cancel": () => { },
+                                    "retry": () => { }
+                                }]);
+                                if (this.currentTab == "content") this.showContent();
+                                return;
+                            }
+                        }
+                        log.sendData([{
+                            "title": "Updating Content",
+                            "progress": 100,
+                            "desc": "Done",
+                            "id": processId,
+                            "status": "done",
+                            "cancel": () => { },
+                            "retry": () => { }
+                        }]);
+                        displaySuccess(translate("app.instances.updated_all", "%i", this.instance.name));
+                        if (this.currentTab == "content") this.showContent();
+                    }
+                }
+            }, dropdownInfo, translate("app.content.not_found"), this.contentElement);
+        }
+        let currently_installing = new CurrentlyInstalling();
+        contentListWrap.appendChild(currently_installing.element);
+        this.instance.watchForChange("installing", async (v) => {
+            if (!v) {
+                await checkForPlayerContent();
+                await showContent();
+            } else {
+                contentListWrap.innerHTML = "";
+                contentListWrap.appendChild(currently_installing.element);
+            }
+        });
+        if (!this.instance.installing) {
+            await checkForPlayerContent();
+            await showContent();
+        } else {
+            contentListWrap.innerHTML = "";
+            contentListWrap.appendChild(currently_installing.element);
+        }
+        const fragment = document.createDocumentFragment();
+        this.tabElement.innerHTML = "";
+        fragment.appendChild(fileDrop);
+        if (this.instance.locked) {
+            fragment.appendChild(instanceLockedBanner);
+        }
+        fragment.appendChild(searchAndFilter);
+        fragment.appendChild(contentListWrap);
+        this.tabElement.appendChild(fragment);
+    }
+
+    async showWorlds() {
+        this.currentTab = "worlds";
+        let loading = new LoadingContainer();
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(loading.element);
+        await this.requestFrame();
+        clearMoreMenus();
+        let searchAndFilter = document.createElement("div");
+        searchAndFilter.classList.add("search-and-filter-v2");
+        let importWorlds = document.createElement("button");
+        importWorlds.classList.add("add-content-button");
+        importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.import")
+        importWorlds.onclick = async () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.worlds.import.title"), "form", [
+                {
+                    "type": "dropdown",
+                    "id": "launcher",
+                    "name": translate("app.worlds.import.launcher"),
+                    "options": [
+                        {
+                            "name": translate("app.name"),
+                            "value": "current"
+                        },
+                        {
+                            "name": translate("app.launcher.vanilla"),
+                            "value": "vanilla"
+                        },
+                        {
+                            "name": translate("app.launcher.modrinth"),
+                            "value": "modrinth"
+                        },
+                        {
+                            "name": translate("app.launcher.curseforge"),
+                            "value": "curseforge"
+                        },
+                        {
+                            "name": translate("app.launcher.multimc"),
+                            "value": "multimc"
+                        },
+                        {
+                            "name": translate("app.launcher.prism"),
+                            "value": "prism"
+                        },
+                        {
+                            "name": translate("app.launcher.atlauncher"),
+                            "value": "atlauncher"
+                        },
+                        {
+                            "name": translate("app.launcher.gdlauncher"),
+                            "value": "gdlauncher"
+                        }
+                    ]
+                },
+                {
+                    "type": "text",
+                    "id": "folder_path",
+                    "name": translate("app.worlds.import.folder_path"),
+                    "default": window.enderlynx.getInstanceFolderPath(),
+                    "input_source": "launcher",
+                    "source": async (l) => await window.enderlynx.getLauncherInstancePath(l),
+                    "buttons": [
+                        {
+                            "name": translate("app.worlds.import.folder_path.browse"),
+                            "icon": '<i class="fa-solid fa-folder"></i>',
+                            "func": async (v, b, i) => {
+                                let newValue = await window.enderlynx.triggerFileImportBrowse(v, 1);
+                                if (newValue) i.value = newValue;
+                                if (i.onchange) i.onchange();
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "dropdown",
+                    "name": translate("app.worlds.import.instance"),
+                    "input_source": "folder_path",
+                    "id": "instance",
+                    "source": window.enderlynx.getLauncherInstances,
+                    "options": [],
+                    "onchange": async (a, b, c) => {
+                        let launcher = "";
+                        let filePath = "";
+                        for (let i = 0; i < b.length; i++) {
+                            if (b[i].id == "launcher") {
+                                launcher = b[i].element.value;
+                                if (launcher == "vanilla") {
+                                    c.style.display = "none";
+                                } else {
+                                    c.style.display = "grid";
+                                }
+                            }
+                            if (b[i].id == "folder_path") {
+                                filePath = b[i].element.value;
+                            }
+                            if (b[i].id == "world") {
+                                if (launcher == "vanilla") {
+                                    b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(filePath)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                                } else {
+                                    b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(a)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "type": "checkboxes",
+                    "name": translate("app.worlds.import.worlds"),
+                    "options": (await getInstanceWorlds(this.instance)).map(e => ({ "name": e.name, "value": e.id })),
+                    "id": "world"
+                },
+                {
+                    "type": "toggle",
+                    "name": translate("app.worlds.import.remove"),
+                    "id": "remove",
+                    "default": false
+                }
+            ], [
+                {
+                    "type": "cancel",
+                    "content": translate("app.worlds.import.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.worlds.import.confirm")
+                }
+            ], [], async (v) => {
+                let info = {};
+                v.forEach(e => info[e.id] = e.value);
+                for (let i = 0; i < info.world.length; i++) {
+                    let world = info.world[i];
+                    try {
+                        await window.enderlynx.transferWorld(world, this.instance.instance_id, info.remove);
+                    } catch (e) {
+                        displayError(translate("app.worlds.import.error", "%m", e.message));
+                    }
+                }
+                displaySuccess(translate("app.worlds.import.complete"));
+                this.showWorlds();
+            })
+        }
+        let addContent = document.createElement("button");
+        addContent.classList.add("add-content-button");
+        addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.add")
+        addContent.onclick = () => {
+            discoverScreen.display(false, this.instance, this.instance.vanilla_version, this.instance.loader, "world");
+        }
+        let addServer = document.createElement("button");
+        addServer.classList.add("add-content-button");
+        addServer.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.server")
+        addServer.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.worlds.server.title"), "form", [
+                {
+                    "type": "text",
+                    "id": "name",
+                    "name": translate("app.worlds.server.name")
+                },
+                {
+                    "type": "text",
+                    "id": "ip",
+                    "name": translate("app.worlds.server.ip")
+                }
+            ], [
+                {
+                    "type": "cancel",
+                    "content": translate("app.worlds.server.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.worlds.server.confirm")
+                }
+            ], [], async (v) => {
+                let info = {};
+                v.forEach(e => info[e.id] = e.value);
+                await window.enderlynx.addServer(this.instance.instance_id, info.ip, info.name);
+                setInstanceTabContentWorlds(this.instance, element, scrollElement);
+            })
+        }
+        let contentSearch = document.createElement("div");
+        contentSearch.style.flexGrow = 2;
+        let searchBar = new SearchBar(contentSearch, () => { }, null);
+        let typeDropdown = document.createElement("div");
+        let dropdownInfo = new Dropdown(translate("app.worlds.type"), [
+            {
+                "name": translate("app.worlds.all"),
+                "value": "all"
+            },
+            {
+                "name": translate("app.worlds.singleplayer"),
+                "value": "singleplayer"
+            },
+            {
+                "name": translate("app.worlds.multiplayer"),
+                "value": "multiplayer"
+            }//,
+            // {
+            //     "name": translate("app.worlds.realms"),
+            //     "value": "realms"
+            // }
+        ], typeDropdown, "all", () => { });
+        typeDropdown.style.minWidth = "200px";
+        searchAndFilter.appendChild(contentSearch);
+        searchAndFilter.appendChild(typeDropdown);
+        searchAndFilter.appendChild(importWorlds);
+        searchAndFilter.appendChild(addContent);
+        searchAndFilter.appendChild(addServer);
+        let fileDrop = document.createElement("div");
+        fileDrop.dataset.action = "world-import";
+        fileDrop.dataset.instanceId = this.instance.instance_id;
+        fileDrop.className = "small-drop-overlay drop-overlay";
+        let fileDropInner = document.createElement("div");
+        fileDropInner.className = "drop-overlay-inner";
+        fileDropInner.innerHTML = translate("app.import.worlds.drop");
+        fileDrop.appendChild(fileDropInner);
+        let worldList = [];
+
+        let worlds = await getInstanceWorlds(this.instance);
+        let worldsMultiplayer = await getInstanceWorldsMulti(this.instance);
+        for (let i = 0; i < worlds.length; i++) {
+            let world_description = translate("app.worlds.description." + worlds[i].mode);
+            if (worlds[i].mode == "survival" && !worlds[i].hardcore) {
+                world_description += " - " + translate("app.worlds.description." + worlds[i].difficulty);
+            }
+            if (worlds[i].hardcore) {
+                world_description += " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>";
+            }
+            if (worlds[i].commands) {
+                world_description += " - " + translate("app.worlds.description.commands");
+            }
+            worldList.push(
+                {
+                    "primary_column": {
+                        "title": worlds[i].name,
+                        "desc": translate("app.worlds.last_played").replace("%s", formatDate(worlds[i].last_played))
+                    },
+                    "secondary_column": {
+                        "title": () => translate("app.worlds.description.singleplayer"),
+                        "desc": () => world_description
+                    },
+                    "type": "singleplayer",
+                    "image": worlds[i].icon ?? getDefaultImage(worlds[i].id),
+                    "onremove": (ele) => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.worlds.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.worlds.delete.confirm")
+                            }
+                        ], [], async () => {
+                            let success = await window.enderlynx.deleteWorld(this.instance.instance_id, worlds[i].id);
+                            if (success) {
+                                contentList.removeElement(ele);
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
+                            }
+                        });
+                    },
+                    "more": {
+                        "actionsList": [
+                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
+                                "title": translate("app.worlds.play"),
+                                "icon": '<i class="fa-solid fa-play"></i>',
+                                "func": async () => {
+                                    await playSingleplayerWorld(this.instance, worlds[i].id);
+                                }
+                            } : null,
+                            {
+                                "title": translate("app.worlds.open"),
+                                "icon": '<i class="fa-solid fa-folder"></i>',
+                                "func": () => {
+                                    window.enderlynx.openWorldFolder(this.instance.instance_id, worlds[i].id);
+                                }
+                            },
+                            {
+                                "title": translate("app.worlds.edit"),
+                                "icon": '<i class="fa-solid fa-pencil"></i>',
+                                "func": () => {
+                                    openWorldEditDialog(this.instance.instance_id, worlds[i].id, () => setInstanceTabContentWorlds(this.instance, element, scrollElement));
+                                }
+                            },
+                            {
+                                "title": async () => await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                                "icon": async () => await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                                "func": async (e) => {
+                                    let world_pinned = await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer");
+                                    world_pinned ? await unpinSingleplayerWorld(worlds[i].id, this.instance.instance_id) : await pinSingleplayerWorld(worlds[i].id, this.instance.instance_id)
+                                    e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
+                                    e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                                }
+                            },
+                            // {
+                            //     "title": translate("app.worlds.share"),
+                            //     "icon": '<i class="fa-solid fa-share"></i>',
+                            //     "func": () => { }
+                            // },
+                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
+                                "icon": '<i class="fa-solid fa-desktop"></i>',
+                                "title": translate("app.worlds.desktop_shortcut"),
+                                "func": (e) => {
+                                    addDesktopShortcutWorld(this.instance, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? getDefaultImage(worlds[i].id));
+                                }
+                            } : null,
+                            {
+                                "title": translate("app.worlds.delete"),
+                                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                                "danger": true,
+                                "func_id": "delete",
+                                "func": (ele) => {
+                                    let dialog = new Dialog();
+                                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
+                                        {
+                                            "type": "cancel",
+                                            "content": translate("app.worlds.delete.cancel")
+                                        },
+                                        {
+                                            "type": "confirm",
+                                            "content": translate("app.worlds.delete.confirm")
+                                        }
+                                    ], [], async () => {
+                                        let success = await window.enderlynx.deleteWorld(this.instance.instance_id, worlds[i].id);
+                                        if (success) {
+                                            contentList.removeElement(ele);
+                                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
+                                        } else {
+                                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
+                                        }
+                                    });
+                                }
+                            }
+                        ].filter(e => e)
+                    },
+                    "pass_to_checkbox": { "type": "singleplayer", "id": worlds[i].id, "name": worlds[i].name }
+                });
+        }
+        for (let i = 0; i < worldsMultiplayer.length; i++) {
+            let last_played = await getServerLastPlayed(this.instance.instance_id, worldsMultiplayer[i].ip);
+            worldList.push(
+                {
+                    "primary_column": {
+                        "title": worldsMultiplayer[i].name,
+                        "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
+                    },
+                    "secondary_column": {
+                        "title": () => translate("app.worlds.description.multiplayer"),
+                        "desc": () => worldsMultiplayer[i].ip,
+                        "desc_hidden": true
+                    },
+                    "type": "multiplayer",
+                    "image": worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip),
+                    "onremove": (ele) => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.worlds.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.worlds.delete.confirm")
+                            }
+                        ], [], async () => {
+                            let success = await window.enderlynx.deleteServer(this.instance.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                            if (success) {
+                                contentList.removeElement(ele);
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                            }
+                        });
+                    },
+                    "more": {
+                        "actionsList": [
+                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
+                                "title": translate("app.worlds.play"),
+                                "icon": '<i class="fa-solid fa-play"></i>',
+                                "func": async () => {
+                                    await playMultiplayerWorld(this.instance, worldsMultiplayer[i].ip);
+                                }
+                            } : null,
+                            {
+                                "title": async () => await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                                "icon": async () => await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                                "func": async (e) => {
+                                    let world_pinned = await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer");
+                                    world_pinned ? await unpinMultiplayerWorld(worldsMultiplayer[i].ip, this.instance.instance_id) : await pinMultiplayerWorld(worldsMultiplayer[i].ip, this.instance.instance_id)
+                                    e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
+                                    e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                                }
+                            },
+                            // {
+                            //     "title": translate("app.worlds.share"),
+                            //     "icon": '<i class="fa-solid fa-share"></i>',
+                            //     "func": () => { }
+                            // },
+                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
+                                "icon": '<i class="fa-solid fa-desktop"></i>',
+                                "title": translate("app.worlds.desktop_shortcut"),
+                                "func": (e) => {
+                                    addDesktopShortcutWorld(this.instance, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip));
+                                }
+                            } : null,
+                            {
+                                "title": translate("app.worlds.delete"),
+                                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                                "danger": true,
+                                "func_id": "delete",
+                                "func": (ele) => {
+                                    let dialog = new Dialog();
+                                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
+                                        {
+                                            "type": "cancel",
+                                            "content": translate("app.worlds.delete.cancel")
+                                        },
+                                        {
+                                            "type": "confirm",
+                                            "content": translate("app.worlds.delete.confirm")
+                                        }
+                                    ], [], async () => {
+                                        let success = await window.enderlynx.deleteServer(this.instance.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                                        if (success) {
+                                            contentList.removeElement(ele);
+                                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                                        } else {
+                                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                                        }
+                                    });
+                                }
+                            }
+                        ].filter(e => e)
+                    },
+                    "pass_to_checkbox": { "type": "multiplayer", "ip": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name, "index": worldsMultiplayer[i].index }
+                });
+        }
+
+        let contentListWrap = document.createElement("div");
+        let contentList = new ContentList(contentListWrap, worldList, searchBar, {
+            "checkbox": {
+                "enabled": true,
+                "actionsList": [
+                    {
+                        "title": translate("app.worlds.selection.delete"),
+                        "icon": '<i class="fa-solid fa-trash-can"></i>',
+                        "danger": true,
+                        "dont_loop": true,
+                        "func": async (eles, es) => {
+                            let ips = [];
+                            let indexes = [];
+                            let elesm = [];
+                            let names = [];
+                            for (let i = 0; i < es.length; i++) {
+                                let e = es[i];
+                                if (e.type == "singleplayer") {
+                                    window.enderlynx.deleteWorld(this.instance.instance_id, e.id, (success) => {
+                                        if (success) {
+                                            contentList.removeElement(eles[i]);
+                                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                                        } else {
+                                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                                        }
+                                    });
+                                } else if (e.type == "multiplayer") {
+                                    ips.push(e.ip);
+                                    indexes.push(e.index);
+                                    elesm.push(eles[i]);
+                                    names.push(e.name);
+                                }
+                            }
+                            if (!ips.length) return;
+                            let success = await window.enderlynx.deleteServer(this.instance.instance_id, ips, indexes);
+                            if (success) {
+                                elesm.forEach(e => e.remove());
+                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(names.join(", "))));
+                            } else {
+                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(names.join(", "))));
+                            }
+                            contentList.removeElements(elesm);
+                        },
+                        "show_confirmation_dialog": true,
+                        "dialog_title": translate("app.worlds.delete.confirm.title"),
+                        "dialog_content": translate("app.worlds.delete.selection_notice"),
+                        "dialog_button": translate("app.worlds.delete.confirm")
+                    }
+                ]
+            },
+            "disable": {
+                "enabled": false
+            },
+            "remove": {
+                "enabled": true
+            },
+            "more": {
+                "enabled": true
+            },
+            "second_column_centered": true,
+            "primary_column_name": translate("app.worlds.name"),
+            "secondary_column_name": "",
+            "refresh": {
+                "enabled": true,
+                "func": () => {
+                    this.showWorlds();
+                }
+            },
+            "update_all": {
+                "enabled": false
+            }
+        }, dropdownInfo, translate("app.worlds.not_found"), this.contentElement);
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(fileDrop);
+        this.tabElement.appendChild(searchAndFilter);
+        this.tabElement.appendChild(contentListWrap);
+        clearMoreMenus();
+    }
+
+    async showLogs() {
+        setInstanceTabContentLogs(this.instance, this.tabElement, this.contentElement);
+    }
+
+    async showOptions() {
+        setInstanceTabContentOptions(this.instance, this.tabElement, this.contentElement);
+    }
+
+    async showFiles() {
+        setInstanceTabContentFiles(this.instance, this.tabElement, this.contentElement);
+    }
+
+    async showScreenshots() {
+        setInstanceTabContentScreenshots(this.instance, this.tabElement, this.contentElement);
+    }
+}
+
+class HomeScreen extends Screen {
+    constructor() {
+        super("home");
+    }
+
+    display(dont_add_to_log, ...args) {
+        super.display(dont_add_to_log, ...args);
+    }
+    calculateContent() {
+        this.contentElement.innerHTML = "";
+        this.contentElement.className = "home-element";
+        let loading = new LoadingContainer();
+        loading.element.style.gridColumn = "span 2";
+        this.contentElement.appendChild(loading.element);
+        if (!this.hasRequestGoing) this.showHomeContent();
+    }
+    async changeHomeWelcome() {
+        let profile = await getDefaultProfile();
+        if (profile) {
+            this.innerWelcomeElement.textContent = translate("app.welcome", "%n", profile.name);
+        } else {
+            this.innerWelcomeElement.textContent = translate("app.welcome_no_user");
+        }
+    }
+
+    async updateHomeGrid() {
+        let pinnedWorldsList = await getPinnedWorlds();
+        let pinnedInstancesList = await getPinnedInstances();
+        let lastPlayedWorldsList = await getRecentlyPlayedWorlds();
+        let lastPlayedInstancesList = await getRecentlyPlayedInstances();
+
+        animateGridReorderStart(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
+
+        let pinnedWorlds = pinnedWorldsList;
+        let pinnedInstances = pinnedInstancesList;
+        pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+        let pinnedWorldIdentifiers = pinnedWorlds.map(e => (e.id ? e.id : e.ip) + ":" + e.instance_id);
+        let lastPlayedWorlds = lastPlayedWorldsList.filter(e => !pinnedWorldIdentifiers.includes((e.id ? e.id : e.ip) + ":" + e.instance_id)).slice(0, 5);
+        let pinnedInstanceIdentifiers = pinnedInstances.map(e => e.instance_id);
+        let lastPlayedInstances = lastPlayedInstancesList.filter(e => !pinnedInstanceIdentifiers.includes(e.instance_id)).slice(0, 5);
+        pinnedInstances.forEach(e => e.actuallyPinned = true);
+        lastPlayedInstances.forEach(e => e.actuallyPinned = false);
+        pinnedWorlds.forEach(e => e.pinned = true);
+        lastPlayedWorlds.forEach(e => e.pinned = false);
+
+        this.lastPlayedInstanceGrid.innerHTML = "";
+        this.pinnedInstanceGrid.innerHTML = "";
+        this.lastPlayedWorldGrid.innerHTML = "";
+        this.pinnedWorldGrid.innerHTML = "";
+        this.column1.innerHTML = "";
+        this.column2.innerHTML = "";
+        let worlds = pinnedWorlds.concat(lastPlayedWorlds);
+        for (let i = 0; i < worlds.length; i++) {
+            let e = worlds[i];
+            if (!e.ip) e.type = "singleplayer";
+            else e.type = "multiplayer";
+
+            let item = document.createElement("div");
+            item.className = "home-world-entry";
+            item.style.cursor = "auto";
+            item.dataset.id = "world:" + (e.type == "singleplayer" ? e.id : e.ip) + ":" + e.instance_id;
+            let icon = document.createElement("img");
+            icon.className = "instance-image";
+            icon.src = fixPathForImage(e.icon ? e.icon : getDefaultImage(e.type == "singleplayer" ? e.id : e.ip));
+            icon.onerror = () => {
+                icon.src = getDefaultImage(e.type == "singleplayer" ? e.id : e.ip);
+            }
+            item.appendChild(icon);
+            let itemInfo = document.createElement("div");
+            itemInfo.className = "instance-info";
+            let itemTitle = document.createElement("div");
+            itemTitle.className = "instance-name";
+            itemTitle.innerHTML = parseMinecraftFormatting(e.name);
+            let itemDesc = document.createElement("div");
+            itemDesc.className = "instance-desc";
+            let itemDesc1 = document.createElement("span");
+            itemDesc1.className = "instance-desc";
+            itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
+            if (howLongAgo(e.last_played) < 3600000) {
+                setInterval(() => {
+                    itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
+                }, 60000);
+            } else if (howLongAgo(e.last_played) < 86400000) {
+                setInterval(() => {
+                    itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
+                }, 3600000);
+            }
+            let itemDesc2 = document.createElement("span");
+            itemDesc2.className = "instance-desc";
+            itemDesc2.innerHTML = (e.type == "singleplayer" ? (e.hardcore ? "<span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : translate("app.worlds.description." + e.mode)) : e.ip);
+            if (e.type == "multiplayer") {
+                itemDesc2.style.width = "fit-content";
+                itemDesc2.classList.add("hidden-text");
+                itemDesc2.onclick = () => {
+                    itemDesc2.classList.add("shown");
+                }
+            }
+            itemDesc.appendChild(itemDesc1);
+            itemDesc.appendChild(itemDesc2);
+            itemInfo.appendChild(itemTitle);
+            itemInfo.appendChild(itemDesc);
+            item.appendChild(itemInfo);
+            let instanceInfo = await Instance.getInstance(e.instance_id);
+            let playButton = document.createElement("button");
+            playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
+            playButton.className = "home-play-button";
+            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            playButton.onclick = async () => {
+                playButton.className = "home-loading-button";
+                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
+                e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
+                instanceInfo.display();
+            }
+            let morebutton = document.createElement("button");
+            morebutton.className = "home-list-more";
+            morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+            let buttons = new ContextMenuButtons([
+                ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? {
+                    "title": translate("app.worlds.play"),
+                    "icon": '<i class="fa-solid fa-play"></i>',
+                    "func": async () => {
+                        playButton.className = "home-loading-button";
+                        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.loading");
+                        e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
+                        instanceInfo.display();
+                    }
+                } : null,
+                {
+                    "title": translate("app.instance.view"),
+                    "icon": '<i class="fa-solid fa-eye"></i>',
+                    "func": () => {
+                        instanceInfo.display();
+                    }
+                },
+                e.type == "singleplayer" ? {
+                    "title": translate("app.worlds.open"),
+                    "icon": '<i class="fa-solid fa-folder"></i>',
+                    "func": () => {
+                        window.enderlynx.openWorldFolder(instanceInfo.instance_id, e.id);
+                    }
+                } : null,
+                e.type == "singleplayer" ? {
+                    "title": translate("app.worlds.edit"),
+                    "icon": '<i class="fa-solid fa-pencil"></i>',
+                    "func": () => {
+                        openWorldEditDialog(instanceInfo.instance_id, worlds[i].id, async () => {
+                            e = {
+                                ...e,
+                                ...(await window.enderlynx.getWorld(instanceInfo.instance_id, e.id))
+                            }
+                            itemDesc2.innerHTML = (e.type == "singleplayer" ? (e.hardcore ? "<span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : translate("app.worlds.description." + e.mode)) : e.ip);
+                        });
+                    }
+                } : null,
+                {
+                    "title": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                    "icon": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                    "func": async (i, c) => {
+                        if (c) c.remove();
+                        let world_pinned = await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type);
+                        world_pinned ? (e.type == "singleplayer" ? await unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : await unpinMultiplayerWorld(e.ip, instanceInfo.instance_id)) : (e.type == "singleplayer" ? await pinSingleplayerWorld(e.id, instanceInfo.instance_id) : await pinMultiplayerWorld(e.ip, instanceInfo.instance_id))
+                        i.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
+                        i.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                        if (!world_pinned) {
+                            pinnedWorldsList.push(e);
+                        } else {
+                            pinnedWorldsList = pinnedWorldsList.filter(f => e.type == "singleplayer" ? f.id != e.id : f.ip != e.ip);
+                        }
+                        this.updateHomeGrid();
+                    }
+                },
+                // {
+                //     "title": translate("app.worlds.share"),
+                //     "icon": '<i class="fa-solid fa-share"></i>',
+                //     "func": () => { }
+                // },
+                (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions ? {
+                    "icon": '<i class="fa-solid fa-desktop"></i>',
+                    "title": translate("app.worlds.desktop_shortcut"),
+                    "func": () => {
+                        if (e.type == "singleplayer") {
+                            addDesktopShortcutWorld(instanceInfo, e.name, "singleplayer", e.id, e.icon ?? getDefaultImage(e.id));
+                        } else {
+                            addDesktopShortcutWorld(instanceInfo, e.name, "multiplayer", e.ip, e.icon ?? getDefaultImage(e.ip));
+                        }
+                    }
+                } : null,
+                {
+                    "title": translate("app.worlds.delete"),
+                    "icon": '<i class="fa-solid fa-trash-can"></i>',
+                    "danger": true,
+                    "func_id": "delete",
+                    "func": () => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description").replace("%w", parseMinecraftFormatting(e.name)), [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.worlds.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.worlds.delete.confirm")
+                            }
+                        ], [], async () => {
+                            if (e.type == "singleplayer") {
+                                let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id);
+                                if (success) {
+                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                                } else {
+                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                                }
+                            } else if (e.type == "multiplayer") {
+                                let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
+                                if (success) {
+                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
+                                } else {
+                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
+                                }
+                            }
+                            pinnedWorldsList = pinnedWorldsList.filter(f => e.type == "singleplayer" ? f.id != e.id : f.ip != e.ip);
+                            lastPlayedWorldsList = lastPlayedWorldsList.filter(f => e.type == "singleplayer" ? f.id != e.id : f.ip != e.ip);
+                            this.updateHomeGrid();
+                        });
+                    }
+                }
+            ].filter(e => e))
+            new MoreMenu(morebutton, buttons);
+            item.oncontextmenu = (e) => {
+                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+            }
+            item.appendChild(playButton);
+            item.appendChild(morebutton);
+            e.pinned ? this.pinnedWorldGrid.appendChild(item) : this.lastPlayedWorldGrid.appendChild(item);
+        }
+        let instances = pinnedInstances.concat(lastPlayedInstances);
+        for (let i = 0; i < instances.length; i++) {
+            let e = instances[i];
+            let item = document.createElement("div");
+            item.className = "home-entry";
+            item.onclick = (event) => {
+                if (event.target.matches("button")) return;
+                if (event.target.matches("i")) return;
+                e.display();
+            }
+            item.role = "button";
+            item.setAttribute("tabindex", "0");
+            item.onkeydown = (event) => {
+                if (event.target.matches("button")) return;
+                if (event.target.matches("i")) return;
+                if (event.key == "Enter" || event.key == " ") {
+                    e.display();
+                }
+            }
+            item.dataset.id = "instance:" + e.instance_id;
+            let icon = document.createElement("img");
+            icon.className = "instance-image";
+            icon.src = e.image || getDefaultImage(e.instance_id);
+            instances[i].watchForChange("image", (image) => {
+                icon.src = image || getDefaultImage(e.instance_id);
+            });
+            icon.onerror = () => {
+                icon.src = getDefaultImage(e.instance_id);
+            }
+            item.appendChild(icon);
+            let itemInfo = document.createElement("div");
+            itemInfo.className = "instance-info";
+            let itemTitle = document.createElement("div");
+            itemTitle.className = "instance-name";
+            itemTitle.textContent = e.name;
+            instances[i].watchForChange("name", (name) => {
+                itemTitle.textContent = name;
+            });
+            let itemDesc = document.createElement("div");
+            itemDesc.className = "instance-desc";
+            itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            if (howLongAgo(e.last_played) < 3600000) {
+                setInterval(() => {
+                    itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+                }, 60000);
+            } else if (howLongAgo(e.last_played) < 86400000) {
+                setInterval(() => {
+                    itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+                }, 3600000);
+            }
+            instances[i].watchForChange("loader", (loader) => {
+                e.loader = loader;
+                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            });
+            instances[i].watchForChange("vanilla_version", (vanilla_version) => {
+                e.vanilla_version = vanilla_version;
+                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
+            });
+            itemInfo.appendChild(itemTitle);
+            itemInfo.appendChild(itemDesc);
+            item.appendChild(itemInfo);
+            let instanceInfo = e;
+            let running = checkForProcess(instanceInfo.pid);
+            if (!running) instanceInfo.setPid(null);
+            if (running) {
+                window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
+                    if (Display.currentScreen.tabName != "home") return;
+                    formatPlayButton(false);
+                    live.findLive();
+                });
+            }
+            let more;
+            let playButton = document.createElement("button");
+            let formatPlayButton = (isRunning) => {
+                running = isRunning;
+                playButton.setAttribute("title", isRunning ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
+                playButton.className = isRunning ? "home-stop-button" : "home-play-button";
+                playButton.innerHTML = isRunning ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+                playButton.onclick = isRunning ? async () => {
+                    playButton.classList.add("home-loading-button");
+                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
+                    await stopInstance(instanceInfo);
+                    formatPlayButton(false);
+                } : async () => {
+                    playButton.className = "home-loading-button";
+                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
+                    await playInstance(instanceInfo);
+                    instanceInfo.display();
+                }
+                if (more) more.refreshButtons();
+            }
+            formatPlayButton(running);
+            let morebutton = document.createElement("button");
+            morebutton.className = "home-list-more";
+            morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+            let buttons = new ContextMenuButtons([
+                {
+                    "icon": () => running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
+                    "title": () => running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
+                    "func": async (e) => {
+                        if (running) {
+                            await stopInstance(instanceInfo);
+                            formatPlayButton(false);
+                        } else {
+                            playButton.className = "home-loading-button";
+                            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
+                            await playInstance(instanceInfo);
+                            instanceInfo.display();
+                        }
+                    }
+                },
+                instanceInfo.locked ? null : {
+                    "icon": '<i class="fa-solid fa-plus"></i>',
+                    "title": translate("app.button.content.add"),
+                    "func": async (e) => {
+                        discoverScreen.display(false, instanceInfo, instanceInfo.vanilla_version, instanceInfo.loader);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-folder"></i>',
+                    "title": translate("app.button.instances.open_folder"),
+                    "func": (e) => {
+                        window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-share"></i>',
+                    "title": translate("app.button.instances.share"),
+                    "func": (e) => {
+                        openInstanceShareDialog(instanceInfo);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-wrench"></i>',
+                    "title": translate("app.button.instances.repair"),
+                    "func": () => {
+                        showRepairDialog(instanceInfo);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-gear"></i>',
+                    "title": translate("app.button.instances.open_settings"),
+                    "func": async (e) => {
+                        showInstanceSettings(instanceInfo);
+                    }
+                },
+                {
+                    "icon": async () => await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                    "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                    "func": async (e, c) => {
+                        if (c) c.remove();
+                        await instanceInfo.isPinned() ? await unpinInstance(instanceInfo) : await pinInstance(instanceInfo);
+                        e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                        e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                        if (await instanceInfo.isPinned()) {
+                            pinnedInstancesList.push(instanceInfo);
+                        } else {
+                            pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
+                        }
+                        this.updateHomeGrid();
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-desktop"></i>',
+                    "title": translate("app.instances.desktop_shortcut"),
+                    "func": (e) => {
+                        addDesktopShortcut(instanceInfo);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-trash-can"></i>',
+                    "title": translate("app.button.instances.delete"),
+                    "func": (e) => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
+                            "content": translate("app.instances.delete.confirm.description").replace("%i", instanceInfo.name),
+                            "type": "notice"
+                        }, {
+                            "type": "toggle",
+                            "name": translate("app.instances.delete.files"),
+                            "default": false,
+                            "id": "delete"
+                        }], [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.instances.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.instances.delete.confirm")
+                            }
+                        ], [], async (v) => {
+                            instanceInfo.delete();
+                            pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
+                            lastPlayedInstancesList = lastPlayedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
+                            this.updateHomeGrid();
+                            if (v[0].value) {
+                                try {
+                                    await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
+                                } catch (e) {
+                                    displayError(translate("app.instances.delete.files.fail"));
+                                }
+                            }
+                        });
+                    },
+                    "danger": true
+                }
+            ].filter(e => e))
+            more = new MoreMenu(morebutton, buttons);
+            item.oncontextmenu = (e) => {
+                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+            }
+            item.appendChild(playButton);
+            item.appendChild(morebutton);
+            e.actuallyPinned ? this.pinnedInstanceGrid.appendChild(item) : this.lastPlayedInstanceGrid.appendChild(item);
+        };
+        let noPinnedWorlds = document.createElement("div");
+        noPinnedWorlds.className = "home-entry-empty";
+        noPinnedWorlds.innerHTML = translate("app.worlds.no_pinned");
+        let noPinnedInstances = document.createElement("div");
+        noPinnedInstances.className = "home-entry-empty";
+        noPinnedInstances.innerHTML = translate("app.instances.no_pinned");
+        let noPlayedWorlds = document.createElement("div");
+        noPlayedWorlds.className = "home-entry-empty";
+        noPlayedWorlds.innerHTML = translate("app.worlds.no_played");
+        let noPlayedInstances = document.createElement("div");
+        noPlayedInstances.className = "home-entry-empty";
+        noPlayedInstances.innerHTML = translate("app.instances.no_played");
+        let createButton = document.createElement("button");
+        createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
+        createButton.className = 'home-create-button';
+        createButton.onclick = () => {
+            showCreateInstanceDialog();
+        }
+        noPlayedInstances.appendChild(createButton);
+        if (pinnedWorlds.length || pinnedInstances.length) {
+            this.column1.appendChild(this.pinnedWorldTitle);
+            this.column1.appendChild(pinnedWorlds.length ? this.pinnedWorldGrid : noPinnedWorlds);
+            this.column2.appendChild(this.pinnedInstanceTitle);
+            this.column2.appendChild(pinnedInstances.length ? this.pinnedInstanceGrid : noPinnedInstances);
+            this.column1.style.gridRow = "";
+            this.column2.style.gridRow = "";
+        } else {
+            this.column1.style.gridRow = "span 2";
+            this.column2.style.gridRow = "span 2";
+        }
+        this.column1.appendChild(this.lastPlayedWorldTitle);
+        this.column1.appendChild(lastPlayedWorlds.length ? this.lastPlayedWorldGrid : noPlayedWorlds);
+        this.column2.appendChild(this.lastPlayedInstanceTitle);
+        this.column2.appendChild(lastPlayedInstances.length ? this.lastPlayedInstanceGrid : noPlayedInstances);
+        animateGridReorderEnd(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
+    }
+
+    async showHomeContent() {
+        this.hasRequestGoing = true;
+        let welcomeElement = createElement("div", "welcome-container");
+        this.innerWelcomeElement = createElement("div", "welcome");
+        this.changeHomeWelcome();
+        welcomeElement.appendChild(this.innerWelcomeElement);
+        for (let i = 0; i < 10; i++) {
+            let blobElement = createElement("div", "welcome-blob");
+            welcomeElement.appendChild(blobElement);
+            let height = Math.random() * 100 + 20;
+            let width = Math.random() * 200 + 20;
+            let top = Math.random() * (200 + height) - height;
+            let left = Math.random() * (window.innerWidth + width) - width;
+            let rotate = Math.random() * 360;
+            blobElement.style.setProperty("--blob-height", height + "px");
+            blobElement.style.setProperty("--blob-width", width + "px");
+            blobElement.style.setProperty("--blob-top", top + "px");
+            blobElement.style.setProperty("--blob-left", left + "px");
+            blobElement.style.setProperty("--blob-rotate", rotate + "deg");
+        }
+        this.column1 = createElement("div", "home-column");
+        this.column2 = createElement("div", "home-column");
+        this.pinnedWorldTitle = createElement("h2");
+        this.pinnedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_worlds");
+        this.pinnedWorldTitle.dataset.id = "ui:pinned_world_title";
+        this.pinnedInstanceTitle = createElement("h2");
+        this.pinnedInstanceTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_instances");
+        this.pinnedInstanceTitle.dataset.id = "ui:pinned_instance_title";
+        this.lastPlayedWorldTitle = createElement("h2");
+        this.lastPlayedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-clock-rotate-left"></i>' + translate("app.home.last_played_worlds");
+        this.lastPlayedWorldTitle.dataset.id = "ui:last_played_world_title";
+        this.lastPlayedInstanceTitle = createElement("h2");
+        this.lastPlayedInstanceTitle.innerHTML = '<i class="home-icon fa-solid fa-clock-rotate-left"></i>' + translate("app.home.last_played_instances");
+        this.lastPlayedInstanceTitle.dataset.id = "ui:last_played_instance_title";
+        this.pinnedWorldGrid = createElement("div", "home-list-section");
+        this.pinnedWorldGrid.dataset.id = "ui:pinned_world_grid";
+        this.lastPlayedWorldGrid = createElement("div", "home-list-section");
+        this.lastPlayedWorldGrid.dataset.id = "ui:last_played_world_grid";
+        this.pinnedInstanceGrid = createElement("div", "home-list-section");
+        this.pinnedInstanceGrid.dataset.id = "ui:pinned_instance_grid";
+        this.lastPlayedInstanceGrid = createElement("div", "home-list-section");
+        this.lastPlayedInstanceGrid.dataset.id = "ui:last_played_instance_grid";
+
+        await this.updateHomeGrid();
+
+        let discoverModsWrapper = createElement("div", "home-discover-wrapper");
+        discoverModsWrapper.style.display = "none";
+        let discoverModsTitle = createElement("button", "home-discover-title");
+        discoverModsTitle.innerHTML = translate("app.home.discover_modpacks") + ' <i class="fa-solid fa-angles-right"></i>'
+        discoverModsTitle.onclick = () => {
+            discoverScreen.display();
+        }
+        let discoverModsRefresh = createElement("button", "home-discover-refresh");
+        discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.home.discover.refresh");
+        discoverModsRefresh.onclick = async () => {
+            discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i>' + translate("app.home.discover.refresh");
+            try {
+                this.home_modpacks = await window.enderlynx.getRandomModpacks();
+                if (!this.home_modpacks) throw new Error();
+                this.updateHomeModpacksList(this.home_modpacks);
+            } catch (e) {
+                displayError(translate("app.home.discover.refresh.failed"));
+            }
+            discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.home.discover.refresh");
+        }
+        let discoverModsTop = createElement("div", "home-discover-top");
+        discoverModsTop.appendChild(discoverModsTitle);
+        discoverModsTop.appendChild(discoverModsRefresh);
+        discoverModsWrapper.appendChild(discoverModsTop);
+        this.discoverModsWrapper = discoverModsWrapper;
+        let discoverModsContainer = createElement("div", "home-discover-container");
+        this.discoverModsContainer = discoverModsContainer;
+        discoverModsContainer.addEventListener("wheel", e => {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                e.preventDefault();
+                discoverModsContainer.scrollLeft += e.deltaY;
+            }
+        }, { passive: false });
+        discoverModsWrapper.appendChild(discoverModsContainer);
+
+        if (!this.home_modpacks || !this.home_modpacks.hits) {
+            this.getRandomModpacks();
+        } else {
+            this.updateHomeModpacksList();
+        }
+
+        let mcNewsWrapper = createElement("div", "home-discover-wrapper");
+        mcNewsWrapper.style.display = "none";
+        let mcNewsTitle = createElement("div", "home-news-title");
+        mcNewsTitle.innerHTML = translate("app.home.mc_news");
+        mcNewsWrapper.appendChild(mcNewsTitle);
+        let mcNewsContainer = createElement("div", "home-discover-container");
+        this.mcNewsContainer = mcNewsContainer;
+        mcNewsContainer.addEventListener("wheel", e => {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                e.preventDefault();
+                mcNewsContainer.scrollLeft += e.deltaY;
+            }
+        }, { passive: false });
+        mcNewsWrapper.appendChild(mcNewsContainer);
+        this.mcNewsWrapper = mcNewsWrapper;
+
+        if (!this.mc_news?.article_grid) {
+            this.getMCNews();
+        } else {
+            this.updateMCNews();
+        }
+
+        this.contentElement.innerHTML = "";
+        this.contentElement.appendChild(welcomeElement);
+        this.contentElement.appendChild(this.column1);
+        this.contentElement.appendChild(this.column2);
+        this.contentElement.appendChild(discoverModsWrapper);
+        this.contentElement.appendChild(mcNewsWrapper);
+        this.hasRequestGoing = false;
+    }
+
+    updateHomeModpacksList() {
+        if (!this.home_modpacks || !this.home_modpacks.hits || !this.home_modpacks.hits.length) return;
+        this.discoverModsContainer.innerHTML = '';
+        this.discoverModsWrapper.style.display = "grid";
+        this.home_modpacks.hits.forEach(e => {
+            let item = document.createElement("button");
+            item.className = "home-discover";
+            item.onclick = () => {
+                displayContentInfo("modrinth", undefined, e.project_id);
+            }
+            let img = document.createElement("img");
+            img.className = "home-discover-image";
+            img.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
+            item.appendChild(img);
+            let itemInfo = document.createElement("div");
+            itemInfo.className = "home-discover-info";
+            let itemTitle = document.createElement("div");
+            itemTitle.innerHTML = e.title;
+            itemTitle.className = "home-discover-item-title";
+            let itemAuthor = document.createElement("div");
+            itemAuthor.innerHTML = translate("app.home.modpack.author").replace("%a", e.author);
+            itemAuthor.className = "home-discover-author";
+            itemInfo.appendChild(itemTitle);
+            itemInfo.appendChild(itemAuthor);
+            let itemDownloadCount = document.createElement("div");
+            itemDownloadCount.className = "home-discover-downloads";
+            itemDownloadCount.innerHTML = translate("app.home.modpack.downloads").replace("%d", formatNumber(e.downloads));
+            itemInfo.appendChild(itemDownloadCount);
+            item.appendChild(itemInfo);
+            this.discoverModsContainer.appendChild(item);
+        })
+    }
+
+    async getRandomModpacks() {
+        this.home_modpacks = await window.enderlynx.getRandomModpacks();
+        this.updateHomeModpacksList();
+    }
+
+    updateMCNews() {
+        this.mcNewsWrapper.style.display = "";
+        this.mc_news.article_grid.forEach(e => {
+            let article = document.createElement("button");
+            article.className = "mc-news";
+            article.style.backgroundImage = `url("https://minecraft.net${e.default_tile.image.imageURL}")`;
+            article.onclick = () => {
+                window.enderlynx.openInBrowser("https://minecraft.net" + e.article_url);
+            }
+            article.title = e.default_tile.sub_header;
+            let article_title = document.createElement("div");
+            article_title.innerHTML = e.default_tile.title;
+            article_title.className = "mc-news-title";
+            article_title.dataset.type = e.primary_category;
+            article.appendChild(article_title);
+            this.mcNewsContainer.appendChild(article);
+        });
+    }
+
+    async getMCNews() {
+        this.mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/jcr:content.articles.json")).json();
+        this.updateMCNews();
+    }
+}
+
+class InstancesScreen extends Screen {
+    constructor() {
+        super("home");
+    }
+
+    display(dont_add_to_log, ...args) {
+        super.display(dont_add_to_log, ...args);
+    }
+
+    calculateContent() {
+        this.contentElement.innerHTML = "";
+        this.contentElement.className = "instance-content";
+        let loading = new LoadingContainer();
+        this.contentElement.appendChild(loading.element);
+        this.requestFrame();
+        if (!this.hasRequestGoing) this.showInstances();
+    }
+
+    async showInstances() {
+        this.hasRequestGoing = true;
+        this.instanceElements = [];
+        this.contentElement.innerHTML = "";
+        let ele = document.createDocumentFragment();
+        let title = createElement("div", "title-top");
+        let h1 = createElement("h1");
+        h1.innerHTML = translate("app.page.instances");
+        title.appendChild(h1);
+        let createButton = createElement("button", "create-button");
+        createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
+        createButton.onclick = () => {
+            showCreateInstanceDialog();
+        }
+        title.appendChild(createButton);
+        ele.appendChild(title);
+        let searchAndFilter = document.createElement("div");
+        searchAndFilter.classList.add("search-and-filter");
+        ele.appendChild(searchAndFilter);
+        let search = document.createElement("div");
+        new SearchBar(search, this.searchInstances, null);
+        let sort = document.createElement('div');
+        this.sortBy = new Dropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
+        { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
+        { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
+        { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
+        { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
+        { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, await getDefault("default_sort"), () => {
+            this.groupInstances(this.groupBy.getSelected);
+        });
+        let group = document.createElement('div');
+        this.groupBy = new Dropdown(translate("app.instances.group.by"), [
+            { "name": translate("app.instances.group.none"), "value": "none" },
+            { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" },
+            { "name": translate("app.instances.group.pinned"), "value": "pinned" },
+            { "name": translate("app.instances.group.loader"), "value": "loader" },
+            { "name": translate("app.instances.group.game_version"), "value": "game_version" }
+        ], group, await getDefault("default_group"), (group) => this.groupInstances(group));
+        searchAndFilter.appendChild(search);
+        searchAndFilter.appendChild(sort);
+        searchAndFilter.appendChild(group);
+        let instanceGrid = document.createElement("div");
+        instanceGrid.classList.add("group-list");
+        this.groupList = instanceGrid;
+        let groupOne = document.createElement("div");
+        groupOne.setAttribute("data-group-title", "");
+        groupOne.classList.add("group");
+        let noResultsEle = new NoResultsFound(translate("app.instances.none")).element;
+        noResultsEle.style.gridColumn = "1 / -1";
+        ele.appendChild(noResultsEle);
+        instanceGrid.appendChild(groupOne);
+        ele.appendChild(instanceGrid);
+        let instances = await getInstances();
+        for (let i = 0; i < instances.length; i++) {
+            let running = checkForProcess(instances[i].pid);
+            if (!running && instances[i].pid != null) instances[i].setPid(null);
+            let instanceElement = document.createElement("button");
+            instanceElement.setAttribute("data-name", instances[i].name);
+            instanceElement.setAttribute("data-last-played", instances[i].last_played);
+            instanceElement.setAttribute("data-date-created", instances[i].date_created);
+            instanceElement.setAttribute("data-date-modified", instances[i].date_modified);
+            instanceElement.setAttribute("data-play-time", instances[i].playtime);
+            instanceElement.setAttribute("data-game-version", instances[i].vanilla_version);
+            instanceElement.setAttribute("data-custom-groups", instances[i].group_id);
+            instanceElement.setAttribute("data-loader", instances[i].loader);
+            instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+            instanceElement.setAttribute("data-none", "");
+            instanceElement.onclick = () => {
+                instances[i].display();
+            }
+            instanceElement.classList.add("instance-item");
+            this.instanceElements.push(instanceElement);
+            instanceElement.dataset.id = instances[i].instance_id;
+            if (running) {
+                instanceElement.classList.add("running");
+                window.enderlynx.watchProcessForExit(instances[i].pid, () => {
+                    instanceElement.classList.remove("running");
+                    live.findLive();
+                });
+            }
+            instances[i].watchForChange("pid", (pid) => {
+                running = checkForProcess(pid);
+                live.findLive();
+                if (running) {
+                    instanceElement.classList.add("running");
+                    window.enderlynx.watchProcessForExit(instances[i].pid, () => {
+                        instanceElement.classList.remove("running");
+                        live.findLive();
+                    });
+                } else {
+                    instanceElement.classList.remove("running");
+                }
+            });
+            let instanceImage = document.createElement("img");
+            instanceImage.classList.add("instance-image");
+            instanceImage.src = instances[i].image || getDefaultImage(instances[i].instance_id);
+            instanceImage.onerror = () => {
+                instanceImage.src = getDefaultImage(instances[i].instance_id);
+            }
+            instances[i].watchForChange("image", (image) => {
+                instanceImage.src = image || getDefaultImage(instances[i].instance_id);
+            });
+            instanceElement.appendChild(instanceImage);
+            let instanceInfoEle = document.createElement("div");
+            instanceInfoEle.classList.add("instance-info");
+            let instanceName = document.createElement("div");
+            instances[i].watchForChange("name", async (t) => {
+                instanceName.textContent = t;
+                instanceElement.setAttribute("data-name", t);
+                this.groupInstances(await getDefault("default_group"));
+            });
+            instanceName.classList.add("instance-name");
+            instanceName.textContent = instances[i].name;
+            instanceInfoEle.appendChild(instanceName);
+            let instanceDesc = document.createElement("div");
+            instanceDesc.classList.add("instance-desc");
+            instanceDesc.textContent = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
+            let loader_text = loaders[instances[i].loader];
+            let version_text = instances[i].vanilla_version;
+            instances[i].watchForChange("loader", async (l) => {
+                loader_text = loaders[l];
+                instanceDesc.textContent = loader_text + " " + version_text;
+                instanceElement.setAttribute("data-loader", l);
+                this.groupInstances(await getDefault("default_group"));
+            });
+            instances[i].watchForChange("vanilla_version", async (v) => {
+                version_text = v;
+                instanceDesc.textContent = loader_text + " " + version_text;
+                instanceElement.setAttribute("data-game-version", v);
+                this.groupInstances(await getDefault("default_group"));
+            });
+            instances[i].watchForChange("group", async (g) => {
+                instanceElement.setAttribute("data-custom-groups", g);
+                this.groupInstances(await getDefault("default_group"));
+            });
+            instanceInfoEle.appendChild(instanceDesc);
+            instanceElement.appendChild(instanceInfoEle);
+            let buttons = new ContextMenuButtons([
+                {
+                    "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
+                    "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
+                    "func": running ? async (e) => {
+                        await stopInstance(instances[i]);
+                    } : async (e) => {
+                        instances[i].display(undefined, true);
+                        await playInstance(instances[i]);
+                    }
+                },
+                instances[i].locked ? null : {
+                    "icon": '<i class="fa-solid fa-plus"></i>',
+                    "title": translate("app.button.content.add"),
+                    "func": (e) => {
+                        discoverScreen.display(false, instances[i], instances[i].vanilla_version, instances[i].loader);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-folder"></i>',
+                    "title": translate("app.button.instances.open_folder"),
+                    "func": (e) => {
+                        window.enderlynx.openInstanceFolder(instances[i].instance_id);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-share"></i>',
+                    "title": translate("app.button.instances.share"),
+                    "func": (e) => {
+                        openInstanceShareDialog(instances[i]);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-wrench"></i>',
+                    "title": translate("app.button.instances.repair"),
+                    "func": () => {
+                        showRepairDialog(instances[i]);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-gear"></i>',
+                    "title": translate("app.button.instances.open_settings"),
+                    "func": async (e) => {
+                        showInstanceSettings(instances[i]);
+                    }
+                },
+                {
+                    "icon": async () => await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                    "title": async () => await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                    "func": async (e) => {
+                        await instances[i].isPinned() ? await unpinInstance(instances[i]) : await pinInstance(instances[i]);
+                        e.setTitle(await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                        e.setIcon(await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                        instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+                        groupInstances(groupBy.getSelected);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-desktop"></i>',
+                    "title": translate("app.instances.desktop_shortcut"),
+                    "func": (e) => {
+                        addDesktopShortcut(instances[i]);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-trash-can"></i>',
+                    "title": translate("app.button.instances.delete"),
+                    "func": (e) => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
+                            "content": translate("app.instances.delete.confirm.description").replace("%i", instances[i].name),
+                            "type": "notice"
+                        }, {
+                            "type": "toggle",
+                            "name": translate("app.instances.delete.files"),
+                            "default": false,
+                            "id": "delete"
+                        }], [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.instances.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.instances.delete.confirm")
+                            }
+                        ], [], async (v) => {
+                            instances[i].delete();
+                            animateGridReorderStart(".instance-item");
+                            instanceContent.displayContent();
+                            if (v[0].value) {
+                                try {
+                                    await window.enderlynx.deleteInstanceFiles(instances[i].instance_id);
+                                } catch (e) {
+                                    displayError(translate("app.instances.delete.files.fail"));
+                                }
+                            }
+                            animateGridReorderEnd(".instance-item");
+                        });
+                    },
+                    "danger": true
+                }
+            ].filter(e => e));
+            instanceElement.oncontextmenu = (e) => {
+                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+            }
+            groupOne.appendChild(instanceElement);
+        }
+        this.contentElement.appendChild(ele);
+        await this.groupInstances(this.groupBy.getSelected, true);
+        this.hasRequestGoing = false;
+    }
+
+    async groupInstances(how, noAnimate) {
+        if (!noAnimate) animateGridReorderStart(".instance-item");
+        if (!this.groupList) return;
+        await setDefault("default_group", how);
+        let attrhow = how.toLowerCase().replaceAll("_", "-");
+        attrhow = "data-" + attrhow;
+        let instances = this.instanceElements;
+        let groupMap = {};
+        instances.forEach(inst => {
+            let key = inst.getAttribute(attrhow) || "";
+            if (!groupMap[key]) groupMap[key] = [];
+            groupMap[key].push(inst);
+        });
+        let groupList = this.groupList;
+        while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
+        let groups = Object.keys(groupMap);
+        if (how == "game_version") {
+            sortByVersion(groups, true);
+        } else if (how == "pinned") {
+            groups.sort((a, b) => {
+                if (a === "" && b !== "") return -1;
+                if (a !== "" && b === "") return 1;
+                return b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" });
+            });
+        } else {
+            groups.sort((a, b) => {
+                if (a === "" && b !== "") return -1;
+                if (a !== "" && b === "") return 1;
+                return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+            });
+        }
+        this.groupElements = [];
+        groups.forEach(groupKey => {
+            let newElement = document.createElement("div");
+            newElement.classList.add("group");
+            this.groupElements.push(newElement);
+            newElement.setAttribute("data-group-title", how == "loader" ? loaders[groupKey] : groupKey);
+            let frag = document.createDocumentFragment();
+            groupMap[groupKey].forEach(inst => frag.appendChild(inst));
+            newElement.appendChild(frag);
+            groupList.appendChild(newElement);
+        });
+        await this.sortInstances(this.sortBy.getSelected);
+        if (!noAnimate) animateGridReorderEnd(".instance-item");
+    }
+
+    searchInstances(query) {
+        query = query.toLowerCase().trim();
+        let instances = this.instanceElements;
+        for (let i = 0; i < instances.length; i++) {
+            if (!instances[i].getAttribute("data-name").toLowerCase().includes(query)) {
+                instances[i].style.display = "none";
+                instances[i].classList.add("hidden");
+            } else {
+                instances[i].style.display = "flex";
+                instances[i].classList.remove("hidden");
+            }
+        }
+    }
+
+    async sortInstances(how) {
+        if (!this.groupList) return;
+        await setDefault("default_sort", how);
+        let attrhow = how.toLowerCase().replaceAll("_", "-");
+        attrhow = "data-" + attrhow;
+        let groups = this.groupElements;
+        let usedates = (how == "last_played" || how == "date_created" || how == "date_modified");
+        let usenumbers = (how == "play_time");
+        let reverseOrder = ["last_played", "date_created", "date_modified", "play_time", "game_version"].includes(how);
+        let multiply = reverseOrder ? -1 : 1;
+        for (let i = 0; i < groups.length; i++) {
+            let children = Array.from(groups[i].children);
+            if (children.length > 1) {
+                children.sort((a, b) => {
+                    if (how == "game_version") {
+                        const aIndex = minecraftVersions.indexOf(a.getAttribute(attrhow));
+                        const bIndex = minecraftVersions.indexOf(b.getAttribute(attrhow));
+                        if (aIndex === -1 && bIndex === -1) {
+                            return a.getAttribute(attrhow).localeCompare(b.getAttribute(attrhow), undefined, { numeric: true, sensitivity: "base" });
+                        }
+                        if (aIndex === -1) return -1;
+                        if (bIndex === -1) return 1;
+                        return bIndex - aIndex;
+                    }
+                    if (usedates) {
+                        let c = new Date(a.getAttribute(attrhow));
+                        let d = new Date(b.getAttribute(attrhow));
+                        c = c.getTime();
+                        d = d.getTime();
+                        if (isNaN(c)) c = 0;
+                        if (isNaN(d)) d = 0;
+                        return multiply * (c - d);
+                    }
+                    if (usenumbers) {
+                        return multiply * (a.getAttribute(attrhow) - b.getAttribute(attrhow));
+                    }
+                    let av = a.getAttribute(attrhow)?.toLowerCase() ?? "";
+                    let bv = b.getAttribute(attrhow)?.toLowerCase() ?? "";
+                    if (av > bv) return 1 * multiply;
+                    if (av < bv) return -1 * multiply;
+                    return 0;
+                });
+                children.forEach(e => groups[i].appendChild(e));
+            }
+        }
+    }
+}
+
+class DiscoverScreen extends Screen {
+    constructor() {
+        super("discover");
+    }
+
+    display(dont_add_to_log, ...args) {
+        super.display(dont_add_to_log, ...args);
+    }
+
+    calculateContent(instance, vanilla_version, loader, default_tab) {
+        this.instance = instance;
+        this.vanilla_version = vanilla_version;
+        this.loader = loader;
+        this.default_tab = default_tab;
+        added_vt_packs = [];
+        this.discover_content_states = {};
+        global_discover_content_states = {};
+        let titleTop = createElement("div", "title-top");
+        let backButton = createElement("button", "back-button");
+        backButton.innerHTML = '<i class="fa-solid fa-arrow-left"></i>' + translate("app.discover.back_to_instance");
+        backButton.onclick = () => {
+            this.instance.display(default_tab == "world" ? "worlds" : "content");
+        }
+        let title = document.createElement("h1");
+        title.innerHTML = translate("app.discover.add_content");
+        titleTop.appendChild(title);
+        if (this.instance) titleTop.appendChild(backButton);
+        else title.innerHTML = translate("app.discover.title");
+        let ele = this.contentElement;
+        this.contentElement.className = "instance-content";
+        ele.appendChild(titleTop);
+        content.appendChild(ele);
+        let tabsElement = document.createElement("div");
+        ele.appendChild(tabsElement);
+        this.tabs = new TabContent(tabsElement, [
+            !this.instance ? {
+                "name": translate("app.discover.modpacks"),
+                "value": "modpack",
+                "func": () => {
+                    this.contentTabSelect("modpack");
+                }
+            } : null,
+            !this.loader || this.loader != "vanilla" ? {
+                "name": translate("app.discover.mods"),
+                "value": "mod",
+                "func": () => {
+                    this.contentTabSelect("mod");
+                }
+            } : null,
+            {
+                "name": translate("app.discover.resource_packs"),
+                "value": "resourcepack",
+                "func": () => {
+                    this.contentTabSelect("resourcepack");
+                }
+            },
+            !this.loader || this.loader != "vanilla" ? {
+                "name": translate("app.discover.shaders"),
+                "value": "shader",
+                "func": () => {
+                    this.contentTabSelect("shader");
+                }
+            } : null,
+            {
+                "name": translate("app.discover.worlds"),
+                "value": "world",
+                "func": () => {
+                    this.contentTabSelect("world");
+                }
+            },
+            {
+                "name": translate("app.discover.servers"),
+                "value": "servers",
+                "func": () => {
+                    this.contentTabSelect("server");
+                }
+            },
+            {
+                "name": translate("app.discover.data_packs"),
+                "value": "datapack",
+                "func": () => {
+                    this.contentTabSelect("datapack");
+                }
+            }
+        ].filter(e => e));
+        this.tabElement = createElement("div", "tab-info");
+        ele.appendChild(this.tabElement);
+        if (this.default_tab) {
+            this.tabs.selectOptionAdvanced(default_tab);
+            this.contentTabSelect(default_tab);
+        } else if (!this.instance) {
+            this.contentTabSelect("modpack");
+        } else if (!loader || loader != "vanilla") {
+            this.contentTabSelect("mod");
+        } else {
+            this.contentTabSelect("resourcepack");
+        }
+        clearMoreMenus();
+    }
+
+    contentTabSelect(tab) {
+        if (tab == "resource_pack") tab = "resourcepack";
+        this.currentTab = tab;
+        this.tabElement.innerHTML = '';
+        let sources = [];
+        if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "datapack" || tab == "server") {
+            sources.push({
+                "name": translate("app.discover.modrinth"),
+                "value": "modrinth",
+                "func": () => { }
+            });
+        }
+        if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "world" || tab == "datapack") {
+            sources.push({
+                "name": translate("app.discover.curseforge"),
+                "value": "curseforge",
+                "func": () => { }
+            });
+        }
+        if (tab == "resourcepack" || tab == "datapack") {
+            sources.push({
+                "name": translate("app.discover.vanilla_tweaks"),
+                "value": "vanilla_tweaks",
+                "func": () => { }
+            });
+            added_vt_packs = [];
+        }
+
+        let searchAndFilter = createElement("div", "search-and-filter-v2");
+        this.discoverList = createElement("div", "discover-list");
+        let searchElement = createElement("div");
+        searchElement.style.flexGrow = 2;
+        this.searchBar = new SearchBar(searchElement, () => { }, (v) => {
+            this.getContent();
+        });
+        let dropdownElement = document.createElement("div");
+        dropdownElement.style.minWidth = "200px";
+        this.sourceDropdown = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
+            this.getContent();
+        });
+        this.getContent();
+        searchAndFilter.appendChild(dropdownElement);
+        searchAndFilter.appendChild(searchElement);
+        this.tabElement.appendChild(searchAndFilter);
+        this.tabElement.appendChild(this.discoverList);
+    }
+
+    async getContent(vanilla_version = this.vanilla_version, loader = this.loader, page = 1, pageSize = 20, sortBy = "relevance") {
+        let source = this.sourceDropdown.value;
+        let query = this.searchBar.value;
+        if (loader == "all") loader = null;
+        if (vanilla_version == "all") vanilla_version = null;
+        let instance_content = [];
+        if (this.instance) instance_content = await this.instance.getContent();
+        if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currenTab == "server") loader = null;
+        let content_ids = instance_content.map(e => Number.isNaN(Number(e.source_info)) ? e.source_info : Number(e.source_info));
+        this.discoverList.innerHTML = "";
+        let loading = new LoadingContainer();
+        this.discoverList.appendChild(loading.element);
+        this.requestFrame();
+        if (source == "vanilla_tweaks") {
+            new VanillaTweaksSelector(this.currentTab, vanilla_version, this.instance.instance_id, undefined, this.discoverList, query);
+            return;
+        }
+        let results = [];
+        try {
+            if (source == "modrinth") results = await Modrinth.search(query, loader, this.currentTab, vanilla_version, page, pageSize, sortBy);
+            else if (source == "curseforge") results = await CurseForge.search(query, loader, this.currentTab, vanilla_version, page, pageSize, sortBy);
+            this.discoverList.innerHTML = "";
+        } catch (err) {
+            loading.errorOut(err, () => {
+                this.getContent(vanilla_version, loader, page, pageSize, sortBy);
+            });
+        }
+        this.totalPages = Math.ceil(results.total_hits / pageSize);
+        let paginationTop = new Pagination(page, this.totalPages, (new_page) => {
+            this.getContent(vanilla_version, loader, new_page, pageSize, sortBy);
+        });
+        let sortByDropdownElement = createElement("div");
+        sortByDropdownElement.style.width = "150px";
+        let viewDropdownElement = createElement("div");
+        viewDropdownElement.style.width = "75px";
+        let gameVersionDropdownElement = createElement("div");
+        gameVersionDropdownElement.style.width = "180px";
+        let loaderDropdownElement = createElement("div");
+        loaderDropdownElement.style.width = "150px";
+        let sortByDropdown = new Dropdown(translate("app.discover.sort_by"), [
+            {
+                "name": translate("app.discover.sort.relevance"),
+                "value": "relevance"
+            },
+            {
+                "name": translate("app.discover.sort.downloads"),
+                "value": "downloads"
+            },
+            {
+                "name": translate("app.discover.sort.newest"),
+                "value": "newest"
+            },
+            {
+                "name": translate("app.discover.sort.updated"),
+                "value": "updated"
+            }
+        ], sortByDropdownElement, sortBy, (new_sort) => {
+            this.getContent(vanilla_version, loader, 1, pageSize, new_sort)
+        });
+        let viewDropdown = new Dropdown(translate("app.discover.view"), [
+            {
+                "name": translate("app.discover.view.5"),
+                "value": "5"
+            },
+            {
+                "name": translate("app.discover.view.10"),
+                "value": "10"
+            },
+            {
+                "name": translate("app.discover.view.15"),
+                "value": "15"
+            },
+            {
+                "name": translate("app.discover.view.20"),
+                "value": "20"
+            },
+            {
+                "name": translate("app.discover.view.50"),
+                "value": "50"
+            },
+            {
+                "name": translate("app.discover.view.100"),
+                "value": "100"
+            }
+        ], viewDropdownElement, pageSize, (new_page_size) => {
+            this.getContent(vanilla_version, loader, 1, Number(new_page_size), sortBy)
+        });
+        let gameVersionDropdown = new SearchDropdown(translate("app.discover.game_version"), [
+            { "name": translate("app.discover.game_version.all"), "value": "all" }
+        ].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), gameVersionDropdownElement, vanilla_version || "all", (new_game_version) => {
+            this.getContent(new_game_version, loader, 1, pageSize, sortBy)
+        });
+        let loaderDropdown = new Dropdown(translate("app.discover.loader"), this.currentTab == "server" ? [
+            {
+                "name": translate("app.discover.loader.all"),
+                "value": "all"
+            },
+            {
+                "name": translate("app.discover.type.vanilla"),
+                "value": "vanilla"
+            },
+            {
+                "name": translate("app.discover.type.modded"),
+                "value": "modpack"
+            }
+        ] : [
+            {
+                "name": translate("app.discover.loader.all"),
+                "value": "all"
+            },
+            {
+                "name": translate("app.loader.fabric"),
+                "value": "fabric"
+            },
+            {
+                "name": translate("app.loader.forge"),
+                "value": "forge"
+            },
+            {
+                "name": translate("app.loader.neoforge"),
+                "value": "neoforge"
+            },
+            {
+                "name": translate("app.loader.quilt"),
+                "value": "quilt"
+            }
+        ], loaderDropdownElement, loader || "all", (new_loader) => {
+            this.getContent(vanilla_version, new_loader, 1, pageSize, sortBy);
+        });
+        let paginationBottom = new Pagination(page, pages, (new_page) => {
+            this.getContent(vanilla_version, loader, new_page, pageSize, sortBy);
+        });
+        let discoverListTop = createElement("div", "discover-list-top");
+        this.discoverList.appendChild(discoverListTop);
+        discoverListTop.appendChild(sortByDropdownElement);
+        discoverListTop.appendChild(viewDropdownElement);
+        discoverListTop.appendChild(gameVersionDropdownElement);
+        if (!["resourcepack", "shader", "world", "datapack"].includes(this.currentTab)) discoverListTop.appendChild(loaderDropdownElement);
+        discoverListTop.appendChild(paginationTop.element);
+        if (!results.projects || !results.projects.length) {
+            let noresults = new NoResultsFound();
+            this.discoverList.appendChild(noresults.element);
+            return;
+        }
+        for (let i = 0; i < results.projects.length; i++) {
+            let content = results.projects[i];
+            let entry = new ContentSearchEntry(content, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (button) => {
+                installButtonClick(content, undefined, this.instance?.instance_id, button, undefined, undefined, this.discover_content_states)
+            }, this.instance?.instance_id, vanilla_version, loader, content_ids.includes(content.id), false, this.currentTab, undefined, this.discover_content_states);
+            this.discoverList.appendChild(entry.element);
+        }
+        this.discoverList.appendChild(paginationBottom.element);
+    }
+}
+
+class WardrobeScreen extends Screen {
+    constructor() {
+        super("wardrobe");
+    }
+
+    async display(dont_add_to_log, ...args) {
+        await super.display(dont_add_to_log, ...args);
+        this.tabs.selectOptionAdvanced("skins");
+    }
+
+    async calculateContent() {
+        this.contentElement.innerHTML = "";
+        this.profile = await getDefaultProfile();
+        if (!this.profile) {
+            this.contentElement.style.padding = "8px";
+            let signInWarning = new NoResultsFound(translate("app.wardrobe.sign_in"));
+            this.contentElement.appendChild(signInWarning.element);
+            return;
+        }
+        if (this.skinViewer) this.skinViewer.dispose();
+        this.contentElement.className = "my-account-grid";
+        let ele = this.contentElement;
+        let skinRenderContainer = createElement("div", "skin-render-container");
+        let skinRenderCanvas = createElement("canvas", "skin-render-canvas");
+        skinRenderContainer.appendChild(skinRenderCanvas);
+        ele.appendChild(skinRenderContainer);
+        const dpr = window.devicePixelRatio || 1;
+        this.skinViewer = new skinview3d.SkinViewer({
+            canvas: skinRenderCanvas,
+            width: 298 * dpr,
+            height: 498 * dpr
+        });
+        skinRenderCanvas.style.width = "300px";
+        skinRenderCanvas.style.height = "500px";
+        this.skinViewer.pixelRatio = 2
+        this.skinViewer.zoom = 0.7;
+        let walkingAnimation = new skinview3d.WalkingAnimation();
+        walkingAnimation.headBobbing = false;
+        this.skinViewer.animation = walkingAnimation;
+        this.skinViewer.animation.speed = 0.5;
+        let pauseButton = createElement("button", "skin-render-pause");
+        pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        let onPause = () => {
+            this.skinViewer.animation.paused = true;
+            pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+            pauseButton.onclick = onResume;
+        }
+        let onResume = () => {
+            this.skinViewer.animation.paused = false;
+            pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            pauseButton.onclick = onPause;
+        }
+        pauseButton.onclick = onPause;
+        if (document.body.matches(".potato")) {
+            this.skinViewer.animation.paused = true;
+            pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+            pauseButton.onclick = onResume;
+        }
+        skinRenderContainer.appendChild(pauseButton);
+        let optionsContainer = createElement("div", "my-account-options");
+        let title = createElement("div", "title-top");
+        let h1 = document.createElement("h1");
+        h1.innerHTML = translate("app.page.wardrobe");
+        title.appendChild(h1);
+        optionsContainer.appendChild(title);
+        let activeScreen = document.createElement("div");
+        ele.appendChild(optionsContainer);
+        let skinOptions = document.createElement("div");
+        skinOptions.className = "my-account-option-box";
+        activeScreen.appendChild(skinOptions);
+        let fileDrop = createElement("div", "small-drop-overlay drop-overlay");
+        fileDrop.dataset.action = "skin-import";
+        let fileDropInner = createElement("div", "drop-overlay-inner");
+        fileDropInner.innerHTML = translate("app.import.skin.drop");
+        fileDrop.appendChild(fileDropInner);
+        skinOptions.appendChild(fileDrop);
+        let searchAndFilter = createElement("div", "search-and-filter-v2");
+        let searchElement = document.createElement("div");
+        searchElement.style.flexGrow = "2";
+        this.searchbar = new SearchBar(searchElement, () => {
+            this.filterSkins(true);
+        }, () => { })
+        searchAndFilter.appendChild(searchElement);
+        let dropdownElement = document.createElement("div");
+        dropdownElement.style.minWidth = "200px";
+        this.sortdropdown = new Dropdown(translate("app.wardrobe.sort_by"), [
+            {
+                "name": translate("app.wardrobe.sort_by.favorites_first"),
+                "value": "favorites_first"
+            },
+            {
+                "name": translate("app.wardrobe.sort_by.name"),
+                "value": "name"
+            },
+            {
+                "name": translate("app.wardrobe.sort_by.last_used"),
+                "value": "last_used"
+            }
+        ], dropdownElement, "favorites_first", () => {
+            this.filterSkins();
+        })
+        searchAndFilter.appendChild(searchElement);
+        searchAndFilter.appendChild(dropdownElement);
+        skinOptions.appendChild(searchAndFilter);
+        let capeOptions = document.createElement("div");
+        capeOptions.className = "my-account-option-box";
+        let skinList = document.createElement("div");
+        let capeList = document.createElement("div");
+        this.skinList = skinList;
+        this.capeList = capeList;
+        skinList.className = 'my-account-option-list-skin';
+        capeList.className = 'my-account-option-list-cape';
+        skinOptions.appendChild(skinList);
+        capeOptions.appendChild(capeList);
+
+        this.showCapes();
+
+        let detailsWrapper = document.createElement("div");
+        detailsWrapper.className = "details";
+        this.detailsWrapper = detailsWrapper;
+        skinOptions.appendChild(detailsWrapper);
+        let defaultSkinList = document.createElement("div");
+        defaultSkinList.className = "my-account-option-list-skin";
+        this.defaultSkinList = defaultSkinList;
+        let detailstop = createElement("button", "details-top");
+        let detailTitle = createElement("span", "details-top-text");
+        detailTitle.innerHTML = translate("app.wardrobe.defaults");
+        let detailChevron = createElement("span", "details-top-chevron");
+        detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+        this.detailChevron = detailChevron;
+        detailstop.appendChild(detailTitle);
+        detailstop.appendChild(detailChevron);
+        let detailContent = createElement("div", "details-content");
+        detailsWrapper.appendChild(detailstop);
+        detailsWrapper.appendChild(detailContent);
+        detailContent.appendChild(defaultSkinList);
+        let isShow = true;
+        detailstop.onclick = async () => {
+            if (isShow) {
+                await this.showDefSkins();
+            } else {
+                this.hideDefSkins();
+            }
+            isShow = !isShow;
+        }
+        this.skinEntries = [];
+        this.showContent(true);
+        let info = document.createElement("div");
+        info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.wardrobe.notice");
+        info.className = "info";
+        optionsContainer.appendChild(info);
+        let skinButtonContainer = document.createElement("div");
+        skinButtonContainer.className = "skin-button-container";
+        optionsContainer.appendChild(skinButtonContainer);
+        let refreshButton = document.createElement("button");
+        refreshButton.className = "skin-button";
+        let refreshButtonIcon = document.createElement("i");
+        refreshButtonIcon.className = "fa-solid fa-arrows-rotate";
+        let refreshButtonText = document.createElement("span");
+        refreshButtonText.innerHTML = translate("app.wardrobe.refresh");
+        refreshButton.appendChild(refreshButtonIcon);
+        refreshButton.appendChild(refreshButtonText);
+        refreshButton.onclick = async () => {
+            refreshButtonIcon.classList.add("spinning");
+            let profile = await getDefaultProfile();
+            try {
+                await window.enderlynx.getProfile(profile.id);
+                refreshButtonIcon.classList.remove("spinning");
+                this.showContent();
+                this.showCapes();
+                accountSwitcher.reloadHeads();
+            } catch (e) {
+                displayError(translate("app.wardrobe.refresh.fail"));
+                refreshButtonIcon.classList.remove("spinning");
+                return;
+            }
+        }
+        skinButtonContainer.appendChild(refreshButton);
+        let importButton = document.createElement("button");
+        importButton.innerHTML = '<i class="fa-solid fa-file-import"></i>' + translate("app.wardrobe.import");
+        importButton.className = "skin-button";
+        importButton.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.wardrobe.import.title"), "form", [
+                {
+                    "type": "image-upload",
+                    "id": "skin",
+                    "name": translate("app.wardrobe.import.skin"),
+                    "tab": "file"
+                },
+                {
+                    "type": "text",
+                    "id": "name",
+                    "name": translate("app.wardrobe.import.name"),
+                    "tab": "file"
+                },
+                {
+                    "type": "dropdown",
+                    "id": "model",
+                    "name": translate("app.wardrobe.import.model"),
+                    "options": [
+                        { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
+                        { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
+                        { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
+                    ],
+                    "tab": "file"
+                },
+                {
+                    "type": "text",
+                    "id": "username",
+                    "name": translate("app.wardrobe.username_import.username"),
+                    "tab": "username"
+                },
+                {
+                    "type": "text",
+                    "id": "name_u",
+                    "name": translate("app.wardrobe.import.name"),
+                    "tab": "username"
+                },
+                {
+                    "type": "dropdown",
+                    "id": "model_u",
+                    "name": translate("app.wardrobe.import.model"),
+                    "options": [
+                        { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
+                        { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
+                        { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
+                    ],
+                    "tab": "username"
+                },
+                {
+                    "type": "text",
+                    "id": "url",
+                    "name": translate("app.wardrobe.import.url"),
+                    "tab": "url"
+                },
+                {
+                    "type": "text",
+                    "id": "name_l",
+                    "name": translate("app.wardrobe.import.name"),
+                    "tab": "url"
+                },
+                {
+                    "type": "dropdown",
+                    "id": "model_l",
+                    "name": translate("app.wardrobe.import.model"),
+                    "options": [
+                        { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
+                        { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
+                        { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
+                    ],
+                    "tab": "url"
+                }
+            ], [
+                { "type": "cancel", "content": translate("app.wardrobe.import.cancel") },
+                { "type": "confirm", "content": translate("app.wardrobe.import.confirm") }
+            ], [
+                {
+                    "name": translate("app.wardrobe.import.tab.file"),
+                    "value": "file"
+                },
+                {
+                    "name": translate("app.wardrobe.import.tab.username"),
+                    "value": "username"
+                },
+                {
+                    "name": translate("app.wardrobe.import.tab.url"),
+                    "value": "url"
+                }
+            ], async (e) => {
+                let info = {};
+                e.forEach(e => { info[e.id] = e.value });
+                if (info.selected_tab == "username") {
+                    try {
+                        info.skin = (await window.enderlynx.getSkinFromUsername(info.username)).url;
+                    } catch (e) {
+                        displayError(translate("app.wardrobe.import.username.fail"));
+                        return;
+                    }
+                    info.name = info.name_u;
+                    info.model = info.model_u;
+                } else if (info.selected_tab == "url") {
+                    try {
+                        info.skin = (await window.enderlynx.getSkinFromURL(info.url)).url;
+                    } catch (e) {
+                        displayError(translate("app.wardrobe.import.url.fail"));
+                        return;
+                    }
+                    info.name = info.name_l;
+                    info.model = info.model_l;
+                }
+                await importSkin(info, () => {
+                    this.showContent();
+                });
+            });
+        }
+        skinButtonContainer.appendChild(importButton);
+
+        let tabElement = document.createElement("div");
+        optionsContainer.appendChild(tabElement);
+        this.tabs = new TabContent(tabElement, [
+            {
+                "name": translate("app.wardrobe.skins"),
+                "value": "skins",
+                "func": () => {
+                    capeOptions.remove();
+                    activeScreen.appendChild(skinOptions);
+                }
+            },
+            {
+                "name": translate("app.wardrobe.capes"),
+                "value": "capes",
+                "func": () => {
+                    skinOptions.remove();
+                    activeScreen.appendChild(capeOptions);
+                }
+            }
+        ]);
+        optionsContainer.appendChild(activeScreen);
+        return ele;
+    }
+
+    filterSkins(noAnimate) {
+        if (!noAnimate) animateGridReorderStart(".skin");
+        let search = this.searchbar.value.toLowerCase().trim();
+        let sort = this.sortdropdown.value;
+        this.skinEntries.forEach(e => e.element.remove());
+        let filteredEntries = this.skinEntries.filter(e => e.skin.name.toLowerCase().includes(search));
+        filteredEntries.sort((a, b) => {
+            if (sort == "last_used") {
+                let c = a.skin.last_used;
+                let d = b.skin.last_used;
+                c = c.getTime();
+                d = d.getTime();
+                if (isNaN(c)) c = 0;
+                if (isNaN(d)) d = 0;
+                return d - c;
+            }
+            let av = a.skin.name.toLowerCase();
+            let bv = b.skin.name.toLowerCase();
+            if (av > bv) return 1;
+            if (av < bv) return -1;
+            return 0;
+        });
+        if (sort == "favorites_first") {
+            filteredEntries.sort((a, b) => {
+                if (a.skin.favorited && b.skin.favorited) return 0;
+                if (a.skin.favorited) return -1;
+                if (b.skin.favorited) return 1;
+                return 0;
+            });
+        }
+        filteredEntries.forEach(e => {
+            this.skinList.appendChild(e.element);
+        });
+        if (!noAnimate) animateGridReorderEnd(".skin");
+    }
+    async showContent(noAnimate) {
+        if (!noAnimate) animateGridReorderStart(".skin");
+        this.skinEntries = [];
+        let activeSkin = await this.profile.getActiveSkin();
+        this.skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+            model: activeSkin?.model == "slim" ? "slim" : "default",
+        });
+        let activeCape = await this.profile.getActiveCape();
+        this.skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
+        this.skinList.innerHTML = '';
+        let skins = await getSkinsNoDefaults();
+        skins.forEach((e) => {
+            let skinEntry = new SkinEntry(e, true, this.skinViewer, this.profile, () => {
+                this.showContent()
+            }, (noAnimate) => {
+                this.filterSkins(noAnimate);
+            });
+            this.skinEntries.push(skinEntry);
+            this.skinList.appendChild(skinEntry.element);
+        });
+        this.filterSkins(true);
+        if (!noAnimate) animateGridReorderEnd(".skin");
+    }
+
+    async showDefSkins() {
+        this.detailChevron.innerHTML = '<i class="spinner"></i>';
+        let eles = document.querySelectorAll(".my-account-option.default-skin");
+        if (eles.length == 0) {
+            let defaultSkins = await getDefaultSkins();
+            defaultSkins.forEach(e => {
+                let skinEntry = new SkinEntry(e, false, this.skinViewer, this.profile, () => {
+                    this.showContent()
+                }, (noAnimate) => {
+                    this.filterSkins(noAnimate);
+                });
+                this.defaultSkinList.appendChild(skinEntry.element);
+            });
+        }
+        this.detailsWrapper.classList.add("open");
+        this.detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+    }
+
+    hideDefSkins() {
+        this.detailsWrapper.classList.remove("open");
+    }
+
+    async showCapes() {
+        this.capeList.innerHTML = "";
+        let activeCape = await this.profile.getActiveCape();
+
+        let capes = await this.profile.getCapes();
+        capes.sort((a, b) => {
+            if (a.cape_name > b.cape_name) return 1;
+            if (a.cape_name < b.cape_name) return -1;
+            return 0;
+        });
+        capes.forEach((e) => {
+            let capeEle = document.createElement("button");
+            let equipCape = async () => {
+                loader.style.display = "block";
+                capeImg.style.display = "none";
+                let currentEle = capeEle;
+                let success = await applyCape(this.profile, e);
+                if (success) {
+                    let oldEle = document.querySelector(".my-account-option.cape.selected");
+                    oldEle.classList.remove("selected");
+                    currentEle.classList.add("selected");
+                    e.setActive();
+                    this.skinViewer.loadCape(window.enderlynx.getCapePath(e.cape_id));
+                    activeCape = e;
+                }
+                loader.style.display = "none";
+                capeImg.style.display = "block";
+            }
+            capeEle.className = "my-account-option";
+            capeEle.title = e.cape_name;
+            capeEle.classList.add("cape");
+            let capeImg = document.createElement("img");
+            extractImageRegionToDataURL(window.enderlynx.getCapePath(e.cape_id), 1, 1, 10, 16, (e) => {
+                if (e) capeImg.src = e;
+            });
+            capeImg.classList.add("option-image-cape");
+            let loader = createElement("div", "loading-container-spinner");
+            loader.style.display = "none";
+            let capeName = createElement("div", "cape-name");
+            capeEle.appendChild(capeImg);
+            capeEle.appendChild(loader);
+            capeEle.appendChild(capeName);
+            capeName.textContent = e.cape_name;
+            this.capeList.appendChild(capeEle);
+            if (e.active) {
+                capeEle.classList.add("selected");
+            }
+            capeEle.onclick = equipCape;
+        });
+        let capeEle = createElement("button", "my-account-option");
+        capeEle.classList.add("cape");
+        capeEle.title = translate("app.wardrobe.no_cape");
+        let capeImg = createElement("div", "option-image-cape");
+        capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
+        let loader = createElement("div", "loading-container-spinner");
+        loader.style.display = "none";
+        let capeName = createElement("div", "cape-name");
+        capeEle.appendChild(capeImg);
+        capeEle.appendChild(loader);
+        capeEle.appendChild(capeName);
+        capeName.innerHTML = translate("app.wardrobe.no_cape");
+        this.capeList.appendChild(capeEle);
+        if (!activeCape) {
+            capeEle.classList.add("selected");
+        }
+        capeEle.onclick = async (event) => {
+            loader.style.display = "block";
+            capeImg.style.display = "none";
+            let currentEle = event.currentTarget;
+            let success = await applyCape(this.profile, null);
+            if (success) {
+                let oldEle = document.querySelector(".my-account-option.cape.selected");
+                oldEle.classList.remove("selected");
+                currentEle.classList.add("selected");
+                this.profile.removeActiveCape();
+                this.skinViewer.loadCape(null);
+                activeCape = null;
+            }
+            loader.style.display = "none";
+            capeImg.style.display = "block";
+        }
+    }
+}
+
 let contextmenu = new ContextMenu();
-let homeButton = new NavigationButton(homeButtonEle, translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeContent);
-let instanceButton = new NavigationButton(instanceButtonEle, translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instanceContent);
-let discoverButton = new NavigationButton(discoverButtonEle, translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', discoverContent);
-let settingsButton = new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa-solid fa-gear"></i>');
-let wardrobeButton = new NavigationButton(wardrobeButtonEle, translate("app.page.wardrobe"), '<i class="fa-solid fa-user"></i>', wardrobeContent);
+let homeScreen = new HomeScreen();
+let homeButton = new NavigationButton(document.getElementById("homeButtonEle"), translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeScreen);
+homeScreen.setNavButton(homeButton);
+let instancesScreen = new InstancesScreen();
+let instancesButton = new NavigationButton(document.getElementById("instanceButtonEle"), translate("app.page.instances"), '<i class="fa-solid fa-book"></i>', instancesScreen);
+instancesScreen.setNavButton(instancesButton);
+let discoverScreen = new DiscoverScreen();
+let discoverButton = new NavigationButton(document.getElementById("discoverButtonEle"), translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', discoverScreen);
+discoverScreen.setNavButton(discoverButton);
+let wardrobeScreen = new WardrobeScreen();
+let wardrobeButton = new NavigationButton(document.getElementById("wardrobeButtonEle"), translate("app.page.wardrobe"), '<i class="fa-solid fa-user"></i>', wardrobeScreen);
+wardrobeScreen.setNavButton(wardrobeButton);
 
 settingsButtonEle.onclick = async () => {
     let selectedKeySelect;
@@ -3324,7 +6413,7 @@ settingsButtonEle.onclick = async () => {
     }, undefined, 800);
 }
 
-let navButtons = [homeButton, instanceButton, discoverButton, wardrobeButton];
+let navButtons = [homeButton, instancesButton, discoverButton, wardrobeButton];
 
 async function toggleMicrosoftSignIn() {
     try {
@@ -3337,688 +6426,6 @@ async function toggleMicrosoftSignIn() {
     }
 }
 
-function showHome() {
-    let ele = document.createElement("div");
-    ele.className = "home-element";
-    let loading = new LoadingContainer();
-    loading.element.style.gridColumn = "span 2";
-    ele.appendChild(loading.element);
-    setTimeout(() => {
-        showHomeContent(ele);
-    }, 0);
-    return ele;
-}
-
-let changehomewelcome;
-
-async function showHomeContent(oldEle) {
-    let ele = document.createElement("div");
-    content.appendChild(ele);
-    ele.className = "home-element";
-    let welcomeElement = document.createElement("div");
-    welcomeElement.className = "welcome-container";
-    let innerWelcomeElement = document.createElement("div");
-    innerWelcomeElement.className = "welcome";
-    changehomewelcome = async () => {
-        let profile = await getDefaultProfile();
-        if (profile) {
-            innerWelcomeElement.textContent = translate("app.welcome", "%n", profile.name);
-        } else {
-            innerWelcomeElement.textContent = translate("app.welcome_no_user");
-        }
-    }
-    changehomewelcome();
-    welcomeElement.appendChild(innerWelcomeElement);
-    welcomeElement.style.visibility = "hidden";
-    ele.appendChild(welcomeElement);
-    for (let i = 0; i < 10; i++) {
-        let blobElement = document.createElement("div");
-        welcomeElement.appendChild(blobElement);
-        blobElement.className = "welcome-blob";
-        let height = Math.random() * 100 + 20;
-        let width = Math.random() * 200 + 20;
-        let top = Math.random() * (welcomeElement.offsetHeight + height) - height;
-        let left = Math.random() * (welcomeElement.offsetWidth + width) - width;
-        let rotate = Math.random() * 360;
-        blobElement.style.setProperty("--blob-height", height + "px");
-        blobElement.style.setProperty("--blob-width", width + "px");
-        blobElement.style.setProperty("--blob-top", top + "px");
-        blobElement.style.setProperty("--blob-left", left + "px");
-        blobElement.style.setProperty("--blob-rotate", rotate + "deg");
-    }
-    let column1 = document.createElement("div");
-    column1.className = "home-column";
-    let column2 = document.createElement("div");
-    column2.className = "home-column";
-    ele.appendChild(column1);
-    ele.appendChild(column2);
-    let pinnedWorldsList = await getPinnedWorlds();
-    let pinnedInstancesList = await getPinnedInstances();
-    let lastPlayedWorldsList = await getRecentlyPlayedWorlds();
-    let lastPlayedInstancesList = await getRecentlyPlayedInstances();
-    let pinnedWorldTitle = document.createElement("h2");
-    pinnedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_worlds");
-    pinnedWorldTitle.dataset.id = "ui:pinned_world_title";
-    let pinnedInstanceTitle = document.createElement("h2");
-    pinnedInstanceTitle.innerHTML = '<i class="home-icon fa-solid fa-thumbtack"></i>' + translate("app.home.pinned_instances");
-    pinnedInstanceTitle.dataset.id = "ui:pinned_instance_title";
-    let lastPlayedWorldTitle = document.createElement("h2");
-    lastPlayedWorldTitle.innerHTML = '<i class="home-icon fa-solid fa-clock-rotate-left"></i>' + translate("app.home.last_played_worlds");
-    lastPlayedWorldTitle.dataset.id = "ui:last_played_world_title";
-    let lastPlayedInstanceTitle = document.createElement("h2");
-    lastPlayedInstanceTitle.innerHTML = '<i class="home-icon fa-solid fa-clock-rotate-left"></i>' + translate("app.home.last_played_instances");
-    lastPlayedInstanceTitle.dataset.id = "ui:last_played_instance_title";
-    let pinnedWorldGrid = document.createElement("div");
-    pinnedWorldGrid.className = "home-list-section";
-    pinnedWorldGrid.dataset.id = "ui:pinned_world_grid";
-    let lastPlayedWorldGrid = document.createElement("div");
-    lastPlayedWorldGrid.className = "home-list-section";
-    lastPlayedWorldGrid.dataset.id = "ui:last_played_world_grid";
-    let pinnedInstanceGrid = document.createElement("div");
-    pinnedInstanceGrid.className = "home-list-section";
-    pinnedInstanceGrid.dataset.id = "ui:pinned_instance_grid";
-    let lastPlayedInstanceGrid = document.createElement("div");
-    lastPlayedInstanceGrid.className = "home-list-section";
-    lastPlayedInstanceGrid.dataset.id = "ui:last_played_instance_grid";
-    let updateHomeGrid = async () => {
-        animateGridReorderStart(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
-
-        let pinnedWorlds = pinnedWorldsList;
-        let pinnedInstances = pinnedInstancesList;
-        pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-        pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-
-        let pinnedWorldIdentifiers = pinnedWorlds.map(e => (e.id ? e.id : e.ip) + ":" + e.instance_id);
-        let lastPlayedWorlds = lastPlayedWorldsList.filter(e => !pinnedWorldIdentifiers.includes((e.id ? e.id : e.ip) + ":" + e.instance_id)).slice(0, 5);
-        let pinnedInstanceIdentifiers = pinnedInstances.map(e => e.instance_id);
-        let lastPlayedInstances = lastPlayedInstancesList.filter(e => !pinnedInstanceIdentifiers.includes(e.instance_id)).slice(0, 5);
-        pinnedInstances.forEach(e => e.actuallyPinned = true);
-        lastPlayedInstances.forEach(e => e.actuallyPinned = false);
-        pinnedWorlds.forEach(e => e.pinned = true);
-        lastPlayedWorlds.forEach(e => e.pinned = false);
-
-        lastPlayedInstanceGrid.innerHTML = "";
-        pinnedInstanceGrid.innerHTML = "";
-        lastPlayedWorldGrid.innerHTML = "";
-        pinnedWorldGrid.innerHTML = "";
-        column1.innerHTML = "";
-        column2.innerHTML = "";
-        let worlds = pinnedWorlds.concat(lastPlayedWorlds);
-        for (let i = 0; i < worlds.length; i++) {
-            let e = worlds[i];
-            if (!e.ip) e.type = "singleplayer";
-            else e.type = "multiplayer";
-
-            let item = document.createElement("div");
-            item.className = "home-world-entry";
-            item.style.cursor = "auto";
-            item.dataset.id = "world:" + (e.type == "singleplayer" ? e.id : e.ip) + ":" + e.instance_id;
-            let icon = document.createElement("img");
-            icon.className = "instance-image";
-            icon.src = fixPathForImage(e.icon ? e.icon : getDefaultImage(e.type == "singleplayer" ? e.id : e.ip));
-            icon.onerror = () => {
-                icon.src = getDefaultImage(e.type == "singleplayer" ? e.id : e.ip);
-            }
-            item.appendChild(icon);
-            let itemInfo = document.createElement("div");
-            itemInfo.className = "instance-info";
-            let itemTitle = document.createElement("div");
-            itemTitle.className = "instance-name";
-            itemTitle.innerHTML = parseMinecraftFormatting(e.name);
-            let itemDesc = document.createElement("div");
-            itemDesc.className = "instance-desc";
-            let itemDesc1 = document.createElement("span");
-            itemDesc1.className = "instance-desc";
-            itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
-            if (howLongAgo(e.last_played) < 3600000) {
-                setInterval(() => {
-                    itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
-                }, 60000);
-            } else if (howLongAgo(e.last_played) < 86400000) {
-                setInterval(() => {
-                    itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
-                }, 3600000);
-            }
-            let itemDesc2 = document.createElement("span");
-            itemDesc2.className = "instance-desc";
-            itemDesc2.innerHTML = (e.type == "singleplayer" ? (e.hardcore ? "<span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : translate("app.worlds.description." + e.mode)) : e.ip);
-            if (e.type == "multiplayer") {
-                itemDesc2.style.width = "fit-content";
-                itemDesc2.classList.add("hidden-text");
-                itemDesc2.onclick = () => {
-                    itemDesc2.classList.add("shown");
-                }
-            }
-            itemDesc.appendChild(itemDesc1);
-            itemDesc.appendChild(itemDesc2);
-            itemInfo.appendChild(itemTitle);
-            itemInfo.appendChild(itemDesc);
-            item.appendChild(itemInfo);
-            let instanceInfo = await Instance.getInstance(e.instance_id);
-            let playButton = document.createElement("button");
-            playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
-            playButton.className = "home-play-button";
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.onclick = async () => {
-                playButton.className = "home-loading-button";
-                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
-                showSpecificInstanceContent(instanceInfo);
-            }
-            let morebutton = document.createElement("button");
-            morebutton.className = "home-list-more";
-            morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-            let buttons = new ContextMenuButtons([
-                ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? {
-                    "title": translate("app.worlds.play"),
-                    "icon": '<i class="fa-solid fa-play"></i>',
-                    "func": async () => {
-                        playButton.className = "home-loading-button";
-                        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.loading");
-                        e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
-                        showSpecificInstanceContent(instanceInfo);
-                    }
-                } : null,
-                {
-                    "title": translate("app.instance.view"),
-                    "icon": '<i class="fa-solid fa-eye"></i>',
-                    "func": () => {
-                        showSpecificInstanceContent(instanceInfo);
-                    }
-                },
-                e.type == "singleplayer" ? {
-                    "title": translate("app.worlds.open"),
-                    "icon": '<i class="fa-solid fa-folder"></i>',
-                    "func": () => {
-                        window.enderlynx.openWorldFolder(instanceInfo.instance_id, e.id);
-                    }
-                } : null,
-                e.type == "singleplayer" ? {
-                    "title": translate("app.worlds.edit"),
-                    "icon": '<i class="fa-solid fa-pencil"></i>',
-                    "func": () => {
-                        openWorldEditDialog(instanceInfo.instance_id, worlds[i].id, async () => {
-                            e = {
-                                ...e,
-                                ...(await window.enderlynx.getWorld(instanceInfo.instance_id, e.id))
-                            }
-                            itemDesc2.innerHTML = (e.type == "singleplayer" ? (e.hardcore ? "<span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>" : translate("app.worlds.description." + e.mode)) : e.ip);
-                        });
-                    }
-                } : null,
-                {
-                    "title": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                    "icon": async () => await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type) ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                    "func": async (i, c) => {
-                        if (c) c.remove();
-                        let world_pinned = await isWorldPinned(e.type == "singleplayer" ? e.id : e.ip, instanceInfo.instance_id, e.type);
-                        world_pinned ? (e.type == "singleplayer" ? await unpinSingleplayerWorld(e.id, instanceInfo.instance_id) : await unpinMultiplayerWorld(e.ip, instanceInfo.instance_id)) : (e.type == "singleplayer" ? await pinSingleplayerWorld(e.id, instanceInfo.instance_id) : await pinMultiplayerWorld(e.ip, instanceInfo.instance_id))
-                        i.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
-                        i.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                        if (!world_pinned) {
-                            pinnedWorldsList.push(e);
-                        } else {
-                            pinnedWorldsList = pinnedWorldsList.filter(f => e.type == "singleplayer" ? f.id != e.id : f.ip != e.ip);
-                        }
-                        updateHomeGrid();
-                    }
-                },
-                // {
-                //     "title": translate("app.worlds.share"),
-                //     "icon": '<i class="fa-solid fa-share"></i>',
-                //     "func": () => { }
-                // },
-                (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions ? {
-                    "icon": '<i class="fa-solid fa-desktop"></i>',
-                    "title": translate("app.worlds.desktop_shortcut"),
-                    "func": () => {
-                        if (e.type == "singleplayer") {
-                            addDesktopShortcutWorld(instanceInfo, e.name, "singleplayer", e.id, e.icon ?? getDefaultImage(e.id));
-                        } else {
-                            addDesktopShortcutWorld(instanceInfo, e.name, "multiplayer", e.ip, e.icon ?? getDefaultImage(e.ip));
-                        }
-                    }
-                } : null,
-                {
-                    "title": translate("app.worlds.delete"),
-                    "icon": '<i class="fa-solid fa-trash-can"></i>',
-                    "danger": true,
-                    "func_id": "delete",
-                    "func": () => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description").replace("%w", parseMinecraftFormatting(e.name)), [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.worlds.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.worlds.delete.confirm")
-                            }
-                        ], [], async () => {
-                            if (e.type == "singleplayer") {
-                                let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id);
-                                if (success) {
-                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                                } else {
-                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
-                                }
-                            } else if (e.type == "multiplayer") {
-                                let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [e.ip], [e.index]);
-                                if (success) {
-                                    displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                                } else {
-                                    displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
-                                }
-                            }
-                            pinnedWorldsList = pinnedWorldsList.filter(f => e.type == "singleplayer" ? f.id != e.id : f.ip != e.ip);
-                            lastPlayedWorldsList = lastPlayedWorldsList.filter(f => e.type == "singleplayer" ? f.id != e.id : f.ip != e.ip);
-                            updateHomeGrid();
-                        });
-                    }
-                }
-            ].filter(e => e))
-            new MoreMenu(morebutton, buttons);
-            item.oncontextmenu = (e) => {
-                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
-            }
-            item.appendChild(playButton);
-            item.appendChild(morebutton);
-            e.pinned ? pinnedWorldGrid.appendChild(item) : lastPlayedWorldGrid.appendChild(item);
-        }
-        let instances = pinnedInstances.concat(lastPlayedInstances);
-        for (let i = 0; i < instances.length; i++) {
-            let e = instances[i];
-            let item = document.createElement("div");
-            item.className = "home-entry";
-            item.onclick = (event) => {
-                if (event.target.matches("button")) return;
-                if (event.target.matches("i")) return;
-                showSpecificInstanceContent(e);
-            }
-            item.role = "button";
-            item.setAttribute("tabindex", "0");
-            item.onkeydown = (event) => {
-                if (event.target.matches("button")) return;
-                if (event.target.matches("i")) return;
-                if (event.key == "Enter" || event.key == " ") {
-                    showSpecificInstanceContent(e);
-                }
-            }
-            item.dataset.id = "instance:" + e.instance_id;
-            let icon = document.createElement("img");
-            icon.className = "instance-image";
-            icon.src = e.image ? e.image : getDefaultImage(e.instance_id);
-            instances[i].watchForChange("image", (image) => {
-                icon.src = image ? image : getDefaultImage(e.instance_id);
-            });
-            icon.onerror = () => {
-                icon.src = getDefaultImage(e.instance_id);
-            }
-            item.appendChild(icon);
-            let itemInfo = document.createElement("div");
-            itemInfo.className = "instance-info";
-            let itemTitle = document.createElement("div");
-            itemTitle.className = "instance-name";
-            itemTitle.textContent = e.name;
-            instances[i].watchForChange("name", (name) => {
-                itemTitle.textContent = name;
-            });
-            let itemDesc = document.createElement("div");
-            itemDesc.className = "instance-desc";
-            itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
-            if (howLongAgo(e.last_played) < 3600000) {
-                setInterval(() => {
-                    itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
-                }, 60000);
-            } else if (howLongAgo(e.last_played) < 86400000) {
-                setInterval(() => {
-                    itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
-                }, 3600000);
-            }
-            instances[i].watchForChange("loader", (loader) => {
-                e.loader = loader;
-                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
-            });
-            instances[i].watchForChange("vanilla_version", (vanilla_version) => {
-                e.vanilla_version = vanilla_version;
-                itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
-            });
-            itemInfo.appendChild(itemTitle);
-            itemInfo.appendChild(itemDesc);
-            item.appendChild(itemInfo);
-            let instanceInfo = e;
-            let running = checkForProcess(instanceInfo.pid);
-            if (!running) instanceInfo.setPid(null);
-            if (running) {
-                window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
-                    if (currentTab != "home") return;
-                    formatPlayButton(false);
-                    live.findLive();
-                });
-            }
-            let more;
-            let playButton = document.createElement("button");
-            let formatPlayButton = (isRunning) => {
-                running = isRunning;
-                playButton.setAttribute("title", isRunning ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
-                playButton.className = isRunning ? "home-stop-button" : "home-play-button";
-                playButton.innerHTML = isRunning ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-                playButton.onclick = isRunning ? async () => {
-                    playButton.classList.add("home-loading-button");
-                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
-                    await stopInstance(instanceInfo);
-                    formatPlayButton(false);
-                } : async () => {
-                    playButton.className = "home-loading-button";
-                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                    await playInstance(instanceInfo);
-                    showSpecificInstanceContent(instanceInfo);
-                }
-                if (more) more.refreshButtons();
-            }
-            formatPlayButton(running);
-            let morebutton = document.createElement("button");
-            morebutton.className = "home-list-more";
-            morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-            let buttons = new ContextMenuButtons([
-                {
-                    "icon": () => running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-                    "title": () => running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-                    "func": async (e) => {
-                        if (running) {
-                            await stopInstance(instanceInfo);
-                            formatPlayButton(false);
-                        } else {
-                            playButton.className = "home-loading-button";
-                            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                            await playInstance(instanceInfo);
-                            showSpecificInstanceContent(instanceInfo);
-                        }
-                    }
-                },
-                instanceInfo.locked ? null : {
-                    "icon": '<i class="fa-solid fa-plus"></i>',
-                    "title": translate("app.button.content.add"),
-                    "func": async (e) => {
-                        instanceInfo = await instanceInfo.refresh();
-                        showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-folder"></i>',
-                    "title": translate("app.button.instances.open_folder"),
-                    "func": (e) => {
-                        window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-share"></i>',
-                    "title": translate("app.button.instances.share"),
-                    "func": (e) => {
-                        openInstanceShareDialog(instanceInfo);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-wrench"></i>',
-                    "title": translate("app.button.instances.repair"),
-                    "func": () => {
-                        showRepairDialog(instanceInfo);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-gear"></i>',
-                    "title": translate("app.button.instances.open_settings"),
-                    "func": async (e) => {
-                        showInstanceSettings(await instanceInfo.refresh());
-                    }
-                },
-                {
-                    "icon": async () => await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                    "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
-                    "func": async (e, c) => {
-                        if (c) c.remove();
-                        await instanceInfo.isPinned() ? await unpinInstance(instanceInfo) : await pinInstance(instanceInfo);
-                        e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                        e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                        if (await instanceInfo.isPinned()) {
-                            pinnedInstancesList.push(instanceInfo);
-                        } else {
-                            pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
-                        }
-                        updateHomeGrid();
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-desktop"></i>',
-                    "title": translate("app.instances.desktop_shortcut"),
-                    "func": (e) => {
-                        addDesktopShortcut(instanceInfo);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-trash-can"></i>',
-                    "title": translate("app.button.instances.delete"),
-                    "func": (e) => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                            "content": translate("app.instances.delete.confirm.description").replace("%i", instanceInfo.name),
-                            "type": "notice"
-                        }, {
-                            "type": "toggle",
-                            "name": translate("app.instances.delete.files"),
-                            "default": false,
-                            "id": "delete"
-                        }], [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.instances.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.instances.delete.confirm")
-                            }
-                        ], [], async (v) => {
-                            instanceInfo.delete();
-                            pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
-                            lastPlayedInstancesList = lastPlayedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
-                            updateHomeGrid();
-                            if (v[0].value) {
-                                try {
-                                    await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
-                                } catch (e) {
-                                    displayError(translate("app.instances.delete.files.fail"));
-                                }
-                            }
-                        });
-                    },
-                    "danger": true
-                }
-            ].filter(e => e))
-            more = new MoreMenu(morebutton, buttons);
-            item.oncontextmenu = (e) => {
-                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
-            }
-            item.appendChild(playButton);
-            item.appendChild(morebutton);
-            e.actuallyPinned ? pinnedInstanceGrid.appendChild(item) : lastPlayedInstanceGrid.appendChild(item);
-        };
-        let noPinnedWorlds = document.createElement("div");
-        noPinnedWorlds.className = "home-entry-empty";
-        noPinnedWorlds.innerHTML = translate("app.worlds.no_pinned");
-        let noPinnedInstances = document.createElement("div");
-        noPinnedInstances.className = "home-entry-empty";
-        noPinnedInstances.innerHTML = translate("app.instances.no_pinned");
-        let noPlayedWorlds = document.createElement("div");
-        noPlayedWorlds.className = "home-entry-empty";
-        noPlayedWorlds.innerHTML = translate("app.worlds.no_played");
-        let noPlayedInstances = document.createElement("div");
-        noPlayedInstances.className = "home-entry-empty";
-        noPlayedInstances.innerHTML = translate("app.instances.no_played");
-        let createButton = document.createElement("button");
-        createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
-        createButton.className = 'home-create-button';
-        createButton.onclick = () => {
-            showCreateInstanceDialog();
-        }
-        noPlayedInstances.appendChild(createButton);
-        if (pinnedWorlds.length || pinnedInstances.length) {
-            column1.appendChild(pinnedWorldTitle);
-            column1.appendChild(pinnedWorlds.length ? pinnedWorldGrid : noPinnedWorlds);
-            column2.appendChild(pinnedInstanceTitle);
-            column2.appendChild(pinnedInstances.length ? pinnedInstanceGrid : noPinnedInstances);
-            column1.style.gridRow = "";
-            column2.style.gridRow = "";
-        } else {
-            column1.style.gridRow = "span 2";
-            column2.style.gridRow = "span 2";
-        }
-        column1.appendChild(lastPlayedWorldTitle);
-        column1.appendChild(lastPlayedWorlds.length ? lastPlayedWorldGrid : noPlayedWorlds);
-        column2.appendChild(lastPlayedInstanceTitle);
-        column2.appendChild(lastPlayedInstances.length ? lastPlayedInstanceGrid : noPlayedInstances);
-        animateGridReorderEnd(".home-world-entry, .home-entry, .home-element h2", ".home-list-section");
-    }
-
-    updateHomeGrid();
-
-    let discoverModsWrapper = document.createElement("div");
-    discoverModsWrapper.className = "home-discover-wrapper";
-    discoverModsWrapper.style.display = "none";
-    let discoverModsTitle = document.createElement("button");
-    discoverModsTitle.innerHTML = translate("app.home.discover_modpacks") + ' <i class="fa-solid fa-angles-right"></i>'
-    discoverModsTitle.className = "home-discover-title";
-    discoverModsTitle.onclick = () => {
-        showAddContent();
-    }
-    let discoverModsRefresh = document.createElement("button");
-    discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.home.discover.refresh");
-    discoverModsRefresh.className = "home-discover-refresh";
-    discoverModsRefresh.onclick = async () => {
-        discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate spinning"></i>' + translate("app.home.discover.refresh");
-        try {
-            home_modpacks = await window.enderlynx.getRandomModpacks();
-            if (!home_modpacks) throw new Error();
-            updateHomeModpacksList(home_modpacks);
-        } catch (e) {
-            displayError(translate("app.home.discover.refresh.failed"));
-        }
-        discoverModsRefresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>' + translate("app.home.discover.refresh");
-    }
-    let discoverModsTop = document.createElement("div");
-    discoverModsTop.className = "home-discover-top";
-    discoverModsTop.appendChild(discoverModsTitle);
-    discoverModsTop.appendChild(discoverModsRefresh);
-    discoverModsWrapper.appendChild(discoverModsTop);
-    let discoverModsContainer = document.createElement("div");
-    discoverModsContainer.className = "home-discover-container";
-    discoverModsContainer.addEventListener("wheel", e => {
-        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-            e.preventDefault();
-            discoverModsContainer.scrollLeft += e.deltaY;
-        }
-    }, { passive: false });
-    discoverModsWrapper.appendChild(discoverModsContainer);
-
-    let updateHomeModpacksList = (e) => {
-        if (!e || !e.hits || !e.hits.length) return;
-        discoverModsContainer.innerHTML = '';
-        discoverModsWrapper.style.display = "grid";
-        e.hits.forEach(e => {
-            let item = document.createElement("button");
-            item.className = "home-discover";
-            item.onclick = () => {
-                displayContentInfo("modrinth", undefined, e.project_id);
-            }
-            let img = document.createElement("img");
-            img.className = "home-discover-image";
-            img.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
-            item.appendChild(img);
-            let itemInfo = document.createElement("div");
-            itemInfo.className = "home-discover-info";
-            let itemTitle = document.createElement("div");
-            itemTitle.innerHTML = e.title;
-            itemTitle.className = "home-discover-item-title";
-            let itemAuthor = document.createElement("div");
-            itemAuthor.innerHTML = translate("app.home.modpack.author").replace("%a", e.author);
-            itemAuthor.className = "home-discover-author";
-            itemInfo.appendChild(itemTitle);
-            itemInfo.appendChild(itemAuthor);
-            let itemDownloadCount = document.createElement("div");
-            itemDownloadCount.className = "home-discover-downloads";
-            itemDownloadCount.innerHTML = translate("app.home.modpack.downloads").replace("%d", formatNumber(e.downloads));
-            itemInfo.appendChild(itemDownloadCount);
-            item.appendChild(itemInfo);
-            discoverModsContainer.appendChild(item);
-        })
-    }
-    let getRandomModpacks = async () => {
-        home_modpacks = await window.enderlynx.getRandomModpacks();
-        updateHomeModpacksList(home_modpacks);
-    }
-    if (!home_modpacks || !home_modpacks.hits) {
-        getRandomModpacks();
-    } else {
-        updateHomeModpacksList(home_modpacks);
-    }
-    ele.appendChild(discoverModsWrapper);
-
-    let mcNewsWrapper = document.createElement("div");
-    mcNewsWrapper.className = "home-discover-wrapper";
-    mcNewsWrapper.style.display = "none";
-    let mcNewsTitle = document.createElement("div");
-    mcNewsTitle.innerHTML = translate("app.home.mc_news");
-    mcNewsTitle.className = "home-news-title";
-    mcNewsWrapper.appendChild(mcNewsTitle);
-    let mcNewsContainer = document.createElement("div");
-    mcNewsContainer.className = "home-discover-container";
-    mcNewsContainer.addEventListener("wheel", e => {
-        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-            e.preventDefault();
-            mcNewsContainer.scrollLeft += e.deltaY;
-        }
-    }, { passive: false });
-    mcNewsWrapper.appendChild(mcNewsContainer);
-
-    let updateMCNews = (e) => {
-        mcNewsWrapper.style.display = "";
-        e.article_grid.forEach(e => {
-            let article = document.createElement("button");
-            article.className = "mc-news";
-            article.style.backgroundImage = `url("https://minecraft.net${e.default_tile.image.imageURL}")`;
-            article.onclick = () => {
-                window.enderlynx.openInBrowser("https://minecraft.net" + e.article_url);
-            }
-            article.title = e.default_tile.sub_header;
-            let article_title = document.createElement("div");
-            article_title.innerHTML = e.default_tile.title;
-            article_title.className = "mc-news-title";
-            article_title.dataset.type = e.primary_category;
-            article.appendChild(article_title);
-            mcNewsContainer.appendChild(article);
-        });
-    }
-
-    let getMCNews = async () => {
-        mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/jcr:content.articles.json")).json();
-        updateMCNews(mc_news);
-    }
-
-    if (!mc_news.article_grid) {
-        getMCNews();
-    } else {
-        updateMCNews(mc_news);
-    }
-
-    ele.appendChild(mcNewsWrapper);
-    welcomeElement.style.visibility = "visible";
-
-    oldEle.remove();
-    return ele;
-}
-
-let home_modpacks = {};
-let mc_news = {};
 let dont_override_my_page = false;
 
 async function applyDefaults() {
@@ -4049,23 +6456,14 @@ async function applyDefaults() {
 window.enderlynx.onPage((page) => setPage(page));
 
 function setPage(page) {
-    for (let i = 0; i < navButtons.length; i++) {
-        navButtons[i].removeSelected();
-    }
     if (page == "home") {
-        homeButton.setSelected();
-        homeContent.displayContent();
+        homeScreen.display();
     } else if (page == "instances") {
-        instanceButton.setSelected();
-        instanceContent.displayContent();
+        instancesScreen.display();
     } else if (page == "discover") {
-        setTimeout(() => {
-            discoverButton.setSelected();
-            discoverContent.displayContent();
-        }, 0);
+        discoverScreen.display();
     } else if (page == "wardrobe") {
-        wardrobeButton.setSelected();
-        wardrobeContent.displayContent();
+        wardrobeScreen.display();
     }
 }
 
@@ -4143,486 +6541,6 @@ function animateGridReorderEnd(querySelector, pseudoElements) {
     first2.clear();
     last.clear();
     last2.clear();
-}
-
-let skinViewer;
-let refreshWardrobe;
-
-async function showWardrobeContent() {
-    content.innerHTML = "";
-    if (!(await getDefaultProfile())) {
-        let ele = document.createElement("div");
-        content.appendChild(ele);
-        ele.style.padding = "8px";
-        let signInWarning = new NoResultsFound(translate("app.wardrobe.sign_in"));
-        ele.appendChild(signInWarning.element);
-        return;
-    }
-    if (skinViewer) skinViewer.dispose();
-    let ele = document.createElement("div");
-    content.appendChild(ele);
-    ele.className = "my-account-grid";
-    let skinRenderContainer = document.createElement("div");
-    skinRenderContainer.className = "skin-render-container";
-    let skinRenderCanvas = document.createElement("canvas");
-    skinRenderCanvas.className = "skin-render-canvas";
-    skinRenderContainer.appendChild(skinRenderCanvas);
-    ele.appendChild(skinRenderContainer);
-    const dpr = window.devicePixelRatio || 1;
-    skinViewer = new skinview3d.SkinViewer({
-        canvas: skinRenderCanvas,
-        width: 298 * dpr,
-        height: 498 * dpr
-    });
-    skinRenderCanvas.style.width = "300px";
-    skinRenderCanvas.style.height = "500px";
-    skinViewer.pixelRatio = 2
-    skinViewer.zoom = 0.7;
-    let walkingAnimation = new skinview3d.WalkingAnimation();
-    walkingAnimation.headBobbing = false;
-    skinViewer.animation = walkingAnimation;
-    skinViewer.animation.speed = 0.5;
-    let pauseButton = document.createElement("button");
-    pauseButton.className = 'skin-render-pause';
-    pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
-    let onPause = () => {
-        skinViewer.animation.paused = true;
-        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
-        pauseButton.onclick = onResume;
-    }
-    let onResume = () => {
-        skinViewer.animation.paused = false;
-        pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
-        pauseButton.onclick = onPause;
-    }
-    pauseButton.onclick = onPause;
-    if (document.body.matches(".potato")) {
-        skinViewer.animation.paused = true;
-        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
-        pauseButton.onclick = onResume;
-    }
-    skinRenderContainer.appendChild(pauseButton);
-    let optionsContainer = document.createElement("div");
-    optionsContainer.className = "my-account-options";
-    let title = document.createElement("div");
-    title.classList.add("title-top");
-    let h1 = document.createElement("h1");
-    h1.innerHTML = translate("app.page.wardrobe");
-    title.appendChild(h1);
-    optionsContainer.appendChild(title);
-    let activeScreen = document.createElement("div");
-    ele.appendChild(optionsContainer);
-    let skinOptions = document.createElement("div");
-    skinOptions.className = "my-account-option-box";
-    activeScreen.appendChild(skinOptions);
-    let fileDrop = document.createElement("div");
-    fileDrop.dataset.action = "skin-import";
-    fileDrop.className = "small-drop-overlay drop-overlay";
-    let fileDropInner = document.createElement("div");
-    fileDropInner.className = "drop-overlay-inner";
-    fileDropInner.innerHTML = translate("app.import.skin.drop");
-    fileDrop.appendChild(fileDropInner);
-    skinOptions.appendChild(fileDrop);
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.className = "search-and-filter-v2";
-    let searchElement = document.createElement("div");
-    searchElement.style.flexGrow = "2";
-    let searchbar = new SearchBar(searchElement, () => {
-        filterSkins(true);
-    }, () => { })
-    searchAndFilter.appendChild(searchElement);
-    let dropdownElement = document.createElement("div");
-    dropdownElement.style.minWidth = "200px";
-    let sortdropdown = new Dropdown(translate("app.wardrobe.sort_by"), [
-        {
-            "name": translate("app.wardrobe.sort_by.favorites_first"),
-            "value": "favorites_first"
-        },
-        {
-            "name": translate("app.wardrobe.sort_by.name"),
-            "value": "name"
-        },
-        {
-            "name": translate("app.wardrobe.sort_by.last_used"),
-            "value": "last_used"
-        }
-    ], dropdownElement, "favorites_first", () => {
-        filterSkins();
-    })
-    searchAndFilter.appendChild(searchElement);
-    searchAndFilter.appendChild(dropdownElement);
-    skinOptions.appendChild(searchAndFilter);
-    let capeOptions = document.createElement("div");
-    capeOptions.className = "my-account-option-box";
-    let skinList = document.createElement("div");
-    let capeList = document.createElement("div");
-    skinList.className = 'my-account-option-list-skin';
-    capeList.className = 'my-account-option-list-cape';
-    skinOptions.appendChild(skinList);
-    capeOptions.appendChild(capeList);
-
-    let default_profile = await getDefaultProfile();
-    let activeCape = await default_profile.getActiveCape();
-
-    let capes = await default_profile.getCapes();
-    capes.sort((a, b) => {
-        if (a.cape_name > b.cape_name) return 1;
-        if (a.cape_name < b.cape_name) return -1;
-        return 0;
-    });
-    capes.forEach((e) => {
-        let capeEle = document.createElement("button");
-        let equipCape = async () => {
-            loader.style.display = "block";
-            capeImg.style.display = "none";
-            let currentEle = capeEle;
-            let success = await applyCape(default_profile, e);
-            if (success) {
-                let oldEle = document.querySelector(".my-account-option.cape.selected");
-                oldEle.classList.remove("selected");
-                currentEle.classList.add("selected");
-                e.setActive();
-                skinViewer.loadCape(window.enderlynx.getCapePath(e.cape_id));
-                activeCape = e;
-            }
-            loader.style.display = "none";
-            capeImg.style.display = "block";
-        }
-        capeEle.className = "my-account-option";
-        capeEle.title = e.cape_name;
-        capeEle.classList.add("cape");
-        let capeImg = document.createElement("img");
-        extractImageRegionToDataURL(window.enderlynx.getCapePath(e.cape_id), 1, 1, 10, 16, (e) => {
-            if (e) capeImg.src = e;
-        });
-        capeImg.classList.add("option-image-cape");
-        let loader = document.createElement("div");
-        loader.className = "loading-container-spinner";
-        loader.style.display = "none";
-        let capeName = document.createElement("div");
-        capeName.className = "cape-name";
-        capeEle.appendChild(capeImg);
-        capeEle.appendChild(loader);
-        capeEle.appendChild(capeName);
-        capeName.innerHTML = sanitize(e.cape_name);
-        capeList.appendChild(capeEle);
-        if (e.active) {
-            capeEle.classList.add("selected");
-        }
-        capeEle.onclick = equipCape;
-    });
-    let capeEle = document.createElement("button");
-    capeEle.className = "my-account-option";
-    capeEle.classList.add("cape");
-    capeEle.title = translate("app.wardrobe.no_cape");
-    let capeImg = document.createElement("div");
-    capeImg.classList.add("option-image-cape");
-    capeImg.innerHTML = '<i class="fa-regular fa-circle-xmark"></i>';
-    let loader = document.createElement("div");
-    loader.className = "loading-container-spinner";
-    loader.style.display = "none";
-    let capeName = document.createElement("div");
-    capeName.className = "cape-name";
-    capeEle.appendChild(capeImg);
-    capeEle.appendChild(loader);
-    capeEle.appendChild(capeName);
-    capeName.innerHTML = translate("app.wardrobe.no_cape");
-    capeList.appendChild(capeEle);
-    if (!activeCape) {
-        capeEle.classList.add("selected");
-    }
-    capeEle.onclick = async (event) => {
-        loader.style.display = "block";
-        capeImg.style.display = "none";
-        let currentEle = event.currentTarget;
-        let success = await applyCape(default_profile, null);
-        if (success) {
-            let oldEle = document.querySelector(".my-account-option.cape.selected");
-            oldEle.classList.remove("selected");
-            currentEle.classList.add("selected");
-            default_profile.removeActiveCape();
-            skinViewer.loadCape(null);
-            activeCape = null;
-        }
-        loader.style.display = "none";
-        capeImg.style.display = "block";
-    }
-
-    let detailsWrapper = document.createElement("div");
-    detailsWrapper.className = "details";
-    skinOptions.appendChild(detailsWrapper);
-    let defaultSkinList = document.createElement("div");
-    defaultSkinList.className = "my-account-option-list-skin";
-    let detailstop = document.createElement("button");
-    detailstop.className = "details-top";
-    let detailTitle = document.createElement("span");
-    detailTitle.className = "details-top-text";
-    detailTitle.innerHTML = translate("app.wardrobe.defaults");
-    let detailChevron = document.createElement("span");
-    detailChevron.className = "details-top-chevron";
-    detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-    detailstop.appendChild(detailTitle);
-    detailstop.appendChild(detailChevron);
-    let detailContent = document.createElement("div");
-    detailContent.className = "details-content";
-    detailsWrapper.appendChild(detailstop);
-    detailsWrapper.appendChild(detailContent);
-    detailContent.appendChild(defaultSkinList);
-    let showDefSkins = async () => { }
-    let hideDefSkins = () => {
-        detailsWrapper.classList.remove("open");
-    }
-    let isShow = true;
-    detailstop.onclick = async () => {
-        if (isShow) {
-            await showDefSkins();
-        } else {
-            hideDefSkins();
-        }
-        isShow = !isShow;
-    }
-    let skinEntries = [];
-    let filterSkins = (noAnimate) => {
-        if (!noAnimate) animateGridReorderStart(".skin");
-        let search = searchbar.value.toLowerCase().trim();
-        let sort = sortdropdown.value;
-        skinEntries.forEach(e => e.element.remove());
-        let filteredEntries = skinEntries.filter(e => e.skin.name.toLowerCase().includes(search));
-        filteredEntries.sort((a, b) => {
-            if (sort == "last_used") {
-                let c = a.skin.last_used;
-                let d = b.skin.last_used;
-                c = c.getTime();
-                d = d.getTime();
-                if (isNaN(c)) c = 0;
-                if (isNaN(d)) d = 0;
-                return d - c;
-            }
-            let av = a.skin.name.toLowerCase();
-            let bv = b.skin.name.toLowerCase();
-            if (av > bv) return 1;
-            if (av < bv) return -1;
-            return 0;
-        });
-        if (sort == "favorites_first") {
-            filteredEntries.sort((a, b) => {
-                if (a.skin.favorited && b.skin.favorited) return 0;
-                if (a.skin.favorited) return -1;
-                if (b.skin.favorited) return 1;
-                return 0;
-            });
-        }
-        filteredEntries.forEach(e => {
-            skinList.appendChild(e.element);
-        });
-        if (!noAnimate) animateGridReorderEnd(".skin");
-    }
-    let showContent = async (noAnimate) => {
-        if (!noAnimate) animateGridReorderStart(".skin");
-        skinEntries = [];
-        let activeSkin = await default_profile.getActiveSkin();
-        skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-            model: activeSkin?.model == "slim" ? "slim" : "default",
-        });
-        let activeCape = await default_profile.getActiveCape();
-        skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
-        skinList.innerHTML = '';
-        let skins = await getSkinsNoDefaults();
-        skins.forEach((e) => {
-            let skinEntry = new SkinEntry(e, true, skinViewer, default_profile, showContent, filterSkins);
-            skinEntries.push(skinEntry);
-            skinList.appendChild(skinEntry.element);
-        });
-
-        showDefSkins = async () => {
-            detailChevron.innerHTML = '<i class="spinner"></i>';
-            let eles = document.querySelectorAll(".my-account-option.default-skin");
-            if (eles.length == 0) {
-                let defaultSkins = await getDefaultSkins();
-                defaultSkins.forEach(e => {
-                    let skinEntry = new SkinEntry(e, false, skinViewer, default_profile, showContent, filterSkins);
-                    defaultSkinList.appendChild(skinEntry.element);
-                });
-            }
-            detailsWrapper.classList.add("open");
-            detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-        }
-        filterSkins(true);
-        if (!noAnimate) animateGridReorderEnd(".skin");
-    }
-    showContent(true);
-    refreshWardrobe = showContent;
-    let info = document.createElement("div");
-    info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.wardrobe.notice");
-    info.className = "info";
-    optionsContainer.appendChild(info);
-    let skinButtonContainer = document.createElement("div");
-    skinButtonContainer.className = "skin-button-container";
-    optionsContainer.appendChild(skinButtonContainer);
-    let refreshButton = document.createElement("button");
-    refreshButton.className = "skin-button";
-    let refreshButtonIcon = document.createElement("i");
-    refreshButtonIcon.className = "fa-solid fa-arrows-rotate";
-    let refreshButtonText = document.createElement("span");
-    refreshButtonText.innerHTML = translate("app.wardrobe.refresh");
-    refreshButton.appendChild(refreshButtonIcon);
-    refreshButton.appendChild(refreshButtonText);
-    refreshButton.onclick = async () => {
-        refreshButtonIcon.classList.add("spinning");
-        let profile = await getDefaultProfile();
-        try {
-            await window.enderlynx.getProfile(profile.id);
-            refreshButtonIcon.classList.remove("spinning");
-            showContent();
-        } catch (e) {
-            displayError(translate("app.wardrobe.refresh.fail"));
-            refreshButtonIcon.classList.remove("spinning");
-            return;
-        }
-    }
-    skinButtonContainer.appendChild(refreshButton);
-    let importButton = document.createElement("button");
-    importButton.innerHTML = '<i class="fa-solid fa-file-import"></i>' + translate("app.wardrobe.import");
-    importButton.className = "skin-button";
-    importButton.onclick = () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.wardrobe.import.title"), "form", [
-            {
-                "type": "image-upload",
-                "id": "skin",
-                "name": translate("app.wardrobe.import.skin"),
-                "tab": "file"
-            },
-            {
-                "type": "text",
-                "id": "name",
-                "name": translate("app.wardrobe.import.name"),
-                "tab": "file"
-            },
-            {
-                "type": "dropdown",
-                "id": "model",
-                "name": translate("app.wardrobe.import.model"),
-                "options": [
-                    { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
-                    { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
-                    { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
-                ],
-                "tab": "file"
-            },
-            {
-                "type": "text",
-                "id": "username",
-                "name": translate("app.wardrobe.username_import.username"),
-                "tab": "username"
-            },
-            {
-                "type": "text",
-                "id": "name_u",
-                "name": translate("app.wardrobe.import.name"),
-                "tab": "username"
-            },
-            {
-                "type": "dropdown",
-                "id": "model_u",
-                "name": translate("app.wardrobe.import.model"),
-                "options": [
-                    { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
-                    { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
-                    { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
-                ],
-                "tab": "username"
-            },
-            {
-                "type": "text",
-                "id": "url",
-                "name": translate("app.wardrobe.import.url"),
-                "tab": "url"
-            },
-            {
-                "type": "text",
-                "id": "name_l",
-                "name": translate("app.wardrobe.import.name"),
-                "tab": "url"
-            },
-            {
-                "type": "dropdown",
-                "id": "model_l",
-                "name": translate("app.wardrobe.import.model"),
-                "options": [
-                    { "name": translate("app.wardrobe.import.auto"), "value": "auto" },
-                    { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
-                    { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
-                ],
-                "tab": "url"
-            }
-        ], [
-            { "type": "cancel", "content": translate("app.wardrobe.import.cancel") },
-            { "type": "confirm", "content": translate("app.wardrobe.import.confirm") }
-        ], [
-            {
-                "name": translate("app.wardrobe.import.tab.file"),
-                "value": "file"
-            },
-            {
-                "name": translate("app.wardrobe.import.tab.username"),
-                "value": "username"
-            },
-            {
-                "name": translate("app.wardrobe.import.tab.url"),
-                "value": "url"
-            }
-        ], async (e) => {
-            let info = {};
-            e.forEach(e => { info[e.id] = e.value });
-            if (info.selected_tab == "username") {
-                try {
-                    info.skin = (await window.enderlynx.getSkinFromUsername(info.username)).url;
-                } catch (e) {
-                    displayError(translate("app.wardrobe.import.username.fail"));
-                    return;
-                }
-                info.name = info.name_u;
-                info.model = info.model_u;
-            } else if (info.selected_tab == "url") {
-                try {
-                    info.skin = (await window.enderlynx.getSkinFromURL(info.url)).url;
-                } catch (e) {
-                    displayError(translate("app.wardrobe.import.url.fail"));
-                    return;
-                }
-                info.name = info.name_l;
-                info.model = info.model_l;
-            }
-            await importSkin(info, () => {
-                showContent();
-            });
-        });
-    }
-    skinButtonContainer.appendChild(importButton);
-
-    let tabElement = document.createElement("div");
-    optionsContainer.appendChild(tabElement);
-    let wardrobeTabs = new TabContent(tabElement, [
-        {
-            "name": translate("app.wardrobe.skins"),
-            "value": "skins",
-            "func": () => {
-                capeOptions.remove();
-                activeScreen.appendChild(skinOptions);
-            }
-        },
-        {
-            "name": translate("app.wardrobe.capes"),
-            "value": "capes",
-            "func": () => {
-                skinOptions.remove();
-                activeScreen.appendChild(capeOptions);
-            }
-        }
-    ]);
-    optionsContainer.appendChild(activeScreen);
-    return ele;
 }
 
 class SkinEntry {
@@ -4844,7 +6762,7 @@ class SkinEntry {
         skinEle.appendChild(loader);
         skinEle.appendChild(skinName);
         skinEle.dataset.id = e.id;
-        skinName.innerHTML = sanitize(e.name);
+        skinName.textContent = e.name;
         skinName.className = "skin-name";
         if (e.name.toLowerCase() == "dinnerbone" || e.name.toLowerCase() == "grumm" || e.name.toLowerCase() == "dinnerbone's skin" || e.name.toLowerCase() == "grumm's skin") {
             skinImg.classList.add("dinnerbone");
@@ -5026,110 +6944,6 @@ function renderSkinToDataUrl(skinPath, callback, model) {
     skin.src = skinPath;
 }
 
-async function sortInstances(how) {
-    if (!document.getElementsByClassName("group-list")[0]) return;
-    await setDefault("default_sort", how);
-    let attrhow = how.toLowerCase().replaceAll("_", "-");
-    attrhow = "data-" + attrhow;
-    let groups = document.getElementsByClassName("group");
-    let usedates = (how == "last_played" || how == "date_created" || how == "date_modified");
-    let usenumbers = (how == "play_time");
-    let reverseOrder = ["last_played", "date_created", "date_modified", "play_time", "game_version"].includes(how);
-    let multiply = reverseOrder ? -1 : 1;
-    for (let i = 0; i < groups.length; i++) {
-        let children = Array.from(groups[i].children);
-        if (children.length > 1) {
-            children.sort((a, b) => {
-                if (how == "game_version") {
-                    const aIndex = minecraftVersions.indexOf(a.getAttribute(attrhow));
-                    const bIndex = minecraftVersions.indexOf(b.getAttribute(attrhow));
-                    if (aIndex === -1 && bIndex === -1) {
-                        return a.getAttribute(attrhow).localeCompare(b.getAttribute(attrhow), undefined, { numeric: true, sensitivity: "base" });
-                    }
-                    if (aIndex === -1) return -1;
-                    if (bIndex === -1) return 1;
-                    return bIndex - aIndex;
-                }
-                if (usedates) {
-                    let c = new Date(a.getAttribute(attrhow));
-                    let d = new Date(b.getAttribute(attrhow));
-                    c = c.getTime();
-                    d = d.getTime();
-                    if (isNaN(c)) c = 0;
-                    if (isNaN(d)) d = 0;
-                    return multiply * (c - d);
-                }
-                if (usenumbers) {
-                    return multiply * (a.getAttribute(attrhow) - b.getAttribute(attrhow));
-                }
-                let av = a.getAttribute(attrhow)?.toLowerCase() ?? "";
-                let bv = b.getAttribute(attrhow)?.toLowerCase() ?? "";
-                if (av > bv) return 1 * multiply;
-                if (av < bv) return -1 * multiply;
-                return 0;
-            });
-            children.forEach(e => groups[i].appendChild(e));
-        }
-    }
-}
-
-async function groupInstances(how, noAnimate) {
-    if (!noAnimate) animateGridReorderStart(".instance-item");
-    if (!document.getElementsByClassName("group-list")[0]) return;
-    await setDefault("default_group", how);
-    let attrhow = how.toLowerCase().replaceAll("_", "-");
-    attrhow = "data-" + attrhow;
-    let instances = Array.from(document.querySelectorAll(".group-list .instance-item"));
-    let groupMap = {};
-    instances.forEach(inst => {
-        let key = inst.getAttribute(attrhow) || "";
-        if (!groupMap[key]) groupMap[key] = [];
-        groupMap[key].push(inst);
-    });
-    let groupList = document.getElementsByClassName("group-list")[0];
-    while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
-    let groups = Object.keys(groupMap);
-    if (how == "game_version") {
-        sortByVersion(groups, true);
-    } else if (how == "pinned") {
-        groups.sort((a, b) => {
-            if (a === "" && b !== "") return -1;
-            if (a !== "" && b === "") return 1;
-            return b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" });
-        });
-    } else {
-        groups.sort((a, b) => {
-            if (a === "" && b !== "") return -1;
-            if (a !== "" && b === "") return 1;
-            return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
-        });
-    }
-    groups.forEach(groupKey => {
-        let newElement = document.createElement("div");
-        newElement.classList.add("group");
-        newElement.setAttribute("data-group-title", how == "loader" ? loaders[groupKey] : groupKey);
-        let frag = document.createDocumentFragment();
-        groupMap[groupKey].forEach(inst => frag.appendChild(inst));
-        newElement.appendChild(frag);
-        groupList.appendChild(newElement);
-    });
-    await sortInstances(sortBy.getSelected);
-    if (!noAnimate) animateGridReorderEnd(".instance-item");
-}
-function searchInstances(query) {
-    query = query.toLowerCase().trim();
-    let instances = document.querySelectorAll(".group-list .instance-item");
-    for (let i = 0; i < instances.length; i++) {
-        if (!instances[i].getAttribute("data-name").toLowerCase().includes(query)) {
-            instances[i].style.display = "none";
-            instances[i].classList.add("hidden");
-        } else {
-            instances[i].style.display = "flex";
-            instances[i].classList.remove("hidden");
-        }
-    }
-}
-let sortBy;
 let loaders = {
     "vanilla": translate("app.loader.vanilla"),
     "fabric": translate("app.loader.fabric"),
@@ -5137,244 +6951,6 @@ let loaders = {
     "neoforge": translate("app.loader.neoforge"),
     "quilt": translate("app.loader.quilt"),
     "": translate("app.loader.unknown")
-}
-async function showInstanceContent(e) {
-    let ele = document.createElement("div");
-    ele.classList.add("instance-content");
-    let title = document.createElement("div");
-    title.classList.add("title-top");
-    let h1 = document.createElement("h1");
-    h1.innerHTML = translate("app.page.instances");
-    title.appendChild(h1);
-    let createButton = document.createElement("button");
-    createButton.classList.add("create-button");
-    createButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.instances.create");
-    createButton.onclick = (e) => {
-        showCreateInstanceDialog();
-    }
-    title.appendChild(createButton);
-    ele.appendChild(title);
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.classList.add("search-and-filter");
-    ele.appendChild(searchAndFilter);
-    let search = document.createElement("div");
-    let searchbar = new SearchBar(search, searchInstances, null);
-    let sort = document.createElement('div');
-    sortBy = new Dropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
-    { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
-    { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
-    { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
-    { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
-    { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, await getDefault("default_sort"), () => {
-        groupInstances(groupBy.getSelected);
-    });
-    let group = document.createElement('div');
-    let groupBy = new Dropdown(translate("app.instances.group.by"), [
-        { "name": translate("app.instances.group.none"), "value": "none" },
-        { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" },
-        { "name": translate("app.instances.group.pinned"), "value": "pinned" },
-        { "name": translate("app.instances.group.loader"), "value": "loader" },
-        { "name": translate("app.instances.group.game_version"), "value": "game_version" }
-    ], group, await getDefault("default_group"), groupInstances);
-    searchAndFilter.appendChild(search);
-    searchAndFilter.appendChild(sort);
-    searchAndFilter.appendChild(group);
-    let instanceGrid = document.createElement("div");
-    instanceGrid.classList.add("group-list");
-    let groupOne = document.createElement("div");
-    groupOne.setAttribute("data-group-title", "");
-    groupOne.classList.add("group");
-    let noResultsEle = new NoResultsFound(translate("app.instances.none")).element;
-    noResultsEle.style.gridColumn = "1 / -1";
-    ele.appendChild(noResultsEle);
-    instanceGrid.appendChild(groupOne);
-    ele.appendChild(instanceGrid);
-    let instances = await getInstances();
-    for (let i = 0; i < instances.length; i++) {
-        let running = checkForProcess(instances[i].pid);
-        if (!running) instances[i].setPid(null);
-        if (running) {
-            window.enderlynx.watchProcessForExit(instances[i].pid, () => {
-                if (currentTab != "instances") return;
-                instanceContent.displayContent();
-                live.findLive();
-            });
-        }
-        let instanceElement = document.createElement("button");
-        instanceElement.setAttribute("data-name", instances[i].name);
-        instanceElement.setAttribute("data-last-played", instances[i].last_played);
-        instanceElement.setAttribute("data-date-created", instances[i].date_created);
-        instanceElement.setAttribute("data-date-modified", instances[i].date_modified);
-        instanceElement.setAttribute("data-play-time", instances[i].playtime);
-        instanceElement.setAttribute("data-game-version", instances[i].vanilla_version);
-        instanceElement.setAttribute("data-custom-groups", instances[i].group);
-        instanceElement.setAttribute("data-loader", instances[i].loader);
-        instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
-        instanceElement.setAttribute("data-none", "");
-        instanceElement.onclick = (e) => {
-            showSpecificInstanceContent(instances[i]);
-        }
-        instanceElement.classList.add("instance-item");
-        instanceElement.dataset.id = instances[i].instance_id;
-        if (running) instanceElement.classList.add("running");
-        let instanceImage = document.createElement("img");
-        instanceImage.classList.add("instance-image");
-        if (instances[i].image) {
-            instanceImage.src = instances[i].image;
-        } else {
-            instanceImage.src = getDefaultImage(instances[i].instance_id);
-        }
-        instanceImage.onerror = () => {
-            instanceImage.src = getDefaultImage(instances[i].instance_id);
-        }
-        instances[i].watchForChange("image", (image) => {
-            instanceImage.src = image ? image : getDefaultImage(instances[i].instance_id);
-        });
-        instanceElement.appendChild(instanceImage);
-        let instanceInfoEle = document.createElement("div");
-        instanceInfoEle.classList.add("instance-info");
-        let instanceName = document.createElement("div");
-        instances[i].watchForChange("name", (t) => {
-            instanceName.innerHTML = sanitize(t);
-            instanceElement.setAttribute("data-name", t);
-            groupInstances(getDefault("default_group"));
-        });
-        instanceName.classList.add("instance-name");
-        instanceName.innerHTML = sanitize(instances[i].name);
-        instanceInfoEle.appendChild(instanceName);
-        let instanceDesc = document.createElement("div");
-        instanceDesc.classList.add("instance-desc");
-        instanceDesc.innerHTML = sanitize(loaders[instances[i].loader] + " " + instances[i].vanilla_version);
-        let loader_text = loaders[instances[i].loader];
-        let version_text = instances[i].vanilla_version;
-        instances[i].watchForChange("loader", (l) => {
-            loader_text = loaders[l];
-            instanceDesc.innerHTML = sanitize(loader_text + " " + version_text);
-            instanceElement.setAttribute("data-loader", l);
-            groupInstances(getDefault("default_group"));
-        });
-        instances[i].watchForChange("vanilla_version", (v) => {
-            version_text = v;
-            instanceDesc.innerHTML = sanitize(loader_text + " " + version_text);
-            instanceElement.setAttribute("data-game-version", v);
-            groupInstances(getDefault("default_group"));
-        });
-        instances[i].watchForChange("group", (g) => {
-            instanceElement.setAttribute("data-custom-groups", g);
-            groupInstances(getDefault("default_group"));
-        });
-        instanceInfoEle.appendChild(instanceDesc);
-        instanceElement.appendChild(instanceInfoEle);
-        let buttons = new ContextMenuButtons([
-            {
-                "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-                "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-                "func": running ? async (e) => {
-                    await stopInstance(instances[i]);
-                    instanceContent.displayContent();
-                } : async (e) => {
-                    await showSpecificInstanceContent(instances[i], undefined, undefined, true);
-                    await playInstance(instances[i]);
-                }
-            },
-            instances[i].locked ? null : {
-                "icon": '<i class="fa-solid fa-plus"></i>',
-                "title": translate("app.button.content.add"),
-                "func": (e) => {
-                    showAddContent(instances[i].instance_id, instances[i].vanilla_version, instances[i].loader);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-folder"></i>',
-                "title": translate("app.button.instances.open_folder"),
-                "func": (e) => {
-                    window.enderlynx.openInstanceFolder(instances[i].instance_id);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-share"></i>',
-                "title": translate("app.button.instances.share"),
-                "func": (e) => {
-                    openInstanceShareDialog(instances[i]);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-wrench"></i>',
-                "title": translate("app.button.instances.repair"),
-                "func": () => {
-                    showRepairDialog(instances[i]);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-gear"></i>',
-                "title": translate("app.button.instances.open_settings"),
-                "func": async (e) => {
-                    showInstanceSettings(await instances[i].refresh());
-                }
-            },
-            {
-                "icon": async () => await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                "title": async () => await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
-                "func": async (e) => {
-                    await instances[i].isPinned() ? await unpinInstance(instances[i]) : await pinInstance(instances[i]);
-                    e.setTitle(await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                    e.setIcon(await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                    instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
-                    groupInstances(groupBy.getSelected);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-desktop"></i>',
-                "title": translate("app.instances.desktop_shortcut"),
-                "func": (e) => {
-                    addDesktopShortcut(instances[i]);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-trash-can"></i>',
-                "title": translate("app.button.instances.delete"),
-                "func": (e) => {
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                        "content": translate("app.instances.delete.confirm.description").replace("%i", instances[i].name),
-                        "type": "notice"
-                    }, {
-                        "type": "toggle",
-                        "name": translate("app.instances.delete.files"),
-                        "default": false,
-                        "id": "delete"
-                    }], [
-                        {
-                            "type": "cancel",
-                            "content": translate("app.instances.delete.cancel")
-                        },
-                        {
-                            "type": "confirm",
-                            "content": translate("app.instances.delete.confirm")
-                        }
-                    ], [], async (v) => {
-                        instances[i].delete();
-                        animateGridReorderStart(".instance-item");
-                        instanceContent.displayContent();
-                        if (v[0].value) {
-                            try {
-                                await window.enderlynx.deleteInstanceFiles(instances[i].instance_id);
-                            } catch (e) {
-                                displayError(translate("app.instances.delete.files.fail"));
-                            }
-                        }
-                        animateGridReorderEnd(".instance-item");
-                    });
-                },
-                "danger": true
-            }
-        ].filter(e => e));
-        instanceElement.oncontextmenu = (e) => {
-            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
-        }
-        groupOne.appendChild(instanceElement);
-    }
-    return ele;
 }
 
 async function showCreateInstanceDialog() {
@@ -5559,7 +7135,7 @@ async function showCreateInstanceDialog() {
                 return;
             }
             let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
-            await showSpecificInstanceContent(instance);
+            instance.display();
             let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
             if (r.error) {
                 await instance.setFailed(true);
@@ -5573,7 +7149,7 @@ async function showCreateInstanceDialog() {
             if (!info.name_if) info.name_if = "";
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name_f);
             let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
-            await showSpecificInstanceContent(instance);
+            instance.display();
             let packInfo = await window.enderlynx.processPackFile(info.file, instance_id, info.name_f);
             if (packInfo.error) {
                 await instance.setFailed(true);
@@ -5609,7 +7185,7 @@ async function showCreateInstanceDialog() {
         } else if (info.selected_tab == "code") {
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name_c);
             let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
-            await showSpecificInstanceContent(instance);
+            instance.display();
             let packInfo = await window.enderlynx.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
             if (!packInfo) {
                 displayError(translate("app.cf.code.error"));
@@ -5644,378 +7220,22 @@ async function showCreateInstanceDialog() {
     });
 }
 
-async function showSpecificInstanceContent(instanceInfo, default_tab, dont_add_to_log, make_button_loading) {
-    if (!dont_add_to_log) {
-        page_log = page_log.slice(0, page_index + 1).concat([() => {
-            showSpecificInstanceContent(instanceInfo, default_tab, true);
-        }]);
-        page_index++;
+class Display {
+    static currentScreen;
+    static pageLog = [];
+    static pageIndex = 0;
+
+    static pageForward() {
+        if (!this.pageLog[this.pageIndex + 1]) return;
+        this.pageIndex++;
+        this.pageLog[this.pageIndex]();
     }
-    currentTab = "instance";
-    currentInstanceId = instanceInfo.instance_id;
-    instanceInfo = await instanceInfo.refresh();
-    for (let i = 0; i < navButtons.length; i++) {
-        navButtons[i].removeSelected();
+
+    static pageBackward() {
+        if (!this.pageLog[this.pageIndex - 1]) return;
+        this.pageIndex--;
+        this.pageLog[this.pageIndex]();
     }
-    instanceButton.setSelected();
-    let running = checkForProcess(instanceInfo.pid);
-    content.innerHTML = "";
-    let ele = document.createElement("div");
-    content.appendChild(ele);
-    ele.classList.add("instance-content");
-    let topBar = document.createElement("div");
-    topBar.classList.add("instance-top");
-    let instImg = document.createElement("img");
-    instImg.classList.add("instance-top-image");
-    if (instanceInfo.image) {
-        instImg.src = instanceInfo.image;
-    } else {
-        instImg.src = getDefaultImage(instanceInfo.instance_id);
-    }
-    instImg.onerror = () => {
-        instImg.src = getDefaultImage(instanceInfo.instance_id);
-    }
-    instanceInfo.watchForChange("image", (i) => {
-        instImg.src = i ? i : getDefaultImage(instanceInfo.instance_id);
-    })
-    topBar.appendChild(instImg);
-    let instTopInfo = document.createElement("div");
-    instTopInfo.classList.add("instance-top-info");
-    let instTopTitle = document.createElement("h1");
-    instTopTitle.innerHTML = sanitize(instanceInfo.name);
-    instanceInfo.watchForChange("name", (t) => {
-        instTopTitle.innerHTML = sanitize(t);
-    })
-    instTopTitle.classList.add("instance-top-title");
-    instTopInfo.appendChild(instTopTitle);
-    let instTopSubInfo = document.createElement("div");
-    instTopSubInfo.classList.add("instance-top-sub-info");
-    let instTopVersions = document.createElement("div");
-    instTopVersions.classList.add("instance-top-sub-info-specific");
-    instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(loaders[instanceInfo.loader] + " " + instanceInfo.vanilla_version)}`;
-    let loader_text = loaders[instanceInfo.loader];
-    let version_text = instanceInfo.vanilla_version;
-    instanceInfo.watchForChange("loader", (l) => {
-        loader_text = loaders[l];
-        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(loader_text + " " + version_text)}`;
-    })
-    instanceInfo.watchForChange("vanilla_version", (v) => {
-        version_text = v;
-        instTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(loader_text + " " + version_text)}`;
-    })
-    let instTopPlaytime = document.createElement("div");
-    instTopPlaytime.classList.add("instance-top-sub-info-specific");
-    instTopPlaytime.setAttribute("title", translate("app.instances.play_time"));
-    let playtime = instanceInfo.playtime;
-    let last_played = instanceInfo.last_played;
-    instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(instanceInfo.playtime))}`;
-    instanceInfo.watchForChange("playtime", (v) => {
-        if (!running) instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(v))}`
-        playtime = v;
-    });
-    let playtimeInterval = setInterval(() => {
-        if (!document.body.contains(instTopPlaytime)) clearInterval(playtimeInterval);
-        if (!running) return;
-        instTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${sanitize(formatTime(playtime + Math.floor((new Date().getTime() - new Date(last_played).getTime()) / 1000)))}`
-    }, 1000);
-    let instTopLastPlayed = document.createElement("div");
-    instTopLastPlayed.classList.add("instance-top-sub-info-specific");
-    instTopLastPlayed.setAttribute("title", translate("app.instances.last_played", "%t", formatDate(instanceInfo.last_played, 2000)));
-    instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(instanceInfo.last_played))}`;
-    let lastPlayedInterval;
-    if (howLongAgo(instanceInfo.last_played) < 3600000) {
-        lastPlayedInterval = setInterval(() => {
-            instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(instanceInfo.last_played))}`;
-        }, 60000);
-    } else if (howLongAgo(instanceInfo.last_played) < 86400000) {
-        lastPlayedInterval = setInterval(() => {
-            instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(instanceInfo.last_played))}`;
-        }, 3600000);
-    }
-    instanceInfo.watchForChange("last_played", (v) => {
-        instTopLastPlayed.setAttribute("title", translate("app.instances.last_played", "%t", formatDate(v, 2000)));
-        instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(v))}`;
-        last_played = v;
-        clearInterval(lastPlayedInterval);
-        if (howLongAgo(v) < 3600000) {
-            lastPlayedInterval = setInterval(() => {
-                instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(v))}`;
-            }, 60000);
-        } else if (howLongAgo(v) < 86400000) {
-            lastPlayedInterval = setInterval(() => {
-                instTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${sanitize(formatTimeRelatively(v))}`;
-            }, 3600000);
-        }
-    });
-    instTopSubInfo.appendChild(instTopVersions);
-    instTopSubInfo.appendChild(instTopPlaytime);
-    instTopSubInfo.appendChild(instTopLastPlayed);
-    instTopInfo.appendChild(instTopSubInfo);
-    topBar.appendChild(instTopInfo);
-    let playButton = document.createElement("button");
-    let playButtonClick = async () => {
-        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
-        playButton.classList.remove("instance-top-play-button");
-        playButton.classList.add("instance-top-loading-button");
-        playButton.onclick = () => { };
-        await playInstance(instanceInfo);
-        playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-        playButton.classList.remove("instance-top-loading-button");
-        playButton.classList.add("instance-top-stop-button");
-        playButton.onclick = stopButtonClick;
-        if (tabs.selected == 'logs') {
-            setInstanceTabContentLogs(await Instance.getInstance(instanceInfo.instance_id), tabsInfo);
-        }
-        window.enderlynx.clearProcessWatches();
-        window.enderlynx.watchProcessForExit((await Instance.getInstance(instanceInfo.instance_id)).pid, () => {
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.classList.remove("instance-top-stop-button");
-            playButton.classList.remove("instance-top-loading-button");
-            playButton.classList.add("instance-top-play-button");
-            playButton.onclick = playButtonClick;
-            live.findLive();
-            running = false;
-            analyzeLogs();
-        });
-        running = true;
-    }
-    let stopButtonClick = async () => {
-        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
-        playButton.classList.add("instance-top-loading-button");
-        playButton.onclick = () => { };
-        let success = await stopInstance(instanceInfo);
-        if (success) {
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.classList.remove("instance-top-loading-button");
-            playButton.classList.remove("instance-top-stop-button");
-            playButton.classList.add("instance-top-play-button");
-            playButton.onclick = playButtonClick;
-            running = false;
-            analyzeLogs();
-        } else {
-            playButton.classList.remove("instance-top-loading-button");
-            playButton.classList.add("instance-top-stop-button");
-            playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-            playButton.onclick = stopButtonClick
-            window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
-                playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-                playButton.classList.remove("instance-top-stop-button");
-                playButton.classList.remove("instance-top-loading-button");
-                playButton.classList.add("instance-top-play-button");
-                playButton.onclick = playButtonClick;
-                live.findLive();
-                running = false;
-                analyzeLogs();
-            });
-        }
-    }
-    let calculatePlayButtonState = (mc_installed, failed) => {
-        if (failed) {
-            playButton.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
-            playButton.title = translate("app.instances.failed.tooltip");
-            playButton.classList.remove("instance-top-play-button");
-            playButton.classList.remove("instance-top-stop-button");
-            playButton.classList.add("instance-top-loading-button");
-            playButton.onclick = () => { };
-        } else if (!mc_installed) {
-            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-            playButton.classList.remove("instance-top-play-button");
-            playButton.classList.remove("instance-top-stop-button");
-            playButton.classList.add("instance-top-loading-button");
-            playButton.title = "";
-            playButton.onclick = () => { };
-        } else if (!running) {
-            playButton.classList.remove("instance-top-stop-button");
-            playButton.classList.remove("instance-top-loading-button");
-            playButton.classList.add("instance-top-play-button");
-            playButton.title = "";
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.onclick = playButtonClick
-        } else {
-            playButton.classList.remove("instance-top-play-button");
-            playButton.classList.remove("instance-top-loading-button");
-            playButton.classList.add("instance-top-stop-button");
-            playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-            playButton.onclick = stopButtonClick
-            playButton.title = "";
-            window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
-                playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-                playButton.classList.remove("instance-top-stop-button");
-                playButton.classList.add("instance-top-play-button");
-                playButton.onclick = playButtonClick;
-                live.findLive();
-                running = false;
-                analyzeLogs();
-            });
-        }
-    }
-    calculatePlayButtonState(instanceInfo.mc_installed, instanceInfo.failed, running);
-    if (make_button_loading) {
-        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
-        playButton.classList.remove("instance-top-play-button");
-        playButton.classList.add("instance-top-loading-button");
-        playButton.onclick = () => { };
-    }
-    instanceInfo.watchForChange("mc_installed", async (v) => {
-        calculatePlayButtonState(v, (await instanceInfo.refresh()).failed);
-    });
-    instanceInfo.watchForChange("failed", async (v) => {
-        calculatePlayButtonState((await instanceInfo.refresh()).mc_installed, v);
-    });
-    instanceInfo.watchForChange("pid", async (v) => {
-        instanceInfo = await instanceInfo.refresh();
-        running = checkForProcess(v);
-        calculatePlayButtonState(instanceInfo.mc_installed, instanceInfo.failed);
-    });
-    let threeDots = document.createElement("button");
-    threeDots.classList.add("instance-top-more");
-    threeDots.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-    let buttons = new ContextMenuButtons([
-        instanceInfo.locked ? null : {
-            "icon": '<i class="fa-solid fa-plus"></i>',
-            "title": translate("app.button.content.add"),
-            "func": (e) => {
-                showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-copy"></i>',
-            "title": translate("app.button.instances.duplicate"),
-            "func": (e) => {
-                duplicateInstance(instanceInfo);
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-folder"></i>',
-            "title": translate("app.button.instances.open_folder"),
-            "func": (e) => {
-                window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-share"></i>',
-            "title": translate("app.button.instances.share"),
-            "func": (e) => {
-                openInstanceShareDialog(instanceInfo);
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-wrench"></i>',
-            "title": translate("app.button.instances.repair"),
-            "func": () => {
-                showRepairDialog(instanceInfo);
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-gear"></i>',
-            "title": translate("app.button.instances.open_settings"),
-            "func": async (e) => {
-                showInstanceSettings(await instanceInfo.refresh());
-            }
-        },
-        {
-            "icon": async () => await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-            "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
-            "func": async (e) => {
-                await instanceInfo.isPinned() ? await unpinInstance(instanceInfo) : await pinInstance(instanceInfo);
-                e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-desktop"></i>',
-            "title": translate("app.instances.desktop_shortcut"),
-            "func": () => {
-                addDesktopShortcut(instanceInfo);
-            }
-        },
-        {
-            "icon": '<i class="fa-solid fa-trash-can"></i>',
-            "title": translate("app.button.instances.delete"),
-            "func": (e) => {
-                let dialog = new Dialog();
-                dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                    "content": translate("app.instances.delete.confirm.description").replace("%i", instanceInfo.name),
-                    "type": "notice"
-                }, {
-                    "type": "toggle",
-                    "name": translate("app.instances.delete.files"),
-                    "default": false,
-                    "id": "delete"
-                }], [
-                    {
-                        "type": "cancel",
-                        "content": translate("app.instances.delete.cancel")
-                    },
-                    {
-                        "type": "confirm",
-                        "content": translate("app.instances.delete.confirm")
-                    }
-                ], [], async (v) => {
-                    instanceInfo.delete();
-                    instanceContent.displayContent();
-                    if (v[0].value) {
-                        try {
-                            await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
-                        } catch (e) {
-                            displayError(translate("app.instances.delete.files.fail"));
-                        }
-                    }
-                });
-            },
-            "danger": true
-        }
-    ].filter(e => e));
-    let moreMenu = new MoreMenu(threeDots, buttons);
-    topBar.appendChild(playButton);
-    topBar.appendChild(threeDots);
-    topBar.appendChild(moreMenu.element);
-    ele.appendChild(topBar);
-    let tabContent = document.createElement("div");
-    ele.appendChild(tabContent);
-    let tabsInfo = document.createElement("div");
-    tabsInfo.classList.add("tab-info");
-    currentSubTabElement = tabsInfo;
-    ele.appendChild(tabsInfo);
-    let tabs = new TabContent(tabContent, [
-        {
-            "name": translate("app.instances.tabs.content"), "value": "content", "func": () => {
-                setInstanceTabContentContent(instanceInfo, tabsInfo);
-            }
-        },
-        {
-            "name": translate("app.instances.tabs.worlds"), "value": "worlds", "func": () => {
-                setInstanceTabContentWorlds(instanceInfo, tabsInfo);
-            }
-        },
-        {
-            "name": translate("app.instances.tabs.logs"), "value": "logs", "func": async () => {
-                setInstanceTabContentLogs(await instanceInfo.refresh(), tabsInfo);
-            }
-        },
-        {
-            "name": translate("app.instances.tabs.options"), "value": "options", "func": () => {
-                setInstanceTabContentOptions(instanceInfo, tabsInfo);
-            }
-        },
-        {
-            "name": translate("app.instances.tabs.screenshots"), "value": "screenshots", "func": () => {
-                setInstanceTabContentScreenshots(instanceInfo, tabsInfo);
-            }
-        }
-    ]);
-    tabs.selectOptionAdvanced(default_tab ?? "content");
-    let analyzeLogs = async () => {
-        instanceInfo = await instanceInfo.refresh();
-        let info = await window.enderlynx.analyzeLogs(instanceInfo.instance_id, instanceInfo.last_analyzed_log, running ? instanceInfo.current_log_file : "");
-        await instanceInfo.setPlaytime(info.total_playtime + instanceInfo.playtime);
-        if (info.most_recent_log) await instanceInfo.setLastAnalyzedLog(info.most_recent_log);
-        for (let i = 0; i < info.last_played_servers.length; i++) {
-            let entry = info.last_played_servers[i];
-            await window.enderlynx.setServerLastPlayed(instanceInfo.instance_id, entry[1] + ":" + entry[2], entry[0]);
-        }
-    }
-    analyzeLogs();
 }
 
 async function getServerLastPlayed(instance_id, ip) {
@@ -6049,7 +7269,7 @@ async function showInstanceSettings(instanceInfo) {
             "type": "text",
             "name": translate("app.instances.settings.group"),
             "id": "group",
-            "default": instanceInfo.group,
+            "default": instanceInfo.group_id,
             "tab": "general",
             "desc": translate("app.instances.settings.group.description")
         },
@@ -6392,9 +7612,7 @@ async function showInstanceSettings(instanceInfo) {
                             "cancel": () => { },
                             "retry": () => { }
                         }]);
-                        if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                            if (currentSubTabElement) setInstanceTabContentContent(instanceInfo, currentSubTabElement);
-                        }
+                        instanceInfo.instanceScreen.showContent();
                         return;
                     }
                 }
@@ -6408,14 +7626,13 @@ async function showInstanceSettings(instanceInfo) {
                     "retry": () => { }
                 }]);
                 displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
-                if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                    if (currentSubTabElement) setInstanceTabContentContent(instanceInfo, currentSubTabElement);
-                }
+                instanceInfo.instanceScreen.showContent();
             }
             await instanceInfo.setMcInstalled(true);
         }
     });
 }
+
 function showRepairDialog(instanceInfo) {
     let dialog = new Dialog();
     dialog.showDialog(translate("app.instances.repair.title"), "form", [
@@ -6461,1019 +7678,24 @@ function showRepairDialog(instanceInfo) {
             "content": translate("app.instances.repair.confirm")
         }
     ], [], async (v) => {
-        repairInstance(await instanceInfo.refresh(), v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
+        repairInstance(instanceInfo, v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
     });
-}
-function setInstanceTabContentContent(instanceInfo, element) {
-    let loading = new LoadingContainer();
-    element.innerHTML = "";
-    element.appendChild(loading.element);
-    setTimeout(() => {
-        setInstanceTabContentContentReal(instanceInfo, element);
-    }, 0);
 }
 
-async function setInstanceTabContentContentReal(instanceInfo, element) {
-    clearMoreMenus();
-    currentSubTab = "content";
-    let fileDrop = document.createElement("div");
-    fileDrop.dataset.action = "content-import";
-    fileDrop.dataset.instanceId = instanceInfo.instance_id;
-    fileDrop.className = "small-drop-overlay drop-overlay";
-    let fileDropInner = document.createElement("div");
-    fileDropInner.className = "drop-overlay-inner";
-    fileDropInner.innerHTML = translate("app.import.content.drop");
-    fileDrop.appendChild(fileDropInner);
-    instanceInfo = await instanceInfo.refresh();
-    let instanceLockedBanner = document.createElement("div");
-    instanceLockedBanner.className = "instance-locked-banner";
-    let instanceLockedText = document.createElement("span");
-    instanceLockedText.innerHTML = translate("app.instance.locked", "%c", translate("app.discover." + instanceInfo.install_source));
-    let instanceLockedButton = document.createElement("button");
-    instanceLockedButton.className = "instance-locked-button";
-    instanceLockedButton.innerHTML = '<i class="fa-solid fa-unlock"></i>' + translate("app.instance.unlock");
-    instanceLockedButton.onclick = async () => {
-        await instanceInfo.setLocked(false);
-        await instanceInfo.setInstallSource("custom");
-        await instanceInfo.setInstallId("");
-        await instanceInfo.setInstalledVersion("");
-        showSpecificInstanceContent(instanceInfo);
-    }
-    instanceLockedBanner.appendChild(instanceLockedText);
-    instanceLockedBanner.appendChild(instanceLockedButton);
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.classList.add("search-and-filter-v2");
-    let importContent = document.createElement("button");
-    importContent.classList.add("add-content-button");
-    importContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.content.import");
-    importContent.onclick = () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.content.import.title"), "form", [
-            {
-                "type": "text",
-                "id": "file_path",
-                "name": translate("app.content.import.file_path"),
-                "buttons": [
-                    {
-                        "name": translate("app.content.import.file_path.browse"),
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["zip", "jar", "disabled"], translate("app.content.import.file_path.browse.types"));
-                            if (newValue) i.value = newValue;
-                            if (i.onchange) i.onchange();
-                        }
-                    }
-                ]
-            },
-            {
-                "type": "dropdown",
-                "name": translate("app.content.import.type"),
-                "options": [
-                    {
-                        "name": translate("app.content.auto"),
-                        "value": "auto"
-                    },
-                    {
-                        "name": translate("app.content.mod"),
-                        "value": "mod"
-                    },
-                    {
-                        "name": translate("app.content.resource_pack"),
-                        "value": "resource_pack"
-                    },
-                    {
-                        "name": translate("app.content.shader"),
-                        "value": "shader"
-                    }
-                ],
-                "id": "content_type",
-                "default": "auto"
-            }
-        ], [
-            {
-                "type": "cancel",
-                "content": translate("app.content.import.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.content.import.confirm")
-            }
-        ], [], async (v) => {
-            let info = {};
-            v.forEach(e => info[e.id] = e.value);
-            document.body.classList.add("loading");
-            let success = await window.enderlynx.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
-            document.body.classList.remove("loading");
-            if (success) {
-                displaySuccess(translate("app.content.import.complete"));
-            } else {
-                displayError(translate("app.content.import.failed"));
-            }
-            if (document.body.contains(importContent)) setInstanceTabContentContent(instanceInfo, element);
-        })
-    }
-    if (instanceInfo.locked) {
-        importContent.onclick = () => { };
-        importContent.style.opacity = ".5";
-        importContent.style.cursor = "not-allowed";
-        importContent.setAttribute("title", translate("app.instances.locked.tooltip"))
-    }
-    let addContent = document.createElement("button");
-    addContent.classList.add("add-content-button");
-    addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.content.add")
-    addContent.onclick = async () => {
-        instanceInfo = await instanceInfo.refresh();
-        showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader);
-    }
-    if (instanceInfo.locked) {
-        addContent.onclick = () => { };
-        addContent.style.opacity = ".5";
-        addContent.style.cursor = "not-allowed";
-        addContent.setAttribute("title", translate("app.instances.locked.tooltip"))
-    }
-    let contentSearch = document.createElement("div");
-    contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, () => { }, null);
-    let typeDropdown = document.createElement("div");
-    let dropdownInfo = new Dropdown(translate("app.button.content.type"), [
-        {
-            "name": translate("app.content.all"),
-            "value": "all"
-        },
-        {
-            "name": translate("app.content.mods"),
-            "value": "mod"
-        },
-        {
-            "name": translate("app.content.resource_packs"),
-            "value": "resource_pack"
-        },
-        {
-            "name": translate("app.content.shaders"),
-            "value": "shader"
-        }
-    ], typeDropdown, "all", () => { });
-    typeDropdown.style.minWidth = "200px";
-    searchAndFilter.appendChild(contentSearch);
-    searchAndFilter.appendChild(typeDropdown);
-    searchAndFilter.appendChild(importContent);
-    searchAndFilter.appendChild(addContent);
-    let contentListWrap = document.createElement("div");
-    let checkForPlayerContent = async () => {
-        let instanceContent = await instanceInfo.getContent();
-        let old_file_names = instanceContent.map((e) => e.file_name);
-        let newContent = await getInstanceContent(instanceInfo);
-        let newContentAdd = newContent.newContent.filter((e) => !old_file_names.includes(e.file_name));
-        for (let i = 0; i < newContentAdd.length; i++) {
-            let e = newContentAdd[i];
-            await instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-        }
-        let deleteContent = newContent.deleteContent;
-        for (let i = 0; i < deleteContent.length; i++) {
-            let e = deleteContent[i];
-            let index = old_file_names.indexOf(e);
-            await instanceContent[index].delete();
-        }
-    }
-    let showContent = async () => {
-        contentListWrap.innerHTML = '';
-        let content = [];
-        let instance_content = await instanceInfo.getContent();
-        instance_content.sort((a, b) => {
-            if (a.name.toLowerCase() > b.name.toLowerCase()) {
-                return 1;
-            }
-            if (a.name.toLowerCase() < b.name.toLowerCase()) {
-                return -1;
-            }
-            return 0;
-        });
-        let firstTime = true;
-        for (let i = 0; i < instance_content.length; i++) {
-            let e = instance_content[i];
-            content.push({
-                "primary_column": {
-                    "title": e.name,
-                    "desc": e.author ? "by " + e.author : ""
-                },
-                "secondary_column": {
-                    "title": async () => firstTime ? e.version : (await e.refresh()).version,
-                    "desc": async () => firstTime ? e.version : (await e.refresh()).file_name
-                },
-                "type": e.type,
-                "class": e.source,
-                "image": e.image,
-                "onimagefail": async (ele) => {
-                    if (e.source == "modrinth" || e.source == "curseforge") {
-                        let project = Project.getFromId(e.source_info, e.source);
-                        await e.setImage(project.icon);
-                        ele.src = fixPathForImage(project.icon || getDefaultImage(e.name));
-                    } else {
-                        ele.src = fixPathForImage(getDefaultImage(e.name));
-                    }
-                },
-                "onremove": (ele) => {
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.content.delete.title"), "notice", translate("app.content.delete.notice").replace("%c", e.name), [
-                        {
-                            "type": "cancel",
-                            "content": translate("app.content.delete.cancel")
-                        },
-                        {
-                            "type": "confirm",
-                            "content": translate("app.content.delete.confirm")
-                        }
-                    ], [], async () => {
-                        let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, (await e.refresh()).file_name);
-                        if (success) {
-                            displaySuccess(translate("app.content.delete.success").replace("%c", e.name));
-                            await e.delete();
-                            contentList.removeElement(ele);
-                        } else {
-                            displayError(translate("app.content.delete.fail").replace("%c", e.name));
-                        }
-                    });
-                },
-                "more": {
-                    "actionsList": [
-                        {
-                            "title": translate("app.content.open"),
-                            "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
-                            "func": async () => {
-                                e = await e.refresh();
-                                window.enderlynx.showContentInFolder(instanceInfo.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
-                            }
-                        },
-                        e.source == "modrinth" ? {
-                            "title": translate("app.content.view"),
-                            "icon": '<i class="fa-solid fa-circle-info"></i>',
-                            "func": async () => {
-                                instanceInfo = await instanceInfo.refresh();
-                                displayContentInfo(e.source, undefined, e.source_info, instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
-                            }
-                        } : e.source == "curseforge" ? {
-                            "title": translate("app.content.view"),
-                            "icon": '<i class="fa-solid fa-circle-info"></i>',
-                            "func": async () => {
-                                instanceInfo = await instanceInfo.refresh();
-                                displayContentInfo(e.source, undefined, parseInt(e.source_info), instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, instanceInfo.locked, false, contentList);
-                            }
-                        } : null,
-                        e.source == "vanilla_tweaks" && !instanceInfo.locked ? {
-                            "title": translate("app.content.edit_packs"),
-                            "icon": '<i class="fa-solid fa-pencil"></i>',
-                            "func": async () => {
-                                e = await e.refresh();
-                                displayVanillaTweaksEditor(instanceInfo.instance_id, instanceInfo.vanilla_version, JSON.parse(e.source_info), e.file_name, e);
-                            }
-                        } : null,
-                        instanceInfo.locked ? null : e.source == "player_install" ? null : {
-                            "title": translate("app.content.update"),
-                            "icon": '<i class="fa-solid fa-download"></i>',
-                            "func_id": "update",
-                            "func": async () => {
-                                try {
-                                    let s = await updateContent(e.source, await e.refresh(), new Project(), undefined, instanceInfo);
-                                    if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
-                                    if (contentList?.updateSecondaryColumn) contentList.updateSecondaryColumn();
-                                } catch (f) {
-                                    displayError(translate("app.content.update_failed", "%c", e.name));
-                                    throw f;
-                                }
-                            }
-                        },
-                        instanceInfo.locked ? null : {
-                            "title": e.disabled ? translate("app.content.enable") : translate("app.content.disable"),
-                            "icon": e.disabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>',
-                            "func_id": "toggle"
-                        },
-                        instanceInfo.locked ? null : {
-                            "title": translate("app.content.delete"),
-                            "icon": '<i class="fa-solid fa-trash-can"></i>',
-                            "danger": true,
-                            "func_id": "delete",
-                            "func": (ele) => {
-                                let dialog = new Dialog();
-                                dialog.showDialog(translate("app.content.delete.title"), "notice", translate("app.content.delete.notice", "%c", e.name), [
-                                    {
-                                        "type": "cancel",
-                                        "content": translate("app.content.delete.cancel")
-                                    },
-                                    {
-                                        "type": "confirm",
-                                        "content": translate("app.content.delete.confirm")
-                                    }
-                                ], [], async () => {
-                                    let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, e.file_name);
-                                    if (success) {
-                                        displaySuccess(translate("app.content.delete.success", "%c", e.name));
-                                        await e.delete();
-                                        contentList.removeElement(ele);
-                                    } else {
-                                        displayError(translate("app.content.delete.fail", "%c", e.name));
-                                    }
-                                });
-                            }
-                        }
-                    ].filter(e => e)
-                },
-                "disabled": e.disabled,
-                "instance_info": instanceInfo,
-                "pass_to_checkbox": e
-            });
-        }
-        firstTime = false;
-        let contentList = new ContentList(contentListWrap, content, searchBar, {
-            "checkbox": {
-                "enabled": instanceInfo.locked ? false : true,
-                "actionsList": [
-                    instanceInfo.locked ? null : {
-                        "title": translate("app.content.selection.update"),
-                        "icon": '<i class="fa-solid fa-download"></i>',
-                        "func": async (ele, e) => {
-                            try {
-                                let s = await updateContent(e.source, e, new Project(), undefined, instanceInfo);
-                                if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
-                                if (contentList?.updateSecondaryColumn) contentList.updateSecondaryColumn();
-                            } catch (f) {
-                                displayError(translate("app.content.update_failed", "%c", e.name));
-                                throw f;
-                            }
-                        }
-                    },
-                    instanceInfo.locked ? null : {
-                        "title": translate("app.content.selection.enable"),
-                        "icon": '<i class="fa-solid fa-eye"></i>',
-                        "func_id": "enable",
-                        "func": () => { }
-                    },
-                    instanceInfo.locked ? null : {
-                        "title": translate("app.content.selection.disable"),
-                        "icon": '<i class="fa-solid fa-eye-slash"></i>',
-                        "func_id": "disable",
-                        "func": () => { }
-                    },
-                    instanceInfo.locked ? null : {
-                        "title": translate("app.content.selection.delete"),
-                        "icon": '<i class="fa-solid fa-trash-can"></i>',
-                        "danger": true,
-                        "func": async (ele, e) => {
-                            let success = await window.enderlynx.deleteContent(instanceInfo.instance_id, e.type, (await e.refresh()).file_name);
-                            if (success) {
-                                displaySuccess(translate("app.content.delete.success", "%c", e.name));
-                                e.delete();
-                                contentList.removeElement(ele);
-                            } else {
-                                displayError(translate("app.content.delete.fail", "%c", e.name));
-                            }
-                        },
-                        "show_confirmation_dialog": true,
-                        "dialog_title": translate("app.content.delete.title"),
-                        "dialog_content": translate("app.content.delete.selection_notice"),
-                        "dialog_button": translate("app.content.delete.confirm")
-                    }
-                ].filter(e => e)
-            },
-            "disable": {
-                "enabled": instanceInfo.locked ? false : true
-            },
-            "remove": {
-                "enabled": instanceInfo.locked ? false : true
-            },
-            "more": {
-                "enabled": true
-            },
-            "second_column_centered": false,
-            "primary_column_name": translate("app.content.name"),
-            "secondary_column_name": translate("app.content.file_info"),
-            "refresh": {
-                "enabled": true,
-                "func": () => {
-                    setInstanceTabContentContent(instanceInfo, element)
-                }
-            },
-            "update_all": {
-                "enabled": instanceInfo.locked ? false : true,
-                "func": async (b) => {
-                    b.innerHTML = "<i class='spinner'></i>" + translate("app.content.updating")
-                    let content = await instanceInfo.getContent();
-                    let processId = Math.random();
-                    let cancel = false;
-                    for (let i = 0; i < content.length; i++) {
-                        log.sendData([{
-                            "title": "Updating Content",
-                            "progress": i / content.length * 100,
-                            "desc": `Updating ${i + 1} of ${content.length}`,
-                            "id": processId,
-                            "status": "good",
-                            "cancel": () => {
-                                cancel = true;
-                            },
-                            "retry": () => { }
-                        }]);
-                        let c = content[i];
-                        try {
-                            await updateContent(c.source, c, new Project(), undefined, instanceInfo);
-                        } catch (e) {
-                            displayError(translate("app.content.update_failed").replace("%c", c.name));
-                        }
-                        if (cancel) {
-                            log.sendData([{
-                                "title": "Updating Content",
-                                "progress": 100,
-                                "desc": "Canceled by User",
-                                "id": processId,
-                                "status": "error",
-                                "cancel": () => { },
-                                "retry": () => { }
-                            }]);
-                            if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                                setInstanceTabContentContent(instanceInfo, element);
-                            }
-                            return;
-                        }
-                    }
-                    log.sendData([{
-                        "title": "Updating Content",
-                        "progress": 100,
-                        "desc": "Done",
-                        "id": processId,
-                        "status": "done",
-                        "cancel": () => { },
-                        "retry": () => { }
-                    }]);
-                    displaySuccess(translate("app.instances.updated_all", "%i", instanceInfo.name));
-                    if (currentSubTab == "content" && currentTab == "instance" && currentInstanceId == instanceInfo.instance_id) {
-                        setInstanceTabContentContent(instanceInfo, element);
-                    }
-                }
-            }
-        }, dropdownInfo, translate("app.content.not_found"));
-    }
-    let currently_installing = new CurrentlyInstalling();
-    contentListWrap.appendChild(currently_installing.element);
-    instanceInfo.watchForChange("installing", async (v) => {
-        if (!v) {
-            await checkForPlayerContent();
-            showContent();
-        } else {
-            contentListWrap.innerHTML = "";
-            contentListWrap.appendChild(currently_installing.element);
-        }
-    });
-    if (!(await instanceInfo.refresh()).installing) {
-        await checkForPlayerContent();
-        await showContent();
-    } else {
-        contentListWrap.innerHTML = "";
-        contentListWrap.appendChild(currently_installing.element);
-    }
-    const fragment = document.createDocumentFragment();
-    element.innerHTML = "";
-    fragment.appendChild(fileDrop);
-    if (instanceInfo.locked) {
-        fragment.appendChild(instanceLockedBanner);
-    }
-    fragment.appendChild(searchAndFilter);
-    fragment.appendChild(contentListWrap);
-    element.appendChild(fragment);
-}
 function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
 }
-function setInstanceTabContentWorlds(instanceInfo, element) {
+
+function setInstanceTabContentLogs(instanceInfo, element, scrollElement) {
     let loading = new LoadingContainer();
     element.innerHTML = "";
     element.appendChild(loading.element);
     setTimeout(() => {
-        setInstanceTabContentWorldsReal(instanceInfo, element);
-    }, 0);
-}
-async function setInstanceTabContentWorldsReal(instanceInfo, element) {
-    currentSubTab = "worlds";
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.classList.add("search-and-filter-v2");
-    let importWorlds = document.createElement("button");
-    importWorlds.classList.add("add-content-button");
-    importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.import")
-    importWorlds.onclick = async () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.worlds.import.title"), "form", [
-            {
-                "type": "dropdown",
-                "id": "launcher",
-                "name": translate("app.worlds.import.launcher"),
-                "options": [
-                    {
-                        "name": translate("app.name"),
-                        "value": "current"
-                    },
-                    {
-                        "name": translate("app.launcher.vanilla"),
-                        "value": "vanilla"
-                    },
-                    {
-                        "name": translate("app.launcher.modrinth"),
-                        "value": "modrinth"
-                    },
-                    {
-                        "name": translate("app.launcher.curseforge"),
-                        "value": "curseforge"
-                    },
-                    {
-                        "name": translate("app.launcher.multimc"),
-                        "value": "multimc"
-                    },
-                    {
-                        "name": translate("app.launcher.prism"),
-                        "value": "prism"
-                    },
-                    {
-                        "name": translate("app.launcher.atlauncher"),
-                        "value": "atlauncher"
-                    },
-                    {
-                        "name": translate("app.launcher.gdlauncher"),
-                        "value": "gdlauncher"
-                    }
-                ]
-            },
-            {
-                "type": "text",
-                "id": "folder_path",
-                "name": translate("app.worlds.import.folder_path"),
-                "default": window.enderlynx.getInstanceFolderPath(),
-                "input_source": "launcher",
-                "source": async (l) => await window.enderlynx.getLauncherInstancePath(l),
-                "buttons": [
-                    {
-                        "name": translate("app.worlds.import.folder_path.browse"),
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.enderlynx.triggerFileImportBrowse(v, 1);
-                            if (newValue) i.value = newValue;
-                            if (i.onchange) i.onchange();
-                        }
-                    }
-                ]
-            },
-            {
-                "type": "dropdown",
-                "name": translate("app.worlds.import.instance"),
-                "input_source": "folder_path",
-                "id": "instance",
-                "source": window.enderlynx.getLauncherInstances,
-                "options": [],
-                "onchange": async (a, b, c) => {
-                    let launcher = "";
-                    let filePath = "";
-                    for (let i = 0; i < b.length; i++) {
-                        if (b[i].id == "launcher") {
-                            launcher = b[i].element.value;
-                            if (launcher == "vanilla") {
-                                c.style.display = "none";
-                            } else {
-                                c.style.display = "grid";
-                            }
-                        }
-                        if (b[i].id == "folder_path") {
-                            filePath = b[i].element.value;
-                        }
-                        if (b[i].id == "world") {
-                            if (launcher == "vanilla") {
-                                b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(filePath)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
-                            } else {
-                                b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(a)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                "type": "checkboxes",
-                "name": translate("app.worlds.import.worlds"),
-                "options": (await getInstanceWorlds(instanceInfo)).map(e => ({ "name": e.name, "value": e.id })),
-                "id": "world"
-            },
-            {
-                "type": "toggle",
-                "name": translate("app.worlds.import.remove"),
-                "id": "remove",
-                "default": false
-            }
-        ], [
-            {
-                "type": "cancel",
-                "content": translate("app.worlds.import.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.worlds.import.confirm")
-            }
-        ], [], async (v) => {
-            let info = {};
-            v.forEach(e => info[e.id] = e.value);
-            for (let i = 0; i < info.world.length; i++) {
-                let world = info.world[i];
-                try {
-                    await window.enderlynx.transferWorld(world, instanceInfo.instance_id, info.remove);
-                } catch (e) {
-                    displayError(translate("app.worlds.import.error", "%m", e.message));
-                }
-            }
-            displaySuccess(translate("app.worlds.import.complete"));
-            setInstanceTabContentWorlds(instanceInfo, element);
-        })
-    }
-    let addContent = document.createElement("button");
-    addContent.classList.add("add-content-button");
-    addContent.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.add")
-    addContent.onclick = () => {
-        showAddContent(instanceInfo.instance_id, instanceInfo.vanilla_version, instanceInfo.loader, "world");
-    }
-    let addServer = document.createElement("button");
-    addServer.classList.add("add-content-button");
-    addServer.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.server")
-    addServer.onclick = () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.worlds.server.title"), "form", [
-            {
-                "type": "text",
-                "id": "name",
-                "name": translate("app.worlds.server.name")
-            },
-            {
-                "type": "text",
-                "id": "ip",
-                "name": translate("app.worlds.server.ip")
-            }
-        ], [
-            {
-                "type": "cancel",
-                "content": translate("app.worlds.server.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.worlds.server.confirm")
-            }
-        ], [], async (v) => {
-            let info = {};
-            v.forEach(e => info[e.id] = e.value);
-            await window.enderlynx.addServer(instanceInfo.instance_id, info.ip, info.name);
-            setInstanceTabContentWorlds(instanceInfo, element);
-        })
-    }
-    let contentSearch = document.createElement("div");
-    contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, () => { }, null);
-    let typeDropdown = document.createElement("div");
-    let dropdownInfo = new Dropdown(translate("app.worlds.type"), [
-        {
-            "name": translate("app.worlds.all"),
-            "value": "all"
-        },
-        {
-            "name": translate("app.worlds.singleplayer"),
-            "value": "singleplayer"
-        },
-        {
-            "name": translate("app.worlds.multiplayer"),
-            "value": "multiplayer"
-        }//,
-        // {
-        //     "name": translate("app.worlds.realms"),
-        //     "value": "realms"
-        // }
-    ], typeDropdown, "all", () => { });
-    typeDropdown.style.minWidth = "200px";
-    searchAndFilter.appendChild(contentSearch);
-    searchAndFilter.appendChild(typeDropdown);
-    searchAndFilter.appendChild(importWorlds);
-    searchAndFilter.appendChild(addContent);
-    searchAndFilter.appendChild(addServer);
-    let fileDrop = document.createElement("div");
-    fileDrop.dataset.action = "world-import";
-    fileDrop.dataset.instanceId = instanceInfo.instance_id;
-    fileDrop.className = "small-drop-overlay drop-overlay";
-    let fileDropInner = document.createElement("div");
-    fileDropInner.className = "drop-overlay-inner";
-    fileDropInner.innerHTML = translate("app.import.worlds.drop");
-    fileDrop.appendChild(fileDropInner);
-    let worldList = [];
-
-    let worlds = await getInstanceWorlds(instanceInfo);
-    let worldsMultiplayer = await getInstanceWorldsMulti(instanceInfo);
-    for (let i = 0; i < worlds.length; i++) {
-        let world_description = translate("app.worlds.description." + worlds[i].mode);
-        if (worlds[i].mode == "survival" && !worlds[i].hardcore) {
-            world_description += " - " + translate("app.worlds.description." + worlds[i].difficulty);
-        }
-        if (worlds[i].hardcore) {
-            world_description += " - <span style='color:#ff1313'>" + translate("app.worlds.description.hardcore") + "</span>";
-        }
-        if (worlds[i].commands) {
-            world_description += " - " + translate("app.worlds.description.commands");
-        }
-        worldList.push(
-            {
-                "primary_column": {
-                    "title": worlds[i].name,
-                    "desc": translate("app.worlds.last_played").replace("%s", formatDate(worlds[i].last_played))
-                },
-                "secondary_column": {
-                    "title": () => translate("app.worlds.description.singleplayer"),
-                    "desc": () => world_description
-                },
-                "type": "singleplayer",
-                "image": worlds[i].icon ?? getDefaultImage(worlds[i].id),
-                "onremove": (ele) => {
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
-                        {
-                            "type": "cancel",
-                            "content": translate("app.worlds.delete.cancel")
-                        },
-                        {
-                            "type": "confirm",
-                            "content": translate("app.worlds.delete.confirm")
-                        }
-                    ], [], async () => {
-                        let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, worlds[i].id);
-                        if (success) {
-                            contentList.removeElement(ele);
-                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
-                        } else {
-                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
-                        }
-                    });
-                },
-                "more": {
-                    "actionsList": [
-                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
-                            "title": translate("app.worlds.play"),
-                            "icon": '<i class="fa-solid fa-play"></i>',
-                            "func": async () => {
-                                await playSingleplayerWorld(instanceInfo, worlds[i].id);
-                            }
-                        } : null,
-                        {
-                            "title": translate("app.worlds.open"),
-                            "icon": '<i class="fa-solid fa-folder"></i>',
-                            "func": () => {
-                                window.enderlynx.openWorldFolder(instanceInfo.instance_id, worlds[i].id);
-                            }
-                        },
-                        {
-                            "title": translate("app.worlds.edit"),
-                            "icon": '<i class="fa-solid fa-pencil"></i>',
-                            "func": () => {
-                                openWorldEditDialog(instanceInfo.instance_id, worlds[i].id, () => setInstanceTabContentWorlds(instanceInfo, element));
-                            }
-                        },
-                        {
-                            "title": async () => await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                            "icon": async () => await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                            "func": async (e) => {
-                                let world_pinned = await isWorldPinned(worlds[i].id, instanceInfo.instance_id, "singleplayer");
-                                world_pinned ? await unpinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id) : await pinSingleplayerWorld(worlds[i].id, instanceInfo.instance_id)
-                                e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
-                                e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                            }
-                        },
-                        // {
-                        //     "title": translate("app.worlds.share"),
-                        //     "icon": '<i class="fa-solid fa-share"></i>',
-                        //     "func": () => { }
-                        // },
-                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
-                            "icon": '<i class="fa-solid fa-desktop"></i>',
-                            "title": translate("app.worlds.desktop_shortcut"),
-                            "func": (e) => {
-                                addDesktopShortcutWorld(instanceInfo, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? getDefaultImage(worlds[i].id));
-                            }
-                        } : null,
-                        {
-                            "title": translate("app.worlds.delete"),
-                            "icon": '<i class="fa-solid fa-trash-can"></i>',
-                            "danger": true,
-                            "func_id": "delete",
-                            "func": (ele) => {
-                                let dialog = new Dialog();
-                                dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
-                                    {
-                                        "type": "cancel",
-                                        "content": translate("app.worlds.delete.cancel")
-                                    },
-                                    {
-                                        "type": "confirm",
-                                        "content": translate("app.worlds.delete.confirm")
-                                    }
-                                ], [], async () => {
-                                    let success = await window.enderlynx.deleteWorld(instanceInfo.instance_id, worlds[i].id);
-                                    if (success) {
-                                        contentList.removeElement(ele);
-                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
-                                    } else {
-                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
-                                    }
-                                });
-                            }
-                        }
-                    ].filter(e => e)
-                },
-                "pass_to_checkbox": { "type": "singleplayer", "id": worlds[i].id, "name": worlds[i].name }
-            });
-    }
-    for (let i = 0; i < worldsMultiplayer.length; i++) {
-        let last_played = await getServerLastPlayed(instanceInfo.instance_id, worldsMultiplayer[i].ip);
-        worldList.push(
-            {
-                "primary_column": {
-                    "title": worldsMultiplayer[i].name,
-                    "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
-                },
-                "secondary_column": {
-                    "title": () => translate("app.worlds.description.multiplayer"),
-                    "desc": () => worldsMultiplayer[i].ip,
-                    "desc_hidden": true
-                },
-                "type": "multiplayer",
-                "image": worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip),
-                "onremove": (ele) => {
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
-                        {
-                            "type": "cancel",
-                            "content": translate("app.worlds.delete.cancel")
-                        },
-                        {
-                            "type": "confirm",
-                            "content": translate("app.worlds.delete.confirm")
-                        }
-                    ], [], async () => {
-                        let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
-                        if (success) {
-                            contentList.removeElement(ele);
-                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                        } else {
-                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                        }
-                    });
-                },
-                "more": {
-                    "actionsList": [
-                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
-                            "title": translate("app.worlds.play"),
-                            "icon": '<i class="fa-solid fa-play"></i>',
-                            "func": async () => {
-                                await playMultiplayerWorld(instanceInfo, worldsMultiplayer[i].ip);
-                            }
-                        } : null,
-                        {
-                            "title": async () => await isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                            "icon": async () => await isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                            "func": async (e) => {
-                                let world_pinned = await isWorldPinned(worldsMultiplayer[i].ip, instanceInfo.instance_id, "multiplayer");
-                                world_pinned ? await unpinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id) : await pinMultiplayerWorld(worldsMultiplayer[i].ip, instanceInfo.instance_id)
-                                e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
-                                e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                            }
-                        },
-                        // {
-                        //     "title": translate("app.worlds.share"),
-                        //     "icon": '<i class="fa-solid fa-share"></i>',
-                        //     "func": () => { }
-                        // },
-                        minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
-                            "icon": '<i class="fa-solid fa-desktop"></i>',
-                            "title": translate("app.worlds.desktop_shortcut"),
-                            "func": (e) => {
-                                addDesktopShortcutWorld(instanceInfo, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip));
-                            }
-                        } : null,
-                        {
-                            "title": translate("app.worlds.delete"),
-                            "icon": '<i class="fa-solid fa-trash-can"></i>',
-                            "danger": true,
-                            "func_id": "delete",
-                            "func": (ele) => {
-                                let dialog = new Dialog();
-                                dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
-                                    {
-                                        "type": "cancel",
-                                        "content": translate("app.worlds.delete.cancel")
-                                    },
-                                    {
-                                        "type": "confirm",
-                                        "content": translate("app.worlds.delete.confirm")
-                                    }
-                                ], [], async () => {
-                                    let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
-                                    if (success) {
-                                        contentList.removeElement(ele);
-                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                                    } else {
-                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                                    }
-                                });
-                            }
-                        }
-                    ].filter(e => e)
-                },
-                "pass_to_checkbox": { "type": "multiplayer", "ip": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name, "index": worldsMultiplayer[i].index }
-            });
-    }
-
-    let contentListWrap = document.createElement("div");
-    let contentList = new ContentList(contentListWrap, worldList, searchBar, {
-        "checkbox": {
-            "enabled": true,
-            "actionsList": [
-                {
-                    "title": translate("app.worlds.selection.delete"),
-                    "icon": '<i class="fa-solid fa-trash-can"></i>',
-                    "danger": true,
-                    "dont_loop": true,
-                    "func": async (eles, es) => {
-                        let ips = [];
-                        let indexes = [];
-                        let elesm = [];
-                        let names = [];
-                        for (let i = 0; i < es.length; i++) {
-                            let e = es[i];
-                            if (e.type == "singleplayer") {
-                                window.enderlynx.deleteWorld(instanceInfo.instance_id, e.id, (success) => {
-                                    if (success) {
-                                        contentList.removeElement(eles[i]);
-                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(e.name)));
-                                    } else {
-                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(e.name)));
-                                    }
-                                });
-                            } else if (e.type == "multiplayer") {
-                                ips.push(e.ip);
-                                indexes.push(e.index);
-                                elesm.push(eles[i]);
-                                names.push(e.name);
-                            }
-                        }
-                        if (!ips.length) return;
-                        let success = await window.enderlynx.deleteServer(instanceInfo.instance_id, ips, indexes);
-                        if (success) {
-                            elesm.forEach(e => e.remove());
-                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(names.join(", "))));
-                        } else {
-                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(names.join(", "))));
-                        }
-                        contentList.removeElements(elesm);
-                    },
-                    "show_confirmation_dialog": true,
-                    "dialog_title": translate("app.worlds.delete.confirm.title"),
-                    "dialog_content": translate("app.worlds.delete.selection_notice"),
-                    "dialog_button": translate("app.worlds.delete.confirm")
-                }
-            ]
-        },
-        "disable": {
-            "enabled": false
-        },
-        "remove": {
-            "enabled": true
-        },
-        "more": {
-            "enabled": true
-        },
-        "second_column_centered": true,
-        "primary_column_name": translate("app.worlds.name"),
-        "secondary_column_name": "",
-        "refresh": {
-            "enabled": true,
-            "func": () => {
-                setInstanceTabContentWorlds(instanceInfo, element);
-            }
-        },
-        "update_all": {
-            "enabled": false
-        }
-    }, dropdownInfo, translate("app.worlds.not_found"));
-    element.innerHTML = "";
-    element.appendChild(fileDrop);
-    element.appendChild(searchAndFilter);
-    element.appendChild(contentListWrap);
-    clearMoreMenus();
-}
-
-function setInstanceTabContentLogs(instanceInfo, element) {
-    let loading = new LoadingContainer();
-    element.innerHTML = "";
-    element.appendChild(loading.element);
-    setTimeout(() => {
-        setInstanceTabContentLogsReal(instanceInfo, element);
+        setInstanceTabContentLogsReal(instanceInfo, element, scrollElement);
     }, 0);
 }
 
-async function setInstanceTabContentLogsReal(instanceInfo, element) {
-    currentSubTab = "logs";
+async function setInstanceTabContentLogsReal(instanceInfo, element, scrollElement) {
     let deleteButton = document.createElement("button");
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
@@ -7493,11 +7715,21 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
     logDisplay.appendChild(visible);
     logDisplay.appendChild(spacer);
     let logs = [];
+    let logHeight = 600;
+    logResizeFunction = () => {
+        const viewHeight = window.innerHeight;
+        const editorRect = logDisplay.getBoundingClientRect();
+        const distanceFromTop = editorRect.top;
+        const calculatedHeight = viewHeight - distanceFromTop - 10;
+        logDisplay.style.maxHeight = calculatedHeight + "px";
+        logHeight = calculatedHeight;
+        render();
+    }
     let render = () => {
         let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
         const totalItems = showLogs.length;
         const itemHeight = 15;
-        const containerHeight = 600;
+        const containerHeight = logHeight;
         const buffer = 5;
         spacer.style.height = totalItems * itemHeight + "px";
 
@@ -7529,7 +7761,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
             logInfo.forEach((e) => {
                 if (e == "") return;
                 let lineElement = document.createElement("span");
-                lineElement.innerHTML = sanitize(e);
+                lineElement.textContent = e;
                 lineElement.classList.add("log-entry");
                 if (e.includes("INFO")) {
                     lineElement.classList.add("log-info");
@@ -7551,7 +7783,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
                     if (e == "") return;
                     if (e.length == 1) return;
                     let lineElement = document.createElement("span");
-                    lineElement.innerHTML = sanitize(e);
+                    lineElement.textContent = e;
                     lineElement.classList.add("log-entry");
                     if (e.includes("INFO")) {
                         lineElement.classList.add("log-info");
@@ -7587,7 +7819,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
             logInfo.forEach((e) => {
                 if (e == "") return;
                 let lineElement = document.createElement("span");
-                lineElement.innerHTML = sanitize(e);
+                lineElement.textContent = e;
                 lineElement.classList.add("log-entry");
                 if (e.includes("INFO")) {
                     lineElement.classList.add("log-info");
@@ -7668,7 +7900,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
             let success = await window.enderlynx.deleteLogs(instanceInfo.instance_id, currentLog);
             if (success) {
                 displaySuccess(translate("app.logs.delete.success"));
-                setInstanceTabContentLogs(instanceInfo, element);
+                setInstanceTabContentLogs(instanceInfo, element, scrollElement);
             } else {
                 displayError(translate("app.logs.delete.fail"));
             }
@@ -7689,7 +7921,7 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
             let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id);
             if (success) {
                 displaySuccess(translate("app.logs.delete_all.success"));
-                setInstanceTabContentLogs(instanceInfo, element);
+                setInstanceTabContentLogs(instanceInfo, element, scrollElement);
             } else {
                 displayError(translate("app.logs.delete_all.fail"));
             }
@@ -7702,22 +7934,22 @@ async function setInstanceTabContentLogsReal(instanceInfo, element) {
     logDisplay.className = "logs-display";
     element.innerHTML = "";
     element.appendChild(fragment);
+    logResizeFunction();
 }
 
-function setInstanceTabContentOptions(instanceInfo, element) {
+function setInstanceTabContentOptions(instanceInfo, element, scrollElement) {
     let loading = new LoadingContainer();
     element.innerHTML = "";
     element.appendChild(loading.element);
     setTimeout(() => {
-        setInstanceTabContentOptionsReal(instanceInfo, element);
+        setInstanceTabContentOptionsReal(instanceInfo, element, scrollElement);
     }, 0);
 }
 
 let previousKeyDownEventListener;
 let previousMouseDownEventListener;
 
-async function setInstanceTabContentOptionsReal(instanceInfo, element) {
-    currentSubTab = "options";
+async function setInstanceTabContentOptionsReal(instanceInfo, element, scrollElement) {
     let values = await window.enderlynx.getInstanceOptions(instanceInfo.instance_id);
     let searchAndFilter = document.createElement("div");
     searchAndFilter.classList.add("search-and-filter-v2");
@@ -7794,7 +8026,7 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
                 console.error(e);
                 displayError(translate("app.instances.options.apply.fail"));
             }
-            setInstanceTabContentOptions(instanceInfo, element);
+            setInstanceTabContentOptions(instanceInfo, element, scrollElement);
         });
     }
     searchAndFilter.appendChild(contentSearch);
@@ -8069,17 +8301,311 @@ async function setInstanceTabContentOptionsReal(instanceInfo, element) {
     element.appendChild(fragment);
 }
 
-function setInstanceTabContentScreenshots(instanceInfo, element) {
+
+function setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths = "") {
+    setInstanceTabContentFilesReal(instanceInfo, element, scrollElement, paths);
+}
+
+async function setInstanceTabContentFilesReal(instanceInfo, element, scrollElement, paths) {
+    let searchAndFilter = document.createElement("div");
+    searchAndFilter.classList.add("search-and-filter-v2");
+    let filesBreadcrumb = document.createElement("div");
+    filesBreadcrumb.classList.add("files-breadcrumb");
+    let homeButton = document.createElement("button");
+    homeButton.className = "home-button";
+    homeButton.innerHTML = '<i class="fa-solid fa-house"></i>';
+    homeButton.onclick = () => {
+        setInstanceTabContentFiles(instanceInfo, element, scrollElement);
+    }
+    filesBreadcrumb.appendChild(homeButton);
+    let pathSplit = paths.split("/");
+    for (let i = 1; i < pathSplit.length; i++) {
+        let dir = pathSplit[i];
+        let breadcrumbArrow = document.createElement("span");
+        breadcrumbArrow.className = "breadcrumb-arrow";
+        breadcrumbArrow.innerHTML = '<i class="fa-solid fa-angle-right"></i>';
+        let breadcrumbEntry = document.createElement("button");
+        breadcrumbEntry.className = "breadcrumb-entry";
+        breadcrumbEntry.textContent = dir;
+        breadcrumbEntry.onclick = () => {
+            setInstanceTabContentFiles(instanceInfo, element, scrollElement, pathSplit.slice(0, i + 1).join("/"));
+        }
+        filesBreadcrumb.appendChild(breadcrumbArrow);
+        filesBreadcrumb.appendChild(breadcrumbEntry);
+    }
+    searchAndFilter.appendChild(filesBreadcrumb);
+    let contentSearch = document.createElement("div");
+    contentSearch.style.flexGrow = 2;
+    let searchBar = new SearchBar(contentSearch, () => { }, null);
+    let typeDropdown = document.createElement("div");
+    let dropdownInfo = new Dropdown(translate("app.files.type"), [
+        {
+            "name": translate("app.files.all"),
+            "value": "all"
+        },
+        {
+            "name": translate("app.files.folder"),
+            "value": "folder"
+        },
+        {
+            "name": translate("app.files.file"),
+            "value": "file"
+        }
+    ], typeDropdown, "all", () => { });
+    typeDropdown.style.minWidth = "200px";
+    let fileDrop = document.createElement("div");
+    fileDrop.dataset.action = "file-import";
+    fileDrop.dataset.instanceId = instanceInfo.instance_id;
+    fileDrop.dataset.paths = paths;
+    fileDrop.className = "small-drop-overlay drop-overlay";
+    let fileDropInner = document.createElement("div");
+    fileDropInner.className = "drop-overlay-inner";
+    fileDropInner.innerHTML = translate("app.import.files.drop");
+    fileDrop.appendChild(fileDropInner);
+    let fileList = [];
+
+    let contentListWrap = document.createElement("div");
+
+    let files = await window.enderlynx.getFiles(instanceInfo.instance_id, paths);
+
+    if (typeof files == 'string') {
+        let editor = document.createElement("div");
+        editor.id = "ace_editor";
+        editor.className = "ace-enderlynx"
+        aceResizeFunction = () => {
+            const viewHeight = window.innerHeight;
+            const editorRect = editor.getBoundingClientRect();
+            const distanceFromTop = editorRect.top;
+            const calculatedHeight = viewHeight - distanceFromTop - 10;
+            editor.style.height = calculatedHeight + "px";
+            aceEditor.resize();
+        }
+        let aceEditor = ace.edit(editor);
+        aceEditor.setShowPrintMargin(false);
+        aceEditor.setValue(files, -1);
+        aceEditor.session.setMode("ace/mode/enderlynx");
+        aceEditor.setFontSize(".9rem");
+        contentListWrap.appendChild(editor);
+        let resetButton = document.createElement("button");
+        resetButton.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>Reset';
+        resetButton.className = "editor-button";
+        resetButton.onclick = () => {
+            aceEditor.setValue(files, -1);
+        }
+        searchAndFilter.appendChild(resetButton);
+        let saveButton = document.createElement("button");
+        saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+        saveButton.className = "editor-button";
+        saveButton.onclick = async () => {
+            saveButton.innerHTML = '<i class="spinner"></i>Saving';
+            let success = await window.enderlynx.editFile(instanceInfo.instance_id, paths, aceEditor.getValue());
+            if (success) {
+                displaySuccess(translate("app.files.edit.success"));
+            } else {
+                displayError(translate("app.files.edit.fail"));
+            }
+            saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+        }
+        searchAndFilter.appendChild(saveButton);
+    } else {
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+            fileList.push(
+                {
+                    "primary_column": {
+                        "title": file.name,
+                        "desc": ""
+                    },
+                    "secondary_column": {
+                        "title": () => formatTimeRelatively(file.dateModified),
+                        "desc": () => ""
+                    },
+                    "type": file.isDirectory ? "folder" : "file",
+                    "icon": file.isDirectory ? '<i class="fa-regular fa-folder"></i>' : '<i class="fa-regular fa-file"></i>',
+                    "onremove": (ele) => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.files.delete.confirm.title"), "notice", translate("app.files.delete.confirm.description", "%w", file.name), [
+                            {
+                                "type": "cancel",
+                                "content": translate("app.files.delete.cancel")
+                            },
+                            {
+                                "type": "confirm",
+                                "content": translate("app.files.delete.confirm")
+                            }
+                        ], [], async () => {
+                            let success = await window.enderlynx.deleteFiles(instanceInfo.instance_id, paths, [file.name]);
+                            if (success) {
+                                contentList.removeElement(ele);
+                                displaySuccess(translate("app.files.delete.success", "%w", file.name));
+                            } else {
+                                displayError(translate("app.files.delete.fail", "%w", file.name));
+                            }
+                        });
+                    },
+                    "onclick": () => {
+                        setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths + "/" + file.name);
+                    },
+                    "more": {
+                        "actionsList": [
+                            {
+                                "title": translate("app.files.show_in_folder"),
+                                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
+                                "func": () => {
+
+                                }
+                            },
+                            {
+                                "title": translate("app.files.copy_file_name"),
+                                "icon": '<i class="fa-solid fa-copy"></i>',
+                                "func": () => {
+                                    navigator.clipboard.writeText(file.name).then(() => {
+                                        displaySuccess(translate("app.files.name.copy.success"));
+                                    }).catch(() => {
+                                        displayError(translate("app.files.name.copy.fail"));
+                                    });
+                                }
+                            },
+                            {
+                                "title": translate("app.files.copy_relative_path"),
+                                "icon": '<i class="fa-solid fa-copy"></i>',
+                                "func": () => {
+                                    navigator.clipboard.writeText(file.relativePath).then(() => {
+                                        displaySuccess(translate("app.files.relative_path.copy.success"));
+                                    }).catch(() => {
+                                        displayError(translate("app.files.relative_path.copy.fail"));
+                                    });
+                                }
+                            },
+                            {
+                                "title": translate("app.files.copy_full_path"),
+                                "icon": '<i class="fa-solid fa-copy"></i>',
+                                "func": () => {
+                                    navigator.clipboard.writeText(file.fullPath).then(() => {
+                                        displaySuccess(translate("app.files.full_path.copy.success"));
+                                    }).catch(() => {
+                                        displayError(translate("app.files.full_path.copy.fail"));
+                                    });
+                                }
+                            },
+                            {
+                                "title": translate("app.files.rename"),
+                                "icon": '<i class="fa-solid fa-i-cursor"></i>',
+                                "func": () => {
+
+                                }
+                            },
+                            {
+                                "title": translate("app.files.move"),
+                                "icon": '<i class="fa-solid fa-left-right"></i>',
+                                "func": () => {
+
+                                }
+                            },
+                            {
+                                "title": translate("app.files.delete"),
+                                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                                "danger": true,
+                                "func_id": "delete",
+                                "func": (ele) => {
+                                    let dialog = new Dialog();
+                                    dialog.showDialog(translate("app.files.delete.confirm.title"), "notice", translate("app.files.delete.confirm.description", "%w", file.name), [
+                                        {
+                                            "type": "cancel",
+                                            "content": translate("app.files.delete.cancel")
+                                        },
+                                        {
+                                            "type": "confirm",
+                                            "content": translate("app.files.delete.confirm")
+                                        }
+                                    ], [], async () => {
+                                        let success = await window.enderlynx.deleteFiles(instanceInfo.instance_id, paths, [file.name]);
+                                        if (success) {
+                                            contentList.removeElement(ele);
+                                            displaySuccess(translate("app.files.delete.success", "%w", file.name));
+                                        } else {
+                                            displayError(translate("app.files.delete.fail", "%w", file.name));
+                                        }
+                                    });
+                                }
+                            }
+                        ].filter(e => e)
+                    },
+                    "pass_to_checkbox": file
+                });
+        }
+
+        let contentList = new ContentList(contentListWrap, fileList, searchBar, {
+            "checkbox": {
+                "enabled": true,
+                "actionsList": [
+                    {
+                        "title": translate("app.files.selection.delete"),
+                        "icon": '<i class="fa-solid fa-trash-can"></i>',
+                        "danger": true,
+                        "dont_loop": true,
+                        "func": async (eles, es) => {
+                            let success = await window.enderlynx.deleteFiles(instanceInfo.instance_id, paths, es.map(e => e.name));
+                            if (success) {
+                                eles.forEach(e => e.remove());
+                                contentList.removeElements(eles);
+                                displaySuccess(translate("app.files.delete_multiple.success"));
+                            } else {
+                                setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths);
+                                displayError(translate("app.files.delete_multiple.fail"));
+                            }
+                        },
+                        "show_confirmation_dialog": true,
+                        "dialog_title": translate("app.files.delete.confirm.title"),
+                        "dialog_content": translate("app.files.delete.selection_notice"),
+                        "dialog_button": translate("app.files.delete.confirm")
+                    }
+                ]
+            },
+            "disable": {
+                "enabled": false
+            },
+            "remove": {
+                "enabled": true
+            },
+            "more": {
+                "enabled": true
+            },
+            "second_column_centered": true,
+            "primary_column_name": translate("app.worlds.name"),
+            "secondary_column_name": "",
+            "refresh": {
+                "enabled": true,
+                "func": () => {
+                    setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths);
+                }
+            },
+            "update_all": {
+                "enabled": false
+            }
+        }, dropdownInfo, translate("app.files.not_found"), scrollElement);
+    }
+
+    element.innerHTML = "";
+    element.appendChild(fileDrop);
+    if (typeof files != 'string') searchAndFilter.appendChild(contentSearch);
+    if (typeof files != 'string') searchAndFilter.appendChild(typeDropdown);
+    element.appendChild(searchAndFilter);
+    element.appendChild(contentListWrap);
+    clearMoreMenus();
+    if (aceResizeFunction) aceResizeFunction();
+}
+
+function setInstanceTabContentScreenshots(instanceInfo, element, scrollElement) {
     let loading = new LoadingContainer();
     element.innerHTML = "";
     element.appendChild(loading.element);
     setTimeout(() => {
-        setInstanceTabContentScreenshotsReal(instanceInfo, element);
+        setInstanceTabContentScreenshotsReal(instanceInfo, element, scrollElement);
     }, 0);
 }
 
-async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
-    currentSubTab = "screenshots";
+async function setInstanceTabContentScreenshotsReal(instanceInfo, element, scrollElement) {
     let fragment = document.createDocumentFragment();
     let galleryElement = document.createElement("div");
     galleryElement.className = "gallery";
@@ -8138,7 +8664,7 @@ async function setInstanceTabContentScreenshotsReal(instanceInfo, element) {
                     } else {
                         displayError(translate("app.screenshots.delete.fail"));
                     }
-                    setInstanceTabContentScreenshots(instanceInfo, element);
+                    setInstanceTabContentScreenshots(instanceInfo, element, scrollElement);
                 },
                 "danger": true
             }
@@ -8243,7 +8769,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
                 } else {
                     displayError(translate("app.screenshots.custom.delete.fail", "%w", word));
                 }
-                setInstanceTabContentScreenshots(instanceInfo, element);
+                setInstanceTabContentScreenshots(instanceInfo, element, scrollElement);
             };
         }
         let screenshotDisplay = document.createElement("img");
@@ -8260,10 +8786,10 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
             screenshotTitle.innerHTML = translate("app.screenshots.failed");
         };
         screenshotDisplayW.appendChild(screenshotDisplay);
-        screenshotTitle.innerHTML = sanitize(name);
-        screenshotDesc.innerHTML = sanitize(desc);
+        screenshotTitle.textContent = name;
+        screenshotDesc.textContent = desc;
         screenshotDisplay.src = file;
-        screenshotDisplay.alt = sanitize(name);
+        screenshotDisplay.alt = name;
         if (pixelationToggle.toggled) screenshotDisplay.style.imageRendering = "pixelated";
         screenshotElement = screenshotDisplay;
     }
@@ -8902,9 +9428,9 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
         dont_override_my_page = true;
         let pid = instance.pid;
         if (checkForProcess(pid)) {
-            showSpecificInstanceContent(instance, launch_info.world ? "worlds" : "content");
+            instance.display(launch_info.world ? "worlds" : "content");
         } else {
-            showSpecificInstanceContent(instance, launch_info.world ? "worlds" : "content", undefined, true);
+            instance.display(launch_info.world ? "worlds" : "content", true);
         }
     } catch (e) {
         displayError(translate("app.launch_error"));
@@ -10159,7 +10685,7 @@ class Dialog {
                 } else if (info[i].type == "text") {
                     let id = createId();
                     let label = document.createElement("label");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     label.setAttribute("for", id);
                     let labelDesc = document.createElement("label");
@@ -10241,12 +10767,12 @@ class Dialog {
                 } else if (info[i].type == "number") {
                     let id = createId();
                     let label = document.createElement("label");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     label.setAttribute("for", id);
                     let labelDesc = document.createElement("label");
                     if (info[i].desc) {
-                        labelDesc.innerHTML = sanitize(info[i].desc);
+                        labelDesc.textContent = info[i].desc;
                         labelDesc.className = "dialog-label-desc";
                         labelDesc.setAttribute("for", id);
                     }
@@ -10270,10 +10796,10 @@ class Dialog {
                     let labelWrapper = document.createElement("div");
                     labelWrapper.className = "label-wrapper";
                     let label = document.createElement("label");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     let labelDesc = document.createElement("label");
-                    labelDesc.innerHTML = sanitize(info[i].desc);
+                    labelDesc.textContent = info[i].desc;
                     labelDesc.className = "dialog-label-desc";
                     let toggleEle = document.createElement("button");
                     let toggle = new Toggle(toggleEle, () => { }, info[i].default ?? false);
@@ -10291,12 +10817,12 @@ class Dialog {
                 } else if (info[i].type == "slider") {
                     let id = createId();
                     let label = document.createElement("label");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     label.setAttribute("for", id);
                     let labelDesc = document.createElement("label");
                     if (info[i].desc) {
-                        labelDesc.innerHTML = sanitize(info[i].desc);
+                        labelDesc.textContent = info[i].desc;
                         labelDesc.className = "dialog-label-desc";
                         labelDesc.setAttribute("for", id);
                     }
@@ -10316,7 +10842,7 @@ class Dialog {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     let label = document.createElement("div");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
@@ -10328,7 +10854,7 @@ class Dialog {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     let label = document.createElement("div");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
@@ -10344,7 +10870,7 @@ class Dialog {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     let label = document.createElement("div");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
@@ -10357,7 +10883,7 @@ class Dialog {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     let label = document.createElement("div");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     wrapper.appendChild(label);
                     let element = document.createElement("div");
@@ -10371,7 +10897,7 @@ class Dialog {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
                     let label = document.createElement("div");
-                    label.innerHTML = sanitize(info[i].name);
+                    label.textContent = info[i].name;
                     label.className = "dialog-label";
                     let labelDesc = document.createElement("label");
                     if (info[i].desc) {
@@ -10416,12 +10942,12 @@ class Dialog {
                                         multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
                                     }
                                     if (multiSelect.onchange) multiSelect.onchange();
-                                    label.innerHTML = sanitize(info[i].name);
+                                    label.textContent = info[i].name;
                                 } catch (err) {
                                     if (currentToken !== updateToken) return;
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
                                     if (multiSelect.onchange) multiSelect.onchange();
-                                    label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
+                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
                                     multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
                                 }
                             });
@@ -10441,12 +10967,12 @@ class Dialog {
                                         multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
                                     }
                                     if (multiSelect.onchange) multiSelect.onchange();
-                                    label.innerHTML = sanitize(info[i].name);
+                                    label.textContent = info[i].name;
                                 } catch (err) {
                                     if (currentToken !== updateToken) return;
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
                                     if (multiSelect.onchange) multiSelect.onchange();
-                                    label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
+                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
                                     multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
                                 }
                             }
@@ -10464,11 +10990,11 @@ class Dialog {
                                     } else {
                                         multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(info[i].default) ? info[i].default : list[0]);
                                     }
-                                    label.innerHTML = sanitize(info[i].name);
+                                    label.textContent = info[i].name;
                                 } catch (err) {
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
                                     if (multiSelect.onchange) multiSelect.onchange();
-                                    label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
+                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
                                     multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
                                 }
                             }
@@ -10511,7 +11037,7 @@ class Dialog {
                                 } catch (err) {
                                     if (currentToken !== updateToken) return;
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
+                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
                                     multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
                                 }
                             });
@@ -10530,7 +11056,7 @@ class Dialog {
                                     label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loaderElement.value]);
                                 } catch (err) {
                                     displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    label.innerHTML = sanitize(translate("app.dialog.unable_to_load") + " " + info[i].name);
+                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
                                     multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
                                 }
                             }
@@ -10566,7 +11092,7 @@ class Dialog {
         for (let i = 0; i < buttons.length; i++) {
             let buttonElement = document.createElement("button");
             buttonElement.className = "dialog-button";
-            buttonElement.innerHTML = sanitize(buttons[i].content);
+            buttonElement.textContent = buttons[i].content;
             if (buttons[i].type == "cancel") {
                 buttonElement.onclick = (e) => {
                     this.element.close();
@@ -10597,101 +11123,6 @@ class Dialog {
 }
 
 let global_discover_content_states = {};
-
-function showAddContent(instance_id, vanilla_version, loader, default_tab) {
-    for (let i = 0; i < navButtons.length; i++) {
-        navButtons[i].removeSelected();
-    }
-    discoverButton.setSelected();
-    added_vt_packs = [];
-    let discover_content_states = {};
-    global_discover_content_states = {};
-    content.innerHTML = "";
-    let titleTop = document.createElement("div");
-    titleTop.className = "title-top";
-    let backButton = document.createElement("button");
-    backButton.innerHTML = '<i class="fa-solid fa-arrow-left"></i>' + translate("app.discover.back_to_instance");
-    backButton.className = "back-button";
-    backButton.onclick = async () => {
-        showSpecificInstanceContent(await Instance.getInstance(instance_id), default_tab == "world" ? "worlds" : "content");
-    }
-    let title = document.createElement("h1");
-    title.innerHTML = translate("app.discover.add_content");
-    titleTop.appendChild(title);
-    if (instance_id) titleTop.appendChild(backButton);
-    if (!instance_id) title.innerHTML = translate("app.discover.title");
-    let ele = document.createElement("div");
-    ele.classList.add("instance-content");
-    ele.appendChild(titleTop);
-    content.appendChild(ele);
-    let tabsElement = document.createElement("div");
-    ele.appendChild(tabsElement);
-    let tabs = new TabContent(tabsElement, [
-        !instance_id ? {
-            "name": translate("app.discover.modpacks"),
-            "value": "modpack",
-            "func": () => {
-                contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        } : null,
-        !loader || loader != "vanilla" ? {
-            "name": translate("app.discover.mods"),
-            "value": "mod",
-            "func": () => {
-                contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        } : null,
-        {
-            "name": translate("app.discover.resource_packs"),
-            "value": "resourcepack",
-            "func": () => {
-                contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        },
-        !loader || loader != "vanilla" ? {
-            "name": translate("app.discover.shaders"),
-            "value": "shader",
-            "func": () => {
-                contentTabSelect("shader", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        } : null,
-        {
-            "name": translate("app.discover.worlds"),
-            "value": "world",
-            "func": () => {
-                contentTabSelect("world", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        },
-        {
-            "name": translate("app.discover.servers"),
-            "value": "servers",
-            "func": () => {
-                contentTabSelect("server", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        },
-        {
-            "name": translate("app.discover.data_packs"),
-            "value": "datapack",
-            "func": () => {
-                contentTabSelect("datapack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-            }
-        }
-    ].filter(e => e));
-    let tabInfo = document.createElement("div");
-    tabInfo.className = "tab-info";
-    ele.appendChild(tabInfo);
-    if (default_tab) {
-        tabs.selectOptionAdvanced(default_tab);
-        contentTabSelect(default_tab, tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-    } else if (!instance_id) {
-        contentTabSelect("modpack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-    } else if (!loader || loader != "vanilla") {
-        contentTabSelect("mod", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-    } else {
-        contentTabSelect("resourcepack", tabInfo, loader, vanilla_version, instance_id, discover_content_states);
-    }
-    clearMoreMenus();
-}
 
 class ContentSearchEntry {
     constructor(content, installContent, installFunction, instance_id, vanilla_version, loader, alreadyInstalled, experimental, project_type, offline, states) {
@@ -10766,7 +11197,7 @@ class ContentSearchEntry {
             actions.appendChild(downloadCountElement);
         } else if (content.downloads) {
             let downloadCountElement = document.createElement("div");
-            downloadCountElement.innerHTML = translate("app.discover.download_count", "%d", sanitize(formatNumber(content.downloads)));
+            downloadCountElement.innerHTML = translate("app.discover.download_count", "%d", formatNumber(content.downloads));
             downloadCountElement.className = "discover-item-downloads";
             actions.appendChild(downloadCountElement);
         }
@@ -10813,63 +11244,6 @@ function formatNumber(num) {
     if (num < 100000000000) return Math.round(num / 100000000) / 10 + "B";
     if (num < 1000000000000) return Math.round(num / 1000000000) + "B";
     return "Some Number";
-}
-
-function contentTabSelect(tab, ele, loader, version, instance_id, states) {
-    ele.innerHTML = '';
-    let sources = [];
-    if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "datapack" || tab == "server") {
-        sources.push({
-            "name": translate("app.discover.modrinth"),
-            "value": "modrinth",
-            "func": () => { }
-        });
-    }
-    if (tab == "modpack" || tab == "mod" || tab == "resourcepack" || tab == "shader" || tab == "world" || tab == "datapack") {
-        sources.push({
-            "name": translate("app.discover.curseforge"),
-            "value": "curseforge",
-            "func": () => { }
-        });
-    }
-    if (tab == "resourcepack" || tab == "datapack") {
-        sources.push({
-            "name": translate("app.discover.vanilla_tweaks"),
-            "value": "vanilla_tweaks",
-            "func": () => { }
-        });
-        added_vt_packs = [];
-    }
-    // if (tab == "world") {
-    //     sources.push({
-    //         "name": "Minecraft Maps",
-    //         "value": "minecraft_maps",
-    //         "func": () => { }
-    //     });
-    // }
-    // let tabs = new TabContent(tabsElement,sources);
-
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.className = "search-and-filter-v2";
-    let discoverList = document.createElement("div");
-    discoverList.className = "discover-list";
-    let searchElement = document.createElement("div");
-    searchElement.style.flexGrow = 2;
-    let searchContents = "";
-    let s = new SearchBar(searchElement, () => { }, (v) => {
-        searchContents = v;
-        getContent(discoverList, instance_id, d.getSelected, v, loader, version, tab, undefined, undefined, undefined, undefined, states);
-    });
-    let dropdownElement = document.createElement("div");
-    dropdownElement.style.minWidth = "200px";
-    let d = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
-        getContent(discoverList, instance_id, d.getSelected, searchContents, loader, version, tab, undefined, undefined, undefined, undefined, states);
-    });
-    getContent(discoverList, instance_id, sources[0].value, "", loader, version, tab, undefined, undefined, undefined, undefined, states);
-    searchAndFilter.appendChild(dropdownElement);
-    searchAndFilter.appendChild(searchElement);
-    ele.appendChild(searchAndFilter);
-    ele.appendChild(discoverList);
 }
 
 let pages = 0;
@@ -11006,234 +11380,6 @@ class Pagination {
 }
 
 let added_vt_packs = [];
-
-async function getContent(element, instance_id, source, query, loader, version, project_type, vt_version, page = 1, pageSize = 20, sortBy = "relevance", states) {
-    let instance_content = [];
-    if (instance_id) instance_content = await (await Instance.getInstance(instance_id)).getContent();
-    if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && project_type == "server") loader = "all";
-    let content_ids = instance_content.map(e => e.source_info);
-    element.innerHTML = "";
-    let loading = new LoadingContainer();
-    element.appendChild(loading.element);
-    if (source == "modrinth") {
-        let results;
-        try {
-            results = await Modrinth.search(query, loader == "all" ? null : loader, project_type, version, page, pageSize, sortBy);
-            element.innerHTML = "";
-        } catch (err) {
-            loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
-            return;
-        }
-        pages = Math.ceil(results.total_hits / pageSize);
-        let paginationTop = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
-        }, [
-            {
-                "name": translate("app.discover.sort.relevance"),
-                "value": "relevance"
-            },
-            {
-                "name": translate("app.discover.sort.downloads"),
-                "value": "downloads"
-            },
-            {
-                "name": translate("app.discover.sort.newest"),
-                "value": "newest"
-            },
-            {
-                "name": translate("app.discover.sort.updated"),
-                "value": "updated"
-            }
-        ], sortBy, (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v, states);
-        }, [
-            {
-                "name": translate("app.discover.view.5"),
-                "value": "5"
-            },
-            {
-                "name": translate("app.discover.view.10"),
-                "value": "10"
-            },
-            {
-                "name": translate("app.discover.view.15"),
-                "value": "15"
-            },
-            {
-                "name": translate("app.discover.view.20"),
-                "value": "20"
-            },
-            {
-                "name": translate("app.discover.view.50"),
-                "value": "50"
-            },
-            {
-                "name": translate("app.discover.view.100"),
-                "value": "100"
-            }
-        ], pageSize.toString(), (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy, states);
-        }, [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
-            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy, states);
-        }, project_type == "server" ? [
-            {
-                "name": translate("app.discover.loader.all"),
-                "value": "all"
-            },
-            {
-                "name": translate("app.discover.type.vanilla"),
-                "value": "vanilla"
-            },
-            {
-                "name": translate("app.discover.type.modded"),
-                "value": "modpack"
-            }
-        ] : ["resourcepack", "shader", "world", "datapack"].includes(project_type) ? null : [
-            {
-                "name": translate("app.discover.loader.all"),
-                "value": "all"
-            },
-            {
-                "name": translate("app.loader.fabric"),
-                "value": "fabric"
-            },
-            {
-                "name": translate("app.loader.forge"),
-                "value": "forge"
-            },
-            {
-                "name": translate("app.loader.neoforge"),
-                "value": "neoforge"
-            },
-            {
-                "name": translate("app.loader.quilt"),
-                "value": "quilt"
-            }
-        ], loader ? loader : "all", (v) => {
-            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy, states);
-        });
-        let paginationBottom = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
-        });
-        element.appendChild(paginationTop.element);
-        if (!results.projects || !results.projects.length) {
-            let noresults = new NoResultsFound();
-            element.appendChild(noresults.element);
-            return;
-        }
-        for (let i = 0; i < results.projects.length; i++) {
-            let content = results.projects[i];
-            let entry = new ContentSearchEntry(content, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (button) => {
-                installButtonClick(content, undefined, instance_id, button, undefined, undefined, states)
-            }, instance_id, version, loader, content_ids.includes(content.id), false, project_type, undefined, states);
-            element.appendChild(entry.element);
-        }
-        element.appendChild(paginationBottom.element);
-    } else if (source == "curseforge") {
-        let results;
-        try {
-            results = await CurseForge.search(query, loader, project_type, version, page, pageSize, sortBy);
-            element.innerHTML = "";
-        } catch (err) {
-            loading.errorOut(err, () => { getContent(element, instance_id, source, query, loader, version, project_type, vt_version) });
-            return;
-        }
-        pages = Math.ceil(results.total_hits / pageSize);
-        let paginationTop = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
-        }, ["server"].includes(project_type) ? null : [
-            {
-                "name": translate("app.discover.sort.relevance"),
-                "value": "relevance"
-            },
-            {
-                "name": translate("app.discover.sort.downloads"),
-                "value": "downloads"
-            },
-            {
-                "name": translate("app.discover.sort.newest"),
-                "value": "newest"
-            },
-            {
-                "name": translate("app.discover.sort.updated"),
-                "value": "updated"
-            }
-        ], sortBy, (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, pageSize, v, states);
-        }, ["server"].includes(project_type) ? null : [
-            {
-                "name": translate("app.discover.view.5"),
-                "value": "5"
-            },
-            {
-                "name": translate("app.discover.view.10"),
-                "value": "10"
-            },
-            {
-                "name": translate("app.discover.view.15"),
-                "value": "15"
-            },
-            {
-                "name": translate("app.discover.view.20"),
-                "value": "20"
-            },
-            {
-                "name": translate("app.discover.view.50"),
-                "value": "50"
-            },
-            {
-                "name": translate("app.discover.view.100"),
-                "value": "100"
-            }
-        ], pageSize.toString(), (v) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, 1, Number(v), sortBy, states);
-        }, ["server"].includes(project_type) ? null : [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), version ? version : "all", (v) => {
-            getContent(element, instance_id, source, query, loader, v == "all" ? null : v, project_type, vt_version, page, pageSize, sortBy, states);
-        }, ["resourcepack", "shader", "world", "datapack", "server"].includes(project_type) ? null : [
-            {
-                "name": translate("app.discover.loader.all"),
-                "value": "all"
-            },
-            {
-                "name": translate("app.loader.fabric"),
-                "value": "fabric"
-            },
-            {
-                "name": translate("app.loader.forge"),
-                "value": "forge"
-            },
-            {
-                "name": translate("app.loader.neoforge"),
-                "value": "neoforge"
-            },
-            {
-                "name": translate("app.loader.quilt"),
-                "value": "quilt"
-            }
-        ], loader ? loader : "all", (v) => {
-            getContent(element, instance_id, source, query, v == "all" ? null : v, version, project_type, vt_version, page, pageSize, sortBy, states);
-        });
-        let paginationBottom = new Pagination(page, pages, (new_page) => {
-            getContent(element, instance_id, source, query, loader, version, project_type, vt_version, new_page, pageSize, sortBy, states)
-        });
-        element.appendChild(paginationTop.element);
-        if (!results.projects || !results.projects.length) {
-            let noresults = new NoResultsFound();
-            element.appendChild(noresults.element);
-            return;
-        }
-        for (let i = 0; i < results.projects.length; i++) {
-            let content = results.projects[i];
-            let entry = new ContentSearchEntry(content, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (button) => {
-                installButtonClick(content, undefined, instance_id, button, undefined, undefined, states)
-            }, instance_id, version, loader, content_ids.includes(content.id + ".0"), false, project_type, undefined, states);
-            element.appendChild(entry.element);
-        }
-        element.appendChild(paginationBottom.element);
-    } else if (source == "vanilla_tweaks") {
-        new VanillaTweaksSelector(project_type, version, instance_id, vt_version, element, query);
-    }
-}
 
 function displayVanillaTweaksEditor(instance_id, version, packs, file_name, content) {
     let wrapper = document.createElement("div");
@@ -11566,7 +11712,7 @@ class VanillaTweaksSelector {
                         }
                         let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                         await instance.setInstalling(true);
-                        await showSpecificInstanceContent(instance);
+                        instance.display();
                         let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
                         if (file_name) {
                             await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
@@ -11831,7 +11977,6 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let content = await instance.getContent();
     let modrinth_ids = content.filter(e => e.source == "modrinth").map(e => e.source_info);
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => Number(e.source_info));
-    console.log(version);
     let initialContent = await addContent(instance_id, project_type, version.download_url, version.filename, data_pack_world, project_id);
     if (isUpdate) return initialContent;
     let version_number = version.version_number || "";
@@ -11845,7 +11990,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     if (dependencies && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
-            if (modrinth_ids.includes(dependency.project_id) || curseforge_ids.includes(dependency.project_id)) continue;
+            if (modrinth_ids.includes(dependency.project_id) || curseforge_ids.includes(Number(dependency.project_id))) continue;
             let project = Project.getFromId(dependency.project_id, source);
             if (dependency.version_id) {
                 let version = ProjectVersion.getFromId(dependency.version_id, dependency.project_id, source);
@@ -11856,16 +12001,6 @@ async function installSpecificVersion(version, source, instance, project_type, t
         }
     }
     return initialContent;
-}
-
-function formatCategory(e) {
-    return toTitleCase(e.replaceAll("-", " "));
-}
-
-function toTitleCase(str) {
-    return str.replace(/\w\S*/g, function (txt) {
-        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-    });
 }
 
 async function addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id) {
@@ -11897,7 +12032,7 @@ class LoadingContainer {
         error.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         let text = document.createElement("div");
         text.className = "loading-container-text";
-        text.innerHTML = sanitize(e.message);
+        text.textContent = e.message;
         this.element.innerHTML = '';
         this.element.appendChild(error);
         this.element.appendChild(text);
@@ -11934,6 +12069,13 @@ function sanitize(input) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+function superSanitize(input) {
+    return input;
+    return sanitize(input);
+    if (typeof input !== "string") return "";
+    const sanitizer = new Sanitizer();
 }
 
 async function applyCape(profile, cape) {
@@ -11974,7 +12116,6 @@ async function applySkinFromURL(profile, skin) {
 document.getElementsByClassName("toasts")[0].showPopover();
 
 async function duplicateInstance(instanceInfo) {
-    instanceInfo = await instanceInfo.refresh();
     let dialog = new Dialog();
     if (!instanceInfo.mc_installed || instanceInfo.installing) {
         dialog.showDialog(translate("app.instances.duplicate.title", "%i", instanceInfo.name), "notice", translate("app.instances.duplicate.installing.notice"), [
@@ -12030,7 +12171,7 @@ async function duplicateInstance(instanceInfo) {
                 instanceInfo.loader_version,
                 instanceInfo.locked,
                 instanceInfo.downloaded,
-                instanceInfo.group,
+                instanceInfo.group_id,
                 info.icon,
                 new_instance_id,
                 0,
@@ -12069,7 +12210,7 @@ async function duplicateInstance(instanceInfo) {
                     c.version_id
                 );
             }
-            await showSpecificInstanceContent(newInstance);
+            newInstance.display();
         } catch (e) {
             displayError(translate("app.instances.duplicate.fail"));
             throw e;
@@ -12228,7 +12369,11 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let display_source = translate("app.discover.modrinth");
     if (content_source == "curseforge") display_source = translate("app.discover.curseforge");
 
-    await content.getInfoFromId(content_id, content_source);
+    if (content_id.toString().includes(":")) {
+        await content.getInfoFromSlug(content_id, content_source);
+    } else {
+        await content.getInfoFromId(content_id, content_source);
+    }
     await content.getAllVersions();
     await content.getAuthors();
 
@@ -12243,7 +12388,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let contentTopInfo = document.createElement("div");
     contentTopInfo.classList.add("content-top-info");
     let contentTopTitle = document.createElement("h1");
-    contentTopTitle.innerHTML = sanitize(content.name);
+    contentTopTitle.textContent = content.name;
     contentTopTitle.classList.add("content-top-title");
     contentTopInfo.appendChild(contentTopTitle);
     let contentTopSubInfo = document.createElement("div");
@@ -12269,11 +12414,11 @@ async function displayContentInfo(content_source, content, content_id, instance_
     }
     let contentTopLastUpdated = document.createElement("div");
     contentTopLastUpdated.classList.add("content-top-sub-info-specific");
-    contentTopLastUpdated.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${sanitize(formatTimeRelatively(content.updated))}`;
+    contentTopLastUpdated.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${formatTimeRelatively(content.updated)}`;
     contentTopLastUpdated.setAttribute("title", translate("app.discover.last_updated") + ": " + formatDate(content.updated));
     let contentTopSource = document.createElement("div");
     contentTopSource.classList.add("content-top-sub-info-specific");
-    contentTopSource.innerHTML = `${sanitize(display_source)}`;
+    contentTopSource.textContent = display_source;
     contentTopSource.classList.add(content.source);
     contentTopSubInfo.appendChild(contentTopType);
     contentTopSubInfo.appendChild(contentTopDownloads);
@@ -12552,7 +12697,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 element.style.maxWidth = "800px";
                 element.style.marginInline = "auto";
                 tabContent.appendChild(element);
-                element.innerHTML = content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description;
+                element.innerHTML = superSanitize(content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description);
                 afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked);
             }
         },
@@ -12650,7 +12795,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 wrapper.className = "version-files-wrapper";
                 let topBar = document.createElement("div");
                 topBar.className = "version-file-top";
-                let noLoaderProjectTypes = ["resource_pack", "world"];
+                let noLoaderProjectTypes = ["resource_pack", "world", "resourcepack"];
                 let removeLoaders = noLoaderProjectTypes.includes(content.project_type);
                 let names = ["", translate("app.discover.files.name"), translate("app.discover.files.versions"), translate("app.discover.files.loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""];
                 if (removeLoaders) {
@@ -13313,7 +13458,6 @@ document.addEventListener("scroll", function (e) {
 }, true);
 
 async function addDesktopShortcut(instanceInfo) {
-    instanceInfo = await instanceInfo.refresh();
     let success = await window.enderlynx.createDesktopShortcut(instanceInfo.instance_id, instanceInfo.name, instanceInfo.image);
     if (success) {
         displaySuccess(translate("app.instances.shortcut.created"));
@@ -13564,7 +13708,6 @@ async function updateContent(source, content, project, version, instance) {
     }
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, content.type, content.source_info, content.source);
     if (!version) {
-        content = await content.refresh();
         let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
         if (!new_file_name) {
             displayError(translate("app.error.failure_to_disable"));
@@ -13814,7 +13957,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
             }
             let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
             await instance.setInstalledVersion(version.version_id);
-            await showSpecificInstanceContent(instance);
+            instance.display();
             if (source == "modrinth") {
                 await window.enderlynx.downloadModrinthPack(instance_id, version.download_url, title);
             } else if (source == "curseforge") {
@@ -13995,7 +14138,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 }
                 let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                 await instance.setInstalling(true);
-                await showSpecificInstanceContent(instance);
+                instance.display();
                 await installContent(source, content, version, instance);
                 await instance.setInstalling(false);
                 let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
@@ -14262,7 +14405,6 @@ async function checkForUpdates(isManual) {
 checkForUpdates();
 
 async function createElPack(instance, content_list, overrides, pack_version) {
-    instance = await instance.refresh();
     let manifest = {
         "name": instance.name,
         "icon": instance.image,
@@ -14283,7 +14425,6 @@ async function createElPack(instance, content_list, overrides, pack_version) {
     window.enderlynx.createElPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createMrPack(instance, content_list, overrides, pack_version) {
-    instance = await instance.refresh();
     let url = `https://api.modrinth.com/v2/versions?ids=["${content_list.map(e => e.version_id).join('","')}"]`;
     let info = [];
     try {
@@ -14339,7 +14480,6 @@ async function createMrPack(instance, content_list, overrides, pack_version) {
     window.enderlynx.createMrPack(instance.instance_id, instance.name, manifest, overrides);
 }
 async function createCfZip(instance, content_list, overrides, pack_version) {
-    instance = await instance.refresh();
     let manifest = {
         "minecraft": {
             "version": instance.vanilla_version,
@@ -14380,7 +14520,7 @@ let importInstance = (info, file_path) => {
     ], [], async () => {
         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
         let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
-        await showSpecificInstanceContent(instance);
+        instance.display();
         let packInfo = await window.enderlynx.processPackFile(file_path, instance_id, info.name);
         if (packInfo.error) {
             await instance.setFailed(true);
@@ -14699,6 +14839,7 @@ document.body.ondrop = (e) => {
                         return;
                     }
                     importInstance(info, file.path);
+                    continue;
                 }
                 if (instance.locked) {
                     displayError(translate("app.import.content.locked"));
@@ -14712,7 +14853,7 @@ document.body.ondrop = (e) => {
                     return;
                 }
             }
-            if (document.body.contains(overlay)) setInstanceTabContentContent(instance, overlay.parentElement);
+            if (document.body.contains(overlay)) instance.instanceScreen.showContent();
             document.body.classList.remove("loading");
         });
     } else if (overlay.dataset.action == "world-import") {
@@ -14724,6 +14865,7 @@ document.body.ondrop = (e) => {
                     let info = await window.enderlynx.readPackFile(file.path);
                     if (!info) return;
                     importInstance(info, file.path);
+                    continue;
                 }
                 let success = await window.enderlynx.importWorld(file.path, overlay.dataset.instanceId, file.name);
                 if (!success) {
@@ -14731,7 +14873,27 @@ document.body.ondrop = (e) => {
                     return;
                 }
             }
-            if (document.body.contains(overlay)) setInstanceTabContentWorlds(instance, overlay.parentElement);
+            if (document.body.contains(overlay)) instance.instanceScreen.showWorlds();
+        });
+    } else if (overlay.dataset.action == "file-import") {
+        new Promise(async (resolve) => {
+            let instance = await Instance.getInstance(overlay.dataset.instanceId);
+            let paths = overlay.dataset.paths;
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                if (await window.enderlynx.isInstanceFile(file.path)) {
+                    let info = await window.enderlynx.readPackFile(file.path);
+                    if (!info) return;
+                    importInstance(info, file.path);
+                    continue;
+                }
+                let success = await window.enderlynx.importFile(file.path, overlay.dataset.instanceId, file.name, overlay.dataset.paths);
+                if (!success) {
+                    displayError(translate("app.import.files.fail", "%f", file.name));
+                    return;
+                }
+            }
+            if (document.body.contains(overlay)) instance.instanceScreen.showFiles();
         });
     } else if (overlay.dataset.action == "skin-import") {
         new Promise(async (resolve) => {
@@ -14741,6 +14903,7 @@ document.body.ondrop = (e) => {
                     let info = await window.enderlynx.readPackFile(file.path);
                     if (!info) return;
                     importInstance(info, file.path);
+                    continue;
                 }
                 let dataUrl = await window.enderlynx.pathToDataUrl(file.path);
                 importSkin({
@@ -14748,8 +14911,8 @@ document.body.ondrop = (e) => {
                     "name": translate("app.wardrobe.unnamed"),
                     "model": "auto"
                 }, () => {
-                    if (document.body.contains(overlay) && refreshWardrobe) refreshWardrobe();
-                })
+                    if (document.body.contains(overlay)) wardrobeScreen.display();
+                });
             }
         });
     }
@@ -14798,4 +14961,18 @@ function sortByVersion(list, reverse) {
         return reverse ? bIndex - aIndex : aIndex - bIndex;
     });
     return list;
+}
+
+let logResizeFunction;
+let aceResizeFunction;
+
+window.addEventListener('resize', () => {
+    if (logResizeFunction) logResizeFunction();
+    if (aceResizeFunction) aceResizeFunction();
+});
+
+function createElement(tag, className, props = {}) {
+    let ele = document.createElement(tag);
+    if (className) ele.className = className;
+    return Object.assign(ele, props);
 }

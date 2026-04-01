@@ -23,9 +23,10 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron/fuses": "^1.8.0",
     "@electron/rebuild": "^4.0.3",
-    "electron": "^40.4.1"
+    "electron": "^40.8.5"
   },
   "dependencies": {
+    "ace-builds": "^1.43.6",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",
     "create-desktop-shortcuts": "^1.11.1",

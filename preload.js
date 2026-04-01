@@ -366,6 +366,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
             callback(key, value, instance_id);
         });
     },
+    onContentUpdated: (callback) => {
+        ipcRenderer.on('content-updated', (_event, key, value, content_id) => {
+            callback(key, value, content_id);
+        });
+    },
     onPage: async (callback) => {
         pageCallback = callback;
         if (startingPage) callback (startingPage);
@@ -800,7 +805,12 @@ contextBridge.exposeInMainWorld('enderlynx', {
     unpinWorld: async (...params) => ipcRenderer.invoke('unpin-world', ...params),
     getPinnedInstances: async (...params) => ipcRenderer.invoke('get-pinned-instances', ...params),
     clearNetworkCache: async () => ipcRenderer.invoke('clear-network-cache'),
-    downloadLatestJava: async (version) => ipcRenderer.invoke('download-latest-java', version)
+    downloadLatestJava: async (version) => ipcRenderer.invoke('download-latest-java', version),
+    getFiles: async (instance_id, paths) => ipcRenderer.invoke('get-files', instance_id, paths),
+    deleteFiles: async (instance_id, paths, files) => ipcRenderer.invoke('delete-files', instance_id, paths, files),
+    editFile: async (instance_id, filePath, data) => ipcRenderer.invoke('edit-file', instance_id, filePath, data),
+    renameFile: async (instance_id, filePath, newFilePath) => ipcRenderer.invoke('rename-file', instance_id, filePath, newFilePath),
+    importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths)
 });
 
 async function getServerLastPlayed(instance_id, ip) {

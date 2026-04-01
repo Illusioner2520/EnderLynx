@@ -88,7 +88,7 @@ async function moveFiles() {
             configData = await fsPromises.readFile(srcConfigPath);
             await fsPromises.writeFile(path.resolve(user_path, "log_config.xml"), configData);
         } catch (e) {
-            await fsPromises.writeFileSync(path.resolve(user_path, "log_config.xml"), "");
+            await fsPromises.writeFile(path.resolve(user_path, "log_config.xml"), "");
         }
     }
     let srcConfigPath = path.resolve(__dirname, "updater.exe");
@@ -4501,6 +4501,7 @@ function updateContent(key, value, content_id) {
     if (typeof value === "boolean") value = Number(value);
     let allowedKeys = ["name", "author", "disabled", "image", "file_name", "source", "type", "version", "version_id", "instance", "source_info TEXT"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
+    if (win && win.webContents) win.webContents.send('content-updated', key, value, content_id);
     return db.prepare(`UPDATE content SET ${key} = ? WHERE id = ?`).run(value, content_id);
 }
 function addContentDatabase(name, author, image, file_name, source, type, version, instance_id, source_info, disabled, version_id) {
@@ -5032,6 +5033,85 @@ ipcMain.handle('download-latest-java', async (_, version) => {
     try {
         let java = new Java(db, user_path, win, translate);
         return java.downloadJava(version);
+    } catch (e) {
+        return false;
+    }
+});
+
+ipcMain.handle('get-files', async (_, instance_id, paths) => {
+    if (paths.startsWith("/")) paths = paths.substring(1);
+    let fullPath = path.join(user_path, "minecraft/instances", instance_id, paths);
+    try {
+
+        if (!fs.statSync(fullPath).isDirectory()) {
+            const fileContent = await fsPromises.readFile(fullPath, 'utf-8');
+            return fileContent;
+        }
+
+        const files = await fsPromises.readdir(fullPath, { withFileTypes: true });
+        const result = [];
+        
+        for (const file of files) {
+            const filePath = path.join(fullPath, file.name);
+            const stats = await fsPromises.stat(filePath);
+            result.push({
+                name: file.name,
+                dateModified: stats.mtime,
+                isDirectory: file.isDirectory(),
+                fullPath: filePath,
+                relativePath: path.join(paths, file.name)
+            });
+        }
+        
+        return result;
+    } catch (e) {
+        return [];
+    }
+});
+
+ipcMain.handle('delete-files', async (_, instance_id, paths, files) => {
+    let fullPath = path.join(user_path, "minecraft/instances", instance_id, paths);
+    console.log(files);
+    try {
+        for (const file of files) {
+            const filePath = path.join(fullPath, file);
+            if (fs.existsSync(filePath)) {
+                await fsPromises.rm(filePath, { recursive: true, force: true });
+            }
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
+
+ipcMain.handle('edit-file', async (_, instance_id, filePath, data) => {
+    let fullPath = path.join(user_path, "minecraft/instances", instance_id, filePath);
+    try {
+        await fsPromises.writeFile(fullPath, data, { encoding: 'utf-8' });
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
+
+ipcMain.handle('rename-file', async (_, instance_id, filePath, newFilePath) => {
+    let oldPath = path.join(user_path, "minecraft/instances", instance_id, filePath);
+    let newPath = path.join(user_path, "minecraft/instances", instance_id, newFilePath);
+    if (fs.existsSync(newPath)) return false;
+    try {
+        await fsPromises.rename(oldPath, newPath);
+        return true;
+    } catch (e) {
+        return false;
+    }
+});
+
+ipcMain.handle('import-file', async (_, file_path, instance_id, file_name, paths) => {
+    let fullPath = path.join(user_path, "minecraft/instances", instance_id, paths, file_name);
+    try {
+        await fsPromises.copyFile(file_path, fullPath);
+        return true;
     } catch (e) {
         return false;
     }

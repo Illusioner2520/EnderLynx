@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EnderLynx</title>
     <link href="style.css" rel="stylesheet" type="text/css">
-    <link href="fontawesome/css/all.min.css" rel="stylesheet" type="text/css">
+    <link href="resources/fontawesome/css/all.min.css" rel="stylesheet" type="text/css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' 'nonce-starting-script-enderlynx'; style-src 'self' 'unsafe-inline'; img-src data: *; connect-src *; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;">
@@ -71,8 +71,16 @@
             script.type = "module";
             const script2 = document.createElement("script");
             script2.src = "node_modules/skinview3d/bundles/skinview3d.bundle.js";
+            const script3 = document.createElement("script");
+            script3.src = "node_modules/ace-builds/src/ace.js";
             document.body.appendChild(script);
             document.body.appendChild(script2);
+            document.body.appendChild(script3);
+            script3.onload = () => {
+                const script4 = document.createElement("script");
+                script4.src = "resources/ace/ace-mode.js";
+                document.body.appendChild(script4);
+            }
         });
     </script>
     <div id="drop-overlay" class="drop-overlay" data-action="instance-import">
