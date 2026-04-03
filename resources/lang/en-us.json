@@ -1163,7 +1163,19 @@
     "app.files.copy_relative_path": "Copy Relative Path",
     "app.files.copy_full_path": "Copy Full Path",
     "app.files.rename": "Rename",
+    "app.files.rename.title": "Rename File",
+    "app.files.rename.cancel": "Cancel",
+    "app.files.rename.confirm": "Rename",
+    "app.files.rename.name": "Name",
+    "app.files.rename.success": "File renamed",
+    "app.files.rename.fail": "Failed to rename file",
     "app.files.move": "Move",
+    "app.files.move.title": "Move File",
+    "app.files.move.cancel": "Cancel",
+    "app.files.move.confirm": "Move",
+    "app.files.move.location": "File Location",
+    "app.files.move.success": "File moved",
+    "app.files.move.fail": "Failed to move file",
     "app.files.delete": "Delete",
     "app.files.delete_multiple.success": "Deleted files",
     "app.files.delete_multiple.fail": "Failed to delete files",
@@ -1174,5 +1186,6 @@
     "app.files.relative_path.copy.success": "Copied relative path to clipboard",
     "app.files.relative_path.copy.fail": "Failed to copy to clipboard",
     "app.files.full_path.copy.success": "Copied full path to clipboard",
-    "app.files.full_path.copy.fail": "Failed to copy to clipboard"
+    "app.files.full_path.copy.fail": "Failed to copy to clipboard",
+    "app.discover.error": "There is no version of this content marked as compatible with this instance. Please install a specific version instead."
 }

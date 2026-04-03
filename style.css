@@ -609,6 +609,7 @@ h1 {
     display: flex;
     gap: 8px;
     align-items: center;
+    overflow: hidden;
 }
 
 .search {
@@ -1193,7 +1194,6 @@ i {
 }
 
 .content-list {
-    display: grid;
     background-color: var(--color-1t);
     border-radius: 10px;
     overflow: hidden;
@@ -5780,6 +5780,9 @@ body.loading * {
     align-items: center;
     gap: 4px;
     flex-shrink: 1;
+    overflow: auto;
+    scrollbar-width: none !important;
+    position: relative;
 }
 
 .breadcrumb-arrow {

@@ -744,12 +744,16 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return path.resolve(userPath, "minecraft", "capes", `${cape_id}.png`);
     },
     showContentInFolder: (instance_id, type, file_name) => {
-        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, type, file_name);
+        let file_path = path.join(userPath, "minecraft", "instances", instance_id, type, file_name);
         showFileInFolder(file_path);
     },
     showScreenshotInFolder: (instance_id, file_name) => {
-        let file_path = path.resolve(userPath, "minecraft", "instances", instance_id, "screenshots", file_name);
+        let file_path = path.join(userPath, "minecraft", "instances", instance_id, "screenshots", file_name);
         showFileInFolder(file_path);
+    },
+    showInstanceFileInFolder: (instance_id, file_path) => {
+        let full_path = path.join(userPath, "minecraft/instances", instance_id, file_path);
+        showFileInFolder(full_path);
     },
     getInstance: async (...params) => ipcRenderer.invoke('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),

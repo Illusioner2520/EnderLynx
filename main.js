@@ -5059,7 +5059,9 @@ ipcMain.handle('get-files', async (_, instance_id, paths) => {
                 dateModified: stats.mtime,
                 isDirectory: file.isDirectory(),
                 fullPath: filePath,
-                relativePath: path.join(paths, file.name)
+                relativePath: path.join(paths, file.name),
+                ext: path.extname(filePath).substring(1),
+                location: paths
             });
         }
         
@@ -5100,6 +5102,7 @@ ipcMain.handle('rename-file', async (_, instance_id, filePath, newFilePath) => {
     let newPath = path.join(user_path, "minecraft/instances", instance_id, newFilePath);
     if (fs.existsSync(newPath)) return false;
     try {
+        await fsPromises.mkdir(path.dirname(newPath), { recursive: true });
         await fsPromises.rename(oldPath, newPath);
         return true;
     } catch (e) {

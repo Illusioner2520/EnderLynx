@@ -1539,6 +1539,9 @@ class ContentList {
     } */
     constructor(element, content, searchBar, features, filter, notFoundMessage = translate("app.list.no_results_found"), scrollElement) {
         this.scrollElement = scrollElement;
+        scrollElement.onscroll = () => {
+            this.render(this.filteredItems);
+        }
         const fragment = document.createDocumentFragment();
         let notFoundElement = new NoResultsFound(notFoundMessage).element;
         notFoundElement.style.background = "transparent";
@@ -1891,10 +1894,8 @@ class ContentList {
         this.contentElement = contentMainElement;
         fragment.appendChild(contentMainElement);
         element.appendChild(fragment);
+        this.offset = getRelativeOffset(contentMainElement, this.scrollElement);
         this.applyFilters("", "all");
-        // instanceScrollFunction = () => {
-        //     this.render();
-        // }
     }
 
     reApplyFilters() {
@@ -1928,35 +1929,45 @@ class ContentList {
         this.reApplyFilters();
     }
 
-    render() {
-        let scrollTop = this.scrollElement.scrollY;
-        let top = this.contentElement
+    render(items) {
+        let h = 0;
+        for (let i = 0; i < items.length; i++) h += items[i].height;
+        this.contentElement.style.height = h + "px";
+        const scrollTop = this.scrollElement.scrollTop;
+        const viewportHeight = this.scrollElement.clientHeight;
+        let rangeBottom = scrollTop - this.offset;
+        let rangeTop = scrollTop + viewportHeight;
+        let itemsHeight = 0;
+        let spacerSet = false;
+        let count = 0;
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < items.length; i++) {
+            let ele = items[i].element;
+            itemsHeight += items[i].height;
+            count++;
+            if (itemsHeight > rangeBottom && itemsHeight < rangeTop + 100) {
+                if (!spacerSet) {
+                    this.spacer.style.height = itemsHeight - items[i].height + "px";
+                    spacerSet = true;
+                }
+                fragment.appendChild(ele);
+            } else {
+                ele.remove();
+            }
+        }
+        this.contentElement.appendChild(fragment);
+        this.totalText.innerHTML = translate("app.list.total", "%c", count);
+        this.notFoundElement.style.display = count ? "none" : "";
+        if (count == 0) {
+            this.contentElement.style.height = "auto";
+        }
     }
 
     applyFilters(search, dropdown) {
-        let height = 0;
-        let count = 0;
-        const fragment = document.createDocumentFragment();
-        for (let i = 0; i < this.items.length; i++) {
-            let ele = this.items[i].element;
-            if (!this.items[i].name.toLowerCase().includes(search.toLowerCase().trim())) {
-                ele.remove();
-                continue;
-            }
-            if (this.items[i].type != dropdown && dropdown != "all") {
-                ele.remove();
-                continue;
-            }
-            count++;
-            fragment.appendChild(ele);
-            height += this.items[i].height;
-        }
-        height--;
-        this.contentElement.appendChild(fragment);
-        this.contentElement.style.height = height + "px";
-        this.totalText.innerHTML = translate("app.list.total", "%c", count);
-        this.notFoundElement.style.display = count ? "none" : "";
-        this.figureOutMainCheckedState();
+        this.filteredItems = this.items.filter(e => {
+            return e.name.toLowerCase().includes(search.toLowerCase().trim()) && (e.type == dropdown || dropdown == "all");
+        });
+        this.render(this.filteredItems);
     }
 
     updateSecondaryColumn() {
@@ -2009,6 +2020,18 @@ class ContentList {
         });
         this.checkBoxActions.forEach(e => e.style.display = "none");
     }
+}
+
+function getRelativeOffset(child, ancestor) {
+    let offset = 0;
+    let el = child;
+
+    while (el && el !== ancestor) {
+        offset += el.offsetTop;
+        el = el.offsetParent;
+    }
+
+    return offset;
 }
 
 async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown) {
@@ -2418,15 +2441,15 @@ class InstanceScreen extends Screen {
             }, 3600000);
         }
         this.instance.watchForChange("last_played", (date) => {
-            this.last_played = date;
+            this.last_played = new Date(date);
             instanceTopLastPlayed.title = translate("app.instances.last_played", "%t", formatDate(this.last_played, 2000));
             instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
             clearInterval(this.lastPlayedInterval);
-            if (howLongAgo(v) < 3600000) {
+            if (howLongAgo(date) < 3600000) {
                 this.lastPlayedInterval = setInterval(() => {
                     instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
                 }, 60000);
-            } else if (howLongAgo(v) < 86400000) {
+            } else if (howLongAgo(date) < 86400000) {
                 this.lastPlayedInterval = setInterval(() => {
                     instanceTopLastPlayed.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}`;
                 }, 3600000);
@@ -2454,35 +2477,35 @@ class InstanceScreen extends Screen {
                 "icon": '<i class="fa-solid fa-plus"></i>',
                 "title": translate("app.button.content.add"),
                 "func": (e) => {
-                    discoverScreen.display(false, instanceInfo, instanceInfo.vanilla_version, instanceInfo.loader);
+                    discoverScreen.display(false, this.instance, this.instance.vanilla_version, this.instance.loader);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": translate("app.button.instances.duplicate"),
                 "func": (e) => {
-                    duplicateInstance(instanceInfo);
+                    duplicateInstance(this.instance);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
-                    window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
+                    window.enderlynx.openInstanceFolder(this.instance.instance_id);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-share"></i>',
                 "title": translate("app.button.instances.share"),
                 "func": (e) => {
-                    openInstanceShareDialog(instanceInfo);
+                    openInstanceShareDialog(this.instance);
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-wrench"></i>',
                 "title": translate("app.button.instances.repair"),
                 "func": () => {
-                    showRepairDialog(instanceInfo);
+                    showRepairDialog(this.instance);
                 }
             },
             {
@@ -2514,7 +2537,7 @@ class InstanceScreen extends Screen {
                 "func": (e) => {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                        "content": translate("app.instances.delete.confirm.description").replace("%i", instanceInfo.name),
+                        "content": translate("app.instances.delete.confirm.description").replace("%i", this.instance.name),
                         "type": "notice"
                     }, {
                         "type": "toggle",
@@ -2532,7 +2555,7 @@ class InstanceScreen extends Screen {
                         }
                     ], [], async (v) => {
                         this.instance.delete();
-                        instanceContent.displayContent();
+                        instancesScreen.display();
                         if (v[0].value) {
                             try {
                                 await window.enderlynx.deleteInstanceFiles(this.instance.instance_id);
@@ -2742,11 +2765,9 @@ class InstanceScreen extends Screen {
                     "type": "confirm",
                     "content": translate("app.content.import.confirm")
                 }
-            ], [], async (v) => {
-                let info = {};
-                v.forEach(e => info[e.id] = e.value);
+            ], [], async (info) => {
                 document.body.classList.add("loading");
-                let success = await window.enderlynx.importContent(info.file_path, info.content_type, instanceInfo.instance_id);
+                let success = await window.enderlynx.importContent(info.file_path, info.content_type, this.instance.instance_id);
                 document.body.classList.remove("loading");
                 if (success) {
                     displaySuccess(translate("app.content.import.complete"));
@@ -3234,9 +3255,7 @@ class InstanceScreen extends Screen {
                     "type": "confirm",
                     "content": translate("app.worlds.import.confirm")
                 }
-            ], [], async (v) => {
-                let info = {};
-                v.forEach(e => info[e.id] = e.value);
+            ], [], async (info) => {
                 for (let i = 0; i < info.world.length; i++) {
                     let world = info.world[i];
                     try {
@@ -3280,11 +3299,9 @@ class InstanceScreen extends Screen {
                     "type": "confirm",
                     "content": translate("app.worlds.server.confirm")
                 }
-            ], [], async (v) => {
-                let info = {};
-                v.forEach(e => info[e.id] = e.value);
+            ], [], async (info) => {
                 await window.enderlynx.addServer(this.instance.instance_id, info.ip, info.name);
-                setInstanceTabContentWorlds(this.instance, element, scrollElement);
+                this.instance.instanceScreen.showWorlds();
             })
         }
         let contentSearch = document.createElement("div");
@@ -3391,7 +3408,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.worlds.edit"),
                                 "icon": '<i class="fa-solid fa-pencil"></i>',
                                 "func": () => {
-                                    openWorldEditDialog(this.instance.instance_id, worlds[i].id, () => setInstanceTabContentWorlds(this.instance, element, scrollElement));
+                                    openWorldEditDialog(this.instance.instance_id, worlds[i].id, () => this.instance.instanceScreen.showWorlds());
                                 }
                             },
                             {
@@ -3628,19 +3645,1092 @@ class InstanceScreen extends Screen {
     }
 
     async showLogs() {
-        setInstanceTabContentLogs(this.instance, this.tabElement, this.contentElement);
+        this.currentTab = "logs";
+        let loading = new LoadingContainer();
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(loading.element);
+        await this.requestFrame();
+        clearMoreMenus();
+        let deleteButton = document.createElement("button");
+        let searchAndFilter = document.createElement("div");
+        searchAndFilter.classList.add("search-and-filter-v2");
+        let contentSearch = document.createElement("div");
+        contentSearch.style.flexGrow = 2;
+        let searchBarFilter = "";
+        new SearchBar(contentSearch, (v) => {
+            searchBarFilter = v.toLowerCase().trim();
+            render();
+        }, null);
+        let typeDropdown = document.createElement("div");
+        let log_info = await window.enderlynx.getInstanceLogs(this.instance.instance_id);
+        let logDisplay = document.createElement("div");
+        let visible = createElement("div", "logs-visible");
+        let spacer = document.createElement("div");
+        logDisplay.appendChild(visible);
+        logDisplay.appendChild(spacer);
+        let logs = [];
+        let logHeight = 600;
+        logResizeFunction = () => {
+            const viewHeight = window.innerHeight;
+            const editorRect = logDisplay.getBoundingClientRect();
+            const distanceFromTop = editorRect.top;
+            const calculatedHeight = viewHeight - distanceFromTop - 10;
+            logDisplay.style.maxHeight = calculatedHeight + "px";
+            logHeight = calculatedHeight;
+            render();
+        }
+        let render = () => {
+            let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
+            const totalItems = showLogs.length;
+            const itemHeight = 15;
+            const containerHeight = logHeight;
+            const buffer = 5;
+            spacer.style.height = totalItems * itemHeight + "px";
+
+            const scrollTop = logDisplay.scrollTop;
+            const startIdx = Math.max(Math.floor(scrollTop / itemHeight) - buffer, 0);
+            const visibleCount = Math.ceil(containerHeight / itemHeight) + buffer * 2;
+            const endIdx = Math.min(startIdx + visibleCount, totalItems);
+
+            visible.style.translate = `0px ${startIdx * itemHeight}px`;
+            visible.innerHTML = '';
+            for (let i = startIdx; i < endIdx; i++) {
+                visible.appendChild(showLogs[i].element);
+            }
+        }
+        let setUpLiveLog = async () => {
+            let log_path = this.instance.current_log_file;
+            let running = checkForProcess(this.instance.pid);
+            if (!running) {
+                await this.instance.setPid(null);
+                logs = [];
+                let lineElement = document.createElement("span");
+                lineElement.innerHTML = translate("app.logs.no_live");
+                lineElement.classList.add("log-entry");
+                logs.push({ "element": lineElement, "content": translate("app.logs.no_live") });
+            } else {
+                let logInfo = await window.enderlynx.getLog(log_path);
+                logInfo = logInfo.split("\n");
+                logs = [];
+                logInfo.forEach((e) => {
+                    if (e == "") return;
+                    let lineElement = document.createElement("span");
+                    lineElement.textContent = e;
+                    lineElement.classList.add("log-entry");
+                    if (e.includes("INFO")) {
+                        lineElement.classList.add("log-info");
+                    } else if (e.includes("WARN")) {
+                        lineElement.classList.add("log-warn");
+                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                        lineElement.classList.add("log-error");
+                    }
+                    logs.push({ "element": lineElement, "content": e });
+                });
+                spacer.style.height = logs.length * 15 + "px";
+                setTimeout(() => {
+                    logDisplay.scrollTo(0, logDisplay.scrollHeight);
+                }, 0);
+                window.enderlynx.watchFile(log_path, (log) => {
+                    let logInfo = log.split("\n");
+                    let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
+                    logInfo.forEach((e) => {
+                        if (e == "") return;
+                        if (e.length == 1) return;
+                        let lineElement = document.createElement("span");
+                        lineElement.textContent = e;
+                        lineElement.classList.add("log-entry");
+                        if (e.includes("INFO")) {
+                            lineElement.classList.add("log-info");
+                        } else if (e.includes("WARN")) {
+                            lineElement.classList.add("log-warn");
+                        } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                            lineElement.classList.add("log-error");
+                        }
+                        logs.push({ "element": lineElement, "content": e });
+                    });
+                    spacer.style.height = logs.length * 15 + "px";
+                    if (scroll) logDisplay.scrollTo(0, logDisplay.scrollHeight);
+                    render();
+                });
+            }
+        }
+        let currentLog = "";
+        logDisplay.onscroll = render;
+        let onChangeLogDropdown = async (e) => {
+            try {
+                window.enderlynx.stopWatching(this.instance.current_log_file);
+            } catch (e) { }
+
+            if (e == "live_log") {
+                deleteButton.style.display = "none";
+                await setUpLiveLog();
+            } else {
+                deleteButton.style.display = "flex";
+                currentLog = e;
+                let logInfo = await window.enderlynx.getLog(this.instance.instance_id, e);
+                logInfo = logInfo.split("\n");
+                logs = [];
+                logInfo.forEach((e) => {
+                    if (e == "") return;
+                    let lineElement = document.createElement("span");
+                    lineElement.textContent = e;
+                    lineElement.classList.add("log-entry");
+                    if (e.includes("INFO")) {
+                        lineElement.classList.add("log-info");
+                    } else if (e.includes("WARN")) {
+                        lineElement.classList.add("log-warn");
+                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                        lineElement.classList.add("log-error");
+                    }
+                    logs.push({ "element": lineElement, "content": e });
+                });
+            }
+            render();
+        }
+        if (log_info.length > 9) {
+            new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
+        } else {
+            new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
+        }
+        typeDropdown.style.minWidth = "300px";
+        searchAndFilter.appendChild(contentSearch);
+        searchAndFilter.appendChild(typeDropdown);
+        let fragment = document.createDocumentFragment();
+        fragment.appendChild(searchAndFilter);
+        let logWrapper = createElement("div", "logs");
+        fragment.appendChild(logWrapper);
+        let logTop = createElement("div", "logs-top");
+        logWrapper.appendChild(logTop);
+        logWrapper.appendChild(logDisplay);
+        deleteButton.style.display = "none";
+        await setUpLiveLog();
+        render();
+        let copyButton = createElement("button", "logs-copy");
+        let shareButton = createElement("button", "logs-share");
+        let deleteAllButton = createElement("button", "logs-delete");
+        deleteButton.className = "logs-delete";
+        copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>' + translate("app.logs.copy");
+        shareButton.innerHTML = '<i class="fa-solid fa-share"></i>' + translate("app.logs.share");
+        deleteButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>' + translate("app.logs.delete");
+        deleteAllButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>' + translate("app.logs.delete_all");
+        copyButton.onclick = () => {
+            let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
+            let copyLogs = showLogs.map(e => e.content).join("\n");
+            navigator.clipboard.writeText(copyLogs).then(() => {
+                displaySuccess(searchBarFilter ? translate("app.logs.clipboard.search") : translate("app.logs.clipboard"));
+            }).catch(() => {
+                displayError(translate("app.logs.clipboard.fail"));
+            });
+        }
+        shareButton.onclick = async () => {
+            let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
+            let copyLogs = showLogs.map(e => e.content).join("\n");
+            let url = "";
+            try {
+                url = await window.enderlynx.shareLogs(copyLogs);
+            } catch (e) {
+                displayError(translate("app.logs.share.fail"));
+                return;
+            }
+            await openShareDialog(translate("app.logs.share.title"), url, translate("app.logs.share.text"));
+        }
+        deleteButton.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.logs.delete.title"), "notice", translate("app.logs.delete.notice"), [
+                {
+                    "type": "cancel",
+                    "content": translate("app.logs.delete.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.logs.delete.confirm")
+                }
+            ], [], async () => {
+                let success = await window.enderlynx.deleteLogs(this.instance.instance_id, currentLog);
+                if (success) {
+                    displaySuccess(translate("app.logs.delete.success"));
+                    this.showLogs();
+                } else {
+                    displayError(translate("app.logs.delete.fail"));
+                }
+            });
+        }
+        deleteAllButton.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.logs.delete_all.title"), "notice", translate("app.logs.delete_all.notice"), [
+                {
+                    "type": "cancel",
+                    "content": translate("app.logs.delete_all.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.logs.delete_all.confirm")
+                }
+            ], [], async () => {
+                let success = await window.enderlynx.deleteAllLogs(this.instance.instance_id);
+                if (success) {
+                    displaySuccess(translate("app.logs.delete_all.success"));
+                    this.showLogs();
+                } else {
+                    displayError(translate("app.logs.delete_all.fail"));
+                }
+            });
+        }
+        logTop.appendChild(copyButton);
+        logTop.appendChild(shareButton);
+        logTop.appendChild(deleteButton);
+        logTop.appendChild(deleteAllButton);
+        logDisplay.className = "logs-display";
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(fragment);
+        logResizeFunction();
     }
 
     async showOptions() {
-        setInstanceTabContentOptions(this.instance, this.tabElement, this.contentElement);
+        this.currentTab = "options";
+        let loading = new LoadingContainer();
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(loading.element);
+        await this.requestFrame();
+        clearMoreMenus();
+        let values = await window.enderlynx.getInstanceOptions(this.instance.instance_id);
+        let searchAndFilter = document.createElement("div");
+        searchAndFilter.classList.add("search-and-filter-v2");
+        let contentSearch = document.createElement("div");
+        contentSearch.style.flexGrow = 2;
+        let searchBar = new SearchBar(contentSearch, (v) => {
+            for (let i = 0; i < values.length; i++) {
+                if (values[i].key.toLowerCase().includes(v.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == dropdownInfo.value || dropdownInfo.value == "all")) {
+                    values[i].element.style.display = "grid";
+                } else {
+                    values[i].element.style.display = "none";
+                }
+            }
+        }, null);
+        let typeDropdown = document.createElement("div");
+        let dropdownInfo = new Dropdown(translate("app.options.type"), [
+            {
+                "name": translate("app.options.all"),
+                "value": "all"
+            },
+            {
+                "name": translate("app.options.number"),
+                "value": "number"
+            },
+            {
+                "name": translate("app.options.text"),
+                "value": "text"
+            },
+            {
+                "name": translate("app.options.boolean"),
+                "value": "boolean"
+            },
+            {
+                "name": translate("app.options.key"),
+                "value": "key"
+            },
+            {
+                "name": translate("app.options.unknown"),
+                "value": "unknown"
+            }
+        ], typeDropdown, "all", (v) => {
+            for (let i = 0; i < values.length; i++) {
+                if (values[i].key.toLowerCase().includes(searchBar.value.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == v || v == "all")) {
+                    values[i].element.style.display = "grid";
+                    values[i].element.classList.remove("hidden");
+                } else {
+                    values[i].element.style.display = "none";
+                    values[i].element.classList.add("hidden");
+                }
+            }
+        });
+        typeDropdown.style.minWidth = "200px";
+        let applyDefaults = createElement("button", "add-content-button");
+        applyDefaults.innerHTML = '<i class="fa-regular fa-file-lines"></i>' + translate("app.instances.options.apply")
+        applyDefaults.onclick = async () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.instances.options.apply.title"), "notice", translate("app.instances.options.apply.description"), [
+                {
+                    "type": "cancel",
+                    "content": translate("app.instances.options.apply.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.instances.options.apply.confirm")
+                }
+            ], [], async () => {
+                let default_options = new DefaultOptions(this.instance.vanilla_version);
+                try {
+                    let v = await window.enderlynx.setOptionsTXT(this.instance.instance_id, await default_options.getOptionsTXT(), false, true);
+                    await this.instance.setAttemptedOptionsTxtVersion(v);
+                    displaySuccess(translate("app.instances.options.apply.done"));
+                } catch (e) {
+                    console.error(e);
+                    displayError(translate("app.instances.options.apply.fail"));
+                }
+                this.showOptions();
+            });
+        }
+        searchAndFilter.appendChild(contentSearch);
+        searchAndFilter.appendChild(typeDropdown);
+        searchAndFilter.appendChild(applyDefaults);
+        let fragment = document.createDocumentFragment();
+        fragment.appendChild(searchAndFilter);
+        let info = document.createElement("div");
+        info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.options.notice_1");
+        info.className = "info";
+        info.style.marginTop = "10px";
+        fragment.appendChild(info);
+        let info2 = document.createElement("div");
+        info2.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.options.notice_2");
+        info2.className = "info";
+        info2.style.marginTop = "10px";
+        fragment.appendChild(info2);
+        let optionList = document.createElement("div");
+        optionList.className = "option-list";
+        fragment.appendChild(optionList);
+        let selectedKeySelect;
+        let selectedKeySelectFunction;
+
+        document.body.removeEventListener("keydown", previousKeyDownEventListener);
+        document.body.removeEventListener("mousedown", previousMouseDownEventListener);
+
+        previousKeyDownEventListener = async (e) => {
+            if (selectedKeySelect) {
+                e.preventDefault();
+                e.stopPropagation();
+                let keyCode = codeToKey[e.code];
+                if (e.key == "NumLock") {
+                    keyCode = codeToKey["NumLock"];
+                }
+                let oldInnerHtml = selectedKeySelect.innerHTML;
+                let oldValue = selectedKeySelect.value;
+                let tempSelected = selectedKeySelect;
+                if (keyCode) {
+                    selectedKeySelect.innerHTML = keys[keyCode] || keyCode;
+                    selectedKeySelect.value = keyCode;
+                } else {
+                    selectedKeySelect.innerHTML = keys["key.keyboard.unknown"];
+                    selectedKeySelect.value = "key.keyboard.unknown";
+                }
+                selectedKeySelect.classList.remove("selected");
+                let key = selectedKeySelect.getAttribute("data-key")
+                selectedKeySelect = null;
+                try {
+                    await window.enderlynx.updateOptionsTXT(this.instance.instance_id, key, keyCode ? keyCode : "key.keyboard.unknown");
+                    displaySuccess(translate("app.options.updated"));
+                    if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
+                } catch (e) {
+                    displayError(translate("app.options.failed"));
+                    tempSelected.innerHTML = oldInnerHtml;
+                    tempSelected.value = oldValue;
+                }
+            }
+        }
+
+        previousMouseDownEventListener = async (e) => {
+            if (selectedKeySelect) {
+                e.preventDefault();
+                e.stopPropagation();
+                let mouseKey;
+                if (e.button === 0) mouseKey = "key.mouse.left";
+                else if (e.button === 1) mouseKey = "key.mouse.middle";
+                else if (e.button === 2) mouseKey = "key.mouse.right";
+                else if (e.button >= 3 && e.button <= 20) mouseKey = `key.mouse.${e.button + 1}`;
+                else mouseKey = "key.keyboard.unknown";
+                let oldInnerHtml = selectedKeySelect.innerHTML;
+                let oldValue = selectedKeySelect.value;
+                let tempSelected = selectedKeySelect;
+                selectedKeySelect.innerHTML = keys[mouseKey] || mouseKey;
+                selectedKeySelect.classList.remove("selected");
+                selectedKeySelect.value = mouseKey;
+                let key = selectedKeySelect.getAttribute("data-key")
+                selectedKeySelect = null;
+                try {
+                    await window.enderlynx.updateOptionsTXT(this.instance.instance_id, key, mouseKey);
+                    displaySuccess(translate("app.options.updated"));
+                    if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
+                } catch (e) {
+                    displayError(translate("app.options.failed"));
+                    tempSelected.innerHTML = oldInnerHtml;
+                    tempSelected.value = oldValue;
+                }
+            }
+        }
+
+        document.body.addEventListener("keydown", previousKeyDownEventListener);
+        document.body.addEventListener("mousedown", previousMouseDownEventListener);
+
+        let defaultOptions = new DefaultOptions(this.instance.vanilla_version);
+        for (let i = 0; i < values.length; i++) {
+            let e = values[i];
+            let item = createElement("div", "option-item");
+            values[i].element = item;
+
+            let titleElement = createElement("div", "option-title");
+            titleElement.innerHTML = e.key;
+            item.appendChild(titleElement);
+
+            let onChange = async (v) => {
+                values[i].value = (type == "text" ? '"' + v + '"' : v);
+                if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
+                    setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                    setDefaultButton.onclick = onRemove;
+                } else {
+                    setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+                    setDefaultButton.onclick = onSet;
+                }
+            }
+
+            let oldvalue = e.value;
+
+            let type = "unknown";
+            if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
+                type = "number";
+            }
+            if (e.value == "false" || e.value == "true") {
+                type = "boolean";
+            }
+            if (e.value.startsWith('"') && e.value.endsWith('"')) {
+                type = "text";
+            }
+            if (e.value.startsWith("key.")) {
+                type = "key";
+            }
+            let inputElement;
+            item.setAttribute("data-type", type);
+            if (type == "text") {
+                inputElement = document.createElement("input");
+                inputElement.className = "option-input";
+                inputElement.value = e.value.slice(1, -1);
+                inputElement.onchange = async () => {
+                    try {
+                        await window.enderlynx.updateOptionsTXT(this.instance.instance_id, e.key, '"' + inputElement.value + '"');
+                        displaySuccess(translate("app.options.updated"));
+                        values[i].value = '"' + inputElement.value + '"';
+                        oldvalue = inputElement.value;
+                        onChange(inputElement.value);
+                    } catch (e) {
+                        displayError(translate("app.options.failed"));
+                        values[i].value = oldvalue;
+                        inputElement.value = '"' + oldvalue + '"';
+                    }
+                }
+                item.appendChild(inputElement);
+            } else if (type == "number") {
+                inputElement = document.createElement("input");
+                inputElement.className = "option-input";
+                inputElement.value = e.value;
+                inputElement.type = "number";
+                inputElement.onchange = async () => {
+                    try {
+                        await window.enderlynx.updateOptionsTXT(this.instance.instance_id, e.key, inputElement.value);
+                        displaySuccess(translate("app.options.updated"));
+                        values[i].value = inputElement.value;
+                        oldvalue = inputElement.value;
+                        onChange(inputElement.value);
+                    } catch (e) {
+                        displayError(translate("app.options.failed"));
+                        inputElement.value = oldvalue;
+                        values[i].value = oldvalue;
+                    }
+                }
+                item.appendChild(inputElement);
+            } else if (type == "boolean") {
+                let inputElement1 = document.createElement("div");
+                inputElement1.className = "option-input";
+                inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, async (v) => {
+                    try {
+                        await window.enderlynx.updateOptionsTXT(this.instance.instance_id, e.key, v);
+                        displaySuccess(translate("app.options.updated"));
+                        values[i].value = v;
+                        oldvalue = v;
+                        onChange(v);
+                    } catch (e) {
+                        displayError(translate("app.options.failed"));
+                        inputElement.selectOption(oldvalue);
+                        values[i].value = oldvalue;
+                    }
+                });
+                item.appendChild(inputElement1);
+            } else if (type == "unknown") {
+                inputElement = document.createElement("input");
+                inputElement.className = "option-input";
+                inputElement.value = e.value;
+                inputElement.onchange = async () => {
+                    try {
+                        await window.enderlynx.updateOptionsTXT(this.instance.instance_id, e.key, inputElement.value);
+                        displaySuccess(translate("app.options.updated"));
+                        values[i].value = inputElement.value;
+                        oldvalue = inputElement.value;
+                        onChange(inputElement.value);
+                    } catch (e) {
+                        displayError(translate("app.options.failed"));
+                        inputElement.value = oldvalue;
+                        values[i].value = oldvalue;
+                    }
+                }
+                item.appendChild(inputElement);
+            } else if (type == "key") {
+                inputElement = document.createElement("button");
+                inputElement.className = "option-key-input";
+                inputElement.value = e.value;
+                inputElement.setAttribute("data-key", e.key);
+                inputElement.innerHTML = keys[e.value] ? keys[e.value] : e.value;
+                inputElement.onclick = () => {
+                    [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
+                        e.classList.remove("selected");
+                    });
+                    inputElement.classList.add("selected");
+                    selectedKeySelect = inputElement;
+                    selectedKeySelectFunction = (v) => {
+                        onChange(v);
+                    }
+                }
+                item.appendChild(inputElement);
+            }
+
+            let setDefaultButton = document.createElement("button");
+            setDefaultButton.className = "option-button";
+            setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+
+            let onSet = async () => {
+                await defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                setDefaultButton.onclick = onRemove;
+                displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
+            }
+
+            setDefaultButton.onclick = onSet;
+
+            let onRemove = async () => {
+                await defaultOptions.deleteDefault(e.key);
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+                setDefaultButton.onclick = onSet;
+                displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
+            }
+
+            if (await defaultOptions.getDefault(e.key) == e.value) {
+                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                setDefaultButton.onclick = onRemove;
+            }
+
+            item.appendChild(setDefaultButton);
+
+            if (e.key == "version") {
+                setDefaultButton.remove();
+                inputElement.style.gridColumn = "span 2";
+                inputElement.style.opacity = ".5";
+                inputElement.style.cursor = "not-allowed";
+                inputElement.disabled = true;
+            }
+
+            if (e.key == "version" && Number(e.value) != this.instance.attempted_options_txt_version) {
+                defaultOptions.setDefault(e.key, e.value);
+            }
+
+            optionList.appendChild(item);
+        }
+        if (!values.length) {
+            let nofound = new NoResultsFound(translate("app.options.not_found"));
+            nofound.element.style.background = "transparent";
+            nofound.element.style.gridColumn = "span 3";
+            optionList.appendChild(nofound.element);
+        }
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(fragment);
     }
 
     async showFiles() {
-        setInstanceTabContentFiles(this.instance, this.tabElement, this.contentElement);
+        let searchAndFilter = createElement("div", "search-and-filter-v2");
+        let filesBreadcrumb = createElement("div", "files-breadcrumb");
+        let homeButton = createElement("button", "home-button");
+        homeButton.innerHTML = '<i class="fa-solid fa-house"></i>';
+        homeButton.onclick = () => {
+            this.setFilesPath("");
+        }
+        this.filesHomeButton = homeButton;
+        filesBreadcrumb.appendChild(homeButton);
+        searchAndFilter.appendChild(filesBreadcrumb);
+        let contentSearch = document.createElement("div");
+        contentSearch.style.flexGrow = 2;
+        let searchBar = new SearchBar(contentSearch, () => { }, null);
+        let typeDropdown = document.createElement("div");
+        let dropdownInfo = new Dropdown(translate("app.files.type"), [
+            {
+                "name": translate("app.files.all"),
+                "value": "all"
+            },
+            {
+                "name": translate("app.files.folder"),
+                "value": "folder"
+            },
+            {
+                "name": translate("app.files.file"),
+                "value": "file"
+            }
+        ], typeDropdown, "all", () => { });
+        typeDropdown.style.minWidth = "200px";
+        searchAndFilter.appendChild(contentSearch);
+        searchAndFilter.appendChild(typeDropdown);
+        this.filesSearchBar = searchBar;
+        this.filesSearchBarElement = contentSearch;
+        this.filesDropdown = dropdownInfo;
+        this.filesDropdownElement = typeDropdown;
+        this.filesSearch = searchAndFilter;
+        this.filesBreadcrumb = filesBreadcrumb;
+        clearMoreMenus();
+        await this.setFilesPath("");
+    }
+
+    async setFilesPath(paths) {
+        let pathSplit = paths.split("/");
+        if (this.filesResetButton) this.filesResetButton.remove();
+        if (this.filesSaveButton) this.filesSaveButton.remove();
+        this.filesBreadcrumb.innerHTML = "";
+        this.filesBreadcrumb.appendChild(this.filesHomeButton);
+        for (let i = 1; i < pathSplit.length; i++) {
+            let dir = pathSplit[i];
+            let breadcrumbArrow = createElement("span", "breadcrumb-arrow");
+            breadcrumbArrow.innerHTML = '<i class="fa-solid fa-angle-right"></i>';
+            let breadcrumbEntry = createElement("button", "breadcrumb-entry");
+            breadcrumbEntry.textContent = dir;
+            breadcrumbEntry.onclick = () => {
+                this.setFilesPath(pathSplit.slice(0, i + 1).join("/"));
+            }
+            this.filesBreadcrumb.appendChild(breadcrumbArrow);
+            this.filesBreadcrumb.appendChild(breadcrumbEntry);
+        }
+        let fileDrop = document.createElement("div");
+        fileDrop.dataset.action = "file-import";
+        fileDrop.dataset.instanceId = this.instance.instance_id;
+        fileDrop.dataset.paths = paths;
+        fileDrop.className = "small-drop-overlay drop-overlay";
+        let fileDropInner = document.createElement("div");
+        fileDropInner.className = "drop-overlay-inner";
+        fileDropInner.innerHTML = translate("app.import.files.drop");
+        fileDrop.appendChild(fileDropInner);
+        let fileList = [];
+
+        let contentListWrap = document.createElement("div");
+
+        let files = await window.enderlynx.getFiles(this.instance.instance_id, paths);
+
+        if (typeof files == 'string') {
+            let editor = document.createElement("div");
+            editor.id = "ace_editor";
+            editor.className = "ace-enderlynx"
+            aceResizeFunction = () => {
+                const viewHeight = window.innerHeight;
+                const editorRect = editor.getBoundingClientRect();
+                const distanceFromTop = editorRect.top;
+                const calculatedHeight = viewHeight - distanceFromTop - 10;
+                editor.style.height = calculatedHeight + "px";
+                aceEditor.resize();
+            }
+            let aceEditor = ace.edit(editor);
+            aceEditor.setShowPrintMargin(false);
+            aceEditor.setValue(files, -1);
+            aceEditor.session.setMode("ace/mode/enderlynx");
+            aceEditor.setFontSize(".9rem");
+            let saveFunction = async () => {
+                saveButton.innerHTML = '<i class="spinner"></i>Saving';
+                let success = await window.enderlynx.editFile(this.instance.instance_id, paths, aceEditor.getValue());
+                if (success) {
+                    displaySuccess(translate("app.files.edit.success"));
+                } else {
+                    displayError(translate("app.files.edit.fail"));
+                }
+                saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+            }
+            aceEditor.commands.addCommand({
+                name: "save",
+                bindKey: { win: "Ctrl-S", mac: "Cmd-S" },
+                exec: saveFunction
+            });
+            contentListWrap.appendChild(editor);
+            let resetButton = document.createElement("button");
+            resetButton.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>Reset';
+            resetButton.className = "editor-button";
+            resetButton.onclick = () => {
+                aceEditor.setValue(files, -1);
+            }
+            this.filesSearch.appendChild(resetButton);
+            this.filesResetButton = resetButton;
+            let saveButton = document.createElement("button");
+            saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+            saveButton.className = "editor-button";
+            saveButton.onclick = saveFunction;
+            this.filesSaveButton = saveButton;
+            this.filesSearch.appendChild(saveButton);
+        } else {
+            let extensionsToNotEdit = ["png", "jpg", "jpeg", "webp", "avif", "dat", "dat_old", "apng", "mca", "zip", "jar"];
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                fileList.push(
+                    {
+                        "primary_column": {
+                            "title": file.name,
+                            "desc": ""
+                        },
+                        "secondary_column": {
+                            "title": () => formatTimeRelatively(file.dateModified),
+                            "desc": () => ""
+                        },
+                        "type": file.isDirectory ? "folder" : "file",
+                        "icon": file.isDirectory ? '<i class="fa-regular fa-folder"></i>' : '<i class="fa-regular fa-file"></i>',
+                        "onremove": (ele) => {
+                            let dialog = new Dialog();
+                            dialog.showDialog(translate("app.files.delete.confirm.title"), "notice", translate("app.files.delete.confirm.description", "%w", file.name), [
+                                {
+                                    "type": "cancel",
+                                    "content": translate("app.files.delete.cancel")
+                                },
+                                {
+                                    "type": "confirm",
+                                    "content": translate("app.files.delete.confirm")
+                                }
+                            ], [], async () => {
+                                let success = await window.enderlynx.deleteFiles(this.instance.instance_id, paths, [file.name]);
+                                if (success) {
+                                    contentList.removeElement(ele);
+                                    displaySuccess(translate("app.files.delete.success", "%w", file.name));
+                                } else {
+                                    displayError(translate("app.files.delete.fail", "%w", file.name));
+                                }
+                            });
+                        },
+                        "onclick": extensionsToNotEdit.includes(file.ext) ? null : () => {
+                            this.setFilesPath(paths + "/" + file.name);
+                        },
+                        "more": {
+                            "actionsList": [
+                                {
+                                    "title": translate("app.files.show_in_folder"),
+                                    "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
+                                    "func": () => {
+                                        window.enderlynx.showInstanceFileInFolder(this.instance.instance_id, paths + "/" + file.name);
+                                    }
+                                },
+                                {
+                                    "title": translate("app.files.copy_file_name"),
+                                    "icon": '<i class="fa-solid fa-copy"></i>',
+                                    "func": () => {
+                                        navigator.clipboard.writeText(file.name).then(() => {
+                                            displaySuccess(translate("app.files.name.copy.success"));
+                                        }).catch(() => {
+                                            displayError(translate("app.files.name.copy.fail"));
+                                        });
+                                    }
+                                },
+                                {
+                                    "title": translate("app.files.copy_relative_path"),
+                                    "icon": '<i class="fa-solid fa-copy"></i>',
+                                    "func": () => {
+                                        navigator.clipboard.writeText(file.relativePath).then(() => {
+                                            displaySuccess(translate("app.files.relative_path.copy.success"));
+                                        }).catch(() => {
+                                            displayError(translate("app.files.relative_path.copy.fail"));
+                                        });
+                                    }
+                                },
+                                {
+                                    "title": translate("app.files.copy_full_path"),
+                                    "icon": '<i class="fa-solid fa-copy"></i>',
+                                    "func": () => {
+                                        navigator.clipboard.writeText(file.fullPath).then(() => {
+                                            displaySuccess(translate("app.files.full_path.copy.success"));
+                                        }).catch(() => {
+                                            displayError(translate("app.files.full_path.copy.fail"));
+                                        });
+                                    }
+                                },
+                                {
+                                    "title": translate("app.files.rename"),
+                                    "icon": '<i class="fa-solid fa-i-cursor"></i>',
+                                    "func": () => {
+                                        let dialog = new Dialog();
+                                        dialog.showDialog(translate("app.files.rename.title"), "form", [
+                                            {
+                                                "type": "text",
+                                                "id": "name",
+                                                "default": file.name,
+                                                "name": translate("app.files.rename.name"),
+                                                "focus": true
+                                            }
+                                        ], [
+                                            {
+                                                "content": translate("app.files.rename.cancel"),
+                                                "type": "cancel"
+                                            },
+                                            {
+                                                "content": translate("app.files.rename.confirm"),
+                                                "type": "confirm"
+                                            }
+                                        ], [], async (info) => {
+                                            let success = await window.enderlynx.renameFile(this.instance.instance_id, paths + "/" + file.name, paths + "/" + info.name);
+                                            if (success) {
+                                                displaySuccess(translate("app.files.rename.success"));
+                                            } else {
+                                                displayError(translate("app.files.rename.fail"));
+                                            }
+                                            this.setFilesPath(paths);
+                                        });
+                                    }
+                                },
+                                {
+                                    "title": translate("app.files.move"),
+                                    "icon": '<i class="fa-solid fa-left-right"></i>',
+                                    "func": () => {
+                                        let dialog = new Dialog();
+                                        dialog.showDialog(translate("app.files.move.title"), "form", [
+                                            {
+                                                "type": "text",
+                                                "id": "location",
+                                                "default": file.location,
+                                                "name": translate("app.files.move.location"),
+                                                "focus": true
+                                            }
+                                        ], [
+                                            {
+                                                "content": translate("app.files.move.cancel"),
+                                                "type": "cancel"
+                                            },
+                                            {
+                                                "content": translate("app.files.move.confirm"),
+                                                "type": "confirm"
+                                            }
+                                        ], [], async (info) => {
+                                            let success = await window.enderlynx.renameFile(this.instance.instance_id, paths + "/" + file.name, info.location + "/" + file.name);
+                                            if (success) {
+                                                displaySuccess(translate("app.files.move.success"));
+                                            } else {
+                                                displayError(translate("app.files.move.fail"));
+                                            }
+                                            this.setFilesPath(paths);
+                                        });
+                                    }
+                                },
+                                {
+                                    "title": translate("app.files.delete"),
+                                    "icon": '<i class="fa-solid fa-trash-can"></i>',
+                                    "danger": true,
+                                    "func_id": "delete",
+                                    "func": (ele) => {
+                                        let dialog = new Dialog();
+                                        dialog.showDialog(translate("app.files.delete.confirm.title"), "notice", translate("app.files.delete.confirm.description", "%w", file.name), [
+                                            {
+                                                "type": "cancel",
+                                                "content": translate("app.files.delete.cancel")
+                                            },
+                                            {
+                                                "type": "confirm",
+                                                "content": translate("app.files.delete.confirm")
+                                            }
+                                        ], [], async () => {
+                                            let success = await window.enderlynx.deleteFiles(this.instance.instance_id, paths, [file.name]);
+                                            if (success) {
+                                                contentList.removeElement(ele);
+                                                displaySuccess(translate("app.files.delete.success", "%w", file.name));
+                                            } else {
+                                                displayError(translate("app.files.delete.fail", "%w", file.name));
+                                            }
+                                        });
+                                    }
+                                }
+                            ].filter(e => e)
+                        },
+                        "pass_to_checkbox": file
+                    });
+            }
+
+            let contentList = new ContentList(contentListWrap, fileList, this.filesSearchBar, {
+                "checkbox": {
+                    "enabled": true,
+                    "actionsList": [
+                        {
+                            "title": translate("app.files.selection.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "dont_loop": true,
+                            "func": async (eles, es) => {
+                                let success = await window.enderlynx.deleteFiles(this.instance.instance_id, paths, es.map(e => e.name));
+                                if (success) {
+                                    eles.forEach(e => e.remove());
+                                    contentList.removeElements(eles);
+                                    displaySuccess(translate("app.files.delete_multiple.success"));
+                                } else {
+                                    this.setFilesPath(paths);
+                                    displayError(translate("app.files.delete_multiple.fail"));
+                                }
+                            },
+                            "show_confirmation_dialog": true,
+                            "dialog_title": translate("app.files.delete.confirm.title"),
+                            "dialog_content": translate("app.files.delete.selection_notice"),
+                            "dialog_button": translate("app.files.delete.confirm")
+                        }
+                    ]
+                },
+                "disable": {
+                    "enabled": false
+                },
+                "remove": {
+                    "enabled": true
+                },
+                "more": {
+                    "enabled": true
+                },
+                "second_column_centered": true,
+                "primary_column_name": translate("app.worlds.name"),
+                "secondary_column_name": "",
+                "refresh": {
+                    "enabled": true,
+                    "func": () => {
+                        this.setFilesPath(paths);
+                    }
+                },
+                "update_all": {
+                    "enabled": false
+                }
+            }, this.filesDropdown, translate("app.files.not_found"), this.contentElement);
+        }
+
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(fileDrop);
+        if (typeof files != 'string') this.filesSearch.appendChild(this.filesSearchBarElement);
+        else this.filesSearchBarElement.remove();
+        if (typeof files != 'string') this.filesSearch.appendChild(this.filesDropdownElement);
+        else this.filesDropdownElement.remove();
+        this.tabElement.appendChild(this.filesSearch);
+        this.tabElement.appendChild(contentListWrap);
+        if (aceResizeFunction) aceResizeFunction();
     }
 
     async showScreenshots() {
-        setInstanceTabContentScreenshots(this.instance, this.tabElement, this.contentElement);
+        this.currentTab = "screenshots";
+        let loading = new LoadingContainer();
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(loading.element);
+        await this.requestFrame();
+        clearMoreMenus();
+        let fragment = document.createDocumentFragment();
+        let galleryElement = document.createElement("div");
+        galleryElement.className = "gallery";
+        let screenshots = (await window.enderlynx.getScreenshots(this.instance.instance_id)).reverse();
+        let screenshotElements = [];
+        screenshots.forEach(e => {
+            let screenshotElement = document.createElement("button");
+            screenshotElement.className = "gallery-screenshot";
+            screenshotElement.setAttribute("data-title", formatDateAndTime(e.file_name));
+            screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
+            let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
+            screenshotElement.onclick = () => {
+                displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, e.file_name, this.instance, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
+            }
+            let buttons = new ContextMenuButtons([
+                {
+                    "icon": '<i class="fa-solid fa-folder"></i>',
+                    "title": translate("app.screenshots.open_in_folder"),
+                    "func": () => {
+                        window.enderlynx.showScreenshotInFolder(this.instance.instance_id, e.real_file_name);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-image"></i>',
+                    "title": translate("app.screenshots.open_photo"),
+                    "func": () => {
+                        window.enderlynx.openFolder(e.file_path);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-copy"></i>',
+                    "title": translate("app.screenshots.copy"),
+                    "func": async () => {
+                        let success = await window.enderlynx.copyImageToClipboard(e.file_path);
+                        if (success) {
+                            displaySuccess(translate("app.screenshots.copy.success"));
+                        } else {
+                            displayError(translate("app.screenshots.copy.fail"));
+                        }
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-share"></i>',
+                    "title": translate("app.screenshots.share"),
+                    "func": () => {
+                        openShareDialogForFile(e.file_path);
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-trash-can"></i>',
+                    "title": translate("app.screenshots.delete"),
+                    "func": async () => {
+                        let success = await window.enderlynx.deleteScreenshot(this.instance.instance_id, e.file_name);
+                        if (success) {
+                            displaySuccess(translate("app.screenshots.delete.success"));
+                        } else {
+                            displayError(translate("app.screenshots.delete.fail"));
+                        }
+                        this.showScreenshots();
+                    },
+                    "danger": true
+                }
+            ]);
+            screenshotElement.oncontextmenu = (e) => {
+                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+            }
+            screenshotElements.push(screenshotElement);
+        });
+        let setPage = (page) => {
+            currentPage = page;
+            paginationTop.setPage(page);
+            paginationBottom.setPage(page);
+            let fragment = document.createDocumentFragment();
+            for (let i = 0; i < screenshotElements.length; i++) {
+                screenshotElements[i].remove();
+            }
+            for (let i = pageSize * (page - 1); i < Math.min(screenshotElements.length, pageSize * page); i++) {
+                fragment.appendChild(screenshotElements[i]);
+            }
+            galleryElement.appendChild(fragment);
+        }
+        let paginationTop = new Pagination(1, Math.ceil(screenshots.length / 25), setPage);
+        let paginationBottom = new Pagination(1, Math.ceil(screenshots.length / 25), setPage);
+        paginationTop.element.style.marginBottom = "10px";
+        paginationBottom.element.style.marginTop = "10px";
+        fragment.appendChild(paginationTop.element);
+        fragment.appendChild(galleryElement);
+        fragment.appendChild(paginationBottom.element);
+        this.tabElement.innerHTML = "";
+        this.tabElement.appendChild(fragment);
+        let currentPage = 1;
+        let computePageSize = () => {
+            let styles = getComputedStyle(galleryElement);
+            let columns = styles.gridTemplateColumns.split(" ").length;
+            for (let i = 29; i >= 1; i--) {
+                if (i % columns == 0) {
+                    let totalPages = Math.ceil(screenshots.length / i);
+                    paginationTop.setTotalPages(totalPages);
+                    paginationBottom.setTotalPages(totalPages);
+                    if (currentPage > totalPages && totalPages != 0) {
+                        setPage(totalPages);
+                    }
+                    return i;
+                }
+            }
+            return screenshotElements.length;
+        }
+        document.body.onresize = () => {
+            pageSize = computePageSize();
+            setPage(currentPage);
+        }
+        let pageSize = computePageSize();
+        setPage(1);
+        if (!screenshots.length) {
+            let nofound = new NoResultsFound(translate("app.screenshots.not_found"));
+            nofound.element.style.gridColumn = "1 / -1";
+            galleryElement.appendChild(nofound.element);
+        }
     }
 }
 
@@ -4351,7 +5441,7 @@ class InstancesScreen extends Screen {
         searchAndFilter.classList.add("search-and-filter");
         ele.appendChild(searchAndFilter);
         let search = document.createElement("div");
-        new SearchBar(search, this.searchInstances, null);
+        new SearchBar(search, (v) => this.searchInstances(v), null);
         let sort = document.createElement('div');
         this.sortBy = new Dropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
         { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
@@ -4699,6 +5789,7 @@ class DiscoverScreen extends Screen {
     }
 
     calculateContent(instance, vanilla_version, loader, default_tab) {
+        this.contentElement.innerHTML = "";
         this.instance = instance;
         this.vanilla_version = vanilla_version;
         this.loader = loader;
@@ -5491,6 +6582,7 @@ discoverScreen.setNavButton(discoverButton);
 let wardrobeScreen = new WardrobeScreen();
 let wardrobeButton = new NavigationButton(document.getElementById("wardrobeButtonEle"), translate("app.page.wardrobe"), '<i class="fa-solid fa-user"></i>', wardrobeScreen);
 wardrobeScreen.setNavButton(wardrobeButton);
+new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa-solid fa-gear"></i>');
 
 settingsButtonEle.onclick = async () => {
     let selectedKeySelect;
@@ -5724,9 +6816,7 @@ settingsButtonEle.onclick = async () => {
                 "type": "confirm",
                 "content": translate("app.settings.def_opts.import.confirm")
             }
-        ], [], async (v) => {
-            let info = {};
-            v.forEach(e => info[e.id] = e.value);
+        ], [], async (info) => {
             let options = await window.enderlynx.getOptions(info.options_txt_location);
             await window.enderlynx.deleteDefaultOptions();
             let defaultOptions = new DefaultOptions();
@@ -5775,9 +6865,7 @@ settingsButtonEle.onclick = async () => {
                 "type": "confirm",
                 "content": translate("app.settings.def_opts.add.confirm")
             }
-        ], [], async (v) => {
-            let info = {};
-            v.forEach(e => info[e.id] = e.value);
+        ], [], async (info) => {
             let defaultOptions = new DefaultOptions();
             if (info.key != "version") {
                 await defaultOptions.setDefault(info.key, info.value);
@@ -6311,9 +7399,7 @@ settingsButtonEle.onclick = async () => {
             "name": translate("app.settings.tab.app_info"),
             "value": "app_info"
         }
-    ], async (v) => {
-        let info = {};
-        v.forEach(e => info[e.id] = e.value);
+    ], async (info) => {
         await setDefault("default_width", info.default_width);
         await setDefault("default_height", info.default_height);
         await setDefault("default_ram", info.default_ram);
@@ -6596,9 +7682,7 @@ class SkinEntry {
                     ], [
                         { "type": "cancel", "content": translate("app.wardrobe.skin.edit.cancel") },
                         { "type": "confirm", "content": translate("app.wardrobe.skin.edit.confirm") }
-                    ], [], async (v) => {
-                        let info = {};
-                        v.forEach(e => { info[e.id] = e.value });
+                    ], [], async (info) => {
                         await e.setName(info.name);
                         if (!info.name) await e.setName(translate("app.wardrobe.unnamed"));
                         await e.setModel(info.model);
@@ -7686,1047 +8770,10 @@ function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
 }
 
-function setInstanceTabContentLogs(instanceInfo, element, scrollElement) {
-    let loading = new LoadingContainer();
-    element.innerHTML = "";
-    element.appendChild(loading.element);
-    setTimeout(() => {
-        setInstanceTabContentLogsReal(instanceInfo, element, scrollElement);
-    }, 0);
-}
-
-async function setInstanceTabContentLogsReal(instanceInfo, element, scrollElement) {
-    let deleteButton = document.createElement("button");
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.classList.add("search-and-filter-v2");
-    let contentSearch = document.createElement("div");
-    contentSearch.style.flexGrow = 2;
-    let searchBarFilter = "";
-    let searchBar = new SearchBar(contentSearch, (v) => {
-        searchBarFilter = v.toLowerCase().trim();
-        render();
-    }, null);
-    let typeDropdown = document.createElement("div");
-    let log_info = await window.enderlynx.getInstanceLogs(instanceInfo.instance_id);
-    let logDisplay = document.createElement("div");
-    let visible = document.createElement("div");
-    visible.className = "logs-visible";
-    let spacer = document.createElement("div");
-    logDisplay.appendChild(visible);
-    logDisplay.appendChild(spacer);
-    let logs = [];
-    let logHeight = 600;
-    logResizeFunction = () => {
-        const viewHeight = window.innerHeight;
-        const editorRect = logDisplay.getBoundingClientRect();
-        const distanceFromTop = editorRect.top;
-        const calculatedHeight = viewHeight - distanceFromTop - 10;
-        logDisplay.style.maxHeight = calculatedHeight + "px";
-        logHeight = calculatedHeight;
-        render();
-    }
-    let render = () => {
-        let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
-        const totalItems = showLogs.length;
-        const itemHeight = 15;
-        const containerHeight = logHeight;
-        const buffer = 5;
-        spacer.style.height = totalItems * itemHeight + "px";
-
-        const scrollTop = logDisplay.scrollTop;
-        const startIdx = Math.max(Math.floor(scrollTop / itemHeight) - buffer, 0);
-        const visibleCount = Math.ceil(containerHeight / itemHeight) + buffer * 2;
-        const endIdx = Math.min(startIdx + visibleCount, totalItems);
-
-        visible.style.translate = `0px ${startIdx * itemHeight}px`;
-        visible.innerHTML = '';
-        for (let i = startIdx; i < endIdx; i++) {
-            visible.appendChild(showLogs[i].element);
-        }
-    }
-    let setUpLiveLog = async () => {
-        let log_path = instanceInfo.current_log_file;
-        let running = checkForProcess(instanceInfo.pid);
-        if (!running) {
-            await instanceInfo.setPid(null);
-            logs = [];
-            let lineElement = document.createElement("span");
-            lineElement.innerHTML = translate("app.logs.no_live");
-            lineElement.classList.add("log-entry");
-            logs.push({ "element": lineElement, "content": translate("app.logs.no_live") });
-        } else {
-            let logInfo = await window.enderlynx.getLog(log_path);
-            logInfo = logInfo.split("\n");
-            logs = [];
-            logInfo.forEach((e) => {
-                if (e == "") return;
-                let lineElement = document.createElement("span");
-                lineElement.textContent = e;
-                lineElement.classList.add("log-entry");
-                if (e.includes("INFO")) {
-                    lineElement.classList.add("log-info");
-                } else if (e.includes("WARN")) {
-                    lineElement.classList.add("log-warn");
-                } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
-                    lineElement.classList.add("log-error");
-                }
-                logs.push({ "element": lineElement, "content": e });
-            });
-            spacer.style.height = logs.length * 15 + "px";
-            setTimeout(() => {
-                logDisplay.scrollTo(0, logDisplay.scrollHeight);
-            }, 0);
-            window.enderlynx.watchFile(log_path, (log) => {
-                let logInfo = log.split("\n");
-                let scroll = logDisplay.scrollHeight - logDisplay.scrollTop - 50 <= logDisplay.clientHeight + 1;
-                logInfo.forEach((e) => {
-                    if (e == "") return;
-                    if (e.length == 1) return;
-                    let lineElement = document.createElement("span");
-                    lineElement.textContent = e;
-                    lineElement.classList.add("log-entry");
-                    if (e.includes("INFO")) {
-                        lineElement.classList.add("log-info");
-                    } else if (e.includes("WARN")) {
-                        lineElement.classList.add("log-warn");
-                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
-                        lineElement.classList.add("log-error");
-                    }
-                    logs.push({ "element": lineElement, "content": e });
-                });
-                spacer.style.height = logs.length * 15 + "px";
-                if (scroll) logDisplay.scrollTo(0, logDisplay.scrollHeight);
-                render();
-            });
-        }
-    }
-    let currentLog = "";
-    logDisplay.onscroll = render;
-    let onChangeLogDropdown = async (e) => {
-        try {
-            window.enderlynx.stopWatching(instanceInfo.current_log_file);
-        } catch (e) { }
-
-        if (e == "live_log") {
-            deleteButton.style.display = "none";
-            await setUpLiveLog();
-        } else {
-            deleteButton.style.display = "flex";
-            currentLog = e;
-            let logInfo = await window.enderlynx.getLog(instanceInfo.instance_id, e);
-            logInfo = logInfo.split("\n");
-            logs = [];
-            logInfo.forEach((e) => {
-                if (e == "") return;
-                let lineElement = document.createElement("span");
-                lineElement.textContent = e;
-                lineElement.classList.add("log-entry");
-                if (e.includes("INFO")) {
-                    lineElement.classList.add("log-info");
-                } else if (e.includes("WARN")) {
-                    lineElement.classList.add("log-warn");
-                } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
-                    lineElement.classList.add("log-error");
-                }
-                logs.push({ "element": lineElement, "content": e });
-            });
-        }
-        render();
-    }
-    if (log_info.length > 9) {
-        new SearchDropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
-    } else {
-        new Dropdown(translate("app.logs.session"), [{ "name": translate("app.logs.live"), "value": "live_log" }].concat(log_info.toReversed().map((e) => ({ "name": formatDateAndTime(e.date), "value": e.file_name }))), typeDropdown, "live_log", onChangeLogDropdown);
-    }
-    typeDropdown.style.minWidth = "300px";
-    searchAndFilter.appendChild(contentSearch);
-    searchAndFilter.appendChild(typeDropdown);
-    let fragment = document.createDocumentFragment();
-    fragment.appendChild(searchAndFilter);
-    let logWrapper = document.createElement("div");
-    logWrapper.className = "logs";
-    fragment.appendChild(logWrapper);
-    let logTop = document.createElement("div");
-    logTop.className = "logs-top";
-    logWrapper.appendChild(logTop);
-    logWrapper.appendChild(logDisplay);
-    deleteButton.style.display = "none";
-    await setUpLiveLog();
-    render();
-    let copyButton = document.createElement("button");
-    let shareButton = document.createElement("button");
-    let deleteAllButton = document.createElement("button");
-    copyButton.className = "logs-copy";
-    shareButton.className = "logs-share";
-    deleteButton.className = "logs-delete";
-    deleteAllButton.className = "logs-delete";
-    copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>' + translate("app.logs.copy");
-    shareButton.innerHTML = '<i class="fa-solid fa-share"></i>' + translate("app.logs.share");
-    deleteButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>' + translate("app.logs.delete");
-    deleteAllButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>' + translate("app.logs.delete_all");
-    copyButton.onclick = () => {
-        let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
-        let copyLogs = showLogs.map(e => e.content).join("\n");
-        navigator.clipboard.writeText(copyLogs).then(() => {
-            displaySuccess(searchBarFilter ? translate("app.logs.clipboard.search") : translate("app.logs.clipboard"));
-        }).catch(() => {
-            displayError(translate("app.logs.clipboard.fail"));
-        });
-    }
-    shareButton.onclick = async () => {
-        let showLogs = logs.filter(e => e.content.toLowerCase().includes(searchBarFilter));
-        let copyLogs = showLogs.map(e => e.content).join("\n");
-        let url = "";
-        try {
-            url = await window.enderlynx.shareLogs(copyLogs);
-        } catch (e) {
-            displayError(translate("app.logs.share.fail"));
-            return;
-        }
-        await openShareDialog(translate("app.logs.share.title"), url, translate("app.logs.share.text"));
-    }
-    deleteButton.onclick = () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.logs.delete.title"), "notice", translate("app.logs.delete.notice"), [
-            {
-                "type": "cancel",
-                "content": translate("app.logs.delete.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.logs.delete.confirm")
-            }
-        ], [], async () => {
-            let success = await window.enderlynx.deleteLogs(instanceInfo.instance_id, currentLog);
-            if (success) {
-                displaySuccess(translate("app.logs.delete.success"));
-                setInstanceTabContentLogs(instanceInfo, element, scrollElement);
-            } else {
-                displayError(translate("app.logs.delete.fail"));
-            }
-        });
-    }
-    deleteAllButton.onclick = () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.logs.delete_all.title"), "notice", translate("app.logs.delete_all.notice"), [
-            {
-                "type": "cancel",
-                "content": translate("app.logs.delete_all.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.logs.delete_all.confirm")
-            }
-        ], [], async () => {
-            let success = await window.enderlynx.deleteAllLogs(instanceInfo.instance_id);
-            if (success) {
-                displaySuccess(translate("app.logs.delete_all.success"));
-                setInstanceTabContentLogs(instanceInfo, element, scrollElement);
-            } else {
-                displayError(translate("app.logs.delete_all.fail"));
-            }
-        });
-    }
-    logTop.appendChild(copyButton);
-    logTop.appendChild(shareButton);
-    logTop.appendChild(deleteButton);
-    logTop.appendChild(deleteAllButton);
-    logDisplay.className = "logs-display";
-    element.innerHTML = "";
-    element.appendChild(fragment);
-    logResizeFunction();
-}
-
-function setInstanceTabContentOptions(instanceInfo, element, scrollElement) {
-    let loading = new LoadingContainer();
-    element.innerHTML = "";
-    element.appendChild(loading.element);
-    setTimeout(() => {
-        setInstanceTabContentOptionsReal(instanceInfo, element, scrollElement);
-    }, 0);
-}
-
 let previousKeyDownEventListener;
 let previousMouseDownEventListener;
 
-async function setInstanceTabContentOptionsReal(instanceInfo, element, scrollElement) {
-    let values = await window.enderlynx.getInstanceOptions(instanceInfo.instance_id);
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.classList.add("search-and-filter-v2");
-    let contentSearch = document.createElement("div");
-    contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, (v) => {
-        for (let i = 0; i < values.length; i++) {
-            if (values[i].key.toLowerCase().includes(v.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == dropdownInfo.value || dropdownInfo.value == "all")) {
-                values[i].element.style.display = "grid";
-            } else {
-                values[i].element.style.display = "none";
-            }
-        }
-    }, null);
-    let typeDropdown = document.createElement("div");
-    let dropdownInfo = new Dropdown(translate("app.options.type"), [
-        {
-            "name": translate("app.options.all"),
-            "value": "all"
-        },
-        {
-            "name": translate("app.options.number"),
-            "value": "number"
-        },
-        {
-            "name": translate("app.options.text"),
-            "value": "text"
-        },
-        {
-            "name": translate("app.options.boolean"),
-            "value": "boolean"
-        },
-        {
-            "name": translate("app.options.key"),
-            "value": "key"
-        },
-        {
-            "name": translate("app.options.unknown"),
-            "value": "unknown"
-        }
-    ], typeDropdown, "all", (v) => {
-        for (let i = 0; i < values.length; i++) {
-            if (values[i].key.toLowerCase().includes(searchBar.value.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == v || v == "all")) {
-                values[i].element.style.display = "grid";
-                values[i].element.classList.remove("hidden");
-            } else {
-                values[i].element.style.display = "none";
-                values[i].element.classList.add("hidden");
-            }
-        }
-    });
-    typeDropdown.style.minWidth = "200px";
-    let applyDefaults = document.createElement("button");
-    applyDefaults.classList.add("add-content-button");
-    applyDefaults.innerHTML = '<i class="fa-regular fa-file-lines"></i>' + translate("app.instances.options.apply")
-    applyDefaults.onclick = async () => {
-        let dialog = new Dialog();
-        dialog.showDialog(translate("app.instances.options.apply.title"), "notice", translate("app.instances.options.apply.description"), [
-            {
-                "type": "cancel",
-                "content": translate("app.instances.options.apply.cancel")
-            },
-            {
-                "type": "confirm",
-                "content": translate("app.instances.options.apply.confirm")
-            }
-        ], [], async () => {
-            let default_options = new DefaultOptions(instanceInfo.vanilla_version);
-            try {
-                let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, await default_options.getOptionsTXT(), false, true);
-                await instanceInfo.setAttemptedOptionsTxtVersion(v);
-                displaySuccess(translate("app.instances.options.apply.done"));
-            } catch (e) {
-                console.error(e);
-                displayError(translate("app.instances.options.apply.fail"));
-            }
-            setInstanceTabContentOptions(instanceInfo, element, scrollElement);
-        });
-    }
-    searchAndFilter.appendChild(contentSearch);
-    searchAndFilter.appendChild(typeDropdown);
-    searchAndFilter.appendChild(applyDefaults);
-    let fragment = document.createDocumentFragment();
-    fragment.appendChild(searchAndFilter);
-    let info = document.createElement("div");
-    info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.options.notice_1");
-    info.className = "info";
-    info.style.marginTop = "10px";
-    fragment.appendChild(info);
-    let info2 = document.createElement("div");
-    info2.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.options.notice_2");
-    info2.className = "info";
-    info2.style.marginTop = "10px";
-    fragment.appendChild(info2);
-    let optionList = document.createElement("div");
-    optionList.className = "option-list";
-    fragment.appendChild(optionList);
-    let selectedKeySelect;
-    let selectedKeySelectFunction;
-
-    document.body.removeEventListener("keydown", previousKeyDownEventListener);
-    document.body.removeEventListener("mousedown", previousMouseDownEventListener);
-
-    previousKeyDownEventListener = async (e) => {
-        if (selectedKeySelect) {
-            e.preventDefault();
-            e.stopPropagation();
-            let keyCode = codeToKey[e.code];
-            if (e.key == "NumLock") {
-                keyCode = codeToKey["NumLock"];
-            }
-            let oldInnerHtml = selectedKeySelect.innerHTML;
-            let oldValue = selectedKeySelect.value;
-            let tempSelected = selectedKeySelect;
-            if (keyCode) {
-                selectedKeySelect.innerHTML = keys[keyCode] || keyCode;
-                selectedKeySelect.value = keyCode;
-            } else {
-                selectedKeySelect.innerHTML = keys["key.keyboard.unknown"];
-                selectedKeySelect.value = "key.keyboard.unknown";
-            }
-            selectedKeySelect.classList.remove("selected");
-            let key = selectedKeySelect.getAttribute("data-key")
-            selectedKeySelect = null;
-            try {
-                await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, key, keyCode ? keyCode : "key.keyboard.unknown");
-                displaySuccess(translate("app.options.updated"));
-                if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
-            } catch (e) {
-                displayError(translate("app.options.failed"));
-                tempSelected.innerHTML = oldInnerHtml;
-                tempSelected.value = oldValue;
-            }
-        }
-    }
-
-    previousMouseDownEventListener = async (e) => {
-        if (selectedKeySelect) {
-            e.preventDefault();
-            e.stopPropagation();
-            let mouseKey;
-            if (e.button === 0) mouseKey = "key.mouse.left";
-            else if (e.button === 1) mouseKey = "key.mouse.middle";
-            else if (e.button === 2) mouseKey = "key.mouse.right";
-            else if (e.button >= 3 && e.button <= 20) mouseKey = `key.mouse.${e.button + 1}`;
-            else mouseKey = "key.keyboard.unknown";
-            let oldInnerHtml = selectedKeySelect.innerHTML;
-            let oldValue = selectedKeySelect.value;
-            let tempSelected = selectedKeySelect;
-            selectedKeySelect.innerHTML = keys[mouseKey] || mouseKey;
-            selectedKeySelect.classList.remove("selected");
-            selectedKeySelect.value = mouseKey;
-            let key = selectedKeySelect.getAttribute("data-key")
-            selectedKeySelect = null;
-            try {
-                await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, key, mouseKey);
-                displaySuccess(translate("app.options.updated"));
-                if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
-            } catch (e) {
-                displayError(translate("app.options.failed"));
-                tempSelected.innerHTML = oldInnerHtml;
-                tempSelected.value = oldValue;
-            }
-        }
-    }
-
-    document.body.addEventListener("keydown", previousKeyDownEventListener);
-    document.body.addEventListener("mousedown", previousMouseDownEventListener);
-
-    let defaultOptions = new DefaultOptions(instanceInfo.vanilla_version);
-    for (let i = 0; i < values.length; i++) {
-        let e = values[i];
-        let item = document.createElement("div");
-        item.className = "option-item";
-        values[i].element = item;
-
-        let titleElement = document.createElement("div");
-        titleElement.className = "option-title";
-        titleElement.innerHTML = e.key;
-        item.appendChild(titleElement);
-
-        let onChange = async (v) => {
-            values[i].value = (type == "text" ? '"' + v + '"' : v);
-            if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
-                setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
-                setDefaultButton.onclick = onRemove;
-            } else {
-                setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
-                setDefaultButton.onclick = onSet;
-            }
-        }
-
-        let oldvalue = e.value;
-
-        let type = "unknown";
-        if (!isNaN(e.value) && e.value !== "" && typeof e.value === "string" && e.value.trim() !== "") {
-            type = "number";
-        }
-        if (e.value == "false" || e.value == "true") {
-            type = "boolean";
-        }
-        if (e.value.startsWith('"') && e.value.endsWith('"')) {
-            type = "text";
-        }
-        if (e.value.startsWith("key.")) {
-            type = "key";
-        }
-        let inputElement;
-        item.setAttribute("data-type", type);
-        if (type == "text") {
-            inputElement = document.createElement("input");
-            inputElement.className = "option-input";
-            inputElement.value = e.value.slice(1, -1);
-            inputElement.onchange = async () => {
-                try {
-                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, '"' + inputElement.value + '"');
-                    displaySuccess(translate("app.options.updated"));
-                    values[i].value = '"' + inputElement.value + '"';
-                    oldvalue = inputElement.value;
-                    onChange(inputElement.value);
-                } catch (e) {
-                    displayError(translate("app.options.failed"));
-                    values[i].value = oldvalue;
-                    inputElement.value = '"' + oldvalue + '"';
-                }
-            }
-            item.appendChild(inputElement);
-        } else if (type == "number") {
-            inputElement = document.createElement("input");
-            inputElement.className = "option-input";
-            inputElement.value = e.value;
-            inputElement.type = "number";
-            inputElement.onchange = async () => {
-                try {
-                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
-                    displaySuccess(translate("app.options.updated"));
-                    values[i].value = inputElement.value;
-                    oldvalue = inputElement.value;
-                    onChange(inputElement.value);
-                } catch (e) {
-                    displayError(translate("app.options.failed"));
-                    inputElement.value = oldvalue;
-                    values[i].value = oldvalue;
-                }
-            }
-            item.appendChild(inputElement);
-        } else if (type == "boolean") {
-            let inputElement1 = document.createElement("div");
-            inputElement1.className = "option-input";
-            inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, async (v) => {
-                try {
-                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, v);
-                    displaySuccess(translate("app.options.updated"));
-                    values[i].value = v;
-                    oldvalue = v;
-                    onChange(v);
-                } catch (e) {
-                    displayError(translate("app.options.failed"));
-                    inputElement.selectOption(oldvalue);
-                    values[i].value = oldvalue;
-                }
-            });
-            item.appendChild(inputElement1);
-        } else if (type == "unknown") {
-            inputElement = document.createElement("input");
-            inputElement.className = "option-input";
-            inputElement.value = e.value;
-            inputElement.onchange = async () => {
-                try {
-                    await window.enderlynx.updateOptionsTXT(instanceInfo.instance_id, e.key, inputElement.value);
-                    displaySuccess(translate("app.options.updated"));
-                    values[i].value = inputElement.value;
-                    oldvalue = inputElement.value;
-                    onChange(inputElement.value);
-                } catch (e) {
-                    displayError(translate("app.options.failed"));
-                    inputElement.value = oldvalue;
-                    values[i].value = oldvalue;
-                }
-            }
-            item.appendChild(inputElement);
-        } else if (type == "key") {
-            inputElement = document.createElement("button");
-            inputElement.className = "option-key-input";
-            inputElement.value = e.value;
-            inputElement.setAttribute("data-key", e.key);
-            inputElement.innerHTML = keys[e.value] ? keys[e.value] : e.value;
-            inputElement.onclick = () => {
-                [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
-                    e.classList.remove("selected");
-                });
-                inputElement.classList.add("selected");
-                selectedKeySelect = inputElement;
-                selectedKeySelectFunction = (v) => {
-                    onChange(v);
-                }
-            }
-            item.appendChild(inputElement);
-        }
-
-        let setDefaultButton = document.createElement("button");
-        setDefaultButton.className = "option-button";
-        setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
-
-        let onSet = async () => {
-            await defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
-            setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
-            setDefaultButton.onclick = onRemove;
-            displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
-        }
-
-        setDefaultButton.onclick = onSet;
-
-        let onRemove = async () => {
-            await defaultOptions.deleteDefault(e.key);
-            setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
-            setDefaultButton.onclick = onSet;
-            displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
-        }
-
-        if (await defaultOptions.getDefault(e.key) == e.value) {
-            setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
-            setDefaultButton.onclick = onRemove;
-        }
-
-        item.appendChild(setDefaultButton);
-
-        if (e.key == "version") {
-            setDefaultButton.remove();
-            inputElement.style.gridColumn = "span 2";
-            inputElement.style.opacity = ".5";
-            inputElement.style.cursor = "not-allowed";
-            inputElement.disabled = true;
-        }
-
-        if (e.key == "version" && Number(e.value) != instanceInfo.attempted_options_txt_version) {
-            defaultOptions.setDefault(e.key, e.value);
-        }
-
-        optionList.appendChild(item);
-    }
-    if (!values.length) {
-        let nofound = new NoResultsFound(translate("app.options.not_found"));
-        nofound.element.style.background = "transparent";
-        nofound.element.style.gridColumn = "span 3";
-        optionList.appendChild(nofound.element);
-    }
-    element.innerHTML = "";
-    element.appendChild(fragment);
-}
-
-
-function setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths = "") {
-    setInstanceTabContentFilesReal(instanceInfo, element, scrollElement, paths);
-}
-
-async function setInstanceTabContentFilesReal(instanceInfo, element, scrollElement, paths) {
-    let searchAndFilter = document.createElement("div");
-    searchAndFilter.classList.add("search-and-filter-v2");
-    let filesBreadcrumb = document.createElement("div");
-    filesBreadcrumb.classList.add("files-breadcrumb");
-    let homeButton = document.createElement("button");
-    homeButton.className = "home-button";
-    homeButton.innerHTML = '<i class="fa-solid fa-house"></i>';
-    homeButton.onclick = () => {
-        setInstanceTabContentFiles(instanceInfo, element, scrollElement);
-    }
-    filesBreadcrumb.appendChild(homeButton);
-    let pathSplit = paths.split("/");
-    for (let i = 1; i < pathSplit.length; i++) {
-        let dir = pathSplit[i];
-        let breadcrumbArrow = document.createElement("span");
-        breadcrumbArrow.className = "breadcrumb-arrow";
-        breadcrumbArrow.innerHTML = '<i class="fa-solid fa-angle-right"></i>';
-        let breadcrumbEntry = document.createElement("button");
-        breadcrumbEntry.className = "breadcrumb-entry";
-        breadcrumbEntry.textContent = dir;
-        breadcrumbEntry.onclick = () => {
-            setInstanceTabContentFiles(instanceInfo, element, scrollElement, pathSplit.slice(0, i + 1).join("/"));
-        }
-        filesBreadcrumb.appendChild(breadcrumbArrow);
-        filesBreadcrumb.appendChild(breadcrumbEntry);
-    }
-    searchAndFilter.appendChild(filesBreadcrumb);
-    let contentSearch = document.createElement("div");
-    contentSearch.style.flexGrow = 2;
-    let searchBar = new SearchBar(contentSearch, () => { }, null);
-    let typeDropdown = document.createElement("div");
-    let dropdownInfo = new Dropdown(translate("app.files.type"), [
-        {
-            "name": translate("app.files.all"),
-            "value": "all"
-        },
-        {
-            "name": translate("app.files.folder"),
-            "value": "folder"
-        },
-        {
-            "name": translate("app.files.file"),
-            "value": "file"
-        }
-    ], typeDropdown, "all", () => { });
-    typeDropdown.style.minWidth = "200px";
-    let fileDrop = document.createElement("div");
-    fileDrop.dataset.action = "file-import";
-    fileDrop.dataset.instanceId = instanceInfo.instance_id;
-    fileDrop.dataset.paths = paths;
-    fileDrop.className = "small-drop-overlay drop-overlay";
-    let fileDropInner = document.createElement("div");
-    fileDropInner.className = "drop-overlay-inner";
-    fileDropInner.innerHTML = translate("app.import.files.drop");
-    fileDrop.appendChild(fileDropInner);
-    let fileList = [];
-
-    let contentListWrap = document.createElement("div");
-
-    let files = await window.enderlynx.getFiles(instanceInfo.instance_id, paths);
-
-    if (typeof files == 'string') {
-        let editor = document.createElement("div");
-        editor.id = "ace_editor";
-        editor.className = "ace-enderlynx"
-        aceResizeFunction = () => {
-            const viewHeight = window.innerHeight;
-            const editorRect = editor.getBoundingClientRect();
-            const distanceFromTop = editorRect.top;
-            const calculatedHeight = viewHeight - distanceFromTop - 10;
-            editor.style.height = calculatedHeight + "px";
-            aceEditor.resize();
-        }
-        let aceEditor = ace.edit(editor);
-        aceEditor.setShowPrintMargin(false);
-        aceEditor.setValue(files, -1);
-        aceEditor.session.setMode("ace/mode/enderlynx");
-        aceEditor.setFontSize(".9rem");
-        contentListWrap.appendChild(editor);
-        let resetButton = document.createElement("button");
-        resetButton.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>Reset';
-        resetButton.className = "editor-button";
-        resetButton.onclick = () => {
-            aceEditor.setValue(files, -1);
-        }
-        searchAndFilter.appendChild(resetButton);
-        let saveButton = document.createElement("button");
-        saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
-        saveButton.className = "editor-button";
-        saveButton.onclick = async () => {
-            saveButton.innerHTML = '<i class="spinner"></i>Saving';
-            let success = await window.enderlynx.editFile(instanceInfo.instance_id, paths, aceEditor.getValue());
-            if (success) {
-                displaySuccess(translate("app.files.edit.success"));
-            } else {
-                displayError(translate("app.files.edit.fail"));
-            }
-            saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
-        }
-        searchAndFilter.appendChild(saveButton);
-    } else {
-        for (let i = 0; i < files.length; i++) {
-            let file = files[i];
-            fileList.push(
-                {
-                    "primary_column": {
-                        "title": file.name,
-                        "desc": ""
-                    },
-                    "secondary_column": {
-                        "title": () => formatTimeRelatively(file.dateModified),
-                        "desc": () => ""
-                    },
-                    "type": file.isDirectory ? "folder" : "file",
-                    "icon": file.isDirectory ? '<i class="fa-regular fa-folder"></i>' : '<i class="fa-regular fa-file"></i>',
-                    "onremove": (ele) => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.files.delete.confirm.title"), "notice", translate("app.files.delete.confirm.description", "%w", file.name), [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.files.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.files.delete.confirm")
-                            }
-                        ], [], async () => {
-                            let success = await window.enderlynx.deleteFiles(instanceInfo.instance_id, paths, [file.name]);
-                            if (success) {
-                                contentList.removeElement(ele);
-                                displaySuccess(translate("app.files.delete.success", "%w", file.name));
-                            } else {
-                                displayError(translate("app.files.delete.fail", "%w", file.name));
-                            }
-                        });
-                    },
-                    "onclick": () => {
-                        setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths + "/" + file.name);
-                    },
-                    "more": {
-                        "actionsList": [
-                            {
-                                "title": translate("app.files.show_in_folder"),
-                                "icon": '<i class="fa-solid fa-arrow-up-right-from-square"></i>',
-                                "func": () => {
-
-                                }
-                            },
-                            {
-                                "title": translate("app.files.copy_file_name"),
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "func": () => {
-                                    navigator.clipboard.writeText(file.name).then(() => {
-                                        displaySuccess(translate("app.files.name.copy.success"));
-                                    }).catch(() => {
-                                        displayError(translate("app.files.name.copy.fail"));
-                                    });
-                                }
-                            },
-                            {
-                                "title": translate("app.files.copy_relative_path"),
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "func": () => {
-                                    navigator.clipboard.writeText(file.relativePath).then(() => {
-                                        displaySuccess(translate("app.files.relative_path.copy.success"));
-                                    }).catch(() => {
-                                        displayError(translate("app.files.relative_path.copy.fail"));
-                                    });
-                                }
-                            },
-                            {
-                                "title": translate("app.files.copy_full_path"),
-                                "icon": '<i class="fa-solid fa-copy"></i>',
-                                "func": () => {
-                                    navigator.clipboard.writeText(file.fullPath).then(() => {
-                                        displaySuccess(translate("app.files.full_path.copy.success"));
-                                    }).catch(() => {
-                                        displayError(translate("app.files.full_path.copy.fail"));
-                                    });
-                                }
-                            },
-                            {
-                                "title": translate("app.files.rename"),
-                                "icon": '<i class="fa-solid fa-i-cursor"></i>',
-                                "func": () => {
-
-                                }
-                            },
-                            {
-                                "title": translate("app.files.move"),
-                                "icon": '<i class="fa-solid fa-left-right"></i>',
-                                "func": () => {
-
-                                }
-                            },
-                            {
-                                "title": translate("app.files.delete"),
-                                "icon": '<i class="fa-solid fa-trash-can"></i>',
-                                "danger": true,
-                                "func_id": "delete",
-                                "func": (ele) => {
-                                    let dialog = new Dialog();
-                                    dialog.showDialog(translate("app.files.delete.confirm.title"), "notice", translate("app.files.delete.confirm.description", "%w", file.name), [
-                                        {
-                                            "type": "cancel",
-                                            "content": translate("app.files.delete.cancel")
-                                        },
-                                        {
-                                            "type": "confirm",
-                                            "content": translate("app.files.delete.confirm")
-                                        }
-                                    ], [], async () => {
-                                        let success = await window.enderlynx.deleteFiles(instanceInfo.instance_id, paths, [file.name]);
-                                        if (success) {
-                                            contentList.removeElement(ele);
-                                            displaySuccess(translate("app.files.delete.success", "%w", file.name));
-                                        } else {
-                                            displayError(translate("app.files.delete.fail", "%w", file.name));
-                                        }
-                                    });
-                                }
-                            }
-                        ].filter(e => e)
-                    },
-                    "pass_to_checkbox": file
-                });
-        }
-
-        let contentList = new ContentList(contentListWrap, fileList, searchBar, {
-            "checkbox": {
-                "enabled": true,
-                "actionsList": [
-                    {
-                        "title": translate("app.files.selection.delete"),
-                        "icon": '<i class="fa-solid fa-trash-can"></i>',
-                        "danger": true,
-                        "dont_loop": true,
-                        "func": async (eles, es) => {
-                            let success = await window.enderlynx.deleteFiles(instanceInfo.instance_id, paths, es.map(e => e.name));
-                            if (success) {
-                                eles.forEach(e => e.remove());
-                                contentList.removeElements(eles);
-                                displaySuccess(translate("app.files.delete_multiple.success"));
-                            } else {
-                                setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths);
-                                displayError(translate("app.files.delete_multiple.fail"));
-                            }
-                        },
-                        "show_confirmation_dialog": true,
-                        "dialog_title": translate("app.files.delete.confirm.title"),
-                        "dialog_content": translate("app.files.delete.selection_notice"),
-                        "dialog_button": translate("app.files.delete.confirm")
-                    }
-                ]
-            },
-            "disable": {
-                "enabled": false
-            },
-            "remove": {
-                "enabled": true
-            },
-            "more": {
-                "enabled": true
-            },
-            "second_column_centered": true,
-            "primary_column_name": translate("app.worlds.name"),
-            "secondary_column_name": "",
-            "refresh": {
-                "enabled": true,
-                "func": () => {
-                    setInstanceTabContentFiles(instanceInfo, element, scrollElement, paths);
-                }
-            },
-            "update_all": {
-                "enabled": false
-            }
-        }, dropdownInfo, translate("app.files.not_found"), scrollElement);
-    }
-
-    element.innerHTML = "";
-    element.appendChild(fileDrop);
-    if (typeof files != 'string') searchAndFilter.appendChild(contentSearch);
-    if (typeof files != 'string') searchAndFilter.appendChild(typeDropdown);
-    element.appendChild(searchAndFilter);
-    element.appendChild(contentListWrap);
-    clearMoreMenus();
-    if (aceResizeFunction) aceResizeFunction();
-}
-
-function setInstanceTabContentScreenshots(instanceInfo, element, scrollElement) {
-    let loading = new LoadingContainer();
-    element.innerHTML = "";
-    element.appendChild(loading.element);
-    setTimeout(() => {
-        setInstanceTabContentScreenshotsReal(instanceInfo, element, scrollElement);
-    }, 0);
-}
-
-async function setInstanceTabContentScreenshotsReal(instanceInfo, element, scrollElement) {
-    let fragment = document.createDocumentFragment();
-    let galleryElement = document.createElement("div");
-    galleryElement.className = "gallery";
-    let screenshots = (await window.enderlynx.getScreenshots(instanceInfo.instance_id)).reverse();
-    let screenshotElements = [];
-    screenshots.forEach(e => {
-        let screenshotElement = document.createElement("button");
-        screenshotElement.className = "gallery-screenshot";
-        screenshotElement.setAttribute("data-title", formatDateAndTime(e.file_name));
-        screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
-        let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
-        screenshotElement.onclick = () => {
-            displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, e.file_name, instanceInfo, element, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
-        }
-        let buttons = new ContextMenuButtons([
-            {
-                "icon": '<i class="fa-solid fa-folder"></i>',
-                "title": translate("app.screenshots.open_in_folder"),
-                "func": () => {
-                    window.enderlynx.showScreenshotInFolder(instanceInfo.instance_id, e.real_file_name);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-image"></i>',
-                "title": translate("app.screenshots.open_photo"),
-                "func": () => {
-                    window.enderlynx.openFolder(e.file_path);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-copy"></i>',
-                "title": translate("app.screenshots.copy"),
-                "func": async () => {
-                    let success = await window.enderlynx.copyImageToClipboard(e.file_path);
-                    if (success) {
-                        displaySuccess(translate("app.screenshots.copy.success"));
-                    } else {
-                        displayError(translate("app.screenshots.copy.fail"));
-                    }
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-share"></i>',
-                "title": translate("app.screenshots.share"),
-                "func": () => {
-                    openShareDialogForFile(e.file_path);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-trash-can"></i>',
-                "title": translate("app.screenshots.delete"),
-                "func": async () => {
-                    let success = await window.enderlynx.deleteScreenshot(instanceInfo.instance_id, e.file_name);
-                    if (success) {
-                        displaySuccess(translate("app.screenshots.delete.success"));
-                    } else {
-                        displayError(translate("app.screenshots.delete.fail"));
-                    }
-                    setInstanceTabContentScreenshots(instanceInfo, element, scrollElement);
-                },
-                "danger": true
-            }
-        ]);
-        screenshotElement.oncontextmenu = (e) => {
-            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
-        }
-        screenshotElements.push(screenshotElement);
-    });
-    let setPage = (page) => {
-        currentPage = page;
-        paginationTop.setPage(page);
-        paginationBottom.setPage(page);
-        let fragment = document.createDocumentFragment();
-        for (let i = 0; i < screenshotElements.length; i++) {
-            screenshotElements[i].remove();
-        }
-        for (let i = pageSize * (page - 1); i < Math.min(screenshotElements.length, pageSize * page); i++) {
-            fragment.appendChild(screenshotElements[i]);
-        }
-        galleryElement.appendChild(fragment);
-    }
-    let paginationTop = new Pagination(1, Math.ceil(screenshots.length / 25), setPage);
-    let paginationBottom = new Pagination(1, Math.ceil(screenshots.length / 25), setPage);
-    paginationTop.element.style.marginBottom = "10px";
-    paginationBottom.element.style.marginTop = "10px";
-    fragment.appendChild(paginationTop.element);
-    fragment.appendChild(galleryElement);
-    fragment.appendChild(paginationBottom.element);
-    element.innerHTML = "";
-    element.appendChild(fragment);
-    let currentPage = 1;
-    let computePageSize = () => {
-        let styles = getComputedStyle(galleryElement);
-        let columns = styles.gridTemplateColumns.split(" ").length;
-        for (let i = 29; i >= 1; i--) {
-            if (i % columns == 0) {
-                let totalPages = Math.ceil(screenshots.length / i);
-                paginationTop.setTotalPages(totalPages);
-                paginationBottom.setTotalPages(totalPages);
-                if (currentPage > totalPages && totalPages != 0) {
-                    setPage(totalPages);
-                }
-                return i;
-            }
-        }
-        return screenshotElements.length;
-    }
-    document.body.onresize = () => {
-        pageSize = computePageSize();
-        setPage(currentPage);
-    }
-    let pageSize = computePageSize();
-    setPage(1);
-    if (!screenshots.length) {
-        let nofound = new NoResultsFound(translate("app.screenshots.not_found"));
-        nofound.element.style.gridColumn = "1 / -1";
-        galleryElement.appendChild(nofound.element);
-    }
-}
-
-function displayScreenshot(name, desc, file, file_name, instanceInfo, element, list, currentIndex, word = translate("app.screenshot")) {
+function displayScreenshot(name, desc, file, file_name, instanceInfo, list, currentIndex, word = translate("app.screenshot")) {
     let index = currentIndex;
     let buttonLeft = document.createElement("button");
     buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
@@ -8769,7 +8816,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, element, l
                 } else {
                     displayError(translate("app.screenshots.custom.delete.fail", "%w", word));
                 }
-                setInstanceTabContentScreenshots(instanceInfo, element, scrollElement);
+                instanceInfo.instanceScreen.showScreenshots();
             };
         }
         let screenshotDisplay = document.createElement("img");
@@ -10591,6 +10638,7 @@ class Dialog {
         }, 1000);
     }
     showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, max_width) {
+        this.onsubmit = onsubmit;
         let element = document.createElement("dialog");
         element.className = "dialog";
         element.oncancel = (e) => {
@@ -10628,7 +10676,7 @@ class Dialog {
         element.showModal();
         let tabElement = document.createElement("div");
         this.values = [];
-        let selectedTab = tabs ? tabs[0]?.value ?? "" : "";
+        this.selectedTab = tabs ? tabs[0]?.value ?? "" : "";
         if (tabs && tabs.length) {
             realDialogContent.appendChild(tabElement);
             new TabContent(tabElement, tabs.map(e => ({
@@ -10638,7 +10686,7 @@ class Dialog {
                         contents[e].style.display = "none";
                     });
                     contents[v].style.display = "grid";
-                    selectedTab = v;
+                    this.selectedTab = v;
                 }
             })))
         }
@@ -10656,7 +10704,7 @@ class Dialog {
             contents["default"] = dialogContent;
             realDialogContent.appendChild(dialogContent);
         }
-        if (selectedTab) contents[selectedTab].style.display = "grid";
+        if (this.selectedTab) contents[this.selectedTab].style.display = "grid";
         if (type == "notice") {
             if (info instanceof Element) {
                 realDialogContent.innerHTML = '';
@@ -10761,6 +10809,16 @@ class Dialog {
                                     textInput.value = "";
                                 }
                             });
+                        }
+                    }
+                    if (info[i].focus) {
+                        textInput.focus();
+                    }
+                    if (i == info.length - 1) {
+                        textInput.onkeydown = (e) => {
+                            if (e.key == "Enter") {
+                                this.submit();
+                            }
                         }
                     }
                     this.values.push({ "id": info[i].id, "element": textInput });
@@ -11103,15 +11161,10 @@ class Dialog {
                 }
             } else if (buttons[i].type == "confirm") {
                 buttonElement.classList.add("confirm");
-                buttonElement.onclick = async () => {
-                    let info = this.values.map(e => ({ "id": e.id, "value": e.element.value, "pass": e.element.getPass ? e.element.getPass() : null }));
-                    info.push({ "id": "selected_tab", "value": selectedTab });
-                    onsubmit(info, buttonElement);
-                    this.element.close();
-                    setTimeout(() => {
-                        this.element.remove();
-                    }, 1000);
+                buttonElement.onclick = () => {
+                    this.submit();
                 }
+                this.buttonelement = buttonElement;
             }
             dialogButtons.appendChild(buttonElement);
         }
@@ -11119,6 +11172,18 @@ class Dialog {
         // make the toasts show on top of the dialog
         document.getElementsByClassName("toasts")[0].hidePopover();
         document.getElementsByClassName("toasts")[0].showPopover();
+    }
+
+    async submit() {
+        let info = this.values.map(e => ({ "id": e.id, "value": e.element.value, "pass": e.element.getPass ? e.element.getPass() : null }));
+        info.push({ "id": "selected_tab", "value": this.selectedTab });
+        let info2 = {};
+        info.forEach(e => info2[e.id] = e.value);
+        this.onsubmit(info2, this.buttonElement);
+        this.element.close();
+        setTimeout(() => {
+            this.element.remove();
+        }, 1000);
     }
 }
 
@@ -11968,6 +12033,10 @@ async function installContent(source, project, version, instance, data_pack_worl
         return { id: true };
     }
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, project.project_type, project.id, source);
+    if (!version) {
+        displayError(translate("app.discover.error"));
+        return;
+    }
     await installSpecificVersion(version, source, instance, project.project_type, project.name, project.authors.map(e => e.name).join(", "), project.icon, project.id, false, data_pack_world);
     return { id: version.version_id };
 }
@@ -12153,9 +12222,7 @@ async function duplicateInstance(instanceInfo) {
             "type": "confirm",
             "content": translate("app.instances.duplicate.confirm")
         }
-    ], [], async (v) => {
-        let info = {};
-        v.forEach(e => info[e.id] = e.value);
+    ], [], async (info) => {
         let new_instance_id = await window.enderlynx.getInstanceFolderName(info.name);
         try {
             let success = await window.enderlynx.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
@@ -13173,7 +13240,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                     screenshotElement.style.backgroundImage = `url("${e.thumbnail_url}")`;
                     let screenshotInformation = content.gallery.map(e => ({ "name": e.name || translate("app.discover.gallery.untitled"), "file": e.url, "desc": e.description }));
                     screenshotElement.onclick = () => {
-                        displayScreenshot(e.name || translate("app.discover.gallery.untitled"), e.description, e.url, null, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.url), translate("app.discover.gallery.image"));
+                        displayScreenshot(e.name || translate("app.discover.gallery.untitled"), e.description, e.url, null, null, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.url), translate("app.discover.gallery.image"));
                     }
                     let buttons = new ContextMenuButtons([
                         {
@@ -14715,9 +14782,7 @@ async function openInstanceShareDialog(instanceInfo) {
             "type": "confirm",
             "content": translate("app.instances.share.confirm")
         }
-    ], [], (v) => {
-        let info = {};
-        v.forEach(e => info[e.id] = e.value);
+    ], [], (info) => {
         let nonContentSpecific = info.files.filter(e => !contentSpecific.includes(e));
         let yesContentSpecific = info.files.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]);
         yesContentSpecific = yesContentSpecific.filter(e => {
