@@ -3191,8 +3191,6 @@ async function getAllFilesRecursive(baseDir, relDir = "", processDatFiles) {
             results.push(relPath.replace(/\\/g, "/"));
         }
     }
-    console.log(relDir);
-    console.log(Object.keys(datFileData));
     return { results, datFileData };
 }
 
@@ -3236,7 +3234,6 @@ function readMrPack(file_path) {
         if (!manifestEntry) return null;
         const manifestData = manifestEntry.getData().toString('utf-8');
         let jsonData = JSON.parse(manifestData);
-        console.log(jsonData);
         let loader = "vanilla";
         let loaders = ["forge", "fabric-loader", "neoforge", "quilt-loader"];
         let keys = Object.keys(jsonData.dependencies)
@@ -5075,7 +5072,6 @@ ipcMain.handle('get-files', async (_, instance_id, paths) => {
 
 ipcMain.handle('delete-files', async (_, instance_id, paths, files) => {
     let fullPath = path.join(user_path, "minecraft/instances", instance_id, paths);
-    console.log(files);
     try {
         for (const file of files) {
             const filePath = path.join(fullPath, file);

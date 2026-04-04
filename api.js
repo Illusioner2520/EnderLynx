@@ -51,7 +51,7 @@ class Project {
         this.links.donations = urlInfo.link_urls ? Object.entries(urlInfo.link_urls).map(e => e[1]).filter(e => e.donation) : [];
         this.links.browser = `https://modrinth.com/project/${this.id}`;
         this.gallery = urlInfo.gallery.map(e => new GalleryImage(e, "modrinth"));
-        this.loaders = [...new Set((urlInfo.mrpack_loaders || []).concat(urlInfo.loaders || []).concat(urlInfo.project_loader_files?.mrpack_loaders || []))];
+        this.loaders = [...new Set((urlInfo.mrpack_loaders || []).concat(urlInfo.loaders || []).concat(urlInfo.project_loader_fields?.mrpack_loaders || []))];
         this.game_versions = urlInfo.minecraft_java_server?.content?.kind == "vanilla" ? urlInfo.minecraft_java_server.content.supported_game_versions : urlInfo.project_loader_fields ? urlInfo.project_loader_fields.game_versions : urlInfo.game_versions;
         this.online_players = urlInfo.minecraft_java_server?.ping?.data?.players_online ?? null;
         this.max_players = urlInfo.minecraft_java_server?.ping?.data?.players_max ?? null;

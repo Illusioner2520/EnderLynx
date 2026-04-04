@@ -710,7 +710,7 @@ class MinecraftAccountSwitcher {
         newPlayerInfo.setDefault();
         this.setPlayerInfo();
         if (Display.currentScreen.tabName == "wardrobe") {
-            wardrobeContent.displayContent();
+            wardrobeScreen.display();
         }
         if (Display.currentScreen.tabName == 'home') {
             homeScreen.changeHomeWelcome();
@@ -750,7 +750,7 @@ class MinecraftAccountSwitcher {
             }
         }
         if (Display.currentScreen.tabName == "wardrobe") {
-            wardrobeContent.displayContent();
+            wardrobeScreen.display();
         }
         if (Display.currentScreen.tabName == "home") {
             homeScreen.changeHomeWelcome();
@@ -779,7 +779,7 @@ class MinecraftAccountSwitcher {
         }
         this.setPlayerInfo();
         if (Display.currentScreen.tabName == "wardrobe") {
-            wardrobeContent.displayContent();
+            wardrobeScreen.display();
         }
         if (Display.currentScreen.tabName == "home") {
             homeScreen.changeHomeWelcome();
@@ -2596,10 +2596,10 @@ class InstanceScreen extends Screen {
                             "type": "confirm",
                             "content": translate("app.instances.delete.confirm")
                         }
-                    ], [], async (v) => {
+                    ], [], async (info) => {
                         this.instance.delete();
                         instancesScreen.display();
-                        if (v[0].value) {
+                        if (info.delete) {
                             try {
                                 await window.enderlynx.deleteInstanceFiles(this.instance.instance_id);
                             } catch (e) {
@@ -2663,6 +2663,7 @@ class InstanceScreen extends Screen {
     }
 
     async calculatePlayButtonState(make_loading) {
+        console.log("calculating play button state");
         this.running = checkForProcess(this.instance.pid);
         if (make_loading) {
             this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
@@ -5204,12 +5205,12 @@ class HomeScreen extends Screen {
                                 "type": "confirm",
                                 "content": translate("app.instances.delete.confirm")
                             }
-                        ], [], async (v) => {
+                        ], [], async (info) => {
                             instanceInfo.delete();
                             pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
                             lastPlayedInstancesList = lastPlayedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
                             this.updateHomeGrid();
-                            if (v[0].value) {
+                            if (info.delete) {
                                 try {
                                     await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
                                 } catch (e) {
@@ -5655,7 +5656,7 @@ class InstancesScreen extends Screen {
                         e.setTitle(await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
                         e.setIcon(await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                         instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
-                        groupInstances(groupBy.getSelected);
+                        instancesScreen.groupInstances();
                     }
                 },
                 {
@@ -5687,11 +5688,11 @@ class InstancesScreen extends Screen {
                                 "type": "confirm",
                                 "content": translate("app.instances.delete.confirm")
                             }
-                        ], [], async (v) => {
+                        ], [], async (info) => {
                             instances[i].delete();
                             animateGridReorderStart(".instance-item");
-                            instanceContent.displayContent();
-                            if (v[0].value) {
+                            instancesScreen.display();
+                            if (info.delete) {
                                 try {
                                     await window.enderlynx.deleteInstanceFiles(instances[i].instance_id);
                                 } catch (e) {
@@ -5715,6 +5716,7 @@ class InstancesScreen extends Screen {
     }
 
     async groupInstances(how, noAnimate) {
+        if (!how) how = this.groupBy.getSelected;
         if (!noAnimate) animateGridReorderStart(".instance-item");
         if (!this.groupList) return;
         await setDefault("default_group", how);
@@ -7498,10 +7500,10 @@ settingsButtonEle.onclick = async () => {
         } else {
             window.enderlynx.clearActivity();
         }
-        v.forEach(e => {
-            if (e.id.startsWith("java_")) {
-                let version = e.id.replace("java_", "");
-                window.enderlynx.setJavaInstallation(version, e.value);
+        Object.entries(info).forEach(e => {
+            if (e[0].startsWith("java_")) {
+                let version = e[0].replace("java_", "");
+                window.enderlynx.setJavaInstallation(version, e[1]);
             }
         });
         window.enderlynx.changeFolder(window.enderlynx.userPath, info.folder_location);
@@ -8311,7 +8313,7 @@ async function showCreateInstanceDialog() {
             if (!packInfo) {
                 displayError(translate("app.cf.code.error"));
                 await instance.delete();
-                instanceContent.displayContent();
+                instancesScreen.display();
                 return;
             }
             if (!("loader_version" in packInfo)) {
