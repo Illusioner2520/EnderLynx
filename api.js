@@ -57,11 +57,13 @@ class Project {
         this.max_players = urlInfo.minecraft_java_server?.ping?.data?.players_max ?? null;
         this.ip_address = urlInfo.minecraft_java_server?.address || null;
         this.server_modpack = urlInfo.minecraft_java_server?.content;
+        this.has_organzation = Boolean(urlInfo.organization);
         if (urlInfo.minecraft_java_server) {
             this.project_type = "server";
         }
         this.uses_markdown_description = true;
         if (urlInfo.author) {
+            this.author = urlInfo.author;
             this.authors = [new Author(urlInfo.author)];
         }
     }
@@ -95,6 +97,7 @@ class Project {
         this.project_type = Project.curseforge_project_type_conversion[urlInfo.classId];
         this.categories = urlInfo.categories.map(e => e.name);
         this.authors = urlInfo.authors.map(e => new Author(e, "curseforge"));
+        this.author = this.authors.join(", ");
         this.icon = urlInfo.logo?.thumbnailUrl || urlInfo.logo?.url || "";
         this.published = new Date(urlInfo.dateCreated);
         this.updated = new Date(urlInfo.dateModified);
@@ -201,9 +204,17 @@ class Project {
     async getAuthors() {
         if ((this.authors?.length || 0) > 0 && this.authors[0].id) return;
         if (this.source == "modrinth") {
-            let url = `https://api.modrinth.com/v3/project/${this.id}/members`;
-            let urlInfo = await (await fetch(url)).json();
-            this.authors = urlInfo.map(e => new Author(e, "modrinth"));
+            if (this.has_organzation) {
+                let url = `https://api.modrinth.com/v3/project/${this.id}/organization`;
+                let urlInfo = await (await fetch(url)).json();
+                this.authors = [new Author(urlInfo, "modrinth_organization")].concat(urlInfo.members.map(e => new Author(e, "modrinth")));
+                this.author = urlInfo.name;
+            } else {
+                let url = `https://api.modrinth.com/v3/project/${this.id}/members`;
+                let urlInfo = await (await fetch(url)).json();
+                this.authors = urlInfo.map(e => new Author(e, "modrinth"));
+                this.author = this.authors.join(", ");
+            }
         }
     }
     static async getFromId(id, source) {
@@ -393,7 +404,14 @@ class GalleryImage {
 
 class Author {
     constructor(info, source) {
-        if (source == "modrinth") {
+        if (source == "modrinth_organization") {
+            this.name = info.name;
+            this.url = `https://modrinth.com/organization/${info.id}`;
+            this.avatar = info.icon_url;
+            this.bio = info.description || "";
+            this.id = info.id;
+            this.organization = true;
+        } else if (source == "modrinth") {
             this.name = info.user.username;
             this.url = `https://modrinth.com/user/${info.user.id}`;
             this.avatar = info.user.avatar_url;

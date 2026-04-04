@@ -1016,6 +1016,8 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
     let project_ids = [];
     let team_ids = [];
     let team_to_project_ids = {};
+    let organization_ids = [];
+    let organization_to_project_ids = {};
 
     try {
         if (link_with_modrinth && all_hashes.length > 0) {
@@ -1054,9 +1056,15 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                         item.name = e.title;
                         item.image = e.icon_url;
                         item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                        team_ids.push(e.team);
-                        if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
-                        else team_to_project_ids[e.team].push(e.id);
+                        if (e.organization) {
+                            organization_ids.push(e.organization);
+                            if (!organization_to_project_ids[e.organization]) organization_to_project_ids[e.organization] = [e.id];
+                            else organization_to_project_ids[e.organization].push(e.id);
+                        } else {
+                            team_ids.push(e.team);
+                            if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+                            else team_to_project_ids[e.team].push(e.id);
+                        }
                     }
                 });
             });
@@ -1075,6 +1083,19 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                         });
                     });
                 }
+            });
+            let res_3 = await fetch(`https://api.modrinth.com/v3/organizations?ids=["${organization_ids.join('","')}"]`);
+            let res_json_3 = await res_3.json();
+            res_json_3.forEach(e => {
+                let author = e.name;
+                if (!organization_to_project_ids[e.id]) return;
+                organization_to_project_ids[e.id].forEach(f => {
+                    content.forEach(item => {
+                        if (item.source_id == f) {
+                            item.author = author;
+                        }
+                    })
+                });
             });
         }
     } catch (e) {
@@ -1152,7 +1173,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                throw new(translate("app.installing.override.fail", "%o", file));
+                throw new (translate("app.installing.override.fail", "%o", file));
             }
         }
 
@@ -1173,7 +1194,7 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
 
         const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', translate("app.installing", "%t", title), ((i + 1) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", i+1, "%b", manifest_json.files.length), processId, "good", cancelId);
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), ((i + 1) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", i + 1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
             let project_id = file.projectID;
             let file_id = file.fileID;
@@ -1328,7 +1349,7 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                throw new(translate("app.installing.override.fail", "%o", file.name));
+                throw new (translate("app.installing.override.fail", "%o", file.name));
             }
             signal.throwIfAborted();
         }
@@ -1342,6 +1363,8 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         let version_hashes = [];
         let team_ids = [];
         let team_to_project_ids = {};
+        let organization_ids = [];
+        let organization_to_project_ids = {};
 
         const limit = pLimit(max_downloads);
         signal.throwIfAborted();
@@ -1409,9 +1432,15 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                     item.name = e.title;
                     item.image = e.icon_url;
                     item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                    team_ids.push(e.team);
-                    if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
-                    else team_to_project_ids[e.team].push(e.id);
+                    if (e.organization) {
+                        organization_ids.push(e.organization);
+                        if (!organization_to_project_ids[e.organization]) organization_to_project_ids[e.organization] = [e.id];
+                        else organization_to_project_ids[e.organization].push(e.id);
+                    } else {
+                        team_ids.push(e.team);
+                        if (!team_to_project_ids[e.team]) team_to_project_ids[e.team] = [e.id];
+                        else team_to_project_ids[e.team].push(e.id);
+                    }
                 }
             });
         });
@@ -1431,6 +1460,19 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
                     });
                 });
             }
+        });
+        let res_3 = await fetch(`https://api.modrinth.com/v3/organizations?ids=["${organization_ids.join('","')}"]`, { signal });
+        let res_json_3 = await res_3.json();
+        res_json_3.forEach(e => {
+            let author = e.name;
+            if (!organization_to_project_ids[e.id]) return;
+            organization_to_project_ids[e.id].forEach(f => {
+                content.forEach(item => {
+                    if (item.source_id == f) {
+                        item.author = author;
+                    }
+                })
+            });
         });
 
         if (!loader) {
@@ -1510,7 +1552,7 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                throw new(translate("app.installing.override.fail", "%o", file));
+                throw new (translate("app.installing.override.fail", "%o", file));
             }
         }
 
@@ -1525,6 +1567,8 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
         let cf_version_ids = [];
         let mr_team_ids = [];
         let mr_team_to_project_ids = {};
+        let mr_organization_ids = [];
+        let mr_organization_to_project_ids = {};
 
         const limit = pLimit(max_downloads);
 
@@ -1602,9 +1646,15 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
                             item.name = e.title;
                             item.image = e.icon_url;
                             item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
-                            if (!mr_team_to_project_ids[e.team]) mr_team_to_project_ids[e.team] = [];
-                            mr_team_to_project_ids[e.team].push(e.id);
-                            if (!mr_team_ids.includes(e.team)) mr_team_ids.push(e.team);
+                            if (e.organization) {
+                                mr_organization_ids.push(e.organization);
+                                if (!mr_organization_to_project_ids[e.organization]) mr_organization_to_project_ids[e.organization] = [e.id];
+                                else mr_organization_to_project_ids[e.organization].push(e.id);
+                            } else {
+                                if (!mr_team_ids.includes(e.team)) mr_team_ids.push(e.team);
+                                if (!mr_team_to_project_ids[e.team]) mr_team_to_project_ids[e.team] = [e.id];
+                                else mr_team_to_project_ids[e.team].push(e.id);
+                            }
                         }
                     });
                 });
@@ -1647,6 +1697,24 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
                 });
             } catch (e) { }
         }
+        if (mr_organization_ids.length) {
+            try {
+                let res_3 = await fetch(`https://api.modrinth.com/v3/organizations?ids=["${mr_organization_ids.join('","')}"]`);
+                let res_json_3 = await res_3.json();
+                res_json_3.forEach(e => {
+                    let author = e.name;
+                    if (!mr_organization_to_project_ids[e.id]) return;
+                    mr_organization_to_project_ids[e.id].forEach(f => {
+                        content.forEach(item => {
+                            if (item.source == "modrinth" && item.source_id == f) {
+                                item.author = author;
+                            }
+                        })
+                    });
+                });
+            } catch (e) { }
+        }
+
         signal.throwIfAborted();
 
         if (cf_project_ids.length) {
@@ -1737,7 +1805,7 @@ async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                throw new(translate("app.installing.override.fail", "%o", file));
+                throw new (translate("app.installing.override.fail", "%o", file));
             }
         }
 
@@ -5049,7 +5117,7 @@ ipcMain.handle('get-files', async (_, instance_id, paths) => {
 
         const files = await fsPromises.readdir(fullPath, { withFileTypes: true });
         const result = [];
-        
+
         for (const file of files) {
             const filePath = path.join(fullPath, file.name);
             const stats = await fsPromises.stat(filePath);
@@ -5063,7 +5131,7 @@ ipcMain.handle('get-files', async (_, instance_id, paths) => {
                 location: paths
             });
         }
-        
+
         return result;
     } catch (e) {
         return [];

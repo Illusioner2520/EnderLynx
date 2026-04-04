@@ -11269,10 +11269,10 @@ class ContentSearchEntry {
         titleElement.className = "discover-item-title";
         titleElement.innerHTML = `<div>${sanitize(content.name)}</div>`;
         top.appendChild(titleElement);
-        if (content.authors.map(e => e.name).join(", ")) {
+        if (content.author) {
             let authorElement = document.createElement("div");
             authorElement.className = "discover-item-author";
-            authorElement.innerHTML = `<div>${sanitize(translate("app.discover.author", "%a", content.authors.map(e => e.name).join(", ")))}</div>`;
+            authorElement.innerHTML = `<div>${sanitize(translate("app.discover.author", "%a", content.author))}</div>`;
             top.appendChild(authorElement);
         }
         let descElement = document.createElement("div");
@@ -12071,7 +12071,7 @@ async function installContent(source, project, version, instance, data_pack_worl
         displayError(translate("app.discover.error"));
         return;
     }
-    await installSpecificVersion(version, source, instance, project.project_type, project.name, project.authors.map(e => e.name).join(", "), project.icon, project.id, false, data_pack_world);
+    await installSpecificVersion(version, source, instance, project.project_type, project.name, project.author, project.icon, project.id, false, data_pack_world);
     return { id: version.version_id };
 }
 
@@ -12097,7 +12097,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
             let project = Project.getFromId(dependency.project_id, source);
             if (dependency.version_id) {
                 let version = ProjectVersion.getFromId(dependency.version_id, dependency.project_id, source);
-                await installSpecificVersion(version, source, instance, project.project_type, project.name, project.authors.map(e => e.name).join(", "), project.icon, project.id, false, undefined);
+                await installSpecificVersion(version, source, instance, project.project_type, project.name, project.author, project.icon, project.id, false, undefined);
             } else {
                 await installContent(source, project, undefined, instance);
             }
@@ -13211,6 +13211,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 let authors = document.createElement("div");
                 authors.className = "authors";
                 content.authors.forEach(e => {
+                    if (e.organization) e.role = translate("app.discover.authors.organization");
                     let author = document.createElement("div");
                     author.className = "author";
                     if (e.bio) author.setAttribute("title", e.bio);
