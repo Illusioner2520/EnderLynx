@@ -1941,7 +1941,6 @@ class ContentList {
     }
 
     render(items) {
-        console.log("Hey guess what Im rendering");
         let h = 0;
         for (let i = 0; i < items.length; i++) h += items[i].height;
         this.contentElement.style.height = h + "px";
@@ -6395,9 +6394,7 @@ class WardrobeScreen extends Screen {
                     "name": translate("app.wardrobe.import.tab.url"),
                     "value": "url"
                 }
-            ], async (e) => {
-                let info = {};
-                e.forEach(e => { info[e.id] = e.value });
+            ], async (info) => {
                 if (info.selected_tab == "username") {
                     try {
                         info.skin = (await window.enderlynx.getSkinFromUsername(info.username)).url;
@@ -6984,9 +6981,7 @@ settingsButtonEle.onclick = async () => {
                         ], [
                             { "type": "cancel", "content": translate("app.settings.java.cancel") },
                             { "type": "confirm", "content": translate("app.settings.java.confirm") }
-                        ], [], (e) => {
-                            let info = {};
-                            e.forEach(e => { info[e.id] = e.value });
+                        ], [], (info) => {
                             i.value = info.java_path;
                         });
                         b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>Detect';
@@ -8234,9 +8229,7 @@ async function showCreateInstanceDialog() {
         //     "name": translate("app.instances.tab.launcher"),
         //     "value": "launcher"
         // }
-    ], async (e) => {
-        let info = {};
-        e.forEach(e => { info[e.id] = e.value });
+    ], async (info) => {
         if (info.selected_tab == "custom") {
             if (info.game_version == "loading") {
                 displayError(translate("app.instances.no_game_version"));
@@ -8537,9 +8530,7 @@ async function showInstanceSettings(instanceInfo) {
                         ], [
                             { "type": "cancel", "content": translate("app.instances.settings.java_installation.detect.cancel") },
                             { "type": "confirm", "content": translate("app.instances.settings.java_installation.detect.confirm") }
-                        ], [], (e) => {
-                            let info = {};
-                            e.forEach(e => { info[e.id] = e.value });
+                        ], [], (info) => {
                             i.value = info.java_path;
                         });
                         b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>' + translate("app.instances.settings.java_installation.detect");
@@ -8652,9 +8643,7 @@ async function showInstanceSettings(instanceInfo) {
         { "name": translate("app.instances.settings.tab.window"), "value": "window" },
         { "name": translate("app.instances.settings.tab.java"), "value": "java" },
         { "name": translate("app.instances.settings.tab.launch_hooks"), "value": "launch_hooks" }
-    ].filter(e => e), async (e) => {
-        let info = {};
-        e.forEach(e => { info[e.id] = e.value });
+    ].filter(e => e), async (info) => {
         await instanceInfo.setDateModified(new Date());
         await instanceInfo.setName(info.name);
         await instanceInfo.setImage(info.icon);
@@ -8683,7 +8672,7 @@ async function showInstanceSettings(instanceInfo) {
         await instanceInfo.setPostExitHook(info.post_exit_hook);
         if (info.modpack_version && (info.modpack_version != instanceInfo.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
             let source = instanceInfo.install_source;
-            let modpack_info = e.filter(e => e.id == "modpack_version")[0].pass;
+            let modpack_info = info.modpack_version_pass;
             runModpackUpdate(instanceInfo, source, modpack_info);
             return;
         }
@@ -11222,7 +11211,10 @@ class Dialog {
         let info = this.values.map(e => ({ "id": e.id, "value": e.element.value, "pass": e.element.getPass ? e.element.getPass() : null }));
         info.push({ "id": "selected_tab", "value": this.selectedTab });
         let info2 = {};
-        info.forEach(e => info2[e.id] = e.value);
+        info.forEach(e => {
+            if (e.pass) info2[e.id + "_pass"] = e.pass;
+            info2[e.id] = e.value;
+        });
         this.onsubmit(info2, this.buttonElement);
         this.element.close();
         setTimeout(() => {
@@ -11699,9 +11691,7 @@ class VanillaTweaksSelector {
                 ].filter(e => e), [
                     { "content": translate("app.discover.datapacks.cancel"), "type": "cancel" },
                     { "content": translate("app.discover.datapacks.confirm"), "type": "confirm" }
-                ], [], async (e) => {
-                    let info = {};
-                    e.forEach(e => { info[e.id] = e.value });
+                ], [], async (info) => {
                     let instance = this.instance_id ? this.instance_id : info.instance;
                     let world = info.world;
                     if (world == "loading" || world == "" || !world) {
@@ -11790,11 +11780,9 @@ class VanillaTweaksSelector {
                     ], [
                         { "content": translate("app.instances.cancel"), "type": "cancel" },
                         { "content": translate("app.instances.submit"), "type": "confirm" }
-                    ], [], async (e) => {
+                    ], [], async (info) => {
                         dialog.closeDialog();
                         contentInfo.close();
-                        let info = {};
-                        e.forEach(e => { info[e.id] = e.value });
                         if (info.game_version == "loading") {
                             displayError(translate("app.instances.no_game_version"));
                             return;
@@ -13937,9 +13925,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
         ].filter(e => e), [
             { "content": translate("app.discover.datapacks.cancel"), "type": "cancel" },
             { "content": translate("app.discover.datapacks.confirm"), "type": "confirm" }
-        ], [], async (e) => {
-            let info = {};
-            e.forEach(e => { info[e.id] = e.value });
+        ], [], async (info) => {
             let instance = instance_id ? instance_id : info.instance;
             let world = info.world;
             if (world == "loading" || world == "" || !world) {
@@ -14041,27 +14027,10 @@ async function installButtonClick(content, version, instance_id, button, dialog_
         ].filter(e => e), [
             { "content": translate("app.instances.cancel"), "type": "cancel" },
             { "content": translate("app.instances.submit"), "type": "confirm" }
-        ], [], async (e) => {
+        ], [], async (info) => {
             if (dialog_to_close) dialog_to_close.close();
-            let info = {};
-            e.forEach(e => { info[e.id] = e.value });
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-            if (!version) await content.getAllVersions();
-            if (source == "modrinth" && !version) {
-                for (let j = 0; j < content.versions.length; j++) {
-                    if (content.versions[j].game_versions.includes(info.game_version) && content.versions[j].loaders.includes(info.loader)) {
-                        version = content.versions[j];
-                        break;
-                    }
-                }
-            } else if (source == "curseforge" && !version) {
-                for (let j = 0; j < content.versions.length; j++) {
-                    if (content.versions[j].game_versions.includes(info.game_version) && content.versions[j].loaders.includes(info.loader)) {
-                        version = content.versions[j];
-                        break;
-                    }
-                }
-            }
+            if (!version) version = await content.getVersion(info.loader, info.game_version, project_type, content.id, content.source);
             if (!version) {
                 displayError(translate("app.discover.error_creating_modpack", "%t", title, "%v", info.game_version, "%l", loaders[info.loader]));
                 return;
@@ -14218,11 +14187,9 @@ async function installButtonClick(content, version, instance_id, button, dialog_
             ], [
                 { "content": translate("app.instances.cancel"), "type": "cancel" },
                 { "content": translate("app.instances.submit"), "type": "confirm" }
-            ], [], async (e) => {
+            ], [], async (info) => {
                 dialog.closeDialog();
                 contentInfo.close();
-                let info = {};
-                e.forEach(e => { info[e.id] = e.value });
                 if (info.game_version == "loading") {
                     displayError(translate("app.instances.no_game_version"));
                     return;
