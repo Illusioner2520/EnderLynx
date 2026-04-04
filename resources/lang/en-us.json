@@ -1187,5 +1187,7 @@
     "app.files.relative_path.copy.fail": "Failed to copy to clipboard",
     "app.files.full_path.copy.success": "Copied full path to clipboard",
     "app.files.full_path.copy.fail": "Failed to copy to clipboard",
-    "app.discover.error": "There is no version of this content marked as compatible with this instance. Please install a specific version instead."
+    "app.discover.error": "There is no version of this content marked as compatible with this instance. Please install a specific version instead.",
+    "app.list.clear": "Clear",
+    "app.list.count": "%c selected"
 }

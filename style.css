@@ -121,6 +121,7 @@ body {
     margin: 0;
     font-family: "Arial Rounded", Arial, Helvetica, sans-serif;
     color: var(--text-color);
+    --floating-offset: 150.5px;
 }
 
 button {
@@ -560,6 +561,10 @@ body.sidebar-right .content {
     left: unset;
 }
 
+body.sidebar-right {
+    --floating-offset: -150.5px;
+}
+
 body.sidebar-right #offline-notice {
     right: 301px;
     left: unset;
@@ -570,6 +575,10 @@ body.compact .content {
     width: calc(100% - 77px);
 }
 
+body.compact {
+    --floating-offset: 38.5px;
+}
+
 body.compact #offline-notice {
     left: 77px;
     width: calc(100% - 77px);
@@ -578,6 +587,10 @@ body.compact #offline-notice {
 body.compact.sidebar-right .content {
     right: 77px;
     left: unset;
+}
+
+body.compact.sidebar-right {
+    --floating-offset: -38.5px;
 }
 
 body.compact.sidebar-right #offline-notice {
@@ -1202,7 +1215,7 @@ i {
 .content-list {
     background-color: var(--color-1t);
     border-radius: 10px;
-    overflow: hidden;
+    position: relative;
 }
 
 .content-list-checkbox {
@@ -3234,9 +3247,8 @@ dialog[open]::backdrop {
 }
 
 .selected-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
-    background-color: var(--color-1t);
     width: max-content;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
@@ -4731,7 +4743,7 @@ dialog {
 
 #tooltip:popover-open {
     opacity: 1;
-    transform: scaleY(1) scaleX(1) translateY(0);
+    transform: scale(1) translateY(0);
 
     @starting-style {
         opacity: 0;
@@ -5314,7 +5326,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 .small-drop-overlay>.drop-overlay-inner {
     max-height: calc(100vh - 16px);
     position: sticky;
-    top: 8px;
+    top: -4px;
 }
 
 .home-discover-refresh {
@@ -6004,4 +6016,61 @@ body.loading * {
 
 .editor-button:first-of-type {
     margin-left: auto;
+}
+
+.floating-controls {
+    z-index: 10;
+    background-color: var(--dialog-background);
+    backdrop-filter: blur(30px);
+    border-color: var(--color-2);
+    border-style: solid;
+    border-width: 1px;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
+    display: none;
+    transform: translateY(100px) scale(0.8);
+    transition: transform .25s, display .25s allow-discrete, opacity .25s;
+    opacity: 0;
+    pointer-events: all;
+    box-shadow: 0 0 10px black;
+    align-items: center;
+    width: fit-content;
+    position: fixed;
+    bottom: 30px;
+    left: calc(50% + var(--floating-offset));
+    translate: -50% 0;
+}
+
+.floating-controls.shown {
+    display: flex;
+    transform: translateY(0px) scale(1);
+    opacity: 1;
+
+    @starting-style {
+        opacity: 0;
+        transform: translateY(100px) scale(0.8);
+    }
+}
+
+.selected-count {
+    font-weight: bold;
+    padding-left: 8px;
+    white-space: nowrap;
+}
+
+.selected-clear {
+    margin-right: 8px;
+    position: relative;
+    color: var(--subtle-text-color);
+}
+
+.selected-clear::after {
+    width: 2px;
+    background-color: var(--color-2t);
+    height: 75%;
+    left: calc(100% + 7px);
+    top: 12.5%;
+    position: absolute;
+    content: "";
 }

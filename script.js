@@ -1549,7 +1549,23 @@ class ContentList {
         let contentListTop = document.createElement("div");
         contentListTop.className = "content-list-top";
         fragment.appendChild(contentListTop);
+
+        let contentMainElement = document.createElement("div");
+        contentMainElement.className = "content-list";
         if (features?.checkbox?.enabled) {
+            let floatingControls = createElement("div", "floating-controls");
+            contentMainElement.appendChild(floatingControls);
+            this.floatingControls = floatingControls;
+            let clearButton = createElement("button", "selected-clear selected-button");
+            clearButton.textContent = translate("app.list.clear");
+            clearButton.onclick = () => {
+                this.uncheckCheckboxes();
+            }
+            let countElement = createElement("div", "selected-count");
+            countElement.textContent = translate("app.list.count", "%c", 0);
+            this.countElement = countElement;
+            this.floatingControls.appendChild(countElement);
+            this.floatingControls.appendChild(clearButton);
             let checkboxElement = document.createElement("input");
             checkboxElement.type = "checkbox";
             checkboxElement.className = "content-list-checkbox content-list-checkbox-top";
@@ -1563,13 +1579,10 @@ class ContentList {
             this.checkBox = checkboxElement;
             contentListTop.appendChild(checkboxElement);
 
-            this.checkBoxActions = [];
-
             if (features.checkbox.actionsList) features.checkbox.actionsList.forEach(e => {
                 let actionElement = document.createElement("button");
                 actionElement.className = "selected-button";
                 actionElement.innerHTML = e.icon + e.title;
-                actionElement.style.display = "none";
                 if (e.danger) {
                     actionElement.classList.add("danger");
                 }
@@ -1656,8 +1669,7 @@ class ContentList {
                     this.uncheckCheckboxes();
                     this.figureOutMainCheckedState();
                 }
-                this.checkBoxActions.push(actionElement);
-                contentListTop.appendChild(actionElement);
+                floatingControls.appendChild(actionElement);
             });
         }
         let primaryColumnTitle = document.createElement("div");
@@ -1702,9 +1714,6 @@ class ContentList {
         filter.setOnChange((v) => {
             this.applyFilters(searchBar.value, v);
         });
-
-        let contentMainElement = document.createElement("div");
-        contentMainElement.className = "content-list";
 
         contentMainElement.appendChild(notFoundElement);
         notFoundElement.style.display = "none";
@@ -1921,12 +1930,14 @@ class ContentList {
         ele.remove();
         this.items = this.items.filter(e => e.element != ele);
         this.reApplyFilters();
+        this.figureOutMainCheckedState();
     }
 
     removeElements(eles) {
         eles.forEach(e => e.remove);
         this.items = this.items.filter(e => !eles.includes(e.element));
         this.reApplyFilters();
+        this.figureOutMainCheckedState();
     }
 
     render(items) {
@@ -2025,22 +2036,33 @@ class ContentList {
             this.checkBox.indeterminate = false;
         }
         if (checked == 0) {
-            this.checkBoxActions.forEach(e => e.style.display = "none");
+            this.floatingControls.classList.remove("shown");
         } else {
-            this.checkBoxActions.forEach(e => e.style.display = "");
+            this.floatingControls.classList.add("shown");
         }
+        this.countElement.textContent = translate("app.list.count", "%c", checked);
     }
     checkCheckboxes() {
+        let count = 0;
         this.items.map(e => e.checkbox).forEach((e) => {
-            if (this.isCheckboxVisible(e)) e.checked = true;
+            if (this.isCheckboxVisible(e)) {
+                count++;
+                e.checked = true;
+            }
         });
-        this.checkBoxActions.forEach(e => e.style.display = "");
+        if (count > 0) {
+            this.floatingControls.classList.add("shown");
+        } else {
+            this.floatingControls.classList.remove("shown");
+        }
+        this.countElement.textContent = translate("app.list.count", "%c", count);
     }
     uncheckCheckboxes() {
         this.items.map(e => e.checkbox).forEach((e) => {
             if (this.isCheckboxVisible(e)) e.checked = false;
         });
-        this.checkBoxActions.forEach(e => e.style.display = "none");
+        this.floatingControls.classList.remove("shown");
+        this.countElement.textContent = translate("app.list.count", "%c", 0);
     }
 }
 
@@ -2440,7 +2462,7 @@ class InstanceScreen extends Screen {
             this.version_text = version;
             instanceTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(this.loader_text + " " + this.version_text)}`;
         });
-        this.last_played = this.instance.last_played;
+        this.last_played = new Date(this.instance.last_played);
         this.playtime = this.instance.playtime + (this.running ? Math.floor((new Date().getTime() - this.last_played.getTime()) / 1000) : 0);
         let instanceTopPlaytime = createElement("div", "instance-top-sub-info-specific", { title: translate("app.instances.play_time"), innerHTML: `<i class="fa-solid fa-clock"></i>${formatTime(this.playtime)}` });
         this.instance.watchForChange("playtime", (time) => {

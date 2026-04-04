@@ -2543,7 +2543,9 @@ async function addContent(instance_id, project_type, project_url, filename, data
         "resourcepack": "resource_pack",
         "shader": "shader",
         "world": "world",
-        "datapack": "data_pack"
+        "datapack": "data_pack",
+        "resource_pack": "resource_pack",
+        "data_pack": "data_pack"
     }
 
     return {
