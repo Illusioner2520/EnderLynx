@@ -1930,6 +1930,7 @@ class ContentList {
     }
 
     render(items) {
+        console.log("Hey guess what Im rendering");
         let h = 0;
         for (let i = 0; i < items.length; i++) h += items[i].height;
         this.contentElement.style.height = h + "px";
@@ -1940,32 +1941,54 @@ class ContentList {
         let itemsHeight = 0;
         let spacerSet = false;
         let count = 0;
-        const fragment = document.createDocumentFragment();
+        let currentNode = this.spacer.nextSibling;
         for (let i = 0; i < items.length; i++) {
-            let ele = items[i].element;
-            itemsHeight += items[i].height;
+            const item = items[i];
+            const ele = item.element;
+            itemsHeight += item.height;
             count++;
-            if (itemsHeight > rangeBottom && itemsHeight < rangeTop + 100) {
+            const inRange = itemsHeight > rangeBottom && itemsHeight < rangeTop + 300;
+
+            if (inRange) {
                 if (!spacerSet) {
-                    this.spacer.style.height = itemsHeight - items[i].height + "px";
+                    this.spacer.style.height = itemsHeight - item.height + "px";
                     spacerSet = true;
                 }
-                fragment.appendChild(ele);
+
+                if (ele !== currentNode) {
+                    this.contentElement.insertBefore(ele, currentNode);
+                } else {
+                    currentNode = currentNode.nextSibling;
+                }
             } else {
-                ele.remove();
+                if (ele.parentNode === this.contentElement) {
+                    if (currentNode === ele) {
+                        currentNode = currentNode.nextSibling;
+                    }
+                    ele.remove();
+                }
             }
         }
-        this.contentElement.appendChild(fragment);
+
         this.totalText.innerHTML = translate("app.list.total", "%c", count);
         this.notFoundElement.style.display = count ? "none" : "";
-        if (count == 0) {
+
+        if (count === 0) {
             this.contentElement.style.height = "auto";
         }
     }
 
     applyFilters(search, dropdown) {
         this.filteredItems = this.items.filter(e => {
-            return e.name.toLowerCase().includes(search.toLowerCase().trim()) && (e.type == dropdown || dropdown == "all");
+            let w = e.name.toLowerCase().includes(search.toLowerCase().trim()) && (e.type == dropdown || dropdown == "all");
+            if (w) e.element.classList.remove("hidden");
+            else {
+                e.element.classList.add("hidden");
+                if (e.element.parentNode === this.contentElement) {
+                    e.element.remove();
+                }
+            }
+            return w;
         });
         this.render(this.filteredItems);
     }
@@ -1991,7 +2014,6 @@ class ContentList {
                 total++;
             }
         }
-        console.log({ total, checked })
         if (total == checked && total != 0) {
             this.checkBox.checked = true;
             this.checkBox.indeterminate = false;
@@ -4242,7 +4264,7 @@ class InstanceScreen extends Screen {
     }
 
     async showFiles() {
-        let searchAndFilter = createElement("div", "search-and-filter-v2");
+        let searchAndFilter = createElement("div", "search-and-filter-v3");
         let filesBreadcrumb = createElement("div", "files-breadcrumb");
         let homeButton = createElement("button", "home-button");
         homeButton.innerHTML = '<i class="fa-solid fa-house"></i>';
@@ -14958,7 +14980,7 @@ document.body.ondrop = (e) => {
                     return;
                 }
             }
-            if (document.body.contains(overlay)) instance.instanceScreen.showFiles();
+            if (document.body.contains(overlay)) instance.instanceScreen.setFilesPath(paths);
         });
     } else if (overlay.dataset.action == "skin-import") {
         new Promise(async (resolve) => {

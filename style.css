@@ -609,6 +609,12 @@ h1 {
     display: flex;
     gap: 8px;
     align-items: center;
+}
+
+.search-and-filter-v3 {
+    display: flex;
+    gap: 8px;
+    align-items: center;
     overflow: hidden;
 }
 
