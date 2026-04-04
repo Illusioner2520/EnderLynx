@@ -2,9 +2,13 @@
 
 EnderLynx is a Minecraft launcher that is currently a work in progress. We are currently in beta, therefore expect plenty of bugs. If you encounter a bug when using the app, please report it in the issues tab. If you want something added to the app, please request it in the issues tab.
 
+## Installation
+
+Download the latest version from the [releases page](https://github.com/Illusioner2520/EnderLynx/releases). You can download an installer for your OS or just the files in the form of a .zip file. If on Windows, you will be able to get updates from within the app. Other operating systems must manually install each update.
+
 ## Requirements
 
-Currently, EnderLynx only supports Windows 64-bit. We are currently in the process of expanding to Linux and MacOS. As for space required on the disk, the app itself requires less than 512 MB, however any installed instances (especially large modpacks) can significantly increase the amount of space required.
+Currently, EnderLynx supports Windows and Linux. We offer a macOS distribution, but it has not been tested at all. The app itself requires less than 512 MB of storage space, however any installed instances (especially large modpacks) can significantly increase the amount of space required.
 
 ## Features
 
@@ -36,6 +40,7 @@ Currently, EnderLynx only supports Windows 64-bit. We are currently in the proce
    - 🗺️ Import worlds from other launchers
    - 📦 Add data packs from Modrinth and CurseForge to any singleplayer world
  - 🪵 View the logs for an instance in real time (and past logs)
+ - 📂 View and edit the files in the launcher for each instance
  - 🤔 Set default options that are applied to any newly created instance
  - 🖼️ View the screenshots for any instance
  - 🔧 Easily Repair instances (and select which parts to repair)
@@ -45,7 +50,7 @@ Currently, EnderLynx only supports Windows 64-bit. We are currently in the proce
  - 🍵 Automatic downloads of Java
    - ☕ Change the Java Installation the launcher uses
    - 🐏 Change the amount of RAM each instance can use
- - ⬆️ Update from inside of the App (Only on Windows) (We use manual updates to give you more control)
+ - ⬆️ Update from inside of the App (Only on Windows) (It will never update automatically to give you control)
  - ✅ Many other helpful features and more to come!
 
 ## Technologies
