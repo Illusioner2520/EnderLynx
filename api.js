@@ -34,7 +34,7 @@ class Project {
         this.id = urlInfo.id || urlInfo.project_id;
         this.slug = urlInfo.slug;
         this.team = urlInfo.team_id;
-        this.project_type = Project.modrinth_project_type_conversion[urlInfo.project_types[0]] || urlInfo.project_types[0];
+        this.project_type = urlInfo.project_types.includes("mod") ? "mod" : Project.modrinth_project_type_conversion[urlInfo.project_types[0]] || urlInfo.project_types[0];
         this.name = urlInfo.name;
         this.summary = urlInfo.summary;
         this.description = urlInfo.description;
@@ -97,7 +97,7 @@ class Project {
         this.project_type = Project.curseforge_project_type_conversion[urlInfo.classId];
         this.categories = urlInfo.categories.map(e => e.name);
         this.authors = urlInfo.authors.map(e => new Author(e, "curseforge"));
-        this.author = this.authors.join(", ");
+        this.author = this.authors.map(e => e.name).join(", ");
         this.icon = urlInfo.logo?.thumbnailUrl || urlInfo.logo?.url || "";
         this.published = new Date(urlInfo.dateCreated);
         this.updated = new Date(urlInfo.dateModified);
@@ -213,7 +213,7 @@ class Project {
                 let url = `https://api.modrinth.com/v3/project/${this.id}/members`;
                 let urlInfo = await (await fetch(url)).json();
                 this.authors = urlInfo.map(e => new Author(e, "modrinth"));
-                this.author = this.authors.join(", ");
+                this.author = this.authors.map(e => e.name).join(", ");
             }
         }
     }
@@ -336,6 +336,11 @@ class ProjectVersion {
             this.download_url = info.files[0]?.url;
             this.filename = info.files[0]?.filename;
             this.uses_markdown_description = true;
+            if (info.project_types.includes("datapack")) {
+                this.project_type = "datapack";
+            } else if (info.project_types.includes("mod")) {
+                this.project_type = "mod";
+            }
         } else if (source == "curseforge") {
             this.version_id = info.id;
             this.project_id = info.modId;
