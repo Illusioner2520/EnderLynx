@@ -5978,9 +5978,11 @@ class DiscoverScreen extends Screen {
         if (loader == "all") loader = null;
         if (vanilla_version == "all") vanilla_version = null;
         let instance_content = [];
+        console.log("getting list of content");
         if (this.instance) instance_content = await this.instance.getContent();
         if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currenTab == "server") loader = null;
         let content_ids = instance_content.map(e => Number.isNaN(Number(e.source_info)) ? e.source_info : Number(e.source_info));
+        console.log(content_ids);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
         this.discoverList.appendChild(loading.element);
@@ -11321,6 +11323,7 @@ class ContentSearchEntry {
             }
         } else if (states) {
             states[content.id].buttons.push(installButton);
+            states[content.id].state = alreadyInstalled ? "installed" : states[content.id].state;
         }
         if (global_discover_content_states[content.id]) global_discover_content_states[content.id].push(installButton);
         else global_discover_content_states[content.id] = [installButton];
@@ -12062,10 +12065,6 @@ class Details {
 }
 
 async function installContent(source, project, version, instance, data_pack_world) {
-    let instanceContent = await instance.getContent();
-    if (instanceContent.map(e => e.source_id).includes(project.id)) {
-        return false;
-    }
     if (project.server_modpack?.kind == "vanilla") {
         await addContent(instance.instance_id, "server", project.ip_address, project.name, project.icon);
         return { id: true };
@@ -12098,9 +12097,10 @@ async function installSpecificVersion(version, source, instance, project_type, t
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
             if (modrinth_ids.includes(dependency.project_id) || curseforge_ids.includes(Number(dependency.project_id))) continue;
-            let project = Project.getFromId(dependency.project_id, source);
+            let project = await Project.getFromId(dependency.project_id, source);
+            await project.getAuthors();
             if (dependency.version_id) {
-                let version = ProjectVersion.getFromId(dependency.version_id, dependency.project_id, source);
+                let version = await ProjectVersion.getFromId(dependency.version_id, dependency.project_id, source);
                 await installSpecificVersion(version, source, instance, project.project_type, project.name, project.author, project.icon, project.id, false, undefined);
             } else {
                 await installContent(source, project, undefined, instance);
@@ -12535,15 +12535,15 @@ async function displayContentInfo(content_source, content, content_id, instance_
     installButton.className = "content-top-install-button";
     installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
     installButton.onclick = async () => {
-        currentlyInstalling = true;
+        if (instance_id) currentlyInstalling = true;
         installButtonClick(content, null, instance_id, installButton, contentInfo, (id) => {
             if (tabs.selected == "files" && refreshVersionsList) {
                 setVersionIdAndIndex(id);
                 refreshVersionsList();
             }
+            if (instance_id) currentlyInstalling = false;
         }, states);
     }
-    let bigInstallButton = installButton;
     let content_ids = instance_content.map(e => e.source_info);
     if (typeof content.id == 'number') content_ids = content_ids.map(Number);
     if (states && !states[content.id]) {
@@ -12747,7 +12747,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
         installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
         installButton.classList.add("disabled");
         installButton.onclick = () => { };
-        currentlyInstalling = true;
+        if (instance_id) currentlyInstalling = true;
     } else if (content_ids.includes(content.id)) {
         installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
         installButton.classList.add("disabled");
@@ -13163,14 +13163,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
                                 if (content.project_type != "modpack" && e.project_type != "datapack") installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
                                 if (content.project_type != "modpack" && e.project_type != "datapack") installButton.classList.add("disabled");
                                 if (content.project_type != "modpack" && instance_id && e.project_type != "datapack") installButton.onclick = () => { };
-                                if (states && content.project_type != "modpack" && e.project_type != "datapack") {
-                                    states[content.id].state = "installing";
-                                    states[content.id].buttons.forEach(e => {
-                                        e.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-                                        e.classList.add("disabled");
-                                        if (instance_id) e.onclick = () => { };
-                                    });
-                                }
                                 installButtonClick(content, e, instance_id, installButton, contentInfo, () => {
                                     if (content.project_type != "modpack" && e.project_type != "datapack") installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                                     if (instance_id) {
@@ -14146,12 +14138,10 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 states[project_id].state = "installed";
                 states[project_id].buttons.forEach(e => {
                     e.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                    console.log(e);
                 });
             } else {
                 button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             }
-            console.log(states);
             if (oncomplete) oncomplete(version ? version.version_id : (success.id ? success.id : ""));
         } else {
             if (states) {

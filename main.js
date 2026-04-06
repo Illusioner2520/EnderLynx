@@ -675,7 +675,6 @@ async function getMultiplayerWorlds(instance_id) {
             i++;
         }
     } catch (e) {
-        console.error(`Failed to parse servers.dat:`, e);
         return [];
     }
 
