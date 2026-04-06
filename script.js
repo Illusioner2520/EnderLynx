@@ -121,6 +121,10 @@ class Skin {
         await window.enderlynx.setActiveSkin(uuid, this.id);
         this.setLastUsed(new Date());
     }
+
+    async isActive() {
+        return await window.enderlynx.isActiveSkin(this.id);
+    }
 }
 
 class Cape {
@@ -7827,7 +7831,7 @@ class SkinEntry {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "danger": true,
                 "func": async (a, b) => {
-                    if (e.active_uuid.replaceAll(";", "")) {
+                    if (await e.isActive()) {
                         displayError(translate("app.wardrobe.skin.delete.in_use"));
                         return;
                     }
@@ -7890,7 +7894,7 @@ class SkinEntry {
         skinEle.appendChild(loader);
         skinEle.appendChild(skinName);
         skinEle.dataset.id = e.id;
-        skinName.textContent = e.name;
+        skinName.textContent = allowEditing ? e.name : translate(e.name);
         skinName.className = "skin-name";
         if (e.name.toLowerCase() == "dinnerbone" || e.name.toLowerCase() == "grumm" || e.name.toLowerCase() == "dinnerbone's skin" || e.name.toLowerCase() == "grumm's skin") {
             skinImg.classList.add("dinnerbone");

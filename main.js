@@ -4623,19 +4623,18 @@ function getSkinsNoDefaults() {
 async function getDefaultSkins() {
     let skins = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
     let defaultSkins = JSON.parse(await fsPromises.readFile(path.resolve(__dirname, "resources/default_skins.json"), 'utf-8'));
-    if (skins.length != defaultSkins.length) {
-        let texture_keys = skins.map(e => e.texture_key);
-        for (let i = 0; i < defaultSkins.length; i++) {
-            let e = defaultSkins[i];
-            if (!texture_keys.includes(e.texture_key)) {
-                let info = await downloadSkin(e.url);
-                db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, 1, "", e.texture_key);
-            }
+    let texture_keys = skins.map(e => e.texture_key);
+    for (let i = 0; i < defaultSkins.length; i++) {
+        let e = defaultSkins[i];
+        if (!texture_keys.includes(e.texture_key)) {
+            let info = await downloadSkin(e.url);
+            db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, 1, "", e.texture_key);
+        } else {            
+            db.prepare("UPDATE skins SET name = ?, model = ? WHERE texture_key = ?").run(e.name, e.model, e.texture_key);
         }
-        let skinsAgain = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
-        return skinsAgain;
     }
-    return skins;
+    let skinsAgain = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
+    return skinsAgain;
 }
 function getSkin(skin_id) {
     return db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(skin_id);
@@ -4676,6 +4675,10 @@ function setActiveSkin(uuid, skin_id) {
     if (active.length <= 1) active = ["", ""];
     active.splice(1, 0, uuid);
     return updateSkin("active_uuid", active.join(";"), current.id);
+}
+function isActiveSkin(skin_id) {
+    let skin = db.prepare("SELECT * FROM skins WHERE id = ?").get(skin_id);
+    return skin.active_uuid.replaceAll(";", "") != "";
 }
 
 // default management
@@ -5052,6 +5055,7 @@ ipcMain.handle('add-skin', (_, ...params) => addSkin(...params));
 ipcMain.handle('delete-skin', (_, ...params) => deleteSkin(...params));
 ipcMain.handle('get-active-skin', (_, ...params) => getActiveSkin(...params));
 ipcMain.handle('set-active-skin', (_, ...params) => setActiveSkin(...params));
+ipcMain.handle('is-active-skin', (_, ...params) => isActiveSkin(...params));
 ipcMain.handle('get-default', (_, ...params) => getDefault(...params));
 ipcMain.handle('set-default', (_, ...params) => setDefault(...params));
 ipcMain.handle('get-cape', (_, ...params) => getCape(...params));

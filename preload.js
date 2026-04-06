@@ -782,6 +782,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteSkin: async (...params) => ipcRenderer.invoke('delete-skin', ...params),
     getActiveSkin: async (...params) => ipcRenderer.invoke('get-active-skin', ...params),
     setActiveSkin: async (...params) => ipcRenderer.invoke('set-active-skin', ...params),
+    isActiveSkin: async (...params) => ipcRenderer.invoke('is-active-skin', ...params),
     getDefault: async (...params) => ipcRenderer.invoke('get-default', ...params),
     setDefault: async (...params) => ipcRenderer.invoke('set-default', ...params),
     getCape: async (...params) => ipcRenderer.invoke('get-cape', ...params),
