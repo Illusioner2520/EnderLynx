@@ -5986,7 +5986,7 @@ class DiscoverScreen extends Screen {
         this.discoverList.appendChild(loading.element);
         this.requestFrame();
         if (source == "vanilla_tweaks") {
-            new VanillaTweaksSelector(this.currentTab, vanilla_version, this.instance.instance_id, undefined, this.discoverList, query);
+            new VanillaTweaksSelector(this.currentTab, vanilla_version, this.instance?.instance_id, undefined, this.discoverList, query);
             return;
         }
         let results = [];
@@ -7574,6 +7574,9 @@ async function applyDefaults() {
     }
     if (await getDefault("hide_ip") == "true") {
         document.body.classList.add("hide_ip");
+    }
+    if (new Date().getMonth() == 3 && new Date().getDate() == 1) {
+        document.body.classList.add("april_fools");
     }
     let defaultpage = await getDefault("default_page");
     if (dont_override_my_page) return;
@@ -11956,6 +11959,7 @@ class VanillaTweaksSelector {
             }
             let vtIcon = document.createElement("img");
             vtIcon.className = "vt-icon";
+            vtIcon.loading = "lazy";
             vtIcon.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
             let vtInfo = document.createElement("div");
             vtInfo.className = "vt-info";

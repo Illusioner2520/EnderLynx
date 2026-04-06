@@ -6074,3 +6074,9 @@ body.loading * {
     position: absolute;
     content: "";
 }
+
+body.april_fools *:not(.spinner):not(.loading-container-spinner):not(.spinning),
+body.april_fools *::after,
+body.april_fools *::before {
+    border-radius: 0 !important;
+}
