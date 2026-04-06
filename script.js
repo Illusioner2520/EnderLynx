@@ -7835,9 +7835,22 @@ class SkinEntry {
                         displayError(translate("app.wardrobe.skin.delete.in_use"));
                         return;
                     }
-                    if (b) b.remove();
-                    await e.delete();
-                    showContent();
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.wardrobe.delete.confirm.title"), "notice", translate("app.wardrobe.delete.confirm.description", "%s", e.name), [
+                        {
+                            "type": "cancel",
+                            "content": translate("app.wardrobe.delete.cancel")
+                        },
+                        {
+                            "type": "confirm",
+                            "content": translate("app.wardrobe.delete.confirm")
+                        }
+                    ], [], async () => {
+                        if (b) b.remove();
+                        await e.delete();
+                        showContent();
+                        displaySuccess(translate("app.wardrobe.delete.success", "%s", e.name));
+                    });
                 }
             } : null
         ].filter(e => e));
