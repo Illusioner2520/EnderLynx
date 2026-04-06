@@ -5978,11 +5978,9 @@ class DiscoverScreen extends Screen {
         if (loader == "all") loader = null;
         if (vanilla_version == "all") vanilla_version = null;
         let instance_content = [];
-        console.log("getting list of content");
         if (this.instance) instance_content = await this.instance.getContent();
         if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currenTab == "server") loader = null;
         let content_ids = instance_content.map(e => Number.isNaN(Number(e.source_info)) ? e.source_info : Number(e.source_info));
-        console.log(content_ids);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
         this.discoverList.appendChild(loading.element);
@@ -9017,7 +9015,6 @@ async function playInstance(instInfo, quickPlay = null) {
         pid = await window.enderlynx.playMinecraft(instInfo.instance_id, profile.id, quickPlay);
         await live.findLive();
     } catch (e) {
-        console.log(e);
         displayError(e);
     }
 }
@@ -9528,7 +9525,6 @@ window.enderlynx.onInstallInstance(async (install_info) => {
     if (!install_info.id) return;
     if (!install_info.source) return;
     let project = await Project.getFromId(install_info.id, install_info.source);
-    console.log(JSON.stringify(project));
     importInstanceFromContentProvider(project);
 });
 
@@ -10611,7 +10607,6 @@ class MultipleSelect {
         });
     }
     setOptions(options) {
-        console.log(options);
         this.itemList.innerHTML = "";
         this.checkBoxes = [];
         this.items = [];
