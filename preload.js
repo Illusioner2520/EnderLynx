@@ -116,14 +116,14 @@ contextBridge.exposeInMainWorld('enderlynx', {
         let appMetrics = await ipcRenderer.invoke('get-app-metrics');
         return appMetrics;
     },
-    readPackFile: async (file_path) => {
-        let ext = path.extname(file_path);
+    readPackFile: async (info) => {
+        let ext = path.extname(info.has_buffer ? info.name : info);
         if (ext == ".elpack") {
-            return await readElPack(file_path);
+            return await readElPack(info);
         } else if (ext == ".mrpack") {
-            return await readMrPack(file_path);
+            return await readMrPack(info);
         } else if (ext == ".zip") {
-            return await readCfZip(file_path);
+            return await readCfZip(info);
         }
     },
     getInstanceFiles: async (instance_id) => {
@@ -707,11 +707,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     createElPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-elpack', id, name, manifest, overrides),
     createMrPack: (id, name, manifest, overrides) => ipcRenderer.invoke('create-mrpack', id, name, manifest, overrides),
     createCfZip: (id, name, manifest, overrides) => ipcRenderer.invoke('create-cfzip', id, name, manifest, overrides),
-    readPathsFromDrop: (fileList) => {
-        return Array.from(fileList).map(f => ({
-            path: webUtils.getPathForFile(f),
-            name: f.name
-        }));
+    readPathFromDrop: (f) => {
+        return webUtils.getPathForFile(f);
     },
     isInstanceFile: async (file_path) => {
         return await ipcRenderer.invoke('is-instance-file', file_path);

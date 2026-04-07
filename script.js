@@ -14936,112 +14936,85 @@ document.body.ondragover = (e) => {
     showOverlay(overlay);
 };
 
-document.body.ondrop = (e) => {
+document.body.ondrop = async (e) => {
     if (!isFileDrag(e)) return;
     e.preventDefault();
     [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
     let overlay = activeOverlay;
-    const files = window.enderlynx.readPathsFromDrop(Object.entries(e.dataTransfer.files).map(e => e[1]));
-    if (overlay.dataset.action == "instance-import") {
-        files.forEach(async (file) => {
-            let info = await window.enderlynx.readPackFile(file.path);
-            if (!info) {
-                displayError(translate("app.import.instance.fail", "%f", file.name));
-                return;
-            }
-            importInstance(info, file.path);
-        });
+    const files = e.dataTransfer.files;
+    for (let i = 0; i < files.length; i++) {
+        await processFileDrop(overlay, files[i]);
+    }
+}
+
+async function processFileDrop(overlay, file) {
+    let path = window.enderlynx.readPathFromDrop(file);
+    let usePath = false;
+    let info = {};
+    try {
+        let buffer = await file.arrayBuffer();
+        info = {
+            has_buffer: true,
+            name: file.name,
+            buffer
+        }
+    } catch (e) {
+        usePath = true;
+        if (overlay.dataset.action != "world-import" && overlay.dataset.action != "file-import") {
+            return;
+        }
+    }
+    if (overlay.dataset.action == "instance-import" || await window.enderlynx.isInstanceFile(info)) {
+        let instanceInfo = await window.enderlynx.readPackFile(info);
+        if (!info) {
+            displayError(translate("app.import.instance.fail", "%f", file.name));
+            return;
+        }
+        importInstance(instanceInfo, info);
     } else if (overlay.dataset.action == "content-import") {
-        new Promise(async (resolve) => {
-            document.body.classList.add("loading")
-            let instance = await Instance.getInstance(overlay.dataset.instanceId);
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-                if (await window.enderlynx.isInstanceFile(file.path)) {
-                    let info = await window.enderlynx.readPackFile(file.path);
-                    if (!info) {
-                        displayError(translate("app.import.instance.fail", "%f", file.name));
-                        return;
-                    }
-                    importInstance(info, file.path);
-                    continue;
-                }
-                if (instance.locked) {
-                    displayError(translate("app.import.content.locked"));
-                    document.body.style.cursor = "";
-                    return;
-                }
-                let success = await window.enderlynx.importContent(file.path, "auto", overlay.dataset.instanceId);
-                if (!success) {
-                    displayError(translate("app.import.content.fail", "%f", file.name));
-                    document.body.classList.remove("loading");
-                    return;
-                }
-            }
-            if (document.body.contains(overlay)) instance.instanceScreen.showContent();
+        document.body.classList.add("loading")
+        let instance = await Instance.getInstance(overlay.dataset.instanceId);
+        if (instance.locked) {
+            displayError(translate("app.import.content.locked"));
             document.body.classList.remove("loading");
-        });
+            return;
+        }
+        let success = await window.enderlynx.importContent(info, "auto", overlay.dataset.instanceId);
+        if (!success) {
+            displayError(translate("app.import.content.fail", "%f", file.name));
+            document.body.classList.remove("loading");
+            return;
+        }
+        if (document.body.contains(overlay)) instance.instanceScreen.showContent();
+        document.body.classList.remove("loading");
     } else if (overlay.dataset.action == "world-import") {
-        new Promise(async (resolve) => {
-            let instance = await Instance.getInstance(overlay.dataset.instanceId);
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-                if (await window.enderlynx.isInstanceFile(file.path)) {
-                    let info = await window.enderlynx.readPackFile(file.path);
-                    if (!info) return;
-                    importInstance(info, file.path);
-                    continue;
-                }
-                let success = await window.enderlynx.importWorld(file.path, overlay.dataset.instanceId, file.name);
-                if (!success) {
-                    displayError(translate("app.import.worlds.fail", "%f", file.name));
-                    return;
-                }
-            }
-            if (document.body.contains(overlay)) instance.instanceScreen.showWorlds();
-        });
+        let instance = await Instance.getInstance(overlay.dataset.instanceId);
+        let success = await window.enderlynx.importWorld(usePath ? path : info, overlay.dataset.instanceId, file.name);
+        if (!success) {
+            displayError(translate("app.import.worlds.fail", "%f", file.name));
+            return;
+        }
+        if (document.body.contains(overlay)) instance.instanceScreen.showWorlds();
     } else if (overlay.dataset.action == "file-import") {
-        new Promise(async (resolve) => {
-            let instance = await Instance.getInstance(overlay.dataset.instanceId);
-            let paths = overlay.dataset.paths;
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-                if (await window.enderlynx.isInstanceFile(file.path)) {
-                    let info = await window.enderlynx.readPackFile(file.path);
-                    if (!info) return;
-                    importInstance(info, file.path);
-                    continue;
-                }
-                let success = await window.enderlynx.importFile(file.path, overlay.dataset.instanceId, file.name, overlay.dataset.paths);
-                if (!success) {
-                    displayError(translate("app.import.files.fail", "%f", file.name));
-                    return;
-                }
-            }
-            if (document.body.contains(overlay)) instance.instanceScreen.setFilesPath(paths);
-        });
+        let instance = await Instance.getInstance(overlay.dataset.instanceId);
+        let paths = overlay.dataset.paths;
+        let success = await window.enderlynx.importFile(usePath ? path : info, overlay.dataset.instanceId, file.name, overlay.dataset.paths);
+        if (!success) {
+            displayError(translate("app.import.files.fail", "%f", file.name));
+            return;
+        }
+        if (document.body.contains(overlay)) instance.instanceScreen.setFilesPath(paths);
     } else if (overlay.dataset.action == "skin-import") {
-        new Promise(async (resolve) => {
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
-                if (await window.enderlynx.isInstanceFile(file.path)) {
-                    let info = await window.enderlynx.readPackFile(file.path);
-                    if (!info) return;
-                    importInstance(info, file.path);
-                    continue;
-                }
-                let dataUrl = await window.enderlynx.pathToDataUrl(file.path);
-                importSkin({
-                    "skin": dataUrl,
-                    "name": translate("app.wardrobe.unnamed"),
-                    "model": "auto"
-                }, () => {
-                    if (document.body.contains(overlay)) wardrobeScreen.display();
-                });
-            }
+        let dataUrl = await window.enderlynx.pathToDataUrl(info);
+        importSkin({
+            "skin": dataUrl,
+            "name": translate("app.wardrobe.unnamed"),
+            "model": "auto"
+        }, () => {
+            if (document.body.contains(overlay)) wardrobeScreen.display();
         });
     }
-};
+}
 
 function getDefaultImage(code) {
     let data = window.enderlynx.getDefaultImage(code);

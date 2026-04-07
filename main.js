@@ -1125,19 +1125,19 @@ ipcMain.handle('process-cf-zip', async (_, instance_id, zip_path, cf_id, title) 
     return await processCfZip(instance_id, zip_path, cf_id, title);
 });
 
-async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file") {
+async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processCfZipWithoutID(instance_id, zip_path, title);
+        processCfZipWithoutID(instance_id, info, title);
     }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
-        const zip = new AdmZip(zip_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
@@ -1297,19 +1297,19 @@ async function processCfZipWithoutID(instance_id, zip_path, title = ".zip file")
         return { "error": true };
     }
 }
-async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
+async function processMrPack(instance_id, info, loader, title = ".mrpack file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processMrPack(instance_id, mrpack_path, loader, title);
+        processMrPack(instance_id, info, loader, title);
     }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
-        const zip = new AdmZip(mrpack_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
@@ -1503,19 +1503,19 @@ async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack 
         return { "error": true };
     }
 }
-async function processElPack(instance_id, elpack_path, title = ".elpack file") {
+async function processElPack(instance_id, info, title = ".elpack file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processElPack(instance_id, elpack_path, title);
+        processElPack(instance_id, info, title);
     }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
-        const zip = new AdmZip(elpack_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
@@ -1757,19 +1757,19 @@ async function processElPack(instance_id, elpack_path, title = ".elpack file") {
         return { "error": true };
     }
 }
-async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
+async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     retryFunctions[cancelId] = () => {
-        processCfZip(instance_id, zip_path, cf_id, title);
+        processCfZip(instance_id, info, cf_id, title);
     }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
-        const zip = new AdmZip(zip_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
         let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
@@ -2184,21 +2184,21 @@ async function downloadCurseforgePack(instance_id, url, title) {
     }
 }
 
-ipcMain.handle('process-pack-file', async (_, file_path, instance_id, title) => {
-    return await processPackFile(file_path, instance_id, title);
+ipcMain.handle('process-pack-file', async (_, info, instance_id, title) => {
+    return await processPackFile(info, instance_id, title);
 });
 
-async function processPackFile(file_path, instance_id, title) {
-    if (/^https?:\/\//.test(file_path)) {
-        await downloadCurseforgePack(instance_id, file_path, title);
+async function processPackFile(info, instance_id, title) {
+    if (!info.has_buffer && /^https?:\/\//.test(info)) {
+        await downloadCurseforgePack(instance_id, info, title);
     }
-    let extension = path.extname(file_path);
+    let extension = path.extname(info.has_buffer ? info.name : info);
     if (extension == ".mrpack") {
-        return await processMrPack(instance_id, file_path, null, title);
+        return await processMrPack(instance_id, info, null, title);
     } else if (extension == ".zip") {
-        return await processCfZipWithoutID(instance_id, file_path, title);
+        return await processCfZipWithoutID(instance_id, info, title);
     } else if (extension == ".elpack") {
-        return await processElPack(instance_id, file_path, title);
+        return await processElPack(instance_id, info, title);
     } else if (extension == "") {
         return;
     }
@@ -2921,11 +2921,11 @@ ipcMain.handle('change-folder', async (_, old_path, new_path) => {
     }
 });
 
-ipcMain.handle('import-world', async (_, file_path, instance_id, worldName) => {
-    return await importWorld(file_path, instance_id, worldName);
+ipcMain.handle('import-world', async (_, info, instance_id, worldName) => {
+    return await importWorld(info, instance_id, worldName);
 });
 
-async function importWorld(file_path, instance_id, worldName) {
+async function importWorld(info, instance_id, worldName) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
@@ -2938,8 +2938,8 @@ async function importWorld(file_path, instance_id, worldName) {
         fs.mkdirSync(savesPath, { recursive: true });
         signal.throwIfAborted();
 
-        if (fs.existsSync(file_path) && fs.statSync(file_path).isDirectory()) {
-            const baseName = path.basename(file_path);
+        if (!info.has_buffer && fs.existsSync(info) && fs.statSync(info).isDirectory()) {
+            const baseName = path.basename(info);
             let targetName = baseName;
             let counter = 1;
             while (fs.existsSync(path.join(savesPath, targetName))) {
@@ -2966,7 +2966,7 @@ async function importWorld(file_path, instance_id, worldName) {
 
             signal.throwIfAborted();
             await fsPromises.mkdir(destPath, { recursive: true });
-            const allEntries = await collectFiles(file_path, file_path);
+            const allEntries = await collectFiles(info, info);
 
             const dirs = allEntries.filter(e => e.isDirectory);
             for (const d of dirs) {
@@ -2996,9 +2996,9 @@ async function importWorld(file_path, instance_id, worldName) {
             return { new_world_path: destPath };
         }
 
-        const ext = path.extname(file_path).toLowerCase();
-        if (ext === ".zip" && fs.existsSync(file_path)) {
-            const zip = new AdmZip(file_path);
+        const ext = path.extname(info.has_buffer ? info.name : info).toLowerCase();
+        if (ext === ".zip") {
+            const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
             const entries = zip.getEntries().map(e => ({
                 entry: e,
                 name: e.entryName.replace(/^\/+/, '')
@@ -3006,7 +3006,7 @@ async function importWorld(file_path, instance_id, worldName) {
 
             const rootLevel = entries.find(e => e.name === "level.dat");
             if (rootLevel) {
-                let baseName = path.basename(file_path, ext);
+                let baseName = path.basename(info.has_buffer ? info.name : info, ext);
                 let targetName = baseName;
                 let counter = 1;
                 while (fs.existsSync(path.join(savesPath, targetName))) {
@@ -3283,9 +3283,9 @@ ipcMain.handle('set-world-dat', async (_, instance_id, world_id, datInfo) => {
     }
 })
 
-function readElPack(file_path) {
+function readElPack(info) {
     try {
-        const zip = new AdmZip(file_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         const manifestEntry = zip.getEntry('manifest.json');
         if (!manifestEntry) return null;
         const manifestData = manifestEntry.getData().toString('utf-8');
@@ -3294,9 +3294,9 @@ function readElPack(file_path) {
         return null;
     }
 }
-function readMrPack(file_path) {
+function readMrPack(info) {
     try {
-        const zip = new AdmZip(file_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         const manifestEntry = zip.getEntry('modrinth.index.json');
         if (!manifestEntry) return null;
         const manifestData = manifestEntry.getData().toString('utf-8');
@@ -3322,9 +3322,9 @@ function readMrPack(file_path) {
     }
 }
 
-function readCfZip(file_path) {
+function readCfZip(info) {
     try {
-        const zip = new AdmZip(file_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         const manifestEntry = zip.getEntry('manifest.json');
         if (!manifestEntry) return null;
         const manifestData = manifestEntry.getData().toString('utf-8');
@@ -3342,16 +3342,16 @@ function readCfZip(file_path) {
     }
 }
 
-ipcMain.handle('read-elpack', async (_, file_path) => {
-    return await readElPack(file_path);
+ipcMain.handle('read-elpack', async (_, info) => {
+    return readElPack(info);
 });
 
-ipcMain.handle('read-mrpack', async (_, file_path) => {
-    return await readMrPack(file_path);
+ipcMain.handle('read-mrpack', async (_, info) => {
+    return readMrPack(info);
 });
 
-ipcMain.handle('read-cfzip', async (_, file_path) => {
-    return await readCfZip(file_path);
+ipcMain.handle('read-cfzip', async (_, info) => {
+    return readCfZip(info);
 });
 
 ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
@@ -4060,36 +4060,18 @@ ipcMain.handle('analyze-logs', async (_, instance_id, last_log_date, current_log
     });
 })
 
-ipcMain.handle('import-content', async (_, file_path, content_type, instance_id) => {
+ipcMain.handle('import-content', async (_, info, content_type, instance_id) => {
     let destFolder = "";
     let fileType = content_type;
+    let fileName = info.has_buffer ? info.name : path.basename(info);
 
     if (content_type === "auto") {
-        if (file_path.endsWith(".jar") || file_path.endsWith(".jar.disabled")) {
+        if (fileName.endsWith(".jar") || fileName.endsWith(".jar.disabled")) {
             destFolder = "mods";
             fileType = "mod";
-            // try {
-            //     const tempZip = new AdmZip(file_path);
-            //     if (tempZip.getEntry("fabric.mod.json")) {
-            //         destFolder = "mods";
-            //         fileType = "mod";
-            //     } else if (tempZip.getEntry("META-INF/mods.toml")) {
-            //         destFolder = "mods";
-            //         fileType = "mod";
-            //     } else if (tempZip.getEntry("quilt.mod.json")) {
-            //         destFolder = "mods";
-            //         fileType = "mod";
-            //     } else {
-            //         destFolder = "mods";
-            //         fileType = "mod";
-            //     }
-            // } catch (e) {
-            //     destFolder = "mods";
-            //     fileType = "mod";
-            // }
-        } else if (file_path.endsWith(".zip") || file_path.endsWith(".zip.disabled")) {
+        } else if (fileName.endsWith(".zip") || fileName.endsWith(".zip.disabled")) {
             try {
-                const tempZip = new AdmZip(file_path);
+                const tempZip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
                 if (tempZip.getEntry("pack.mcmeta")) {
                     destFolder = "resourcepacks";
                     fileType = "resource_pack";
@@ -4117,7 +4099,6 @@ ipcMain.handle('import-content', async (_, file_path, content_type, instance_id)
     const destPath = path.resolve(user_path, `minecraft/instances/${instance_id}/${destFolder}`);
     fs.mkdirSync(destPath, { recursive: true });
 
-    let fileName = path.basename(file_path);
     let finalPath = path.join(destPath, fileName);
 
     let uniqueFinalPath = finalPath;
@@ -4130,7 +4111,11 @@ ipcMain.handle('import-content', async (_, file_path, content_type, instance_id)
         uniqueFinalPath = path.join(destPath, uniqueFileName);
         count++;
     }
-    await fsPromises.copyFile(file_path, uniqueFinalPath);
+    if (info.has_buffer) {
+        await fsPromises.writeFile(uniqueFinalPath, Buffer.from(info.buffer));
+    } else {
+        await fsPromises.copyFile(info, uniqueFinalPath);
+    }
     fileName = uniqueFileName;
     finalPath = uniqueFinalPath;
 
@@ -4175,11 +4160,14 @@ async function downloadSkin(url) {
     return { hash, dataUrl };
 }
 
-ipcMain.handle('path-to-data-url', async (_, file_path) => {
-    if (!file_path) return null;
+ipcMain.handle('path-to-data-url', async (_, info) => {
+    if (!info) return null;
     try {
-        if (fs.existsSync(file_path)) {
-            const buffer = await fsPromises.readFile(file_path);
+        if (info.has_buffer) {
+            const pngBuf = await sharp(info.buffer).png().toBuffer();
+            return `data:image/png;base64,${pngBuf.toString('base64')}`;
+        } else if (fs.existsSync(info)) {
+            const buffer = await fsPromises.readFile(info);
             try {
                 const pngBuf = await sharp(buffer).png().toBuffer();
                 return `data:image/png;base64,${pngBuf.toString('base64')}`;
@@ -4246,11 +4234,12 @@ ipcMain.on('open-folder', (_, folderPath) => {
     });
 });
 
-ipcMain.handle('is-instance-file', (_, file_path) => {
-    let ext = path.extname(file_path);
+ipcMain.handle('is-instance-file', (_, info) => {
+    if (typeof info == 'object' && !info.has_buffer) return false;
+    let ext = path.extname(info.has_buffer ? info.name : info);
     if (ext == ".mrpack" || ext == ".elpack") return true;
     if (ext == ".zip") {
-        const zip = new AdmZip(file_path);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         if (zip.getEntry('pack.mcmeta')) return false;
         if (zip.getEntry('manifest.json')) return true;
     }
@@ -5179,12 +5168,17 @@ ipcMain.handle('rename-file', async (_, instance_id, filePath, newFilePath) => {
     }
 });
 
-ipcMain.handle('import-file', async (_, file_path, instance_id, file_name, paths) => {
+ipcMain.handle('import-file', async (_, info, instance_id, file_name, paths) => {
     let fullPath = path.join(user_path, "minecraft/instances", instance_id, paths, file_name);
     try {
-        await fsPromises.copyFile(file_path, fullPath);
+        if (info.has_buffer) {
+            await fsPromises.writeFile(fullPath, Buffer.from(info.buffer));
+        } else {
+            await fsPromises.cp(info, fullPath, { recursive: true });
+        }
         return true;
     } catch (e) {
+        console.log(e);
         return false;
     }
 });

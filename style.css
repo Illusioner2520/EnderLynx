@@ -1216,6 +1216,7 @@ i {
     background-color: var(--color-1t);
     border-radius: 10px;
     position: relative;
+    overflow: hidden;
 }
 
 .content-list-checkbox {
