@@ -2094,18 +2094,9 @@ async function getNewAccessToken(refresh_token) {
         "name": token.profile.name,
         "is_demo": token.profile.demo,
         "xuid": token.xuid,
-        "client_id": getUUID(),
+        "client_id": "54a2cd28-0ed1-4581-bb9f-f44c2d2646bf",
         "expires": date.toISOString()
     }
-}
-
-function getUUID() {
-    var result = "";
-    for (var i = 0; i <= 4; i++) {
-        result += (Math.floor(Math.random() * 16777216) + 1048576).toString(16);
-        if (i < 4) result += "-";
-    }
-    return result;
 }
 
 function parseJavaArgs(input) {
@@ -3201,7 +3192,7 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         "name": token.profile.name,
         "is_demo": token.profile.demo ?? false,
         "xuid": token.xuid,
-        "client_id": getUUID(),
+        "client_id": "54a2cd28-0ed1-4581-bb9f-f44c2d2646bf",
         "expires": date
     }
     let players = getProfiles().map(e => e.uuid);
