@@ -4030,9 +4030,6 @@ ipcMain.handle('analyze-logs', async (_, instance_id, last_log_date, current_log
             continue;
         }
 
-        console.log("Current Log Path: " + path.resolve(current_log_path));
-        console.log("Log Path: " + path.resolve(logPath));
-
         if (current_log_path && path.resolve(logPath) === path.resolve(current_log_path)) {
             break;
         }

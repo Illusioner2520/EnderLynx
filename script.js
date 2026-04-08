@@ -11369,7 +11369,7 @@ function formatNumber(num) {
 let pages = 0;
 
 class Pagination {
-    constructor(currentPage, totalPages, change_page_function, d1opt, d1def, d1func, d2opt, d2def, d2func, d3opt, d3def, d3func, d4opt, d4def, d4func) {
+    constructor(currentPage, totalPages, change_page_function) {
         let element = document.createElement("div");
         element.className = "page-container";
         this.element = element;
@@ -11378,18 +11378,6 @@ class Pagination {
         this.pagesElement = pagesElement;
         this.totalPages = totalPages;
         this.change_page_function = change_page_function;
-        this.d1opt = d1opt;
-        this.d1def = d1def;
-        this.d1func = d1func;
-        this.d2opt = d2opt;
-        this.d2def = d2def;
-        this.d2func = d2func;
-        this.d3opt = d3opt;
-        this.d3def = d3def;
-        this.d3func = d3func;
-        this.d4opt = d4opt;
-        this.d4def = d4def;
-        this.d4func = d4func;
         this.setPage(currentPage);
     }
     setTotalPages(totalPages) {
@@ -11426,31 +11414,6 @@ class Pagination {
         currentPageEle.className = "page";
         currentPageEle.classList.add("selected");
         let gap = 0;
-        if (this.d1opt) {
-            let dropdownEle = document.createElement("div");
-            dropdownEle.style.width = "150px";
-            new Dropdown(translate("app.discover.sort_by"), this.d1opt, dropdownEle, this.d1def, this.d1func);
-            element.appendChild(dropdownEle);
-        }
-        if (this.d2opt) {
-            let dropdownEle = document.createElement("div");
-            dropdownEle.style.width = "75px";
-            new Dropdown(translate("app.discover.view"), this.d2opt, dropdownEle, this.d2def, this.d2func);
-            element.appendChild(dropdownEle);
-        }
-        if (this.d3opt) {
-            let dropdownEle = document.createElement("div");
-            dropdownEle.style.width = "180px";
-            new SearchDropdown(translate("app.discover.game_version"), this.d3opt, dropdownEle, this.d3def, this.d3func);
-            element.appendChild(dropdownEle);
-        }
-        if (this.d4opt) {
-            let dropdownEle = document.createElement("div");
-            dropdownEle.style.marginRight = "auto";
-            dropdownEle.style.width = "150px";
-            new Dropdown(translate("app.discover.loader"), this.d4opt, dropdownEle, this.d4def, this.d4func);
-            element.appendChild(dropdownEle);
-        }
         this.pagesElement.appendChild(leftArrow);
         for (let i = 1; i <= this.totalPages; i++) {
             if (i == this.currentPage) {
