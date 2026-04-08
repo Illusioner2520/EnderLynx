@@ -7594,6 +7594,7 @@ function setPage(page) {
     } else if (page == "wardrobe") {
         wardrobeScreen.display();
     }
+    live.findLive();
 }
 
 applyDefaults();
@@ -9026,10 +9027,9 @@ function displaySuccess(success) {
 }
 
 async function playInstance(instInfo, quickPlay = null) {
-    let pid;
     try {
         let profile = await getDefaultProfile();
-        pid = await window.enderlynx.playMinecraft(instInfo.instance_id, profile.id, quickPlay);
+        await window.enderlynx.playMinecraft(instInfo.instance_id, profile.id, quickPlay);
         await live.findLive();
     } catch (e) {
         displayError(e);
@@ -9264,7 +9264,6 @@ function parseMinecraftFormatting(text) {
 }
 
 let live = new LiveMinecraft(liveMinecraft);
-live.findLive();
 
 class NoResultsFound {
     constructor(message = translate("app.no_results_found")) {
