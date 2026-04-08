@@ -935,7 +935,7 @@ class Minecraft {
                 e = e.replace("${user_type}", "msa");
                 e = e.replace("${user_properties}", "{}");
                 e = e.replace("${version_type}", this.version_type);
-                e = e.replace("${clientid}", auth.clientId);
+                e = e.replace("${clientid}", "54a2cd28-0ed1-4581-bb9f-f44c2d2646bf");
                 e = e.replace("${auth_xuid}", auth.xuid);
                 e = e.replace("${auth_session}", auth.accessToken);
                 return e;
@@ -1024,7 +1024,7 @@ class Minecraft {
                 e = e.replace("${user_type}", "msa");
                 e = e.replace("${user_properties}", "{}");
                 e = e.replace("${version_type}", this.version_type);
-                e = e.replace("${clientid}", auth.clientId);
+                e = e.replace("${clientid}", "54a2cd28-0ed1-4581-bb9f-f44c2d2646bf");
                 e = e.replace("${auth_xuid}", auth.xuid);
                 e = e.replace("${auth_session}", auth.accessToken);
                 return e;

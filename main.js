@@ -63,7 +63,7 @@ if (!fs.existsSync(user_path)) {
 const db = new Database(path.resolve(user_path, "app.db"));
 
 db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, client_id TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT, favorited INTEGER, last_used TEXT, preview TEXT, preview_model TEXT, head TEXT)').run();
@@ -1960,8 +1960,7 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
         }
         let minecraft = await mc.launchGame(instance_info.loader, instance_info.vanilla_version, instance_info.loader_version, player_info.name, player_info.uuid, {
             "accessToken": player_info.access_token,
-            "xuid": player_info.xuid,
-            "clientId": player_info.client_id
+            "xuid": player_info.xuid
         }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, quickPlay, false, instance_info.allocated_ram || 4096, instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version), parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("pid", minecraft.pid, instance_id);
         updateInstance("current_log_file", minecraft.log, instance_id);
@@ -1976,7 +1975,7 @@ async function fixProfile(player_info) {
     if (player_info.expires instanceof Date) {
         player_info.expires = player_info.expires.toISOString();
     }
-    db.prepare("UPDATE profiles SET access_token = ?, client_id = ?, expires = ?, name = ?, refresh_token = ?, xuid = ?, is_demo = ? WHERE uuid = ?").run(player_info.access_token, player_info.client_id, player_info.expires, player_info.name, player_info.refresh_token, player_info.xuid, Number(player_info.is_demo), player_info.uuid);
+    db.prepare("UPDATE profiles SET access_token = ?, expires = ?, name = ?, refresh_token = ?, xuid = ?, is_demo = ? WHERE uuid = ?").run(player_info.access_token, player_info.expires, player_info.name, player_info.refresh_token, player_info.xuid, Number(player_info.is_demo), player_info.uuid);
     if (!player_info.capes || !player_info.skins) return;
     try {
         for (const e of player_info.capes) {
@@ -2094,7 +2093,6 @@ async function getNewAccessToken(refresh_token) {
         "name": token.profile.name,
         "is_demo": token.profile.demo,
         "xuid": token.xuid,
-        "client_id": "54a2cd28-0ed1-4581-bb9f-f44c2d2646bf",
         "expires": date.toISOString()
     }
 }
@@ -3192,13 +3190,11 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         "name": token.profile.name,
         "is_demo": token.profile.demo ?? false,
         "xuid": token.xuid,
-        "client_id": "54a2cd28-0ed1-4581-bb9f-f44c2d2646bf",
         "expires": date
     }
     let players = getProfiles().map(e => e.uuid);
     if (!info.access_token) throw new Error();
     if (!info.refresh_token) throw new Error();
-    if (!info.client_id) throw new Error();
     if (players.includes(info.uuid)) {
         let player = getProfileDatabase(info.uuid);
         setDefaultProfile(player.id);
@@ -3208,7 +3204,7 @@ ipcMain.handle('trigger-microsoft-login', async () => {
             win.webContents.send('display-error', translate("app.login_error.no_username"));
             return;
         }
-        let newPlayer = addProfile(info.access_token, info.client_id, info.expires, info.name, info.refresh_token, info.uuid, info.xuid, info.is_demo, false);
+        let newPlayer = addProfile(info.access_token, info.expires, info.name, info.refresh_token, info.uuid, info.xuid, info.is_demo, false);
         setDefaultProfile(newPlayer.id);
         await fixProfile(info);
     }
@@ -4578,8 +4574,8 @@ function getProfileDatabase(uuid) {
 function getProfileFromId(profile_id) {
     return db.prepare("SELECT * FROM profiles WHERE id = ?").get(profile_id);
 }
-function addProfile(access_token, client_id, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
-    let result = db.prepare("INSERT INTO profiles (access_token,client_id,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?,?)").run(access_token, client_id, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
+function addProfile(access_token, expires, name, refresh_token, uuid, xuid, is_demo, is_default) {
+    let result = db.prepare("INSERT INTO profiles (access_token,expires,name,refresh_token,uuid,xuid,is_demo,is_default) VALUES (?,?,?,?,?,?,?,?)").run(access_token, expires.toISOString(), name, refresh_token, uuid, xuid, Number(is_demo), Number(is_default));
     return getProfileFromId(result.lastInsertRowid);
 }
 function deleteProfile(uuid) {
@@ -4588,7 +4584,7 @@ function deleteProfile(uuid) {
 function updateProfile(key, value, profile_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["access_token", "client_id", "expires", "name", "refresh_token", "uuid", "xuid", "is_demo"];
+    let allowedKeys = ["access_token", "expires", "name", "refresh_token", "uuid", "xuid", "is_demo"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
     return db.prepare(`UPDATE profiles SET ${key} = ? WHERE id = ?`).run(value, profile_id);
 }
@@ -5225,6 +5221,9 @@ try {
             db.prepare("ALTER TABLE java_versions ADD package_uuid TEXT").run();
             db.prepare("ALTER TABLE instances ADD uses_custom_java_installation INTEGER").run();
             db.prepare("UPDATE instances SET uses_custom_java_installation = ?").run(1);
+        case "0.8.0":
+        case "0.8.1":
+            db.prepare("ALTER TABLE profiles DROP COLUMN client_id;").run();
     }
 } catch (e) { }
 

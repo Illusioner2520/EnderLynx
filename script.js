@@ -496,7 +496,6 @@ class Profile {
         if (!profile) return;
         this.id = profile.id;
         this.access_token = profile.access_token;
-        this.client_id = profile.client_id;
         this.expires = new Date(profile.expires);
         this.name = profile.name;
         this.refresh_token = profile.refresh_token;
@@ -512,11 +511,6 @@ class Profile {
     async setAccessToken(access_token) {
         await window.enderlynx.updateProfile("access_token", access_token, this.id);
         this.access_token = access_token;
-    }
-
-    async setClientId(client_id) {
-        await window.enderlynx.updateProfile("client_id", client_id, this.id);
-        this.client_id = client_id;
     }
 
     async setExpires(expires) {
