@@ -3845,7 +3845,7 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
     if (!fs.existsSync(iconPath)) {
         let enderlynxiconpath = path.resolve(user_path, "icons", "enderlynx." + iconExt);
         if (!fs.existsSync(enderlynxiconpath)) {
-            await fsPromises.copyFile(path.resolve(__dirname, "icon." + iconExt), enderlynxiconpath);
+            await fsPromises.copyFile(path.resolve(__dirname, "resources", "icons", "icon." + iconExt), enderlynxiconpath);
         }
         iconPath = enderlynxiconpath;
     }
