@@ -1172,7 +1172,7 @@ async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
                 await fsPromises.cp(srcPath, destPath, { recursive: true });
                 await fsPromises.rm(srcPath, { recursive: true, force: true });
             } catch (err) {
-                throw new (translate("app.installing.override.fail", "%o", file));
+                throw new Error(translate("app.installing.override.fail", "%o", file));
             }
         }
 
