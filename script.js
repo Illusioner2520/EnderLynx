@@ -827,6 +827,7 @@ class NavigationButton {
 }
 
 function resetDiscordStatus(bypassLock) {
+    if (!Display.currentScreen) return;
     if (!rpcLocked || bypassLock) {
         window.enderlynx.setActivity({
             "details": Display.currentScreen.tabName == "home" ? translate("app.discord_rpc.home") : Display.currentScreen.tabName == "instances" || Display.currentScreen.tabName == "instance" ? translate("app.discord_rpc.instances") : Display.currentScreen.tabName == "discover" ? translate("app.discord_rpc.discover") : Display.currentScreen.tabName == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
