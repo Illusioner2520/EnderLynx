@@ -4887,7 +4887,7 @@ dialog {
     color: var(--accent-color);
 }
 
-body.potato *,
+body.potato *:not(.ace_text-layer),
 body.potato *::backdrop,
 body.potato *::before,
 body.potato *::after {
