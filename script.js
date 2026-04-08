@@ -8810,8 +8810,13 @@ function showRepairDialog(instanceInfo) {
             "type": "confirm",
             "content": translate("app.instances.repair.confirm")
         }
-    ], [], async (v) => {
-        repairInstance(instanceInfo, v.filter(e => e.value).map(e => e.id).filter(e => e != "selected_tab"));
+    ], [], async (info) => {
+        let whatToRepair = [];
+        if (info.minecraft) whatToRepair.push("minecraft");
+        if (info.java) whatToRepair.push("java");
+        if (info.assets) whatToRepair.push("assets");
+        if (info.mod_loader) whatToRepair.push("mod_loader");
+        repairInstance(instanceInfo, whatToRepair);
     });
 }
 
