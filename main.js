@@ -1962,8 +1962,8 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid
         }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, quickPlay, false, instance_info.allocated_ram || 4096, instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version), parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
-        updateInstance("pid", minecraft.pid, instance_id);
         updateInstance("current_log_file", minecraft.log, instance_id);
+        updateInstance("pid", minecraft.pid, instance_id);
         return { minecraft, player_info }
     } catch (err) {
         console.error(err);
@@ -4029,6 +4029,9 @@ ipcMain.handle('analyze-logs', async (_, instance_id, last_log_date, current_log
             console.error("Error reading log:", logPath, e);
             continue;
         }
+
+        console.log("Current Log Path: " + path.resolve(current_log_path));
+        console.log("Log Path: " + path.resolve(logPath));
 
         if (current_log_path && path.resolve(logPath) === path.resolve(current_log_path)) {
             break;
