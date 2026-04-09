@@ -6153,38 +6153,46 @@ class WardrobeScreen extends Screen {
         skinRenderContainer.appendChild(skinRenderCanvas);
         ele.appendChild(skinRenderContainer);
         const dpr = window.devicePixelRatio || 1;
-        this.skinViewer = new skinview3d.SkinViewer({
-            canvas: skinRenderCanvas,
-            width: 298 * dpr,
-            height: 498 * dpr
-        });
-        skinRenderCanvas.style.width = "300px";
-        skinRenderCanvas.style.height = "500px";
-        this.skinViewer.pixelRatio = 2
-        this.skinViewer.zoom = 0.7;
-        let walkingAnimation = new skinview3d.WalkingAnimation();
-        walkingAnimation.headBobbing = false;
-        this.skinViewer.animation = walkingAnimation;
-        this.skinViewer.animation.speed = 0.5;
-        let pauseButton = createElement("button", "skin-render-pause");
-        pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
-        let onPause = () => {
-            this.skinViewer.animation.paused = true;
-            pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
-            pauseButton.onclick = onResume;
+        try {
+            this.skinViewer = new skinview3d.SkinViewer({
+                canvas: skinRenderCanvas,
+                width: 298 * dpr,
+                height: 498 * dpr
+            });
+        } catch (e) {
+            this.contentElement.style.gridTemplateColumns = "1fr";
+            skinRenderContainer.style.display = "none";
+            console.log("Unable to create skin viewer");
         }
-        let onResume = () => {
-            this.skinViewer.animation.paused = false;
+        if (this.skinViewer) {
+            skinRenderCanvas.style.width = "300px";
+            skinRenderCanvas.style.height = "500px";
+            this.skinViewer.pixelRatio = 2
+            this.skinViewer.zoom = 0.7;
+            let walkingAnimation = new skinview3d.WalkingAnimation();
+            walkingAnimation.headBobbing = false;
+            this.skinViewer.animation = walkingAnimation;
+            this.skinViewer.animation.speed = 0.5;
+            let pauseButton = createElement("button", "skin-render-pause");
             pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            let onPause = () => {
+                this.skinViewer.animation.paused = true;
+                pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+                pauseButton.onclick = onResume;
+            }
+            let onResume = () => {
+                this.skinViewer.animation.paused = false;
+                pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                pauseButton.onclick = onPause;
+            }
             pauseButton.onclick = onPause;
+            if (document.body.matches(".potato")) {
+                this.skinViewer.animation.paused = true;
+                pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+                pauseButton.onclick = onResume;
+            }
+            skinRenderContainer.appendChild(pauseButton);
         }
-        pauseButton.onclick = onPause;
-        if (document.body.matches(".potato")) {
-            this.skinViewer.animation.paused = true;
-            pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
-            pauseButton.onclick = onResume;
-        }
-        skinRenderContainer.appendChild(pauseButton);
         let optionsContainer = createElement("div", "my-account-options");
         let title = createElement("div", "title-top");
         let h1 = document.createElement("h1");
@@ -6485,11 +6493,11 @@ class WardrobeScreen extends Screen {
         if (!noAnimate) animateGridReorderStart(".skin");
         this.skinEntries = [];
         let activeSkin = await this.profile.getActiveSkin();
-        this.skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
+        if (this.skinViewer) this.skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
             model: activeSkin?.model == "slim" ? "slim" : "default",
         });
         let activeCape = await this.profile.getActiveCape();
-        this.skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
+        if (this.skinViewer) this.skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
         this.skinList.innerHTML = '';
         let skins = await getSkinsNoDefaults();
         skins.forEach((e) => {
@@ -6549,7 +6557,7 @@ class WardrobeScreen extends Screen {
                     oldEle.classList.remove("selected");
                     currentEle.classList.add("selected");
                     e.setActive();
-                    this.skinViewer.loadCape(window.enderlynx.getCapePath(e.cape_id));
+                    if (this.skinViewer) this.skinViewer.loadCape(window.enderlynx.getCapePath(e.cape_id));
                     activeCape = e;
                 }
                 loader.style.display = "none";
@@ -6602,7 +6610,7 @@ class WardrobeScreen extends Screen {
                 oldEle.classList.remove("selected");
                 currentEle.classList.add("selected");
                 this.profile.removeActiveCape();
-                this.skinViewer.loadCape(null);
+                if (this.skinViewer) this.skinViewer.loadCape(null);
                 activeCape = null;
             }
             loader.style.display = "none";
@@ -7687,7 +7695,7 @@ class SkinEntry {
                 if (oldEle) oldEle.classList.remove("selected");
                 currentEle.classList.add("selected");
                 await e.setActive(default_profile.uuid);
-                skinViewer.loadSkin(e.skin_url, {
+                if (skinViewer) skinViewer.loadSkin(e.skin_url, {
                     model: e.model == "wide" ? "default" : "slim"
                 });
             }
@@ -7737,7 +7745,7 @@ class SkinEntry {
                     });
                 }
             } : null,
-            {
+            skinViewer ? {
                 "title": translate("app.wardrobe.skin.preview"),
                 "icon": '<i class="fa-solid fa-eye"></i>',
                 "func": () => {
@@ -7821,7 +7829,7 @@ class SkinEntry {
                         }, 1000);
                     })
                 }
-            },
+            } : null,
             allowEditing ? {
                 "title": translate("app.wardrobe.skin.delete"),
                 "icon": '<i class="fa-solid fa-trash-can"></i>',

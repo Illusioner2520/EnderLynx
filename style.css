@@ -3033,7 +3033,6 @@ dialog[open]::backdrop {
     grid-column: 1;
     grid-row: 1;
     max-height: 100%;
-    padding-bottom: 10px;
 }
 
 .my-account-option-box {
