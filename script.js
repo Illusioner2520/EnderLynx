@@ -3402,7 +3402,7 @@ class InstanceScreen extends Screen {
                 {
                     "primary_column": {
                         "title": worlds[i].name,
-                        "desc": translate("app.worlds.last_played").replace("%s", formatDate(worlds[i].last_played))
+                        "desc": translate("app.worlds.last_played").replace("%s", formatTimeRelatively(worlds[i].last_played))
                     },
                     "secondary_column": {
                         "title": () => translate("app.worlds.description.singleplayer"),
@@ -3514,7 +3514,7 @@ class InstanceScreen extends Screen {
                 {
                     "primary_column": {
                         "title": worldsMultiplayer[i].name,
-                        "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatDate(last_played.toString()))
+                        "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatTimeRelatively(last_played.toString()))
                     },
                     "secondary_column": {
                         "title": () => translate("app.worlds.description.multiplayer"),
