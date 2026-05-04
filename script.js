@@ -6100,7 +6100,7 @@ class DiscoverScreen extends Screen {
         ], loaderDropdownElement, loader || "all", (new_loader) => {
             this.getContent(vanilla_version, new_loader, 1, pageSize, sortBy);
         });
-        let paginationBottom = new Pagination(page, pages, (new_page) => {
+        let paginationBottom = new Pagination(page, this.totalPages, (new_page) => {
             this.getContent(vanilla_version, loader, new_page, pageSize, sortBy);
         });
         let discoverListTop = createElement("div", "discover-list-top");
