@@ -944,38 +944,19 @@ class TabContent {
             let buttonElement = document.createElement("button");
             buttonElement.classList.add("tab-button");
             buttonElement.textContent = options[i].name;
-            buttonElement.setAttribute("data-color", options[i].color);
             buttonElement.onclick = (e) => {
-                let oldLeft = this.offset_left;
-                this.offset_left = buttonElement.offsetLeft;
-                this.offset_right = element.offsetWidth - buttonElement.offsetLeft - buttonElement.offsetWidth;
-                element.style.setProperty("--left", this.offset_left + "px");
-                element.style.setProperty("--right", this.offset_right + "px");
-                element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
-                if (options[i].color) element.style.setProperty("--color", options[i].color);
-                else element.style.removeProperty("--color");
                 this.selectOption(options[i].value);
             }
             element.appendChild(buttonElement);
             options[i].element = buttonElement;
         }
+        this.element.appendChild(createElement("div", "tab-height-adjust", { textContent: "A"}))
         this.options = options;
         options[0].element.classList.add("selected");
-        this.offset_left = 4;
-        this.offset_right = element.offsetWidth - options[0].element.offsetLeft - options[0].element.offsetWidth;
-        let oldLeft = 0;
-        element.style.setProperty("--left", "4px");
-        element.style.setProperty("--right", element.offsetWidth - options[0].element.offsetLeft - options[0].element.offsetWidth + "px");
-        element.style.setProperty("--transition", oldLeft < this.offset_left ? "right .125s, left .125s .125s, background-color .25s" : "right .125s .125s, left .125s, background-color .25s");
-        if (options[0].color) element.style.setProperty("--color", options[0].color);
-        else element.style.removeProperty("--color");
         this.selected = options[0].value;
     }
     get getSelected() {
         return this.selected;
-    }
-    figureOutBackgroundPosition() {
-        this.selectOptionAdvanced(this.selected);
     }
     selectOption(val) {
         let opt;
@@ -988,19 +969,6 @@ class TabContent {
             }
         }
         opt.func(val);
-        this.selected = val;
-    }
-    selectOptionAdvanced(val) {
-        for (let i = 0; i < this.options.length; i++) {
-            if (this.options[i].value == val) {
-                this.element.style.setProperty("--left", this.options[i].element.offset_left + "px");
-                this.element.style.setProperty("--right", this.options[i].element.offset_right + "px");
-                this.element.style.setProperty("--transition", "");
-                if (this.options[i].color) this.element.style.setProperty("--color", this.options[i].color);
-                else this.element.style.removeProperty("--color");
-                this.options[i].element.click();
-            }
-        }
         this.selected = val;
     }
 }
@@ -2653,12 +2621,11 @@ class InstanceScreen extends Screen {
                 }
             }
         ]);
-        this.tabs.selectOptionAdvanced(default_tab || "content");
+        this.tabs.selectOption(default_tab || "content");
     }
 
     async display(dont_add_to_log, ...args) {
         await super.display(dont_add_to_log, ...args);
-        this.tabs.figureOutBackgroundPosition();
         this.calculatePlayButtonState(args[1]);
     }
 
@@ -5912,7 +5879,7 @@ class DiscoverScreen extends Screen {
         this.tabElement = createElement("div", "tab-info");
         ele.appendChild(this.tabElement);
         if (this.default_tab) {
-            this.tabs.selectOptionAdvanced(default_tab);
+            this.tabs.selectOption(default_tab);
             this.contentTabSelect(default_tab);
         } else if (!this.instance) {
             this.contentTabSelect("modpack");
@@ -6133,7 +6100,7 @@ class WardrobeScreen extends Screen {
 
     async display(dont_add_to_log, ...args) {
         await super.display(dont_add_to_log, ...args);
-        this.tabs.selectOptionAdvanced("skins");
+        this.tabs.selectOption("skins");
     }
 
     async calculateContent() {
@@ -9587,21 +9554,42 @@ window.enderlynx.onInstallInstance(async (install_info) => {
 });
 
 class MultiSelect {
-    constructor(element, list) {
+    constructor(element, options) {
         this.onchange = () => { };
-        this.tabs = new TabContent(element, list.map(e => ({
-            "name": e.name, "value": e.value, "func": () => {
-                this.value = e.value;
+        this.element = element;
+        element.classList.add("select-list");
+        for (let i = 0; i < options.length; i++) {
+            let buttonElement = document.createElement("button");
+            buttonElement.classList.add("select-button");
+            buttonElement.innerHTML = '<i class="fa-solid fa-check select-check"></i>' + options[i].name;
+            buttonElement.onclick = (e) => {
+                this.selectOption(options[i].value);
                 this.onchange();
             }
-        })));
-        this.value = list[0].value;
+            element.appendChild(buttonElement);
+            options[i].element = buttonElement;
+        }
+        this.options = options;
+        options[0].element.classList.add("selected");
+        this.selected = options[0].value;
+    }
+    get value() {
+        return this.selected;
     }
     addOnChange(onchange) {
         this.onchange = onchange;
     }
-    selectOption(opt) {
-        this.tabs.selectOptionAdvanced(opt);
+    selectOption(val) {
+        let opt;
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == val) {
+                opt = this.options[i];
+                this.options[i].element.classList.add("selected");
+            } else {
+                this.options[i].element.classList.remove("selected");
+            }
+        }
+        this.selected = val;
     }
 }
 

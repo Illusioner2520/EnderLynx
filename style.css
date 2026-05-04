@@ -1151,45 +1151,110 @@ h1 {
 }
 
 .tab-list {
-    background-color: var(--color-1);
-    border-radius: 10000px;
     display: flex;
-    padding: 4px;
-    width: max-content;
-    position: relative;
+    align-items: end;
+    gap: 4px;
+    border-bottom-style: solid;
+    border-width: 2px;
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    padding-inline: 4px;
 }
 
-.tab-button {
-    padding: 10px;
-    padding-inline: 18px;
+.select-list {
+    display: flex;
+    gap: 4px;
+}
+
+.tab-height-adjust {
+    border-style: solid;
+    border-bottom-style: none;
+    border-width: 2px;
     font-weight: bold;
     font-size: .95rem;
-    border-radius: 10000px;
-    cursor: pointer;
-    transition: background-color .25s, color .25s, scale .1s;
-    z-index: 2;
-    flex-shrink: 0;
+    padding-block: 12px;
+    width: 0px;
+    visibility: hidden;
 }
 
-.tab-button:active {
+.select-button {
+    border-style: solid;
+    border-width: 2px;
+    border-color: var(--color-2);
+    color: var(--subtle-text-color);
+    font-weight: bold;
+    font-size: .95rem;
+    border-radius: 8px;
+    padding: 12px;
+    padding-block: 8px;
+    flex-shrink: 0;
+    transition: border-color .25s, background-color .25s, scale .1s;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.select-button:active {
     scale: .9;
 }
 
-.tab-list::before {
-    position: absolute;
-    top: 4px;
-    bottom: 4px;
-    left: var(--left);
-    right: var(--right);
-    background-color: var(--color, var(--accent-color));
-    border-radius: 10000px;
-    content: "";
-    transition: var(--transition);
+.select-button:hover {
+    background-color: var(--color-1t);
 }
 
-.tab-info {
-    display: grid;
-    position: relative;
+.select-button.selected {
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    background-color: color-mix(in srgb, var(--accent-color), 90% transparent);
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+}
+
+.select-button.selected:hover {
+    background-color: color-mix(in srgb, var(--accent-color), 70% transparent);
+}
+
+.select-button .select-check {
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    transition: width .25s, margin-right .25s;
+    width: 0px;
+    margin-right: 0px;
+    overflow: hidden;
+    interpolate-size: allow-keywords;
+}
+
+.select-button.selected .select-check {
+    width: auto;
+    margin-right: 8px;
+}
+
+.tab-button {
+    border-style: solid;
+    border-bottom-style: none;
+    border-width: 2px;
+    border-color: var(--color-2);
+    color: var(--subtle-text-color);
+    font-weight: bold;
+    font-size: .95rem;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding-inline: 16px;
+    padding-block: 8px;
+    flex-shrink: 0;
+    background-color: var(--background-color);
+    transition: border-color .25s, background-color .25s, padding-block .25s, color .25s, translate .25s;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.tab-button:hover {
+    background-color: var(--color-1);
+    color: var(--text-color);
+}
+
+.tab-button.selected {
+    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--accent-color), 90% var(--background-color)), var(--background-color));
+    padding-block: 12px;
+    translate: 0 2px;
 }
 
 i {
