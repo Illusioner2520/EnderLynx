@@ -4577,6 +4577,33 @@ dialog[open]::backdrop {
     color: var(--subtle-text-color);
 }
 
+.settings-chip {
+    font-size: .9rem;
+    background-color: var(--color-1t);
+    padding: 4px;
+    border-radius: 8px;
+    color: var(--subtle-text-color);
+    padding-left: 8px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.settings-chip-wrapper {
+    display: flex;
+    gap: 4px;
+    max-width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.settings-chip-title {
+    font-weight: bold;
+    color: white;
+}
+
 .version-file-chip {
     font-size: .9rem;
     background-color: var(--color-1t);
@@ -5079,6 +5106,23 @@ body.hide_ip .hidden-text.shown::after {
 }
 
 .share-link-copy:hover {
+    color: var(--text-color);
+    background-color: var(--color-1t);
+}
+
+.settings-chip-copy {
+    color: var(--subtle-text-color);
+    cursor: pointer;
+    padding-inline: 6px;
+    margin-left: 2px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 4px;
+    font-size: .9rem;
+}
+
+.settings-chip-copy:hover {
     color: var(--text-color);
     background-color: var(--color-1t);
 }

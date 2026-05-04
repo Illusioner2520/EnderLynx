@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, session, clipboard } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
@@ -3507,8 +3507,8 @@ ipcMain.handle('get-options', async (_, optionsPath) => {
 });
 
 ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
+    let image;
     try {
-        let image;
         if (/^https?:\/\//.test(file_path)) {
             const response = await fetch(file_path);
             if (!response.ok) return false;
@@ -3519,9 +3519,16 @@ ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
             file_path = path.resolve(file_path);
             image = nativeImage.createFromPath(file_path);
         }
-        return image;
     } catch (err) {
         return false;
+    }
+    if (image) {
+        try {
+            clipboard.writeImage(image);
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 });
 
@@ -4605,7 +4612,7 @@ async function getDefaultSkins() {
         if (!texture_keys.includes(e.texture_key)) {
             let info = await downloadSkin(e.url);
             db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, 1, "", e.texture_key);
-        } else {            
+        } else {
             db.prepare("UPDATE skins SET name = ?, model = ? WHERE texture_key = ?").run(e.name, e.model, e.texture_key);
         }
     }
@@ -5166,6 +5173,15 @@ ipcMain.handle('import-file', async (_, info, instance_id, file_name, paths) => 
         return true;
     } catch (e) {
         console.log(e);
+        return false;
+    }
+});
+
+ipcMain.handle('copy-text', async (_, text) => {
+    try {
+        clipboard.writeText(text);
+        return true;
+    } catch (e) {
         return false;
     }
 });

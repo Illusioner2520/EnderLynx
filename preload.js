@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, clipboard, shell, webUtils } = require('electron');
+const { contextBridge, ipcRenderer, shell, webUtils } = require('electron');
 const path = require('path');
 const os = require('os');
 const MarkdownIt = require('markdown-it');
@@ -96,22 +96,20 @@ contextBridge.exposeInMainWorld('enderlynx', {
     v8version: process.versions.v8,
     localIPs: () => {
         const nets = os.networkInterfaces();
-        let ipAddressv4 = 'N/A';
-        let ipAddressv6 = 'N/A';
+        let ipv4s = [];
+        let ipv6s = [];
+        console.log(nets);
         for (const name of Object.keys(nets)) {
             for (const net of nets[name]) {
-                if (net.family == 'IPv4' && !net.internal && ipAddressv4 == 'N/A') {
-                    ipAddressv4 = net.address;
-                } else if (net.family == 'IPv6' && !net.internal && ipAddressv6 == 'N/A') {
-                    ipAddressv6 = net.address;
+                if (net.family == 'IPv4' && !net.internal) {
+                    ipv4s.push(net.address);
+                } else if (net.family == 'IPv6' && !net.internal) {
+                    ipv6s.push(net.address);
                 }
             }
-            if (ipAddressv4 !== 'N/A' && ipAddressv6 !== 'N/A') break;
         }
-        return { IPv4: ipAddressv4, IPv6: ipAddressv6 }
+        return { IPv4: ipv4s || [translate("app.settings.info.local_ip_address.na")], IPv6: ipv6s || [translate("app.settings.info.local_ip_address.na")] }
     },
-    cpuUsage: process.getCPUUsage,
-    memUsage: process.getProcessMemoryInfo,
     getAppMetrics: async () => {
         let appMetrics = await ipcRenderer.invoke('get-app-metrics');
         return appMetrics;
@@ -495,20 +493,10 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return await ipcRenderer.invoke('get-screenshots', instance_id);
     },
     copyToClipboard: async (text) => {
-        clipboard.writeText(text);
-        return true;
+        return await ipcRenderer.invoke('copy-text', text);
     },
     copyImageToClipboard: async (file_path) => {
-        let image = await ipcRenderer.invoke('copy-image-to-clipboard', file_path);
-        if (image) {
-            try {
-                clipboard.writeImage(image);
-                return true;
-            } catch (e) {
-                return false;
-            }
-        }
-        return false;
+        return await ipcRenderer.invoke('copy-image-to-clipboard', file_path);
     },
     deleteScreenshot: async (instance_id, file_name) => {
         return await ipcRenderer.invoke('delete-screenshot', instance_id, file_name);
