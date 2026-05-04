@@ -973,6 +973,42 @@ class TabContent {
     }
 }
 
+class TabContentVertical {
+    constructor(element, options) {
+        this.element = element;
+        element.classList.add("tab-list-vertical");
+        for (let i = 0; i < options.length; i++) {
+            let buttonElement = document.createElement("button");
+            buttonElement.classList.add("tab-button-vertical");
+            buttonElement.textContent = options[i].name;
+            buttonElement.onclick = (e) => {
+                this.selectOption(options[i].value);
+            }
+            element.appendChild(buttonElement);
+            options[i].element = buttonElement;
+        }
+        this.options = options;
+        options[0].element.classList.add("selected");
+        this.selected = options[0].value;
+    }
+    get getSelected() {
+        return this.selected;
+    }
+    selectOption(val) {
+        let opt;
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == val) {
+                opt = this.options[i];
+                this.options[i].element.classList.add("selected");
+            } else {
+                this.options[i].element.classList.remove("selected");
+            }
+        }
+        opt.func(val);
+        this.selected = val;
+    }
+}
+
 class MenuOption {
     constructor(element, title, icon) {
         this.element = element;
@@ -7150,7 +7186,7 @@ settingsButtonEle.onclick = async () => {
     app_info.appendChild(clearCacheButton);
     dialog.showDialog(translate("app.settings"), "form", [
         {
-            "type": "dropdown",
+            "type": "multi-select",
             "name": translate("app.settings.theme"),
             "tab": "appearance",
             "id": "default_mode",
@@ -7197,7 +7233,7 @@ settingsButtonEle.onclick = async () => {
             }
         },
         {
-            "type": "dropdown",
+            "type": "multi-select",
             "name": translate("app.settings.sidebar"),
             "tab": "appearance",
             "id": "default_sidebar",
@@ -7215,7 +7251,7 @@ settingsButtonEle.onclick = async () => {
             }
         },
         {
-            "type": "dropdown",
+            "type": "multi-select",
             "name": translate("app.settings.sidebar.side"),
             "tab": "appearance",
             "id": "default_sidebar_side",
@@ -7233,7 +7269,7 @@ settingsButtonEle.onclick = async () => {
             }
         },
         {
-            "type": "dropdown",
+            "type": "multi-select",
             "name": translate("app.settings.page"),
             "desc": translate("app.settings.page.description"),
             "tab": "appearance",
@@ -10718,7 +10754,7 @@ class Dialog {
             this.element.remove();
         }, 1000);
     }
-    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, max_width) {
+    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen) {
         this.onsubmit = onsubmit;
         let element = document.createElement("dialog");
         element.className = "dialog";
@@ -10728,7 +10764,6 @@ class Dialog {
                 this.element.remove();
             }, 1000);
         }
-        if (max_width) element.style.maxWidth = max_width + "px";
         this.element = element;
         if (full_screen) element.classList.add("dialog-full");
         let dialogTop = document.createElement("div");
@@ -10760,13 +10795,13 @@ class Dialog {
         this.selectedTab = tabs ? tabs[0]?.value ?? "" : "";
         if (tabs && tabs.length) {
             realDialogContent.appendChild(tabElement);
-            new TabContent(tabElement, tabs.map(e => ({
+            new TabContentVertical(tabElement, tabs.map(e => ({
                 "name": e.name, "value": e.value, "func": (v) => {
                     let keys = Object.keys(contents);
                     keys.forEach(e => {
                         contents[e].style.display = "none";
                     });
-                    contents[v].style.display = "grid";
+                    contents[v].style.display = "flex";
                     this.selectedTab = v;
                 }
             })))
@@ -10785,7 +10820,7 @@ class Dialog {
             contents["default"] = dialogContent;
             realDialogContent.appendChild(dialogContent);
         }
-        if (this.selectedTab) contents[this.selectedTab].style.display = "grid";
+        if (this.selectedTab) contents[this.selectedTab].style.display = "flex";
         if (type == "notice") {
             if (info instanceof Element) {
                 realDialogContent.innerHTML = '';
@@ -10802,6 +10837,7 @@ class Dialog {
                         textElement.appendChild(info[i].content);
                     } else {
                         textElement.innerHTML = (info[i].content);
+                        textElement.className = "dialog-label-desc";
                     }
                     if (info[i].width) textElement.style.width = info[i].width + "px";
                     contents[tab].appendChild(textElement);
@@ -11225,7 +11261,7 @@ class Dialog {
         keys.forEach(e => {
             contents[e].style.display = "none";
         });
-        contents[keys[0]].style.display = "grid";
+        contents[keys[0]].style.display = "flex";
         let dialogButtons = document.createElement("div");
         dialogButtons.className = "dialog-buttons";
         for (let i = 0; i < buttons.length; i++) {
@@ -14958,7 +14994,7 @@ async function processFileDrop(overlay, file) {
     }
     if (overlay.dataset.action == "instance-import" || await window.enderlynx.isInstanceFile(info)) {
         let instanceInfo = await window.enderlynx.readPackFile(info);
-        if (!info) {
+        if (!info || !(await window.enderlynx.isInstanceFile(info))) {
             displayError(translate("app.import.instance.fail", "%f", file.name));
             return;
         }

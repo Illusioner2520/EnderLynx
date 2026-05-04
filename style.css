@@ -510,7 +510,7 @@ body.compact .player-head-menu {
 .search-dropdown:has(.dropdown-button:focus-visible),
 .details:has(.details-top:focus-visible) {
     outline-style: solid;
-    outline-color: var(--secondary-accent-color);
+    outline-color: #8c3d92;
     outline-width: 3.5px;
     z-index: 100000;
 }
@@ -1161,6 +1161,21 @@ h1 {
     padding-inline: 4px;
 }
 
+.tab-list-vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    border-right-style: solid;
+    border-width: 1px;
+    border-color: var(--color-2);
+    padding-block: 4px;
+    flex-shrink: 0;
+    padding-right: 10px;
+    position: sticky;
+    top: 0;
+}
+
 .select-list {
     display: flex;
     gap: 4px;
@@ -1204,7 +1219,7 @@ h1 {
 
 .select-button.selected {
     border-color: var(--secondary-accent-color);
-    background-color: color-mix(in srgb, var(--accent-color), 90% transparent);
+    background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
     color: var(--secondary-accent-color);
 }
 
@@ -1253,9 +1268,37 @@ h1 {
 .tab-button.selected {
     border-color: var(--secondary-accent-color);
     color: var(--secondary-accent-color);
-    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--accent-color), 90% var(--background-color)), var(--background-color));
+    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--accent-color), 70% var(--background-color)), var(--background-color));
     padding-block: 12px;
     translate: 0 2px;
+}
+
+.tab-button-vertical {
+    border-style: solid;
+    border-width: 2px;
+    border-color: var(--color-2);
+    color: var(--subtle-text-color);
+    font-weight: bold;
+    font-size: .95rem;
+    border-radius: 8px;
+    padding-inline: 12px;
+    padding-block: 8px;
+    flex-shrink: 0;
+    background-color: var(--background-color);
+    transition: border-color .25s, background-color .25s, color .25s, translate .25s;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.tab-button-vertical:hover {
+    background-color: var(--color-1);
+    color: var(--text-color);
+}
+
+.tab-button-vertical.selected {
+    border-color: var(--secondary-accent-color);
+    color: var(--secondary-accent-color);
+    background-image: linear-gradient(to right, color-mix(in srgb, var(--accent-color), 70% var(--background-color)), var(--background-color));
 }
 
 i {
@@ -2185,16 +2228,26 @@ dialog[open]::backdrop {
 
 .dialog-content {
     padding: 10px;
-    display: grid;
+    display: flex;
     gap: 10px;
     flex-grow: 1;
     flex-shrink: 1;
     overflow-y: auto;
+    max-height: 600px;
+}
+
+.dialog-content:has(.tab-list-vertical) {
+    height: 600px;
 }
 
 .dialog-content-inner {
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
     gap: 10px;
+    width: 800px;
+    flex-shrink: 1;
+    align-self: start;
 }
 
 .dialog-buttons {
@@ -4670,7 +4723,7 @@ dialog[open]::backdrop {
 
 .settings-chip-title {
     font-weight: bold;
-    color: white;
+    color: var(--text-color);
 }
 
 .version-file-chip {
