@@ -366,7 +366,7 @@ body.compact .player-head-menu {
     padding: 0px;
     overflow-y: hidden;
     position: fixed;
-    top: calc(anchor(bottom) + var(--menu-padding));
+    top: calc(anchor(bottom, -1000px) + var(--menu-padding));
     position-try-fallbacks: --top;
     right: anchor(right);
     border-radius: 10px;
@@ -380,6 +380,7 @@ body.compact .player-head-menu {
     width: max-content;
     scale: .8;
     opacity: 0;
+    position-visibility: anchors-visible;
 }
 
 .more-menu:popover-open {
@@ -925,7 +926,7 @@ h1 {
     overflow-y: hidden;
     flex-direction: column;
     position: fixed;
-    top: anchor(bottom);
+    top: anchor(bottom, -10000px);
     left: anchor(left);
     width: anchor-size(width);
     border-radius: 0 0 10px 10px;
@@ -938,6 +939,7 @@ h1 {
     border-width: 1px;
     box-shadow: 0 0 10px black;
     clip-path: inset(0 -10px -10px -10px);
+    position-visibility: anchors-visible;
 }
 
 .dropdown-list:popover-open {
@@ -959,7 +961,7 @@ h1 {
     overflow-y: auto;
     flex-direction: column;
     position: fixed;
-    top: anchor(bottom);
+    top: anchor(bottom, -10000px);
     left: anchor(left);
     width: anchor-size(width);
     border-radius: 0 0 10px 10px;
@@ -972,6 +974,7 @@ h1 {
     border-width: 1px;
     box-shadow: 0 0 10px black;
     clip-path: inset(0 -10px -10px -10px);
+    position-visibility: anchors-visible;
 }
 
 .dropdown-list-dialog:popover-open {
