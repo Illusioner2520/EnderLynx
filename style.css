@@ -70,6 +70,7 @@ body {
     --opposite-text-color: black;
     --subtle-text-color: #aaa;
     --accent-color: var(--accent);
+    --secondary-accent-color: color-mix(in srgb, var(--accent-color), var(--text-color));
     --neutral-color: #0078d4;
     --danger-color: #d93e5d;
     --go-color: #22ff84;
@@ -509,7 +510,7 @@ body.compact .player-head-menu {
 .search-dropdown:has(.dropdown-button:focus-visible),
 .details:has(.details-top:focus-visible) {
     outline-style: solid;
-    outline-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    outline-color: var(--secondary-accent-color);
     outline-width: 3.5px;
     z-index: 100000;
 }
@@ -1156,7 +1157,7 @@ h1 {
     gap: 4px;
     border-bottom-style: solid;
     border-width: 2px;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     padding-inline: 4px;
 }
 
@@ -1202,9 +1203,9 @@ h1 {
 }
 
 .select-button.selected {
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     background-color: color-mix(in srgb, var(--accent-color), 90% transparent);
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
 }
 
 .select-button.selected:hover {
@@ -1212,7 +1213,7 @@ h1 {
 }
 
 .select-button .select-check {
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     transition: width .25s, margin-right .25s;
     width: 0px;
     margin-right: 0px;
@@ -1250,8 +1251,8 @@ h1 {
 }
 
 .tab-button.selected {
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
+    color: var(--secondary-accent-color);
     background-image: linear-gradient(to bottom, color-mix(in srgb, var(--accent-color), 90% var(--background-color)), var(--background-color));
     padding-block: 12px;
     translate: 0 2px;
@@ -1357,7 +1358,7 @@ i {
     display: flex;
     align-items: center;
     align-self: stretch;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     font-weight: bold;
 }
 
@@ -2471,11 +2472,11 @@ dialog[open]::backdrop {
     font-size: 1rem;
     font-weight: bold;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     border-width: 2px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     margin-top: auto;
-    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --percent-color: color-mix(in srgb, var(--secondary-accent-color), 65% transparent);
     --button-bg-color: transparent;
     --percent-preview: 0%;
     background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
@@ -3281,7 +3282,7 @@ dialog[open]::backdrop {
     padding: 8px;
     border-radius: 8px;
     gap: 8px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     align-items: center;
     font-size: 1rem;
     width: fit-content;
@@ -3536,7 +3537,7 @@ dialog[open]::backdrop {
 }
 
 .option-key-input.selected:hover {
-    background-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    background-color: var(--secondary-accent-color);
 }
 
 .option-key-input.selected::before {
@@ -3570,9 +3571,9 @@ dialog[open]::backdrop {
     font-size: 1rem;
     font-weight: bold;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     border-width: 2px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
 }
 
 .option-button:hover {
@@ -4276,11 +4277,11 @@ dialog[open]::backdrop {
     cursor: pointer;
     transition: --button-bg-color .25s, scale .1s;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     border-width: 2px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     margin-left: auto;
-    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --percent-color: color-mix(in srgb, var(--secondary-accent-color), 65% transparent);
     --button-bg-color: transparent;
     --percent-preview: 0%;
     background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
@@ -4757,12 +4758,12 @@ dialog[open]::backdrop {
     font-size: 1rem;
     font-weight: bold;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     border-width: 2px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     align-self: center;
     margin-left: auto;
-    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    --percent-color: color-mix(in srgb, var(--secondary-accent-color), 65% transparent);
     --button-bg-color: transparent;
     --percent-preview: 0%;
     background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
@@ -5731,10 +5732,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
     font-size: 1rem;
     font-weight: bold;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     border-width: 2px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
-    --percent-color: color-mix(in srgb, color-mix(in srgb, var(--accent-color), var(--text-color)), 65% transparent);
+    color: var(--secondary-accent-color);
+    --percent-color: color-mix(in srgb, var(--secondary-accent-color), 65% transparent);
     --button-bg-color: transparent;
     --percent-preview: 0%;
     background-image: conic-gradient(var(--percent-color) var(--percent-preview), var(--button-bg-color) var(--percent-preview));
@@ -5775,9 +5776,9 @@ div:has(> .dialog-wrapper-hidden.shown) {
     font-size: 1rem;
     font-weight: bold;
     border-style: solid;
-    border-color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    border-color: var(--secondary-accent-color);
     border-width: 2px;
-    color: color-mix(in srgb, var(--accent-color), var(--text-color));
+    color: var(--secondary-accent-color);
     grid-column: span 2;
     margin-left: auto;
 }
