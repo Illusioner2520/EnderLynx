@@ -6429,7 +6429,7 @@ class WardrobeScreen extends Screen {
                 await importSkin(info, () => {
                     this.showContent();
                 });
-            });
+            }, () => {}, undefined, true);
         }
         skinButtonContainer.appendChild(importButton);
 
@@ -7581,7 +7581,7 @@ settingsButtonEle.onclick = async () => {
         } else {
             document.body.classList.remove("sidebar-right");
         }
-    }, undefined, 800);
+    });
 }
 
 let navButtons = [homeButton, instancesButton, discoverButton, wardrobeButton];
@@ -8401,7 +8401,7 @@ async function showCreateInstanceDialog() {
                 await instance.setMcInstalled(true);
             }
         }
-    });
+    }, () => {}, undefined, true);
 }
 
 class Display {
@@ -10754,7 +10754,7 @@ class Dialog {
             this.element.remove();
         }, 1000);
     }
-    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen) {
+    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, dont_maintain_height) {
         this.onsubmit = onsubmit;
         let element = document.createElement("dialog");
         element.className = "dialog";
@@ -10786,6 +10786,7 @@ class Dialog {
         element.appendChild(dialogTop);
         let realDialogContent = document.createElement("div");
         realDialogContent.className = "dialog-content";
+        if (dont_maintain_height) realDialogContent.classList.add("dont-maintain-height");
         let contents = {};
         element.appendChild(realDialogContent);
         document.body.appendChild(element);

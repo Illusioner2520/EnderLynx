@@ -510,9 +510,22 @@ body.compact .player-head-menu {
 .search-dropdown:has(.dropdown-button:focus-visible),
 .details:has(.details-top:focus-visible) {
     outline-style: solid;
-    outline-color: #8c3d92;
+    outline-color: var(--text-color);
     outline-width: 3.5px;
     z-index: 100000;
+    animation-name: outline-bounce;
+    animation-timing-function: ease;
+    animation-duration: .1s;
+}
+
+@keyframes outline-bounce {
+    from {
+        outline-offset: 4px;
+    }
+
+    to {
+        outline-offset: 0;
+    }
 }
 
 .menu-icon {
@@ -2236,7 +2249,7 @@ dialog[open]::backdrop {
     max-height: 600px;
 }
 
-.dialog-content:has(.tab-list-vertical) {
+.dialog-content:has(.tab-list-vertical):not(.dont-maintain-height) {
     height: 600px;
 }
 
@@ -2364,6 +2377,7 @@ dialog[open]::backdrop {
     color: var(--text-color);
     background-color: var(--color-1);
     text-decoration: none;
+    font-size: .9rem;
 }
 
 .image-upload-button:active {
@@ -6145,7 +6159,7 @@ body.loading * {
     margin-bottom: 5px;
 }
 
-.ace-enderlynx .ace_search_form{
+.ace-enderlynx .ace_search_form {
     margin-bottom: 7px;
 }
 
