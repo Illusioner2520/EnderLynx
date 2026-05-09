@@ -237,6 +237,7 @@ window.enderlynx.onContentUpdated(async (key, value, content_id) => {
     if (content[key] instanceof Date) value = Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
+    console.log("Updated " + key + " to " + value + " for " + content_id);
     if (content?.listeners?.get(key)) {
         content.listeners.get(key)(value);
     }
@@ -1788,7 +1789,7 @@ class ContentList {
                 imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : getDefaultImage(contentInfo.primary_column.title));
                 imageElement.loading = "lazy";
                 imageElement.onerror = () => {
-                    if (navigator.onLine && contentInfo.onimagefail) {
+                    if (contentInfo.onimagefail) {
                         contentInfo.onimagefail(imageElement);
                     }
                 }
@@ -2910,9 +2911,14 @@ class InstanceScreen extends Screen {
                     "image": e.image,
                     "onimagefail": async (ele) => {
                         if (e.source == "modrinth" || e.source == "curseforge") {
-                            let project = Project.getFromId(e.source_info, e.source);
-                            await e.setImage(project.icon);
-                            ele.src = fixPathForImage(project.icon || getDefaultImage(e.name));
+                            try {
+                                let project = await Project.getFromId(e.source_info, e.source);
+                                console.log("well now were updating the image for the content");
+                                await e.setImage(project.icon);
+                                ele.src = fixPathForImage(project.icon || getDefaultImage(e.name));
+                            } catch (f) {
+                                ele.src = fixPathForImage(getDefaultImage(e.name));
+                            }
                         } else {
                             ele.src = fixPathForImage(getDefaultImage(e.name));
                         }

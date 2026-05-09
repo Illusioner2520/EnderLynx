@@ -4357,7 +4357,7 @@ dialog[open]::backdrop {
 
 .markdown-body {
     width: 100%;
-    
+
     h1:first-child {
         margin-block-start: 0;
         padding-block-start: 0;
@@ -5530,6 +5530,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     grid-template-columns: 1fr auto auto;
     display: grid;
     border-radius: 8px;
+    width: 100%;
 }
 
 .download-grid:has(.download-grid-entry) .loading-container {
