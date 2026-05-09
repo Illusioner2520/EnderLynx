@@ -76,7 +76,7 @@ body {
     --go-color: #22ff84;
     --success-color: rgb(0, 170, 0);
     --error-color: rgb(200, 0, 0);
-    --dialog-background: #0005;
+    --dialog-background: var(--background-color);
     --dialog-backdrop: #00000088;
     --color-1: color-mix(in srgb, 7.8% var(--text-color), var(--background-color));
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
@@ -85,10 +85,6 @@ body {
     --sidebar: color-mix(in srgb, 7.8% var(--accent-color), transparent);
     color-scheme: dark;
     overflow: hidden;
-}
-
-body.potato {
-    --dialog-background: #000e;
 }
 
 body.light {
@@ -102,7 +98,7 @@ body.light {
     --go-color: #22ff84;
     --success-color: rgb(180, 255, 180);
     --error-color: rgb(255, 180, 180);
-    --dialog-background: #fff9;
+    --dialog-background: var(--background-color);
     --dialog-backdrop: #ffffff88;
     --color-1: color-mix(in srgb, 7.8% var(--text-color), var(--background-color));
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
@@ -169,7 +165,7 @@ body.compact .sidebar {
     display: flex;
     padding: 8px;
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
     gap: 8px;
     align-items: center;
@@ -182,7 +178,7 @@ body.compact .sidebar {
 
 .menu-button {
     display: flex;
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
     padding: 8px;
     transition: background-color .25s, scale .1s;
@@ -311,7 +307,7 @@ body.compact .player-head-menu {
     position: fixed;
     top: calc(anchor(bottom) + 10px);
     left: anchor(left);
-    border-radius: 10px;
+    border-radius: 8px;
     interpolate-size: allow-keywords;
     transition: opacity .25s, scale .25s, overlay .25s allow-discrete, display .25s allow-discrete;
     border-style: solid;
@@ -330,7 +326,7 @@ body.compact .player-head-menu {
     padding: 0px;
     overflow: hidden;
     position: fixed;
-    border-radius: 10px;
+    border-radius: 8px;
     height: max-content;
     interpolate-size: allow-keywords;
     transition: opacity .25s, scale .25s, overlay .25s allow-discrete, display .25s allow-discrete, left .1s, top .1s, translate .1s;
@@ -370,7 +366,7 @@ body.compact .player-head-menu {
     top: calc(anchor(bottom, -1000px) + var(--menu-padding));
     position-try-fallbacks: --top;
     right: anchor(right);
-    border-radius: 10px;
+    border-radius: 8px;
     height: max-content;
     interpolate-size: allow-keywords;
     transition: opacity .25s, scale .25s, overlay .25s allow-discrete, display .25s allow-discrete;
@@ -435,7 +431,7 @@ body.compact .player-head-menu {
 }
 
 .add-player {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -444,6 +440,8 @@ body.compact .player-head-menu {
     display: flex;
     gap: 8px;
     align-items: center;
+    font-size: .9rem;
+    font-weight: bold;
 }
 
 .add-player:hover {
@@ -455,7 +453,7 @@ body.compact .player-head-menu {
 }
 
 .add-content-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -477,7 +475,7 @@ body.compact .player-head-menu {
 }
 
 .create-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -510,7 +508,7 @@ body.compact .player-head-menu {
 .search-dropdown:has(.dropdown-button:focus-visible),
 .details:has(.details-top:focus-visible) {
     outline-style: solid;
-    outline-color: var(--text-color);
+    outline-color: var(--secondary-accent-color);
     outline-width: 3.5px;
     z-index: 100000;
     animation-name: outline-bounce;
@@ -713,7 +711,7 @@ h1 {
 
 .instance-item {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     padding: 8px;
     cursor: pointer;
@@ -1061,7 +1059,7 @@ h1 {
 }
 
 .instance-top-play-button {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--go-color);
     padding: 10px;
     font-size: 1.5rem;
@@ -1084,7 +1082,7 @@ h1 {
 }
 
 .instance-top-loading-button {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: color-mix(in srgb, var(--go-color), black);
     padding: 10px;
     font-size: 1.5rem;
@@ -1122,7 +1120,7 @@ h1 {
 }
 
 .instance-top-stop-button {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--danger-color);
     padding: 10px;
     font-size: 1.5rem;
@@ -1168,11 +1166,7 @@ h1 {
 .tab-list {
     display: flex;
     align-items: end;
-    gap: 4px;
-    border-bottom-style: solid;
-    border-width: 2px;
-    border-color: var(--secondary-accent-color);
-    padding-inline: 4px;
+    gap: 8px;
 }
 
 .tab-list-vertical {
@@ -1196,9 +1190,6 @@ h1 {
 }
 
 .tab-height-adjust {
-    border-style: solid;
-    border-bottom-style: none;
-    border-width: 2px;
     font-weight: bold;
     font-size: .95rem;
     padding-block: 12px;
@@ -1207,20 +1198,18 @@ h1 {
 }
 
 .select-button {
-    border-style: solid;
-    border-width: 2px;
-    border-color: var(--color-2);
-    color: var(--subtle-text-color);
+    color: var(--text-color);
     font-weight: bold;
     font-size: .95rem;
     border-radius: 8px;
     padding: 12px;
     padding-block: 8px;
     flex-shrink: 0;
-    transition: border-color .25s, background-color .25s, scale .1s;
+    transition: background-color .25s, scale .1s;
     cursor: pointer;
     display: flex;
     align-items: center;
+    background-color: var(--color-1t);
 }
 
 .select-button:active {
@@ -1228,21 +1217,19 @@ h1 {
 }
 
 .select-button:hover {
-    background-color: var(--color-1t);
+    background-color: var(--color-2t);
 }
 
 .select-button.selected {
-    border-color: var(--secondary-accent-color);
-    background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
-    color: var(--secondary-accent-color);
+    background-color: var(--accent-color);
 }
 
 .select-button.selected:hover {
-    background-color: color-mix(in srgb, var(--accent-color), 70% transparent);
+    background-color: var(--accent-color);
 }
 
 .select-button .select-check {
-    color: var(--secondary-accent-color);
+    color: var(--text-color);
     transition: width .25s, margin-right .25s;
     width: 0px;
     margin-right: 0px;
@@ -1256,63 +1243,51 @@ h1 {
 }
 
 .tab-button {
-    border-style: solid;
-    border-bottom-style: none;
-    border-width: 2px;
-    border-color: var(--color-2);
-    color: var(--subtle-text-color);
+    color: var(--text-color);
     font-weight: bold;
     font-size: .95rem;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    padding-inline: 16px;
-    padding-block: 8px;
+    border-radius: 8px;
+    padding-inline: 20px;
+    padding-block: 10px;
     flex-shrink: 0;
-    background-color: var(--background-color);
-    transition: border-color .25s, background-color .25s, padding-block .25s, color .25s, translate .25s;
+    background-color: var(--color-1);
+    transition: background-color .25s, padding-block .25s, color .25s;
     cursor: pointer;
     line-height: 1;
 }
 
 .tab-button:hover {
-    background-color: var(--color-1);
+    background-color: var(--color-2);
     color: var(--text-color);
 }
 
 .tab-button.selected {
     border-color: var(--secondary-accent-color);
-    color: var(--secondary-accent-color);
-    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--accent-color), 70% var(--background-color)), var(--background-color));
+    color: var(--text-color);
+    background-color: var(--accent-color);
     padding-block: 12px;
-    translate: 0 2px;
 }
 
 .tab-button-vertical {
-    border-style: solid;
-    border-width: 2px;
-    border-color: var(--color-2);
-    color: var(--subtle-text-color);
+    color: var(--text-color);
     font-weight: bold;
     font-size: .95rem;
     border-radius: 8px;
     padding-inline: 12px;
     padding-block: 8px;
     flex-shrink: 0;
-    background-color: var(--background-color);
-    transition: border-color .25s, background-color .25s, color .25s, translate .25s;
+    background-color: var(--color-1t);
+    transition: background-color .25s, color .25s, translate .25s;
     cursor: pointer;
     line-height: 1;
 }
 
 .tab-button-vertical:hover {
-    background-color: var(--color-1);
-    color: var(--text-color);
+    background-color: var(--color-2t);
 }
 
 .tab-button-vertical.selected {
-    border-color: var(--secondary-accent-color);
-    color: var(--secondary-accent-color);
-    background-image: linear-gradient(to right, color-mix(in srgb, var(--accent-color), 70% var(--background-color)), var(--background-color));
+    background-color: var(--accent-color);
 }
 
 i {
@@ -1340,7 +1315,7 @@ i {
 
 .content-list {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     position: relative;
     overflow: hidden;
 }
@@ -1362,7 +1337,7 @@ i {
 }
 
 .content-list-refresh {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -1388,7 +1363,7 @@ i {
 }
 
 .content-list-update-all {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -2038,7 +2013,7 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
 }
 
 .logs-copy {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -2060,7 +2035,7 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
 }
 
 .logs-share {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -2082,7 +2057,7 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
 }
 
 .logs-delete {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -2113,7 +2088,7 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
 .logs-display {
     font-family: monospace;
     width: 100%;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 10px;
     background-color: black;
     max-width: 100%;
@@ -2143,9 +2118,7 @@ dialog {
     display: none;
     opacity: 0;
     translate: 0 25vh;
-    transition-property: overlay display opacity;
-    transition-duration: .5s;
-    transition-behavior: allow-discrete;
+    transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, translate .5s;
 }
 
 dialog[open] {
@@ -2165,9 +2138,7 @@ dialog[open] {
 
 dialog::backdrop {
     background-color: var(--dialog-backdrop);
-    transition-property: overlay display opacity;
-    transition-duration: .5s;
-    transition-behavior: allow-discrete;
+    transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, backdrop-filter .5s;
     opacity: 0;
     backdrop-filter: blur(0px);
 }
@@ -2227,7 +2198,7 @@ dialog[open]::backdrop {
 }
 
 .dialog {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--dialog-background);
     backdrop-filter: blur(30px);
     border-color: var(--color-2);
@@ -2235,9 +2206,13 @@ dialog[open]::backdrop {
     border-style: solid;
     min-width: 400px;
     box-shadow: 0px 0px 10px black;
-    max-width: 700px;
+    max-width: min(700px, calc(100% - 2em - 6px));
     display: flex;
     flex-direction: column;
+}
+
+.dialog.wide {
+    max-width: min(830px, calc(100% - 2em - 6px));
 }
 
 .dialog-content {
@@ -2258,7 +2233,7 @@ dialog[open]::backdrop {
     display: flex;
     flex-direction: column;
     justify-content: start;
-    gap: 10px;
+    gap: 16px;
     width: 800px;
     flex-shrink: 1;
     align-self: start;
@@ -2278,7 +2253,7 @@ dialog[open]::backdrop {
 .dialog-button {
     padding: 10px;
     cursor: pointer;
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--text-color);
     color: var(--opposite-text-color);
     transition: background-color .25s, scale .1s;
@@ -2369,7 +2344,7 @@ dialog[open]::backdrop {
 
 .image-upload-button {
     display: flex;
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
     padding: 8px;
     transition: background-color .25s, scale .1s;
@@ -2419,7 +2394,7 @@ dialog[open]::backdrop {
 .discover-item {
     display: flex;
     background-color: var(--color-1);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 10px;
     gap: 10px;
     min-width: 0;
@@ -2528,7 +2503,7 @@ dialog[open]::backdrop {
 
 .discover-item-install {
     background-color: transparent;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -2838,7 +2813,7 @@ dialog[open]::backdrop {
 }
 
 .screenshot-preview {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--dialog-background);
     backdrop-filter: blur(30px);
     border-color: var(--color-2);
@@ -2865,8 +2840,7 @@ dialog[open]::backdrop {
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    color: var(--opposite-text-color);
-    background-color: var(--text-color);
+    background-color: var(--color-1t);
     border-radius: 50%;
     flex-shrink: 0;
     transition: background-color .25s, scale .1s;
@@ -2878,7 +2852,7 @@ dialog[open]::backdrop {
 }
 
 .screenshot-arrow:hover {
-    background-color: var(--subtle-text-color);
+    background-color: var(--color-2t);
 }
 
 .screenshot-info {
@@ -2925,7 +2899,7 @@ dialog[open]::backdrop {
 }
 
 .screenshot-action {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     cursor: pointer;
@@ -3035,7 +3009,7 @@ dialog[open]::backdrop {
 
 .loading-container-refresh {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -3362,7 +3336,7 @@ dialog[open]::backdrop {
 }
 
 .skin-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -3508,7 +3482,7 @@ dialog[open]::backdrop {
 }
 
 .sub-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -3540,7 +3514,7 @@ dialog[open]::backdrop {
 .option-list {
     display: grid;
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     grid-template-columns: 1fr 1fr auto;
     overflow: hidden;
 }
@@ -3560,7 +3534,7 @@ dialog[open]::backdrop {
     transition: background-color .25s;
 }
 
-.option-item:has(.fa-minus) {
+.option-item.default {
     background-color: color-mix(in srgb, var(--accent-color), 80% transparent);
 }
 
@@ -3600,26 +3574,22 @@ dialog[open]::backdrop {
     text-align: center;
 }
 
-.option-key-input.selected {
-    background-color: var(--accent-color);
-}
-
-.option-key-input.selected:hover {
-    background-color: var(--secondary-accent-color);
-}
-
 .option-key-input.selected::before {
-    color: yellow;
+    color: var(--secondary-accent-color);
     content: "> "
 }
 
 .option-key-input.selected::after {
-    color: yellow;
+    color: var(--secondary-accent-color);;
     content: " <"
 }
 
 .option-key-input:hover {
     background-color: var(--color-2t);
+}
+
+.option-key-input.selected {
+    background-color: var(--accent-color);
 }
 
 .option-key-input:active {
@@ -3628,7 +3598,7 @@ dialog[open]::backdrop {
 
 .option-button {
     background-color: transparent;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     justify-content: center;
     cursor: pointer;
@@ -3653,7 +3623,7 @@ dialog[open]::backdrop {
 }
 
 .back-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -3822,7 +3792,7 @@ dialog[open]::backdrop {
 
 .home-entry {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     padding: 8px;
     cursor: pointer;
@@ -3834,7 +3804,7 @@ dialog[open]::backdrop {
 
 .home-world-entry {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     padding: 8px;
     gap: 8px;
@@ -3849,7 +3819,7 @@ dialog[open]::backdrop {
 
 .home-entry-empty {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     display: flex;
     padding: 8px;
     gap: 8px;
@@ -4121,7 +4091,7 @@ dialog[open]::backdrop {
 
 .home-discover {
     background-color: var(--color-1t);
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 10px;
     display: flex;
     gap: 10px;
@@ -4190,7 +4160,7 @@ dialog[open]::backdrop {
 }
 
 .content-info {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--dialog-background);
     backdrop-filter: blur(30px);
     border-color: var(--color-2);
@@ -4333,7 +4303,7 @@ dialog[open]::backdrop {
 }
 
 .content-top-install-button {
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: transparent;
     padding: 10px;
     font-size: 1.5rem;
@@ -4543,7 +4513,7 @@ dialog[open]::backdrop {
 
     details {
         border: 2px solid var(--color-1);
-        border-radius: 10px;
+        border-radius: 8px;
         padding: 8px 8px 0;
 
         summary {
@@ -4646,7 +4616,7 @@ dialog[open]::backdrop {
 
 .version-files-wrapper {
     background-color: var(--color-1);
-    border-radius: 10px;
+    border-radius: 8px;
     display: grid;
     grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto auto;
 }
@@ -4788,7 +4758,7 @@ dialog[open]::backdrop {
 
 .version-file-changelog {
     background-color: transparent;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -4815,7 +4785,7 @@ dialog[open]::backdrop {
 }
 
 .version-file-install {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -5074,7 +5044,7 @@ body.potato *::after {
 }
 
 .bug-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -5298,7 +5268,7 @@ body.hide_ip .hidden-text.shown::after {
     background: var(--color-1);
     padding: 8px;
     font-weight: bold;
-    border-radius: 8px 8px 0px 0px;
+    border-radius: 4.5px 4.5px 0px 0px;
     display: none;
     opacity: 0;
     transition: display .25s allow-discrete, opacity .25s;
@@ -5511,7 +5481,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 }
 
 .home-discover-refresh {
-    border-radius: 10px;
+    border-radius: 8px;
     padding-inline: 8px;
     width: max-content;
     cursor: pointer;
@@ -5536,7 +5506,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
     right: 0;
     background: var(--color);
     z-index: -1;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .home-discover-refresh:hover {
@@ -5556,7 +5526,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 .download-grid {
     grid-template-columns: 1fr auto auto;
     display: grid;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 .download-grid:has(.download-grid-entry) .loading-container {
@@ -5694,7 +5664,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 }
 
 .home-create-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;
@@ -5788,7 +5758,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 }
 
 .install-grid-install {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -5832,7 +5802,7 @@ div:has(> .dialog-wrapper-hidden.shown) {
 
 .install-grid-create {
     background-color: transparent;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     width: max-content;
     cursor: pointer;
@@ -5912,7 +5882,7 @@ body.thin-scrollbars *,
 .welcome-container {
     grid-column: span 2;
     overflow: hidden;
-    border-radius: 10px;
+    border-radius: 8px;
     position: relative;
 }
 
@@ -6174,7 +6144,7 @@ body.loading * {
 }
 
 .editor-button {
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px;
     background-color: var(--color-1t);
     width: max-content;

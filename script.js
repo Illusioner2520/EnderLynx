@@ -4121,9 +4121,11 @@ class InstanceScreen extends Screen {
                 values[i].value = (type == "text" ? '"' + v + '"' : v);
                 if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
                     setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                    item.classList.add("default");
                     setDefaultButton.onclick = onRemove;
                 } else {
                     setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+                    item.classList.remove("default");
                     setDefaultButton.onclick = onSet;
                 }
             }
@@ -4243,6 +4245,7 @@ class InstanceScreen extends Screen {
             let onSet = async () => {
                 await defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                item.classList.add("default");
                 setDefaultButton.onclick = onRemove;
                 displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
             }
@@ -4252,12 +4255,14 @@ class InstanceScreen extends Screen {
             let onRemove = async () => {
                 await defaultOptions.deleteDefault(e.key);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
+                item.classList.remove("default");
                 setDefaultButton.onclick = onSet;
                 displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
             }
 
             if (await defaultOptions.getDefault(e.key) == e.value) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
+                item.classList.add("default");
                 setDefaultButton.onclick = onRemove;
             }
 
@@ -7581,7 +7586,7 @@ settingsButtonEle.onclick = async () => {
         } else {
             document.body.classList.remove("sidebar-right");
         }
-    });
+    }, undefined, false, true);
 }
 
 let navButtons = [homeButton, instancesButton, discoverButton, wardrobeButton];
@@ -8810,7 +8815,7 @@ async function showInstanceSettings(instanceInfo) {
             }
             await instanceInfo.setMcInstalled(true);
         }
-    });
+    }, () => {}, undefined, false, true);
 }
 
 function showRepairDialog(instanceInfo) {
@@ -10754,7 +10759,7 @@ class Dialog {
             this.element.remove();
         }, 1000);
     }
-    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, dont_maintain_height) {
+    showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, dont_maintain_height, wide) {
         this.onsubmit = onsubmit;
         let element = document.createElement("dialog");
         element.className = "dialog";
@@ -10787,6 +10792,7 @@ class Dialog {
         let realDialogContent = document.createElement("div");
         realDialogContent.className = "dialog-content";
         if (dont_maintain_height) realDialogContent.classList.add("dont-maintain-height");
+        if (wide) element.classList.add("wide");
         let contents = {};
         element.appendChild(realDialogContent);
         document.body.appendChild(element);
