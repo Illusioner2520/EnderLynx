@@ -12851,7 +12851,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 element.style.marginInline = "auto";
                 tabContent.appendChild(element);
                 element.setHTMLUnsafe(content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description, { sanitizer: superSanitizer });
-                element.innerHTML = element.innerHTML;
+                element.innerHTML = element.innerHTML; // TODO: Remove when Chromium fixes Sanitizer bug with <details>
                 afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked, content_list_to_update, states);
             }
         },
