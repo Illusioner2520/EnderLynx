@@ -950,7 +950,7 @@ class TabContent {
             element.appendChild(buttonElement);
             options[i].element = buttonElement;
         }
-        this.element.appendChild(createElement("div", "tab-height-adjust", { textContent: "A"}))
+        this.element.appendChild(createElement("div", "tab-height-adjust", { textContent: "A" }))
         this.options = options;
         options[0].element.classList.add("selected");
         this.selected = options[0].value;
@@ -6434,7 +6434,7 @@ class WardrobeScreen extends Screen {
                 await importSkin(info, () => {
                     this.showContent();
                 });
-            }, () => {}, undefined, true);
+            }, () => { }, undefined, true);
         }
         skinButtonContainer.appendChild(importButton);
 
@@ -8406,7 +8406,7 @@ async function showCreateInstanceDialog() {
                 await instance.setMcInstalled(true);
             }
         }
-    }, () => {}, undefined, true);
+    }, () => { }, undefined, true);
 }
 
 class Display {
@@ -8815,7 +8815,7 @@ async function showInstanceSettings(instanceInfo) {
             }
             await instanceInfo.setMcInstalled(true);
         }
-    }, () => {}, undefined, false, true);
+    }, () => { }, undefined, false, true);
 }
 
 function showRepairDialog(instanceInfo) {
@@ -12225,12 +12225,7 @@ function sanitize(input) {
         .replace(/'/g, "&#39;");
 }
 
-function superSanitize(input) {
-    return input;
-    return sanitize(input);
-    if (typeof input !== "string") return "";
-    const sanitizer = new Sanitizer();
-}
+const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"]}, { name: "iframe", attributes: ["src", "width", "height", "alt"]}, "b", "center", "strong", { name: "details", attributes: ["open"]}, "summary", { name: "font", attributes: ["size"]}, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section"], "attributes": ["style", "title", "href"] });
 
 async function applyCape(profile, cape) {
     try {
@@ -12838,6 +12833,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let tabContent = document.createElement("div");
     tabContent.className = "tab-info";
     tabContent.style.padding = "10px";
+    tabContent.style.paddingTop = "0px";
     contentWrapper.appendChild(tabContent);
     contentInfo.showModal();
     tabsElement.style.marginInline = "auto";
@@ -12848,14 +12844,14 @@ async function displayContentInfo(content_source, content, content_id, instance_
             "name": translate("app.discover.tabs.description"),
             "value": "description",
             "func": () => {
-                tabContent.style.paddingTop = "10px";
                 tabContent.innerHTML = "";
                 let element = document.createElement("div");
                 element.className = "markdown-body";
                 element.style.maxWidth = "800px";
                 element.style.marginInline = "auto";
                 tabContent.appendChild(element);
-                element.innerHTML = superSanitize(content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description);
+                element.setHTMLUnsafe(content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description, { sanitizer: superSanitizer });
+                element.innerHTML = element.innerHTML;
                 afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked, content_list_to_update, states);
             }
         },
