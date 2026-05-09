@@ -5010,12 +5010,12 @@ async function getPinnedWorlds() {
 }
 
 
-ipcMain.handle('get-instance', (_, ...params) => getInstance(...params));
+ipcMain.on('get-instance', (_, ...params) => _.returnValue = getInstance(...params));
 ipcMain.handle('get-instances', (_, ...params) => getInstances(...params));
 ipcMain.handle('update-instance', (_, ...params) => updateInstance(...params));
 ipcMain.handle('delete-instance', (_, ...params) => deleteInstance(...params));
 ipcMain.handle('add-instance', (_, ...params) => addInstance(...params));
-ipcMain.handle('get-content', (_, ...params) => getContent(...params));
+ipcMain.on('get-content', (_, ...params) => _.returnValue = getContent(...params));
 ipcMain.handle('get-instance-content-database', (_, ...params) => getInstanceContentDatabase(...params));
 ipcMain.handle('update-content', (_, ...params) => updateContent(...params));
 ipcMain.handle('add-content-database', (_, ...params) => addContentDatabase(...params));

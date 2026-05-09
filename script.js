@@ -167,16 +167,16 @@ class Content {
         this.version_id = content.version_id;
     }
 
-    static async getContent(content_id) {
+    static getContent(content_id) {
         if (!this.content.has(content_id)) {
-            let newContent = new Content(await window.enderlynx.getContent(content_id));
+            let newContent = new Content(window.enderlynx.getContent(content_id));
             this.content.set(content_id, newContent);
         }
         return this.content.get(content_id);
     }
 
     async refresh() {
-        return await Content.getContent(this.id);
+        return Content.getContent(this.id);
     }
 
     async setName(name) {
@@ -223,7 +223,7 @@ class Content {
 }
 
 window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
-    let instance = await Instance.getInstance(instance_id);
+    let instance = Instance.getInstance(instance_id);
     if (instance[key] instanceof Date) value = Date(value);
     if (typeof instance[key] == 'boolean') value = Boolean(value);
     instance[key] = value;
@@ -233,7 +233,7 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
 });
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
-    let content = await Content.getContent(content_id);
+    let content = Content.getContent(content_id);
     if (content[key] instanceof Date) value = Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
@@ -290,9 +290,9 @@ class Instance {
         this.instanceScreen = new InstanceScreen(this);
     }
 
-    static async getInstance(instance_id) {
+    static getInstance(instance_id) {
         if (!this.instances.has(instance_id)) {
-            let newInstance = new Instance(await window.enderlynx.getInstance(instance_id));
+            let newInstance = new Instance(window.enderlynx.getInstance(instance_id));
             this.instances.set(instance_id, newInstance);
         }
         return this.instances.get(instance_id);
@@ -425,7 +425,7 @@ class Instance {
         let content = await window.enderlynx.getInstanceContentDatabase(this.instance_id);
         let contentList = [];
         for (let i = 0; i < content.length; i++) {
-            contentList.push(await Content.getContent(content[i].id));
+            contentList.push(Content.getContent(content[i].id));
         }
         return contentList;
     }
@@ -454,13 +454,13 @@ async function getInstances() {
     let instances = await window.enderlynx.getInstances();
     let instanceList = [];
     for (let i = 0; i < instances.length; i++) {
-        instanceList.push(await Instance.getInstance(instances[i].instance_id));
+        instanceList.push(Instance.getInstance(instances[i].instance_id));
     }
     return instanceList;
 }
 async function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
     await window.enderlynx.addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed);
-    return await Instance.getInstance(instance_id);
+    return Instance.getInstance(instance_id);
 }
 async function getProfiles() {
     let profiles = await window.enderlynx.getProfiles();
@@ -4889,7 +4889,7 @@ class HomeScreen extends Screen {
             itemInfo.appendChild(itemTitle);
             itemInfo.appendChild(itemDesc);
             item.appendChild(itemInfo);
-            let instanceInfo = await Instance.getInstance(e.instance_id);
+            let instanceInfo = Instance.getInstance(e.instance_id);
             let playButton = document.createElement("button");
             playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
             playButton.className = "home-play-button";
@@ -9574,7 +9574,7 @@ window.enderlynx.onErrorMessage((message) => {
 window.enderlynx.onLaunchInstance(async (launch_info) => {
     if (!launch_info.instance_id) return;
     try {
-        let instance = await Instance.getInstance(launch_info.instance_id);
+        let instance = Instance.getInstance(launch_info.instance_id);
         dont_override_my_page = true;
         let pid = instance.pid;
         if (checkForProcess(pid)) {
@@ -11562,7 +11562,7 @@ function displayVanillaTweaksEditor(instance_id, version, packs, file_name, cont
             "content": translate("app.content.edit_packs.confirm")
         }
     ], [], async () => {
-        let instanceInfo = await Instance.getInstance(instance_id);
+        let instanceInfo = Instance.getInstance(instance_id);
         let file = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, instanceInfo.vanilla_version, instanceInfo.instance_id, file_name);
         if (!file) {
             displayError(translate("app.discover.vt.fail"));
@@ -11737,10 +11737,10 @@ class VanillaTweaksSelector {
                         "type": "dropdown",
                         "id": "world",
                         "name": translate("app.discover.datapacks.world"),
-                        "options": this.instance_id ? (await getInstanceWorlds(await Instance.getInstance(this.instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
+                        "options": this.instance_id ? (await getInstanceWorlds(Instance.getInstance(this.instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
                         "input_source": this.instance_id ? null : "instance",
                         "source": this.instance_id ? null : async (i) => {
-                            return (await getInstanceWorlds(await Instance.getInstance(i))).map(e => ({ "name": e.name, "value": e.id }));
+                            return (await getInstanceWorlds(Instance.getInstance(i))).map(e => ({ "name": e.name, "value": e.id }));
                         }
                     }
                 ].filter(e => e), [
@@ -11767,7 +11767,7 @@ class VanillaTweaksSelector {
                         }
                     } else {
                         if (success) {
-                            displaySuccess(translate("app.discover.vt.success", "%i", (await Instance.getInstance(instance)).name));
+                            displaySuccess(translate("app.discover.vt.success", "%i", (Instance.getInstance(instance)).name));
                         } else {
                             displayError(translate("app.discover.vt.fail"));
                         }
@@ -11781,7 +11781,7 @@ class VanillaTweaksSelector {
                     displayError(translate("app.discover.vt.fail"));
                     return;
                 }
-                let instance = await Instance.getInstance(this.instance_id);
+                let instance = Instance.getInstance(this.instance_id);
                 await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                 submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             } else {
@@ -12387,7 +12387,7 @@ async function getRecentlyPlayedInstances(ignore_instance_ids = []) {
     instances.sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
     let instanceList = [];
     for (let i = 0; i < instances.length; i++) {
-        instanceList.push(await Instance.getInstance(instances[i].instance_id))
+        instanceList.push(Instance.getInstance(instances[i].instance_id))
     }
     return instanceList;
 }
@@ -12396,7 +12396,7 @@ async function getPinnedInstances() {
     let instances = await window.enderlynx.getPinnedInstances();
     let instanceList = [];
     for (let i = 0; i < instances.length; i++) {
-        let instance = await Instance.getInstance(instances[i].instance_id);
+        let instance = Instance.getInstance(instances[i].instance_id);
         if (!instance) {
             await unpinInstance(instance, true);
             continue;
@@ -12462,7 +12462,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
         }
     }
     let instance_content = [];
-    if (instance_id) instance_content = await (await Instance.getInstance(instance_id)).getContent();
+    if (instance_id) instance_content = await (Instance.getInstance(instance_id)).getContent();
     let currentlyInstalling = false;
 
     contentInfo.innerHTML = "";
@@ -12860,14 +12860,14 @@ async function displayContentInfo(content_source, content, content_id, instance_
             "value": "files",
             "func": async () => {
                 let installedVersion = "";
-                if (instance_id) instance_content = await (await Instance.getInstance(instance_id)).getContent();
+                if (instance_id) instance_content = await (Instance.getInstance(instance_id)).getContent();
                 content_ids = instance_content.map(e => e.source_info);
                 if (typeof content.id == 'number') content_ids = content_ids.map(e => Number(e));
                 if (content_ids.includes(content.id)) {
                     installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
                 }
                 if ((content.project_type == "modpack" || content.project_type == "server") && instance_id) {
-                    installedVersion = (await Instance.getInstance(instance_id)).installed_version;
+                    installedVersion = (Instance.getInstance(instance_id)).installed_version;
                 }
                 if (typeof content.id == 'number') installedVersion = Number(installedVersion);
 
@@ -13149,10 +13149,10 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             if (instance_id & content.project_type != "world" && content.project_type != "datapack") currentlyInstalling = true;
                             if (content.project_type == "modpack" || content.project_type == "server") {
                                 contentInfo.close();
-                                runModpackUpdate(await Instance.getInstance(instance_id), content.source, e);
+                                runModpackUpdate(Instance.getInstance(instance_id), content.source, e);
                                 return;
                             }
-                            let instanceInfo = await Instance.getInstance(instance_id);
+                            let instanceInfo = Instance.getInstance(instance_id);
                             let contentList = await instanceInfo.getContent();
                             installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
                             installButton.classList.add("disabled");
@@ -13996,10 +13996,10 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 "type": "dropdown",
                 "id": "world",
                 "name": translate("app.discover.datapacks.world"),
-                "options": instance_id ? (await getInstanceWorlds(await Instance.getInstance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
+                "options": instance_id ? (await getInstanceWorlds(Instance.getInstance(instance_id))).map(e => ({ "name": e.name, "value": e.id })) : [],
                 "input_source": instance_id ? null : "instance",
                 "source": instance_id ? null : async (i) => {
-                    return (await getInstanceWorlds(await Instance.getInstance(i))).map(e => ({ "name": e.name, "value": e.id }));
+                    return (await getInstanceWorlds(Instance.getInstance(i))).map(e => ({ "name": e.name, "value": e.id }));
                 }
             }
         ].filter(e => e), [
@@ -14025,7 +14025,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 button.classList.add("disabled");
                 button.onclick = () => { };
             }
-            success = await installContent(source, content, version, await Instance.getInstance(instance), world);
+            success = await installContent(source, content, version, Instance.getInstance(instance), world);
             if (success) {
                 if (states) {
                     states[project_id].state = "installed";
@@ -14175,7 +14175,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
             button.classList.add("disabled");
             button.onclick = () => { };
         }
-        let success = await installContent(source, content, version, await Instance.getInstance(instance_id));
+        let success = await installContent(source, content, version, Instance.getInstance(instance_id));
         if (success) {
             if (states) {
                 states[project_id].state = "installed";
@@ -14214,7 +14214,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
         let instanceIdsWithContent = contentOther.map(e => e.instance);
         let instancesWithContent = [];
         for (let i = 0; i < instanceIdsWithContent.length; i++) {
-            instancesWithContent.push(await Instance.getInstance(instanceIdsWithContent[i]));
+            instancesWithContent.push(Instance.getInstance(instanceIdsWithContent[i]));
         }
         let updates = [];
         if (contentOther.length > 0) {
@@ -15004,7 +15004,7 @@ async function processFileDrop(overlay, file) {
         importInstance(instanceInfo, info);
     } else if (overlay.dataset.action == "content-import") {
         document.body.classList.add("loading")
-        let instance = await Instance.getInstance(overlay.dataset.instanceId);
+        let instance = Instance.getInstance(overlay.dataset.instanceId);
         if (instance.locked) {
             displayError(translate("app.import.content.locked"));
             document.body.classList.remove("loading");
@@ -15019,7 +15019,7 @@ async function processFileDrop(overlay, file) {
         if (document.body.contains(overlay)) instance.instanceScreen.showContent();
         document.body.classList.remove("loading");
     } else if (overlay.dataset.action == "world-import") {
-        let instance = await Instance.getInstance(overlay.dataset.instanceId);
+        let instance = Instance.getInstance(overlay.dataset.instanceId);
         let success = await window.enderlynx.importWorld(usePath ? path : info, overlay.dataset.instanceId, file.name);
         if (!success) {
             displayError(translate("app.import.worlds.fail", "%f", file.name));
@@ -15027,7 +15027,7 @@ async function processFileDrop(overlay, file) {
         }
         if (document.body.contains(overlay)) instance.instanceScreen.showWorlds();
     } else if (overlay.dataset.action == "file-import") {
-        let instance = await Instance.getInstance(overlay.dataset.instanceId);
+        let instance = Instance.getInstance(overlay.dataset.instanceId);
         let paths = overlay.dataset.paths;
         let success = await window.enderlynx.importFile(usePath ? path : info, overlay.dataset.instanceId, file.name, overlay.dataset.paths);
         if (!success) {

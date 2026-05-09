@@ -740,12 +740,12 @@ contextBridge.exposeInMainWorld('enderlynx', {
         let full_path = path.join(userPath, "minecraft/instances", instance_id, file_path);
         showFileInFolder(full_path);
     },
-    getInstance: async (...params) => ipcRenderer.invoke('get-instance', ...params),
+    getInstance: (...params) => ipcRenderer.sendSync('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
     updateInstance: async (...params) => ipcRenderer.invoke('update-instance', ...params),
     deleteInstance: async (...params) => ipcRenderer.invoke('delete-instance', ...params),
     addInstance: async (...params) => ipcRenderer.invoke('add-instance', ...params),
-    getContent: async (...params) => ipcRenderer.invoke('get-content', ...params),
+    getContent: (...params) => ipcRenderer.sendSync('get-content', ...params),
     getInstanceContentDatabase: async (...params) => ipcRenderer.invoke('get-instance-content-database', ...params),
     updateContent: async (...params) => ipcRenderer.invoke('update-content', ...params),
     addContentDatabase: async (...params) => ipcRenderer.invoke('add-content-database', ...params),
