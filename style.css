@@ -4356,6 +4356,8 @@ dialog[open]::backdrop {
 }
 
 .markdown-body {
+    width: 100%;
+    
     h1:first-child {
         margin-block-start: 0;
         padding-block-start: 0;
@@ -4473,7 +4475,7 @@ dialog[open]::backdrop {
 
     hr {
         margin: 20px 0;
-        border-color: var(--color-1);
+        border-color: var(--color-2t);
     }
 
     table {
@@ -4553,6 +4555,7 @@ dialog[open]::backdrop {
         width: 850px;
         max-width: 100%;
         height: auto;
+        border: none;
     }
 }
 

@@ -6005,6 +6005,7 @@ class DiscoverScreen extends Screen {
             loading.errorOut(err, () => {
                 this.getContent(vanilla_version, loader, page, pageSize, sortBy);
             });
+            return;
         }
         this.totalPages = Math.ceil(results.total_hits / pageSize);
         let paginationTop = new Pagination(page, this.totalPages, (new_page) => {
@@ -12186,7 +12187,7 @@ class LoadingContainer {
         error.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         let text = document.createElement("div");
         text.className = "loading-container-text";
-        text.textContent = e.message;
+        text.textContent = typeof e == 'string' ? e : e.message;
         this.element.innerHTML = '';
         this.element.appendChild(error);
         this.element.appendChild(text);
@@ -12225,7 +12226,7 @@ function sanitize(input) {
         .replace(/'/g, "&#39;");
 }
 
-const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"]}, { name: "iframe", attributes: ["src", "width", "height", "alt"]}, "b", "center", "strong", { name: "details", attributes: ["open"]}, "summary", { name: "font", attributes: ["size"]}, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section"], "attributes": ["style", "title", "href"] });
+const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"]}, { name: "iframe", attributes: ["src", "width", "height", "alt"]}, "b", "center", "strong", { name: "details", attributes: ["open"]}, "summary", { name: "font", attributes: ["size"]}, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href"] });
 
 async function applyCape(profile, cape) {
     try {
@@ -12516,13 +12517,20 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let display_source = translate("app.discover.modrinth");
     if (content_source == "curseforge") display_source = translate("app.discover.curseforge");
 
-    if (content_id.toString().includes(":")) {
-        await content.getInfoFromSlug(content_id, content_source);
-    } else {
-        await content.getInfoFromId(content_id, content_source);
+    try {
+        if (content_id.toString().includes(":")) {
+            await content.getInfoFromSlug(content_id, content_source);
+        } else {
+            await content.getInfoFromId(content_id, content_source);
+        }
+        await content.getAllVersions();
+        await content.getAuthors();
+    } catch (e) {
+        loading.errorOut(e, () => {
+            displayContentInfo(content_source, content, content_id, instance_id, vanilla_version, loader, locked, true, content_list_to_update, states);
+        });
+        return;
     }
-    await content.getAllVersions();
-    await content.getAuthors();
 
     loading.element.remove();
 

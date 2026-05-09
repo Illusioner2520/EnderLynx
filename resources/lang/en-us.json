@@ -1205,5 +1205,6 @@
     "app.discover.error": "There is no version of this content marked as compatible with this instance. Please install a specific version instead.",
     "app.list.clear": "Clear",
     "app.list.count": "%c selected",
-    "app.discover.authors.organization": "Organization"
+    "app.discover.authors.organization": "Organization",
+    "app.discover.unknown_error": "Something has gone wrong."
 }

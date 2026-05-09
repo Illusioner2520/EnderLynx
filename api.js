@@ -30,6 +30,7 @@ class Project {
     }
     constructor() { }
     applyInfoFromModrinth(urlInfo) {
+        if (!urlInfo) throw new Error("Failed to fetch");
         this.source = "modrinth";
         this.id = urlInfo.id || urlInfo.project_id;
         this.slug = urlInfo.slug;
@@ -68,6 +69,7 @@ class Project {
         }
     }
     applyInfoFromCurseForge(urlInfo) {
+        if (!urlInfo) throw new Error("Failed to fetch");
         this.source = "curseforge";
         this.id = urlInfo.id;
         this.gallery = urlInfo.screenshots.map(e => new GalleryImage(e, "curseforge"));
