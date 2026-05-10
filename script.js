@@ -237,7 +237,6 @@ window.enderlynx.onContentUpdated(async (key, value, content_id) => {
     if (content[key] instanceof Date) value = Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
-    console.log("Updated " + key + " to " + value + " for " + content_id);
     if (content?.listeners?.get(key)) {
         content.listeners.get(key)(value);
     }
@@ -2913,7 +2912,6 @@ class InstanceScreen extends Screen {
                         if (e.source == "modrinth" || e.source == "curseforge") {
                             try {
                                 let project = await Project.getFromId(e.source_info, e.source);
-                                console.log("well now were updating the image for the content");
                                 await e.setImage(project.icon);
                                 ele.src = fixPathForImage(project.icon || getDefaultImage(e.name));
                             } catch (f) {
@@ -6177,7 +6175,7 @@ class WardrobeScreen extends Screen {
         } catch (e) {
             this.contentElement.style.gridTemplateColumns = "1fr";
             skinRenderContainer.style.display = "none";
-            console.log("Unable to create skin viewer");
+            console.error("Unable to create skin viewer");
         }
         if (this.skinViewer) {
             skinRenderCanvas.style.width = "300px";
@@ -8361,6 +8359,8 @@ async function showCreateInstanceDialog() {
             await instance.setLoaderVersion(packInfo.loader_version);
             if (!instance.image && packInfo.image) await instance.setImage(packInfo.image);
             if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
+            if (packInfo.width) await instance.setWindowWidth(packInfo.width);
+            if (packInfo.height) await instance.setWindowWidth(packInfo.height);
             if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
             for (let i = 0; i < packInfo.content.length; i++) {
                 let e = packInfo.content[i];
@@ -9230,6 +9230,7 @@ async function getInstanceContent(instanceInfo) {
 }
 
 function translate(key, ...params) {
+    return "chicken";
     if (!lang) {
         lang = getLangFile();
     }
@@ -12232,7 +12233,7 @@ function sanitize(input) {
         .replace(/'/g, "&#39;");
 }
 
-const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"]}, { name: "iframe", attributes: ["src", "width", "height", "alt"]}, "b", "center", "strong", { name: "details", attributes: ["open"]}, "summary", { name: "font", attributes: ["size"]}, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href"] });
+const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href"] });
 
 async function applyCape(profile, cape) {
     try {
@@ -14707,6 +14708,9 @@ let importInstance = (info, file_path) => {
         await instance.setVanillaVersion(packInfo.vanilla_version);
         await instance.setLoaderVersion(packInfo.loader_version);
         if (!instance.image && packInfo.image) await instance.setImage(packInfo.image);
+        if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
+        if (packInfo.width) await instance.setWindowWidth(packInfo.width);
+        if (packInfo.height) await instance.setWindowWidth(packInfo.height);
         if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
         for (let i = 0; i < packInfo.content.length; i++) {
             let e = packInfo.content[i];

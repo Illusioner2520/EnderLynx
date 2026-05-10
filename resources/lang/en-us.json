@@ -427,7 +427,7 @@
     "app.wardrobe.unnamed": "Unnamed Skin",
     "app.loader.unknown": "Unknown",
     "app.instances.file": "File",
-    "app.instances.file.description": "Select a .mrpack file, .elpack file, or a CurseForge .zip file",
+    "app.instances.file.description": "Select a .mrpack file, .elpack file, CurseForge .zip file or a MultiMC/Prism .zip file",
     "app.instances.file.browse": "Browse Files",
     "app.instances.launcher": "Launcher",
     "app.launcher.modrinth": "Modrinth App",

@@ -794,6 +794,50 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
     fs.mkdirSync(pathc, { recursive: true });
     let all_hashes = [];
     let mods = [];
+    let mod_mmc_data = {};
+    let resourcepack_mmc_data = {};
+    let shader_mmc_data = {};
+
+    const readIndexFolder = (indexPath, targetData) => {
+        if (!fs.existsSync(indexPath)) return;
+        try {
+            const entries = fs.readdirSync(indexPath);
+            for (const entry of entries) {
+                const entryPath = path.resolve(indexPath, entry);
+                try {
+                    const stat = fs.lstatSync(entryPath);
+                    if (!stat.isFile()) continue;
+                    const raw = fs.readFileSync(entryPath, 'utf8');
+                    const parsed = toml.parse(raw);
+                    let source = "player_install";
+                    let source_id = "";
+                    let version_id = "";
+                    if (parsed.update.curseforge) {
+                        source = "curseforge";
+                        source_id = parsed.update.curseforge["project-id"];
+                        version_id = parsed.update.curseforge["file-id"];
+                    }
+                    if (parsed.update.modrinth) {
+                        source = "modrinth";
+                        source_id = parsed.update.modrinth["mod-id"];
+                        version_id = parsed.update.modrinth["version"];
+                    }
+                    targetData[parsed.filename] = {
+                        source, source_id, version_id
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            fs.rmSync(indexPath, { recursive: true, force: true });
+        } catch (e) {
+        }
+    };
+
+    readIndexFolder(path.resolve(patha, '.index'), mod_mmc_data);
+    readIndexFolder(path.resolve(pathb, '.index'), resourcepack_mmc_data);
+    readIndexFolder(path.resolve(pathc, '.index'), shader_mmc_data);
+
     if (loader != "vanilla") mods = fs.readdirSync(patha).map(file => {
         if (old_files.includes(file)) {
             old_files[old_files.indexOf(file)] = null;
@@ -928,13 +972,15 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
         return {
             type: 'mod',
             name: modJson?.name ?? file.replace(".jar.disabled", ".jar"),
-            source: "player_install",
             file_name: file,
-            version: modJson?.version ?? "",
-            disabled: file.includes(".jar.disabled"),
+            version: modJson?.version || "",
+            disabled: file.endsWith(".jar.disabled"),
             author: modJson?.authors && modJson?.authors[0] ? (modJson?.authors[0]?.name ? modJson.authors[0].name : modJson.authors[0]) : "",
-            image: modJson?.icon ?? "",
-            hash: sha512
+            image: modJson?.icon || "",
+            hash: sha512,
+            source: mod_mmc_data[file.replace(".jar.disabled", ".jar")] ? mod_mmc_data[file.replace(".jar.disabled", ".jar")].source : "player_install",
+            version_id: mod_mmc_data[file.replace(".jar.disabled", ".jar")] ? mod_mmc_data[file.replace(".jar.disabled", ".jar")].version_id : undefined,
+            source_id: mod_mmc_data[file.replace(".jar.disabled", ".jar")] ? mod_mmc_data[file.replace(".jar.disabled", ".jar")].source_id : undefined
         };
     }).filter(Boolean);
     let resourcepacks = fs.readdirSync(pathb).map(file => {
@@ -974,13 +1020,15 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
         return {
             type: 'resource_pack',
             name: name,
-            source: "player_install",
             file_name: file,
             version: "",
             disabled: file.includes(".zip.disabled"),
             author: "",
             image: packMcMeta?.icon ?? "",
-            hash: sha512
+            hash: sha512,
+            source: resourcepack_mmc_data[file.replace(".zip.disabled", ".zip")] ? resourcepack_mmc_data[file.replace(".zip.disabled", ".zip")].source : "player_install",
+            version_id: resourcepack_mmc_data[file.replace(".zip.disabled", ".zip")] ? resourcepack_mmc_data[file.replace(".zip.disabled", ".zip")].version_id : undefined,
+            source_id: resourcepack_mmc_data[file.replace(".zip.disabled", ".zip")] ? resourcepack_mmc_data[file.replace(".zip.disabled", ".zip")].source_id : undefined
         };
     });
     let shaderpacks = [];
@@ -1001,22 +1049,25 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
         return {
             type: 'shader',
             name: file.replace(".zip.disabled", ".zip"),
-            source: "player_install",
             file_name: file,
             version: "",
             disabled: file.includes(".zip.disabled"),
             author: "",
             image: "",
-            hash: sha512
+            hash: sha512,
+            source: shader_mmc_data[file.replace(".zip.disabled", ".zip")] ? shader_mmc_data[file.replace(".zip.disabled", ".zip")].source : "player_install",
+            version_id: shader_mmc_data[file.replace(".zip.disabled", ".zip")] ? shader_mmc_data[file.replace(".zip.disabled", ".zip")].version_id : undefined,
+            source_id: shader_mmc_data[file.replace(".zip.disabled", ".zip")] ? shader_mmc_data[file.replace(".zip.disabled", ".zip")].source_id : undefined
         };
     });
     let deleteFromContent = old_files.filter(e => e);
     let content = [...mods, ...resourcepacks, ...shaderpacks].filter(e => e);
-    let project_ids = [];
+    let project_ids = content.filter(e => e.source == "modrinth").map(e => e.source_id);
     let team_ids = [];
     let team_to_project_ids = {};
     let organization_ids = [];
     let organization_to_project_ids = {};
+    let cf_project_ids = content.filter(e => e.source == "curseforge").map(e => e.source_id);
 
     try {
         if (link_with_modrinth && all_hashes.length > 0) {
@@ -1046,7 +1097,7 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
             });
         }
 
-        if (link_with_modrinth && project_ids.length > 0) {
+        if (project_ids.length > 0) {
             let res = await fetch(`https://api.modrinth.com/v2/projects?ids=["${project_ids.join('","')}"]`);
             let res_json = await res.json();
             res_json.forEach(e => {
@@ -1097,9 +1148,32 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                 });
             });
         }
-    } catch (e) {
+    } catch (e) { }
 
-    }
+    try {
+        console.log(cf_project_ids);
+        if (cf_project_ids.length > 0) {
+            const response = await fetch("https://api.curse.tools/v1/mods", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
+            });
+            console.log(response.ok);
+            if (response.ok) {
+                const json = await response.json();
+                const cfData = json.data || [];
+                cfData.forEach(e => {
+                    content.forEach(item => {
+                        if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
+                            item.name = e.name;
+                            item.image = e.logo.thumbnailUrl;
+                            item.author = e.authors.map(e => e.name).join(", ");
+                        }
+                    });
+                });
+            }
+        }
+    } catch (e) { }
 
     content = content.map(e => {
         if (!e.source_id) e.source_id = "";
@@ -1124,6 +1198,9 @@ ipcMain.handle('process-el-pack', async (_, instance_id, elpack_path, loader, ti
 ipcMain.handle('process-cf-zip', async (_, instance_id, zip_path, cf_id, title) => {
     return await processCfZip(instance_id, zip_path, cf_id, title);
 });
+ipcMain.handle('process-mmc-zip', async (_, instance_id, zip_path, cf_id, title) => {
+    return await processMMCZip(instance_id, zip_path, title);
+});
 
 async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
     let max_downloads = getMaxConcurrentDownloads();
@@ -1139,7 +1216,7 @@ async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
-        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}/cfzip`);
 
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
@@ -1150,7 +1227,7 @@ async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
             resolve(v);
         }));
 
-        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
+        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/cfzip/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
         fs.mkdirSync(srcDir, { recursive: true });
@@ -1201,14 +1278,14 @@ async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
             project_ids.push(project_id);
 
             try {
-                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(extractToPath, "temp"));
+                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(destDir, "temp"));
             } catch (e) {
                 let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
                 let res_json = await res.json();
-                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, "temp"));
+                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(destDir, "temp"));
             }
 
-            const tempFilePath = path.resolve(extractToPath, "temp", file_name);
+            const tempFilePath = path.resolve(destDir, "temp", file_name);
             let destFolder = "mods";
             let project_type = "mod";
 
@@ -1233,7 +1310,7 @@ async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
             }
 
 
-            const finalPath = path.resolve(extractToPath, destFolder, file_name);
+            const finalPath = path.resolve(destDir, destFolder, file_name);
             fs.mkdirSync(path.dirname(finalPath), { recursive: true });
             fs.renameSync(tempFilePath, finalPath);
 
@@ -1311,7 +1388,7 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
-        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}/mrpack`);
 
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
@@ -1323,8 +1400,8 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
         }));
         signal.throwIfAborted();
 
-        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
-        let srcDir2 = path.resolve(user_path, `minecraft/instances/${instance_id}/client-overrides`);
+        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/mrpack/overrides`);
+        let srcDir2 = path.resolve(user_path, `minecraft/instances/${instance_id}/mrpack/client-overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
         fs.mkdirSync(srcDir, { recursive: true });
@@ -1375,7 +1452,7 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
         const downloadPromises = modrinth_index_json.files.map((file, i) =>
             limit(async () => {
                 signal.throwIfAborted();
-                await urlToFile(file.downloads[0], path.resolve(extractToPath, file.path), { signal });
+                await urlToFile(file.downloads[0], path.resolve(destDir, file.path), { signal });
                 version_hashes.push(file.hashes.sha512);
                 content.push({
                     "disabled": false,
@@ -1517,7 +1594,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
-        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}/elpack`);
 
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
@@ -1528,7 +1605,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
             resolve(v);
         }));
 
-        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
+        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/elpack/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
         fs.mkdirSync(srcDir, { recursive: true });
@@ -1593,13 +1670,13 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                     url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
                 }
                 try {
-                    await urlToFile(url, path.resolve(extractToPath, install_path), { signal });
+                    await urlToFile(url, path.resolve(destDir, install_path), { signal });
                 } catch (e) {
                     if (file.source === "modrinth") {
                         let url = `https://api.modrinth.com/v2/project/${file.source_info}/version/${file.version_id}`;
                         let res_pre_json = await fetch(url, { signal });
                         let res = await res_pre_json.json();
-                        await urlToFile(res.files[0].url, path.resolve(extractToPath, install_path), { signal });
+                        await urlToFile(res.files[0].url, path.resolve(destDir, install_path), { signal });
                     } else {
                         throw e;
                     }
@@ -1771,7 +1848,7 @@ async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
 
-        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}/cfzip`);
 
         if (!fs.existsSync(extractToPath)) {
             fs.mkdirSync(extractToPath, { recursive: true });
@@ -1782,7 +1859,7 @@ async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
             resolve(v);
         }));
 
-        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/overrides`);
+        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/cfzip/overrides`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
 
         fs.mkdirSync(srcDir, { recursive: true });
@@ -1840,11 +1917,11 @@ async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
             else if (dependency_item?.categoryClass?.slug == "shaders") type = "shader";
             let file_name = "";
             try {
-                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(extractToPath, folder));
+                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(destDir, folder));
             } catch (e) {
                 let res = await fetch(`https://api.curse.tools/v1/cf/mods/${file.projectID}/files/${file.fileID}`);
                 let res_json = await res.json();
-                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(extractToPath, folder));
+                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(destDir, folder));
             }
 
             if (cf_id && dependency_item) {
@@ -1922,6 +1999,122 @@ async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
             "name": manifest_json.name
         })
     } catch (err) {
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
+        return { "error": true };
+    }
+}
+async function processMMCZip(instance_id, info, title = ".zip file") {
+    let max_downloads = getMaxConcurrentDownloads();
+    let processId = generateNewProcessId();
+    let cancelId = generateNewCancelId();
+    let abortController = new AbortController();
+    cancelFunctions[cancelId] = abortController;
+    retryFunctions[cancelId] = () => {
+        processMMCZip(instance_id, info, title);
+    }
+    let signal = abortController.signal;
+    try {
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
+        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
+
+        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}/mmczip`);
+
+        if (!fs.existsSync(extractToPath)) {
+            fs.mkdirSync(extractToPath, { recursive: true });
+        }
+        signal.throwIfAborted();
+
+        await new Promise((resolve) => zip.extractAllToAsync(extractToPath, true, false, (v) => {
+            resolve(v);
+        }));
+
+        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/mmczip/minecraft`);
+        let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+
+        fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const files = await fsPromises.readdir(srcDir);
+
+        for (const file of files) {
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
+            const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+                continue;
+            }
+
+            try {
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                throw new (translate("app.installing.override.fail", "%o", file));
+            }
+        }
+
+        let instance_cfg = (await fsPromises.readFile(path.resolve(extractToPath, "instance.cfg"), 'utf8')).split("\n");
+        let manifest_json = {};
+        for (let i = 0; i < instance_cfg.length; i++) {
+            if (instance_cfg[i][0] == "[") continue;
+            let index = instance_cfg[i].indexOf("=");
+            manifest_json[instance_cfg[i].substring(0, index)] = instance_cfg[i].substring(index + 1).replaceAll("\r", "");
+        }
+        let vanilla_version = "";
+        let loader = "vanilla";
+        let loader_version = "";
+        let mmcPack_json = JSON.parse(await fsPromises.readFile(path.resolve(extractToPath, "mmc-pack.json")));
+        for (let i = 0; i < mmcPack_json.components.length; i++) {
+            let c = mmcPack_json.components[i];
+            if (c.uid == "net.minecraft") {
+                vanilla_version = c.version;
+            }
+            if (c.uid == "net.fabricmc.fabric-loader") {
+                loader = "fabric";
+                loader_version = c.version;
+            }
+            if (c.uid == "net.neoforged") {
+                loader = "neoforge";
+                loader_version = c.version;
+            }
+            if (c.uid == "net.minecraftforge") {
+                loader = "forge";
+                loader_version = c.version;
+            }
+            if (c.uid == "org.quiltmc.quilt-loader") {
+                loader = "quilt"
+                loader_version = c.version;
+            }
+        }
+        let icon_key = manifest_json.iconKey;
+        let image = "";
+        if (icon_key && icon_key != "default" && fs.existsSync(path.resolve(extractToPath, icon_key + ".webp"))) {
+            const iconData = await fsPromises.readFile(path.resolve(extractToPath, icon_key + ".webp"));
+            image = `data:image/png;base64,${iconData.toString("base64")}`;
+        }
+        if (icon_key && icon_key != "default" && fs.existsSync(path.resolve(extractToPath, icon_key + ".png"))) {
+            const iconData = await fsPromises.readFile(path.resolve(extractToPath, icon_key + ".png"));
+            image = `data:image/png;base64,${iconData.toString("base64")}`;
+        }
+
+        signal.throwIfAborted();
+        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
+        return ({
+            "loader_version": loader_version,
+            "content": [],
+            "loader": loader,
+            "vanilla_version": vanilla_version,
+            "image": image,
+            "name": manifest_json.name,
+            "allocated_ram": manifest_json.MaxMemAlloc,
+            "width": manifest_json.MinecraftWinWidth,
+            "height": manifest_json.MinecraftWinHeight,
+            "playtime": manifest_json.totalTimePlayed
+        })
+    } catch (err) {
+        console.error(err);
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
         return { "error": true };
     }
@@ -2185,7 +2378,9 @@ async function processPackFile(info, instance_id, title) {
     if (extension == ".mrpack") {
         return await processMrPack(instance_id, info, null, title);
     } else if (extension == ".zip") {
-        return await processCfZipWithoutID(instance_id, info, title);
+        let zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
+        if (zip.getEntry("manifest.json")) return await processCfZipWithoutID(instance_id, info, title);
+        return await processMMCZip(instance_id, info, title);
     } else if (extension == ".elpack") {
         return await processElPack(instance_id, info, title);
     } else if (extension == "") {
@@ -3309,11 +3504,62 @@ function readMrPack(info) {
     }
 }
 
-function readCfZip(info) {
+function readZip(info) {
     try {
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         const manifestEntry = zip.getEntry('manifest.json');
-        if (!manifestEntry) return null;
+        if (!manifestEntry) {
+            let instance_cfg = zip.getEntry("instance.cfg").getData().toString('utf-8').split("\n");
+            let manifest_json = {};
+            for (let i = 0; i < instance_cfg.length; i++) {
+                if (instance_cfg[i][0] == "[") continue;
+                let index = instance_cfg[i].indexOf("=");
+                manifest_json[instance_cfg[i].substring(0, index)] = instance_cfg[i].substring(index + 1).replaceAll("\r", "");
+            }
+            let vanilla_version = "";
+            let loader = "vanilla";
+            let loader_version = "";
+            let mmcPack_json = JSON.parse(zip.getEntry("mmc-pack.json").getData().toString('utf-8'));
+            for (let i = 0; i < mmcPack_json.components.length; i++) {
+                let c = mmcPack_json.components[i];
+                if (c.uid == "net.minecraft") {
+                    vanilla_version = c.version;
+                }
+                if (c.uid == "net.fabricmc.fabric-loader") {
+                    loader = "fabric";
+                    loader_version = c.version;
+                }
+                if (c.uid == "net.neoforged") {
+                    loader = "neoforge";
+                    loader_version = c.version;
+                }
+                if (c.uid == "net.minecraftforge") {
+                    loader = "forge";
+                    loader_version = c.version;
+                }
+                if (c.uid == "org.quiltmc.quilt-loader") {
+                    loader = "quilt"
+                    loader_version = c.version;
+                }
+            }
+            let icon_key = manifest_json.iconKey;
+            let image = "";
+            if (icon_key && icon_key != "default" && zip.getEntry(icon_key + ".webp")) {
+                const iconData = zip.getEntry(icon_key + ".webp").getData();
+                image = `data:image/webp;base64,${iconData.toString("base64")}`;
+            }
+            if (icon_key && icon_key != "default" && zip.getEntry(icon_key + ".png")) {
+                const iconData = zip.getEntry(icon_key + ".png").getData();
+                image = `data:image/png;base64,${iconData.toString("base64")}`;
+            }
+            return {
+                name: manifest_json.name,
+                game_version: vanilla_version,
+                loader: loader,
+                loader_version: loader_version,
+                image: image
+            }
+        }
         const manifestData = manifestEntry.getData().toString('utf-8');
         let jsonData = JSON.parse(manifestData);
         let loaderSplit = jsonData.minecraft.modLoaders[0].id.split("-");
@@ -3337,8 +3583,8 @@ ipcMain.handle('read-mrpack', async (_, info) => {
     return readMrPack(info);
 });
 
-ipcMain.handle('read-cfzip', async (_, info) => {
-    return readCfZip(info);
+ipcMain.handle('read-zip', async (_, info) => {
+    return readZip(info);
 });
 
 ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
@@ -4236,6 +4482,8 @@ ipcMain.handle('is-instance-file', (_, info) => {
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         if (zip.getEntry('pack.mcmeta')) return false;
         if (zip.getEntry('manifest.json')) return true;
+        if (zip.getEntry('mmc-pack.json')) return true;
+        if (zip.getEntry('instance.cfg')) return true;
     }
     return false;
 });

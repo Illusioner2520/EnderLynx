@@ -54,8 +54,8 @@ async function readMrPack(file_path) {
     return await ipcRenderer.invoke('read-mrpack', file_path);
 }
 
-async function readCfZip(file_path) {
-    return await ipcRenderer.invoke('read-cfzip', file_path);
+async function readZip(file_path) {
+    return await ipcRenderer.invoke('read-zip', file_path);
 }
 
 ipcRenderer.on('arg-info', (event, info) => {
@@ -121,7 +121,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         } else if (ext == ".mrpack") {
             return await readMrPack(info);
         } else if (ext == ".zip") {
-            return await readCfZip(info);
+            return await readZip(info);
         }
     },
     getInstanceFiles: async (instance_id) => {
