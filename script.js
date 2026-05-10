@@ -9230,7 +9230,6 @@ async function getInstanceContent(instanceInfo) {
 }
 
 function translate(key, ...params) {
-    return "chicken";
     if (!lang) {
         lang = getLangFile();
     }

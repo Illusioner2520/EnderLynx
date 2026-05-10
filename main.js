@@ -1151,14 +1151,12 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
     } catch (e) { }
 
     try {
-        console.log(cf_project_ids);
         if (cf_project_ids.length > 0) {
             const response = await fetch("https://api.curse.tools/v1/mods", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
             });
-            console.log(response.ok);
             if (response.ok) {
                 const json = await response.json();
                 const cfData = json.data || [];
@@ -2028,18 +2026,55 @@ async function processMMCZip(instance_id, info, title = ".zip file") {
             resolve(v);
         }));
 
-        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/mmczip/minecraft`);
+        if (!fs.existsSync(path.resolve(extractToPath, "instance.cfg"))) {
+            const topLevelItems = await fsPromises.readdir(extractToPath);
+            for (const item of topLevelItems) {
+                const itemPath = path.resolve(extractToPath, item);
+                const stats = await fsPromises.stat(itemPath);
+                if (stats.isDirectory()) {
+                    const instanceCfgPath = path.resolve(itemPath, "instance.cfg");
+                    if (fs.existsSync(instanceCfgPath)) {
+                        extractToPath = itemPath;
+                        break;
+                    }
+                }
+            }
+        }
+
+        let srcDir = path.resolve(extractToPath, `minecraft`);
         let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
+        let srcDir2 = path.resolve(extractToPath, `.minecraft`);
 
         fs.mkdirSync(srcDir, { recursive: true });
+        fs.mkdirSync(srcDir2, { recursive: true });
         fs.mkdirSync(destDir, { recursive: true });
 
         const files = await fsPromises.readdir(srcDir);
+        const files2 = await fsPromises.readdir(srcDir2);
 
         for (const file of files) {
             signal.throwIfAborted();
             win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
             const srcPath = path.join(srcDir, file);
+            const destPath = path.join(destDir, file);
+
+            if (fs.existsSync(destPath)) {
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+                continue;
+            }
+
+            try {
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
+                await fsPromises.rm(srcPath, { recursive: true, force: true });
+            } catch (err) {
+                throw new (translate("app.installing.override.fail", "%o", file));
+            }
+        }
+
+        for (const file of files2) {
+            signal.throwIfAborted();
+            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
+            const srcPath = path.join(srcDir2, file);
             const destPath = path.join(destDir, file);
 
             if (fs.existsSync(destPath)) {
@@ -2096,6 +2131,10 @@ async function processMMCZip(instance_id, info, title = ".zip file") {
         }
         if (icon_key && icon_key != "default" && fs.existsSync(path.resolve(extractToPath, icon_key + ".png"))) {
             const iconData = await fsPromises.readFile(path.resolve(extractToPath, icon_key + ".png"));
+            image = `data:image/png;base64,${iconData.toString("base64")}`;
+        }
+        if (icon_key && icon_key != "default" && fs.existsSync(path.resolve(extractToPath, icon_key))) {
+            const iconData = await fsPromises.readFile(path.resolve(extractToPath, icon_key));
             image = `data:image/png;base64,${iconData.toString("base64")}`;
         }
 
@@ -3509,7 +3548,22 @@ function readZip(info) {
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
         const manifestEntry = zip.getEntry('manifest.json');
         if (!manifestEntry) {
-            let instance_cfg = zip.getEntry("instance.cfg").getData().toString('utf-8').split("\n");
+            let instanceEntry = zip.getEntry("instance.cfg");
+            let instanceFolder = "";
+            if (!instanceEntry) {
+                const entries = zip.getEntries();
+                for (const entry of entries) {
+                    const entryName = entry.entryName.replace(/\\\\/g, '/');
+                    const parts = entryName.split('/');
+                    if (parts.length === 2 && parts[1] === "instance.cfg") {
+                        instanceEntry = entry;
+                        instanceFolder = parts[0];
+                        break;
+                    }
+                }
+            }
+            if (!instanceEntry) return null;
+            let instance_cfg = instanceEntry.getData().toString('utf-8').split("\n");
             let manifest_json = {};
             for (let i = 0; i < instance_cfg.length; i++) {
                 if (instance_cfg[i][0] == "[") continue;
@@ -3519,7 +3573,7 @@ function readZip(info) {
             let vanilla_version = "";
             let loader = "vanilla";
             let loader_version = "";
-            let mmcPack_json = JSON.parse(zip.getEntry("mmc-pack.json").getData().toString('utf-8'));
+            let mmcPack_json = JSON.parse(zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + "mmc-pack.json").getData().toString('utf-8'));
             for (let i = 0; i < mmcPack_json.components.length; i++) {
                 let c = mmcPack_json.components[i];
                 if (c.uid == "net.minecraft") {
@@ -3544,12 +3598,16 @@ function readZip(info) {
             }
             let icon_key = manifest_json.iconKey;
             let image = "";
-            if (icon_key && icon_key != "default" && zip.getEntry(icon_key + ".webp")) {
-                const iconData = zip.getEntry(icon_key + ".webp").getData();
+            if (icon_key && icon_key != "default" && zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + icon_key + ".webp")) {
+                const iconData = zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + icon_key + ".webp").getData();
                 image = `data:image/webp;base64,${iconData.toString("base64")}`;
             }
-            if (icon_key && icon_key != "default" && zip.getEntry(icon_key + ".png")) {
-                const iconData = zip.getEntry(icon_key + ".png").getData();
+            if (icon_key && icon_key != "default" && zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + icon_key + ".png")) {
+                const iconData = zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + icon_key + ".png").getData();
+                image = `data:image/png;base64,${iconData.toString("base64")}`;
+            }
+            if (icon_key && icon_key != "default" && zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + icon_key)) {
+                const iconData = zip.getEntry((instanceFolder ? instanceFolder + "/" : "") + icon_key).getData();
                 image = `data:image/png;base64,${iconData.toString("base64")}`;
             }
             return {
@@ -4484,6 +4542,22 @@ ipcMain.handle('is-instance-file', (_, info) => {
         if (zip.getEntry('manifest.json')) return true;
         if (zip.getEntry('mmc-pack.json')) return true;
         if (zip.getEntry('instance.cfg')) return true;
+        const entries = zip.getEntries();
+        const topLevelFolders = new Set();
+        for (const entry of entries) {
+            const parts = entry.entryName.split("/").filter(Boolean);
+            if (parts.length >= 2) {
+                const topFolder = parts[0];
+                topLevelFolders.add(topFolder);
+            }
+        }
+        for (const folder of topLevelFolders) {
+            const hasInstanceCfg = entries.some(e => e.entryName === `${folder}/instance.cfg`);
+            const hasMmcPack = entries.some(e => e.entryName === `${folder}/mmc-pack.json`);
+            if (hasInstanceCfg || hasMmcPack) {
+                return true;
+            }
+        }
     }
     return false;
 });
