@@ -2412,6 +2412,7 @@ ipcMain.handle('process-pack-file', async (_, info, instance_id, title) => {
 async function processPackFile(info, instance_id, title) {
     if (!info.has_buffer && /^https?:\/\//.test(info)) {
         await downloadCurseforgePack(instance_id, info, title);
+        info = path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`);
     }
     let extension = path.extname(info.has_buffer ? info.name : info);
     if (extension == ".mrpack") {
