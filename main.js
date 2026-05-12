@@ -428,7 +428,6 @@ ipcMain.handle('create-elpack', async (event, instance_id, name, manifest, overr
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.export.create.elpack"), 0, translate("app.export.manifest"), processId, "good", cancelId);
@@ -483,7 +482,6 @@ ipcMain.handle('create-mrpack', async (event, instance_id, name, manifest, overr
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.export.create.mrpack"), 0, translate("app.export.manifest"), processId, "good", cancelId);
@@ -539,7 +537,6 @@ ipcMain.handle('create-cfzip', async (event, instance_id, name, manifest, overri
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.export.create.zip"), 0, translate("app.export.manifest"), processId, "good", cancelId);
@@ -1184,31 +1181,12 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
     }
 });
 
-ipcMain.handle('process-cf-zip-without-id', async (_, instance_id, zip_path, cf_id, title) => {
-    return await processCfZipWithoutID(instance_id, zip_path, title);
-});
-ipcMain.handle('process-mr-pack', async (_, instance_id, mrpack_path, loader, title) => {
-    return await processMrPack(instance_id, mrpack_path, loader, title);
-});
-ipcMain.handle('process-el-pack', async (_, instance_id, elpack_path, loader, title) => {
-    return await processElPack(instance_id, elpack_path, title);
-});
-ipcMain.handle('process-cf-zip', async (_, instance_id, zip_path, cf_id, title) => {
-    return await processCfZip(instance_id, zip_path, cf_id, title);
-});
-ipcMain.handle('process-mmc-zip', async (_, instance_id, zip_path, cf_id, title) => {
-    return await processMMCZip(instance_id, zip_path, title);
-});
-
 async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        processCfZipWithoutID(instance_id, info, title);
-    }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
@@ -1357,6 +1335,8 @@ async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
             });
         });
 
+        await fsPromises.rm(extractToPath, { recursive: true });
+
         signal.throwIfAborted();
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
@@ -1378,9 +1358,6 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        processMrPack(instance_id, info, loader, title);
-    }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
@@ -1563,6 +1540,9 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
             if (loader == "fabric") loader = "fabric-loader";
             if (loader == "quilt") loader = "quilt-loader";
         }
+        
+        await fsPromises.rm(extractToPath, { recursive: true });
+
         signal.throwIfAborted();
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
@@ -1584,9 +1564,6 @@ async function processElPack(instance_id, info, title = ".elpack file") {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        processElPack(instance_id, info, title);
-    }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
@@ -1815,6 +1792,8 @@ async function processElPack(instance_id, info, title = ".elpack file") {
             } catch (e) { }
         }
 
+        await fsPromises.rm(extractToPath, { recursive: true });
+
         signal.throwIfAborted();
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
@@ -1838,9 +1817,6 @@ async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        processCfZip(instance_id, info, cf_id, title);
-    }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
@@ -1986,6 +1962,8 @@ async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
             });
         }
 
+        await fsPromises.rm(extractToPath, { recursive: true });
+
         signal.throwIfAborted();
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
         return ({
@@ -2007,9 +1985,6 @@ async function processMMCZip(instance_id, info, title = ".zip file") {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        processMMCZip(instance_id, info, title);
-    }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
@@ -2137,6 +2112,8 @@ async function processMMCZip(instance_id, info, title = ".zip file") {
             const iconData = await fsPromises.readFile(path.resolve(extractToPath, icon_key));
             image = `data:image/png;base64,${iconData.toString("base64")}`;
         }
+
+        await fsPromises.rm(extractToPath, { recursive: true });
 
         signal.throwIfAborted();
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
@@ -2351,22 +2328,11 @@ function parseEnvString(input) {
     return env;
 }
 
-ipcMain.handle('download-modrinth-pack', async (_, instance_id, url, title) => {
-    return await downloadModrinthPack(instance_id, url, title);
-});
-
-ipcMain.handle('download-curseforge-pack', async (_, instance_id, url, title) => {
-    return await downloadCurseforgePack(instance_id, url, title);
-});
-
 async function downloadModrinthPack(instance_id, url, title) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        downloadModrinthPack(instance_id, url, title);
-    }
     let signal = abortController.signal;
     win.webContents.send('progress-update', translate("app.downloading", "%t", title), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
     try {
@@ -2376,20 +2342,18 @@ async function downloadModrinthPack(instance_id, url, title) {
             }
         });
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
+        return path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`);
     } catch (err) {
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
 
-async function downloadCurseforgePack(instance_id, url, title) {
+async function downloadCurseForgePack(instance_id, url, title) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => {
-        downloadCurseforgePack(instance_id, url, title);
-    }
     let signal = abortController.signal;
     win.webContents.send('progress-update', translate("app.downloading", "%t", title), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
     try {
@@ -2399,6 +2363,7 @@ async function downloadCurseforgePack(instance_id, url, title) {
             }
         });
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
+        return path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`);
     } catch (err) {
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, err, processId, "error", cancelId);
         throw err;
@@ -2410,10 +2375,6 @@ ipcMain.handle('process-pack-file', async (_, info, instance_id, title) => {
 });
 
 async function processPackFile(info, instance_id, title) {
-    if (!info.has_buffer && /^https?:\/\//.test(info)) {
-        await downloadCurseforgePack(instance_id, info, title);
-        info = path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`);
-    }
     let extension = path.extname(info.has_buffer ? info.name : info);
     if (extension == ".mrpack") {
         return await processMrPack(instance_id, info, null, title);
@@ -2955,7 +2916,6 @@ async function setJavaInstallation(v, f) {
 }
 
 let cancelFunctions = {};
-let retryFunctions = {};
 
 function generateNewCancelId() {
     let id = 0;
@@ -2976,12 +2936,6 @@ ipcMain.handle('cancel', (_, cancelId) => {
     } catch (e) { }
 });
 
-ipcMain.handle('retry', (_, retryId) => {
-    retryFunctions[retryId]();
-    delete retryFunctions[retryId];
-    delete cancelFunctions[retryId];
-});
-
 ipcMain.handle('delete-instance-files', async (_, instance_id) => {
     return await deleteInstanceFiles(instance_id);
 });
@@ -2991,7 +2945,6 @@ async function deleteInstanceFiles(instance_id) {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     const instancePath = path.resolve(user_path, `minecraft/instances/${instance_id}`);
     if (!fs.existsSync(instancePath)) {
@@ -3052,7 +3005,6 @@ async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.instance.duplicating"), 0, translate("app.instance.duplicating.beginning"), processId, "good", cancelId);
@@ -3094,7 +3046,6 @@ ipcMain.handle('change-folder', async (_, old_path, new_path) => {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         let src = path.resolve(old_path);
@@ -3154,7 +3105,6 @@ async function importWorld(info, instance_id, worldName) {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.world.importing", "%w", worldName), 0, translate("app.world.importing.beginning"), processId, "good", cancelId);
@@ -3324,7 +3274,6 @@ async function downloadUpdate(download_url, new_version, checksum) {
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
-    retryFunctions[cancelId] = () => { }
     let signal = abortController.signal;
     try {
         win.webContents.send('progress-update', translate("app.downloading.update"), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
@@ -5508,6 +5457,85 @@ ipcMain.handle('copy-text', async (_, text) => {
         return false;
     }
 });
+
+ipcMain.handle('install-modpack', async (_, info, type, instance_id, name) => {
+    return await installModpack(info, type, instance_id, name);
+});
+
+ipcMain.handle('install-minecraft', async (_, instance_id, loader, game_version, loader_version) => {
+    return await installMinecraft(instance_id, loader, game_version, loader_version);
+});
+
+async function installModpack(info, type, instance_id, name) {
+    try {
+        if (type == "cf_url") {
+            info = await downloadCurseForgePack(instance_id, info, name);
+        } else if (type == "mr_url") {
+            info = await downloadModrinthPack(instance_id, info, name);
+        }
+    } catch (e) {
+        updateInstance("failed", true, instance_id);
+        updateInstance("installing", false, instance_id);
+        return;
+    }
+    let packInfo = await processPackFile(info, instance_id, name);
+    setOptionsTXT(instance_id, getDefaultOptionsTXT(packInfo.vanilla_version), false, true, (v) => {
+        updateInstance("attempted_options_txt_version", v, instance_id);
+    });
+    if (packInfo.error) {
+        updateInstance("failed", true, instance_id);
+        updateInstance("installing", false, instance_id);
+        return;
+    }
+    let instanceInfo = getInstance(instance_id);
+    updateInstance("loader", packInfo.loader, instance_id);
+    updateInstance("vanilla_version", packInfo.vanilla_version, instance_id);
+    updateInstance("loader_version", packInfo.loader_version, instance_id);
+    if (packInfo.name && !instanceInfo.name) updateInstance("name", packInfo.name, instance_id);
+    if (packInfo.allocated_ram) updateInstance("allocated_ram", packInfo.allocated_ram, instance_id);
+    if (packInfo.width) updateInstance("window_width", packInfo.width, instance_id);
+    if (packInfo.height) updateInstance("window_height", packInfo.height, instance_id);
+    for (let i = 0; i < packInfo.content.length; i++) {
+        let e = packInfo.content[i];
+        addContentDatabase(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, instance_id, e.source_id, e.disabled, e.version_id);
+    }
+    updateInstance("installing", false, instance_id);
+    await installMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
+    if (type == "cf_url" || type == "mr_url") {
+        await fsPromises.rm(info);
+    }
+}
+
+async function installMinecraft(instance_id, loader, game_version, loader_version) {
+    if (!loader_version) {
+        let loader_version = "";
+        try {
+            if (loader == "fabric") {
+                loader_version = Fabric.getVersions(game_version);
+            } else if (loader == "forge") {
+                loader_version = Forge.getVersions(game_version);
+            } else if (loader == "neoforge") {
+                loader_version = NeoForge.getVersions(game_version);
+            } else if (loader == "quilt") {
+                loader_version = Quilt.getVersions(game_version);
+            }
+        } catch (e) {
+            win.webContents.send('display-error', translate("app.instances.failed_to_create"));
+            updateInstance("failed", true, instance_id);
+            return;
+        }
+        updateInstance("loader_version", loader_version, instance_id);
+    }
+    let r = await downloadMinecraft(instance_id, loader, game_version, loader_version);
+    if (r.error) {
+        updateInstance("failed", true, instance_id);
+    } else {
+        updateInstance("java_version", r.java_version, instance_id);
+        updateInstance("java_args", r.java_args, instance_id);
+        updateInstance("provided_java_args", r.java_args, instance_id);
+        updateInstance("mc_installed", true, instance_id);
+    }
+}
 
 // update
 try {

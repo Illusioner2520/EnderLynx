@@ -15,7 +15,6 @@ let launchername = "EnderLynx";
 let launcherversion = version;
 
 let cancelLaunchFunctions = {};
-let retryLaunchFunctions = {};
 
 function generateNewCancelId() {
     let id = 0;
@@ -34,12 +33,6 @@ ipcMain.handle('launch-cancel', (_, cancelId, translation) => {
         cancelLaunchFunctions[cancelId].abort(translation);
         delete cancelLaunchFunctions[cancelId];
     } catch (e) { }
-});
-
-ipcMain.handle('launch-retry', (_, retryId) => {
-    retryLaunchFunctions[retryId]();
-    delete retryLaunchFunctions[retryId];
-    delete cancelLaunchFunctions[retryId];
 });
 
 class Minecraft {
@@ -68,7 +61,6 @@ class Minecraft {
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
         cancelLaunchFunctions[cancelId] = abortController;
-        retryLaunchFunctions[cancelId] = () => { }
         let signal = abortController.signal;
         try {
             this.win.webContents.send('progress-update', this.translate("app.downloading.fabric"), 0, this.translate("app.downloading.fabric.info"), processId, "good", cancelId, true);
@@ -105,7 +97,6 @@ class Minecraft {
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
         cancelLaunchFunctions[cancelId] = abortController;
-        retryLaunchFunctions[cancelId] = () => { }
         let signal = abortController.signal;
         try {
             this.win.webContents.send('progress-update', this.translate("app.downloading.quilt"), 0, this.translate("app.downloading.quilt.info"), processId, "good", cancelId, true);
@@ -141,7 +132,6 @@ class Minecraft {
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
         cancelLaunchFunctions[cancelId] = abortController;
-        retryLaunchFunctions[cancelId] = () => { }
         let signal = abortController.signal;
         try {
             this.win.webContents.send('progress-update', this.translate("app.downloading.forge"), 0, this.translate("app.downloading.forge.installer"), processId, "good", cancelId, true);
@@ -491,7 +481,6 @@ class Minecraft {
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
         cancelLaunchFunctions[cancelId] = abortController;
-        retryLaunchFunctions[cancelId] = () => { }
         let signal = abortController.signal;
         try {
             this.win.webContents.send('progress-update', this.translate("app.downloading.neoforge"), 0, this.translate("app.downloading.neoforge.installer"), processId, "good", cancelId, true);
@@ -1165,7 +1154,6 @@ class Minecraft {
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
         cancelLaunchFunctions[cancelId] = abortController;
-        retryLaunchFunctions[cancelId] = () => { }
         let signal = abortController.signal;
         if (!this.libNames) this.libNames = [];
         try {
@@ -1378,7 +1366,6 @@ class Java {
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
         cancelLaunchFunctions[cancelId] = abortController;
-        retryLaunchFunctions[cancelId] = () => { }
         let signal = abortController.signal;
         try {
             const installDir = path.resolve(this.userPath, `java/java-${version}`);

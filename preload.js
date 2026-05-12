@@ -337,10 +337,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
                 ipcRenderer.invoke('launch-cancel', cancel_id, await translate("app.user.canceled"));
             } : () => {
                 ipcRenderer.invoke('cancel', cancel_id);
-            }, from_launch ? () => {
-                ipcRenderer.invoke('launch-retry', cancel_id);
-            } : () => {
-                ipcRenderer.invoke('retry', cancel_id);
             });
         });
     },
@@ -478,17 +474,9 @@ contextBridge.exposeInMainWorld('enderlynx', {
     addContent: async (instance_id, project_type, project_url, filename, data_pack_world, content_id) => {
         return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, filename, data_pack_world, content_id);
     },
-    downloadModrinthPack: async (instance_id, url, title) => {
-        return await ipcRenderer.invoke('download-modrinth-pack', instance_id, url, title);
-    },
-    downloadCurseforgePack: async (instance_id, url, title) => {
-        return await ipcRenderer.invoke('download-curseforge-pack', instance_id, url, title);
-    },
     processPackFile: async (file_path, instance_id, title) => {
         return await ipcRenderer.invoke('process-pack-file', file_path, instance_id, title);
     },
-    processMrPack,
-    processCfZip,
     getScreenshots: async (instance_id) => {
         return await ipcRenderer.invoke('get-screenshots', instance_id);
     },
@@ -740,6 +728,12 @@ contextBridge.exposeInMainWorld('enderlynx', {
         let full_path = path.join(userPath, "minecraft/instances", instance_id, file_path);
         showFileInFolder(full_path);
     },
+    installModpack: async (info, type, instance_id, name) => {
+        return await ipcRenderer.invoke('install-modpack', info, type, instance_id, name);
+    },
+    installMinecraft: async (instance_id, loader, game_version, loader_version) => {
+        return await ipcRenderer.invoke('install-minecraft', instance_id, loader, game_version, loader_version);
+    },
     getInstance: (...params) => ipcRenderer.sendSync('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
     updateInstance: async (...params) => ipcRenderer.invoke('update-instance', ...params),
@@ -834,23 +828,6 @@ async function importWorld(file_path, instance_id, worldName) {
 }
 async function importContent(file_path, content_type, instance_id) {
     return await ipcRenderer.invoke('import-content', file_path, content_type, instance_id);
-}
-
-async function processCfZipWithoutID(instance_id, zip_path, cf_id, title = ".zip file") {
-    zip_path = path.resolve(userPath, "minecraft", "instances", instance_id, zip_path);
-    return await ipcRenderer.invoke('process-cf-zip-without-id', instance_id, zip_path, cf_id, title);
-}
-async function processMrPack(instance_id, mrpack_path, loader, title = ".mrpack file") {
-    mrpack_path = path.resolve(userPath, "minecraft", "instances", instance_id, mrpack_path);
-    return await ipcRenderer.invoke('process-mr-pack', instance_id, mrpack_path, loader, title);
-}
-async function processElPack(instance_id, elpack_path, loader, title = ".elpack file") {
-    elpack_path = path.resolve(userPath, "minecraft", "instances", instance_id, elpack_path);
-    return await ipcRenderer.invoke('process-el-pack', instance_id, elpack_path, loader, title);
-}
-async function processCfZip(instance_id, zip_path, cf_id, title = ".zip file") {
-    zip_path = path.resolve(userPath, "minecraft", "instances", instance_id, zip_path);
-    return await ipcRenderer.invoke('process-cf-zip', instance_id, zip_path, cf_id, title);
 }
 
 async function getSkinFromURL(url) {

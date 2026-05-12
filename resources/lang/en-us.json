@@ -923,7 +923,6 @@
     "app.date.years": "%t years ago",
     "app.downloads.view": "View All Processes",
     "app.downloads.cancel": "Cancel",
-    "app.downloads.retry": "Retry",
     "app.downloads.ignore": "Ignore",
     "app.downloads.all_processes": "All Processes",
     "app.downloads.done": "Done",

@@ -214,6 +214,7 @@ class Content {
     }
 
     async delete() {
+        Content.content.delete(this.id);
         await window.enderlynx.deleteContentDatabase(this.id);
     }
 
@@ -438,6 +439,7 @@ class Instance {
     }
 
     async delete() {
+        Instance.instances.delete(this.instance_id);
         await window.enderlynx.deleteInstance(this.instance_id);
     }
 
@@ -3112,8 +3114,7 @@ class InstanceScreen extends Screen {
                                 "status": "good",
                                 "cancel": () => {
                                     cancel = true;
-                                },
-                                "retry": () => { }
+                                }
                             }]);
                             let c = content[i];
                             try {
@@ -3128,8 +3129,7 @@ class InstanceScreen extends Screen {
                                     "desc": "Canceled by User",
                                     "id": processId,
                                     "status": "error",
-                                    "cancel": () => { },
-                                    "retry": () => { }
+                                    "cancel": () => { }
                                 }]);
                                 if (this.currentTab == "content") this.showContent();
                                 return;
@@ -3141,8 +3141,7 @@ class InstanceScreen extends Screen {
                             "desc": "Done",
                             "id": processId,
                             "status": "done",
-                            "cancel": () => { },
-                            "retry": () => { }
+                            "cancel": () => { }
                         }]);
                         displaySuccess(translate("app.instances.updated_all", "%i", this.instance.name));
                         if (this.currentTab == "content") this.showContent();
@@ -5467,12 +5466,14 @@ class InstancesScreen extends Screen {
         super.display(dont_add_to_log, ...args);
     }
 
-    calculateContent() {
-        this.contentElement.innerHTML = "";
+    calculateContent(useLoadingContainer) {
         this.contentElement.className = "instance-content";
-        let loading = new LoadingContainer();
-        this.contentElement.appendChild(loading.element);
-        this.requestFrame();
+        if (useLoadingContainer) {
+            this.contentElement.innerHTML = "";
+            let loading = new LoadingContainer();
+            this.contentElement.appendChild(loading.element);
+            this.requestFrame();
+        }
         if (!this.hasRequestGoing) this.showInstances();
     }
 
@@ -5702,7 +5703,7 @@ class InstancesScreen extends Screen {
                         ], [], async (info) => {
                             instances[i].delete();
                             animateGridReorderStart(".instance-item");
-                            instancesScreen.display();
+                            instancesScreen.display(true, true);
                             if (info.delete) {
                                 try {
                                     await window.enderlynx.deleteInstanceFiles(instances[i].instance_id);
@@ -8235,53 +8236,9 @@ async function showCreateInstanceDialog() {
                         let newValue = await window.enderlynx.triggerFileImportBrowse(v, 0);
                         if (newValue) i.value = newValue;
                     }
-                }/*,
-                    {
-                        "name": "Browse Folders",
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.enderlynx.triggerFileImportBrowse(v, 1);
-                            if (newValue) i.value = newValue;
-                        }
-                    }*/
+                }
             ]
-        }//,
-        // {
-        //     "type": "dropdown",
-        //     "id": "launcher",
-        //     "tab": "launcher",
-        //     "name": translate("app.instances.launcher"),
-        //     "options": [
-        //         {
-        //             "name": translate("app.launcher.modrinth"),
-        //             "value": "modrinth"
-        //         },
-        //         {
-        //             "name": translate("app.launcher.curseforge"),
-        //             "value": "curseforge"
-        //         },
-        //         {
-        //             "name": translate("app.launcher.multimc"),
-        //             "value": "multimc"
-        //         },
-        //         {
-        //             "name": translate("app.launcher.prism"),
-        //             "value": "prism"
-        //         },
-        //         {
-        //             "name": translate("app.launcher.atlauncher"),
-        //             "value": "atlauncher"
-        //         },
-        //         {
-        //             "name": translate("app.launcher.gdlauncher"),
-        //             "value": "gdlauncher"
-        //         },
-        //         {
-        //             "name": translate("app.launcher.vanilla"),
-        //             "value": "vanilla"
-        //         }
-        //     ]
-        // }
+        }
     ], [
         { "content": translate("app.instances.cancel"), "type": "cancel" },
         { "content": translate("app.instances.submit"), "type": "confirm" }
@@ -8297,11 +8254,7 @@ async function showCreateInstanceDialog() {
         {
             "name": translate("app.instances.tab.code"),
             "value": "code"
-        }//,
-        // {
-        //     "name": translate("app.instances.tab.launcher"),
-        //     "value": "launcher"
-        // }
+        }
     ], async (info) => {
         if (info.selected_tab == "custom") {
             if (info.game_version == "loading") {
@@ -8313,104 +8266,32 @@ async function showCreateInstanceDialog() {
                 return;
             }
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-            let loader_version = "";
-            try {
-                if (info.loader == "fabric") {
-                    loader_version = (await window.enderlynx.getFabricVersion(info.game_version))
-                } else if (info.loader == "forge") {
-                    loader_version = (await window.enderlynx.getForgeVersion(info.game_version))
-                } else if (info.loader == "neoforge") {
-                    loader_version = (await window.enderlynx.getNeoForgeVersion(info.game_version))
-                } else if (info.loader == "quilt") {
-                    loader_version = (await window.enderlynx.getQuiltVersion(info.game_version))
-                }
-            } catch (e) {
-                displayError(translate("app.instances.failed_to_create"));
-                return;
-            }
-            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
             instance.display();
-            let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
-            if (r.error) {
-                await instance.setFailed(true);
-            } else {
-                await instance.setJavaVersion(r.java_version);
-                await instance.setJavaArgs(r.java_args);
-                await instance.setProvidedJavaArgs(r.java_args);
-                await instance.setMcInstalled(true);
-            }
+            await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
         } else if (info.selected_tab == "file") {
             if (!info.name_if) info.name_if = "";
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name_f);
             let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
             instance.display();
-            let packInfo = await window.enderlynx.processPackFile(info.file, instance_id, info.name_f);
-            if (packInfo.error) {
+            try {
+                await window.enderlynx.installModpack(info.file, "file", instance_id, info.name_f);
+            } catch (e) {
                 await instance.setFailed(true);
                 await instance.setInstalling(false);
                 return;
             }
-            if (!("loader_version" in packInfo)) {
-                displayError(packInfo);
-                return;
-            }
-            await instance.setLoader(packInfo.loader);
-            await instance.setVanillaVersion(packInfo.vanilla_version);
-            await instance.setLoaderVersion(packInfo.loader_version);
-            if (!instance.image && packInfo.image) await instance.setImage(packInfo.image);
-            if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
-            if (packInfo.width) await instance.setWindowWidth(packInfo.width);
-            if (packInfo.height) await instance.setWindowWidth(packInfo.height);
-            if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
-            for (let i = 0; i < packInfo.content.length; i++) {
-                let e = packInfo.content[i];
-                await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-            }
-            await instance.setInstalling(false);
-            let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-            if (r.error) {
-                await instance.setFailed(true);
-            } else {
-                await instance.setJavaVersion(r.java_version);
-                await instance.setJavaArgs(r.java_args);
-                await instance.setProvidedJavaArgs(r.java_args);
-                await instance.setMcInstalled(true);
-            }
-        } else if (info.selected_tab == "launcher") {
-            // Import from launcher here
         } else if (info.selected_tab == "code") {
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name_c);
             let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
             instance.display();
-            let packInfo = await window.enderlynx.processPackFile(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, instance_id, info.name_c);
-            if (!packInfo) {
+            try {
+                await window.enderlynx.installModpack(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, "cf_url", instance_id, info.name_c);
+            } catch (e) {
                 displayError(translate("app.cf.code.error"));
                 await instance.delete();
                 instancesScreen.display();
                 return;
-            }
-            if (!("loader_version" in packInfo)) {
-                displayError(packInfo);
-                return;
-            }
-            await instance.setLoader(packInfo.loader);
-            await instance.setVanillaVersion(packInfo.vanilla_version);
-            await instance.setLoaderVersion(packInfo.loader_version);
-            if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
-            if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
-            for (let i = 0; i < packInfo.content.length; i++) {
-                let e = packInfo.content[i];
-                await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-            }
-            await instance.setInstalling(false);
-            let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-            if (r.error) {
-                await instance.setFailed(true);
-            } else {
-                await instance.setJavaVersion(r.java_version);
-                await instance.setJavaArgs(r.java_args);
-                await instance.setProvidedJavaArgs(r.java_args);
-                await instance.setMcInstalled(true);
             }
         }
     }, () => { }, undefined, true);
@@ -8785,8 +8666,7 @@ async function showInstanceSettings(instanceInfo) {
                         "status": "good",
                         "cancel": () => {
                             cancel = true;
-                        },
-                        "retry": () => { }
+                        }
                     }]);
                     let c = content[i];
                     try {
@@ -8801,8 +8681,7 @@ async function showInstanceSettings(instanceInfo) {
                             "desc": "Canceled by User",
                             "id": processId,
                             "status": "error",
-                            "cancel": () => { },
-                            "retry": () => { }
+                            "cancel": () => { }
                         }]);
                         instanceInfo.instanceScreen.showContent();
                         return;
@@ -8814,8 +8693,7 @@ async function showInstanceSettings(instanceInfo) {
                     "desc": "Done",
                     "id": processId,
                     "status": "done",
-                    "cancel": () => { },
-                    "retry": () => { }
+                    "cancel": () => { }
                 }]);
                 displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
                 instanceInfo.instanceScreen.showContent();
@@ -9339,7 +9217,7 @@ class NoResultsFound {
 }
 
 class DownloadLogEntry {
-    constructor(startingTitle, startingDescription, startingProgress, id, status, startingCancelFunction, startingRetryFunction) {
+    constructor(startingTitle, startingDescription, startingProgress, id, status, startingCancelFunction) {
         let element = document.createElement("div");
         element.className = "download-item";
         let title = document.createElement("div");
@@ -9363,7 +9241,6 @@ class DownloadLogEntry {
         this.id = id;
         this.status = status;
         this.cancelFunction = startingCancelFunction;
-        this.retryFunction = startingRetryFunction;
 
         let listElement = document.createElement("div");
         listElement.className = "download-grid-entry";
@@ -9394,13 +9271,6 @@ class DownloadLogEntry {
             cancelButton.innerHTML = '<i class="spinner"></i>' + translate("app.downloads.canceling");
             cancelButton.classList.add("disabled");
         }
-        let retryButton = document.createElement("button");
-        retryButton.innerHTML = '<i class="fa-solid fa-arrow-rotate-left"></i>' + translate("app.downloads.retry");
-        retryButton.className = "download-retry-button";
-        retryButton.onclick = () => {
-            if (this.retryFunction) this.retryFunction();
-            this.remove();
-        }
         let ignoreButton = document.createElement("button");
         ignoreButton.innerHTML = '<i class="fa-solid fa-file-circle-xmark"></i>' + translate("app.downloads.ignore");
         ignoreButton.className = "download-ignore-button";
@@ -9409,7 +9279,6 @@ class DownloadLogEntry {
         }
         listElement.appendChild(itemElement);
         listElement.appendChild(cancelButton);
-        listElement.appendChild(retryButton);
         listElement.appendChild(ignoreButton);
 
         if (status == "error") {
@@ -9437,10 +9306,6 @@ class DownloadLogEntry {
 
     setCancelFunction(cancelFunction) {
         this.cancelFunction = cancelFunction;
-    }
-
-    setRetryFunction(retryFunction) {
-        this.retryFunction = retryFunction;
     }
 
     setStatus(status) {
@@ -9516,11 +9381,10 @@ class DownloadLog {
                     this.logs[j].setStatus(info[i].status);
                     this.logs[j].setTitle(info[i].title);
                     this.logs[j].setCancelFunction(info[i].cancel);
-                    this.logs[j].setRetryFunction(info[i].retry);
                     continue info;
                 }
             }
-            let log = new DownloadLogEntry(info[i].title, info[i].desc, info[i].progress, info[i].id, info[i].status, info[i].cancel, info[i].retry);
+            let log = new DownloadLogEntry(info[i].title, info[i].desc, info[i].progress, info[i].id, info[i].status, info[i].cancel);
             this.allProcessesElement.appendChild(log.listEle);
             this.logs.push(log);
             this.element.appendChild(log.ele);
@@ -9543,7 +9407,7 @@ class DownloadLog {
 
 let log = new DownloadLog(downloadLog);
 
-window.enderlynx.onProgressUpdate((title, progress, task, id, status, cancelFunction, retryFunction) => {
+window.enderlynx.onProgressUpdate((title, progress, task, id, status, cancelFunction) => {
     log.sendData([
         {
             "title": title,
@@ -9551,8 +9415,7 @@ window.enderlynx.onProgressUpdate((title, progress, task, id, status, cancelFunc
             "desc": task,
             "id": id,
             "status": status,
-            "cancel": cancelFunction,
-            "retry": retryFunction
+            "cancel": cancelFunction
         }
     ]);
 });
@@ -11854,22 +11717,7 @@ class VanillaTweaksSelector {
                             return;
                         }
                         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-                        let loader_version = "";
-                        try {
-                            if (info.loader == "fabric") {
-                                loader_version = (await window.enderlynx.getFabricVersion(info.game_version))
-                            } else if (info.loader == "forge") {
-                                loader_version = (await window.enderlynx.getForgeVersion(info.game_version))
-                            } else if (info.loader == "neoforge") {
-                                loader_version = (await window.enderlynx.getNeoForgeVersion(info.game_version))
-                            } else if (info.loader == "quilt") {
-                                loader_version = (await window.enderlynx.getQuiltVersion(info.game_version))
-                            }
-                        } catch (e) {
-                            displayError(translate("app.instances.failed_to_create"));
-                            return;
-                        }
-                        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                         await instance.setInstalling(true);
                         instance.display();
                         let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
@@ -11877,15 +11725,7 @@ class VanillaTweaksSelector {
                             await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                         }
                         await instance.setInstalling(false);
-                        let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
-                        if (r.error) {
-                            await instance.setFailed(true);
-                        } else {
-                            await instance.setJavaVersion(r.java_version);
-                            await instance.setJavaArgs(r.java_args);
-                            await instance.setProvidedJavaArgs(r.java_args);
-                            await instance.setMcInstalled(true);
-                        }
+                        await window.enderlynx.installMinecraft(instance_id, loader, game_version);
                     });
                 }
 
@@ -14132,48 +13972,10 @@ async function installButtonClick(content, version, instance_id, button, dialog_
             let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
             await instance.setInstalledVersion(version.version_id);
             instance.display();
-            if (source == "modrinth") {
-                await window.enderlynx.downloadModrinthPack(instance_id, version.download_url, title);
-            } else if (source == "curseforge") {
-                await window.enderlynx.downloadCurseforgePack(instance_id, version.download_url, title);
-            }
-            let mr_pack_info = {};
-            if (source == "modrinth") {
-                mr_pack_info = await window.enderlynx.processMrPack(instance_id, "pack.mrpack", info.loader, title);
-            } else if (source == "curseforge") {
-                mr_pack_info = await window.enderlynx.processCfZip(instance_id, "pack.zip", project_id, title);
-                if (mr_pack_info.allocated_ram) await instance.setAllocatedRam(mr_pack_info.allocated_ram);
-            }
-            let default_options = new DefaultOptions(info.game_version);
-            let v = await window.enderlynx.setOptionsTXT(instance.instance_id, await default_options.getOptionsTXT(), false);
-            await instance.setAttemptedOptionsTxtVersion(v);
-            if (mr_pack_info.error) {
-                await instance.setFailed(true);
-                await instance.setInstalling(false);
-                return;
-            }
-            if (!mr_pack_info.loader_version) {
-                displayError(mr_pack_info);
-                return;
-            }
-            await instance.setLoaderVersion(mr_pack_info.loader_version);
-            for (let i = 0; i < mr_pack_info.content.length; i++) {
-                let e = mr_pack_info.content[i];
-                await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-            }
+            await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instance_id, title);
             if (project_type == "server") {
                 if (info.link_to_server) await instance.setSourceServer(ip_address);
                 await addContent(instance.instance_id, "server", ip_address, server_name, server_icon);
-            }
-            await instance.setInstalling(false);
-            let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, mr_pack_info.loader_version);
-            if (r.error) {
-                await instance.setFailed(true);
-            } else {
-                await instance.setJavaVersion(r.java_version);
-                await instance.setJavaArgs(r.java_args);
-                await instance.setProvidedJavaArgs(r.java_args);
-                await instance.setMcInstalled(true);
             }
         })
     } else if (instance_id) {
@@ -14293,35 +14095,12 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                     return;
                 }
                 let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-                let loader_version = "";
-                try {
-                    if (info.loader == "fabric") {
-                        loader_version = (await window.enderlynx.getFabricVersion(info.game_version))
-                    } else if (info.loader == "forge") {
-                        loader_version = (await window.enderlynx.getForgeVersion(info.game_version))
-                    } else if (info.loader == "neoforge") {
-                        loader_version = (await window.enderlynx.getNeoForgeVersion(info.game_version))
-                    } else if (info.loader == "quilt") {
-                        loader_version = (await window.enderlynx.getQuiltVersion(info.game_version))
-                    }
-                } catch (e) {
-                    displayError(translate("app.instances.failed_to_create"));
-                    return;
-                }
-                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, loader_version, false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
                 await instance.setInstalling(true);
                 instance.display();
                 await installContent(source, content, version, instance);
                 await instance.setInstalling(false);
-                let r = await window.enderlynx.downloadMinecraft(instance_id, info.loader, info.game_version, loader_version);
-                if (r.error) {
-                    await instance.setFailed(true);
-                } else {
-                    await instance.setJavaVersion(r.java_version);
-                    await instance.setJavaArgs(r.java_args);
-                    await instance.setProvidedJavaArgs(r.java_args);
-                    await instance.setMcInstalled(true);
-                }
+                await window.enderlynx.installMinecraft(instance_id, loader, game_version);
             });
         }
 
@@ -14444,51 +14223,8 @@ async function runModpackUpdate(instanceInfo, source, version) {
     await instanceInfo.setFailed(false);
     await window.enderlynx.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
     await instanceInfo.clearContent();
-    if (source == "modrinth") {
-        await window.enderlynx.downloadModrinthPack(instanceInfo.instance_id, version.download_url, instanceInfo.name);
-        await instanceInfo.setVanillaVersion(version.game_versions[0], true);
-        await instanceInfo.setLoader(version.loaders[0]);
-    } else if (source == "curseforge") {
-        await window.enderlynx.downloadCurseforgePack(instanceInfo.instance_id, version.download_url, instanceInfo.name);
-        await instanceInfo.setVanillaVersion(version.game_versions[0], true);
-        await instanceInfo.setLoader(version.loaders[0]);
-    }
-    let mr_pack_info = {};
-    if (source == "modrinth") {
-        mr_pack_info = await window.enderlynx.processMrPack(instanceInfo.instance_id, "pack.mrpack", instanceInfo.loader, instanceInfo.name);
-        if (mr_pack_info.error) {
-            await instanceInfo.setFailed(true);
-            await instanceInfo.setInstalling(false);
-            return;
-        }
-    } else if (source == "curseforge") {
-        mr_pack_info = await window.enderlynx.processCfZip(instanceInfo.instance_id, "pack.zip", instanceInfo.install_id, instanceInfo.name);
-        if (mr_pack_info.error) {
-            await instanceInfo.setFailed(true);
-            await instanceInfo.setInstalling(false);
-            return;
-        }
-    }
-    if (!mr_pack_info.loader_version) {
-        displayError(mr_pack_info);
-        return;
-    }
     await instanceInfo.setInstalledVersion(version.version_id);
-    await instanceInfo.setLoaderVersion(mr_pack_info.loader_version);
-    for (let i = 0; i < mr_pack_info.content.length; i++) {
-        let e = mr_pack_info.content[i];
-        await instanceInfo.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-    }
-    await instanceInfo.setInstalling(false);
-    let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, instanceInfo.loader, instanceInfo.vanilla_version, mr_pack_info.loader_version);
-    if (r.error) {
-        await instanceInfo.setFailed(true);
-    } else {
-        await instanceInfo.setJavaVersion(r.java_version);
-        await instanceInfo.setJavaArgs(r.java_args);
-        await instanceInfo.setProvidedJavaArgs(r.java_args);
-        await instanceInfo.setMcInstalled(true);
-    }
+    await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instanceInfo.instance_id, instanceInfo.name);
 }
 
 function closeAllDialogs() {
@@ -14693,38 +14429,7 @@ let importInstance = (info, file_path) => {
         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
         let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
         instance.display();
-        let packInfo = await window.enderlynx.processPackFile(file_path, instance_id, info.name);
-        if (packInfo.error) {
-            await instance.setFailed(true);
-            await instance.setInstalling(false);
-            return;
-        }
-        if (!("loader_version" in packInfo)) {
-            displayError(packInfo);
-            return;
-        }
-        await instance.setLoader(packInfo.loader);
-        await instance.setVanillaVersion(packInfo.vanilla_version);
-        await instance.setLoaderVersion(packInfo.loader_version);
-        if (!instance.image && packInfo.image) await instance.setImage(packInfo.image);
-        if (!instance.name && packInfo.name) await instance.setName(packInfo.name);
-        if (packInfo.width) await instance.setWindowWidth(packInfo.width);
-        if (packInfo.height) await instance.setWindowWidth(packInfo.height);
-        if (packInfo.allocated_ram) await instance.setAllocatedRam(packInfo.allocated_ram);
-        for (let i = 0; i < packInfo.content.length; i++) {
-            let e = packInfo.content[i];
-            await instance.addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, e.source_id, e.disabled, e.version_id);
-        }
-        await instance.setInstalling(false);
-        let r = await window.enderlynx.downloadMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
-        if (r.error) {
-            await instance.setFailed(true);
-        } else {
-            await instance.setJavaVersion(r.java_version);
-            await instance.setJavaArgs(r.java_args);
-            await instance.setProvidedJavaArgs(r.java_args);
-            await instance.setMcInstalled(true);
-        }
+        await window.enderlynx.installModpack(file_path, "file", instance_id, info.name);
     });
 }
 
