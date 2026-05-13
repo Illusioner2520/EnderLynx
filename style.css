@@ -221,14 +221,14 @@ body.compact .sidebar {
 }
 
 .player-head {
-    border-radius: 5px;
+    border-radius: 2px;
     aspect-ratio: 1;
     height: 40px;
     image-rendering: pixelated;
 }
 
 .player-head-menu {
-    border-radius: 5px;
+    border-radius: 2px;
     aspect-ratio: 1;
     height: 40px;
     image-rendering: pixelated;
@@ -1259,6 +1259,7 @@ h1 {
     transition: background-color .25s, padding-block .25s, color .25s;
     cursor: pointer;
     line-height: 1;
+    position: relative;
 }
 
 .tab-button:hover {
@@ -1271,6 +1272,26 @@ h1 {
     color: var(--text-color);
     background-color: var(--accent-color);
     padding-block: 12px;
+}
+
+.tab-button[data-notifications]:not([data-notifications=""]):not([data-notifications="0"])::after {
+    content: attr(data-notifications);
+    padding: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-color);
+    background-color: var(--danger-color);
+    border-radius: 100px;
+    font-size: .75rem;
+    min-width: calc(1lh + 12px);
+    position: absolute;
+    top: 0;
+    right: 0;
+    translate: 50% -50%;
+    border-width: 2px;
+    border-style: solid;
+    border-color: var(--background-color);
 }
 
 .tab-button-vertical {
@@ -2965,6 +2986,7 @@ dialog[open]::backdrop {
     padding: 45px;
     border-radius: 8px;
     flex-grow: 1;
+    grid-column: 1 / -1;
 }
 
 .loading-container-spinner {
@@ -2987,8 +3009,8 @@ dialog[open]::backdrop {
     height: 60px;
     width: 60px;
     border-radius: 50%;
-    background-color: color-mix(in srgb, 20% var(--danger-color), transparent);
-    color: var(--danger-color);
+    background-color: var(--danger-color);
+    color: var(--text-color);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -2999,8 +3021,8 @@ dialog[open]::backdrop {
     height: 60px;
     width: 60px;
     border-radius: 50%;
-    background-color: color-mix(in srgb, 20% var(--neutral-color), transparent);
-    color: var(--neutral-color);
+    background-color: var(--neutral-color);
+    color: var(--text-color);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -6217,4 +6239,117 @@ body.april_fools *:not(.spinner):not(.loading-container-spinner):not(.spinning),
 body.april_fools *::after,
 body.april_fools *::before {
     border-radius: 0 !important;
+}
+
+.friend {
+    background-color: var(--color-1t);
+    border-radius: 8px;
+    display: flex;
+    padding: 8px;
+    gap: 8px;
+    align-items: center;
+}
+
+.friends-list {
+    display: grid;
+    gap: 10px;
+}
+
+.friend-head {
+    height: 40px;
+    width: 40px;
+    image-rendering: pixelated;
+    object-fit: contain;
+    background-color: var(--color-1);
+    border-radius: 2px;
+}
+
+.friend-info {
+    overflow: hidden;
+}
+
+.friend-name {
+    font-size: 1rem;
+    color: var(--text-color);
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.friend-status {
+    font-size: .8rem;
+    color: var(--subtle-text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.friend-status.green {
+    color: var(--go-color);
+}
+
+.friend-actions {
+    font-size: .8rem;
+    color: var(--text-color);
+    background-color: var(--color-1t);
+    height: 32px;
+    aspect-ratio: 1;
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color .25s;
+    margin-left: auto;
+}
+
+.friend-actions:hover {
+    background-color: var(--accent-color);
+}
+
+.friends-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.friends-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 8px;
+    position: relative;
+    font-size: 1.2rem;
+}
+
+.friends-group:not([data-group-title=""]) {
+    margin-top: calc(1lh + 10px);
+}
+
+.friends-group:not([data-group-title=""])::after {
+    content: attr(data-group-title);
+    bottom: calc(100% + 10px);
+    left: 0px;
+    position: absolute;
+    font-size: 1.1rem;
+    font-weight: bold;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    padding-right: 10px;
+}
+
+.friends-group:not([data-group-title=""])::before {
+    content: "";
+    bottom: calc(100% + .5lh + 9px);
+    width: 100%;
+    font-size: 1.1rem;
+    height: 2px;
+    position: absolute;
+    background-color: var(--color-2t);
+}
+
+.friends-group.disappearable:not(:has(.friend)) {
+    display: none;
 }

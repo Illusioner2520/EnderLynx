@@ -570,6 +570,14 @@ class Profile {
         let cape = await this.getActiveCape();
         await cape.removeActive();
     }
+
+    async getFriends() {
+        return await window.enderlynx.getFriends(this);
+    }
+
+    async runFriendAction(action, friend) {
+        return await window.enderlynx.friendAction(this, action, friend);
+    }
 }
 
 class MinecraftAccountSwitcher {
@@ -712,6 +720,9 @@ class MinecraftAccountSwitcher {
         if (Display.currentScreen.tabName == "wardrobe") {
             wardrobeScreen.display();
         }
+        if (Display.currentScreen.tabName == "friends") {
+            friendsScreen.display();
+        }
         if (Display.currentScreen.tabName == 'home') {
             homeScreen.changeHomeWelcome();
         }
@@ -752,6 +763,9 @@ class MinecraftAccountSwitcher {
         if (Display.currentScreen.tabName == "wardrobe") {
             wardrobeScreen.display();
         }
+        if (Display.currentScreen.tabName == "friends") {
+            friendsScreen.display();
+        }
         if (Display.currentScreen.tabName == "home") {
             homeScreen.changeHomeWelcome();
         }
@@ -780,6 +794,9 @@ class MinecraftAccountSwitcher {
         this.setPlayerInfo();
         if (Display.currentScreen.tabName == "wardrobe") {
             wardrobeScreen.display();
+        }
+        if (Display.currentScreen.tabName == "friends") {
+            friendsScreen.display();
         }
         if (Display.currentScreen.tabName == "home") {
             homeScreen.changeHomeWelcome();
@@ -832,7 +849,7 @@ function resetDiscordStatus(bypassLock) {
     if (!Display.currentScreen) return;
     if (!rpcLocked || bypassLock) {
         window.enderlynx.setActivity({
-            "details": Display.currentScreen.tabName == "home" ? translate("app.discord_rpc.home") : Display.currentScreen.tabName == "instances" || Display.currentScreen.tabName == "instance" ? translate("app.discord_rpc.instances") : Display.currentScreen.tabName == "discover" ? translate("app.discord_rpc.discover") : Display.currentScreen.tabName == "wardrobe" ? translate("app.discord_rpc.wardrobe") : translate("app.discord_rpc.unknown"),
+            "details": Display.currentScreen.tabName == "home" ? translate("app.discord_rpc.home") : Display.currentScreen.tabName == "instances" || Display.currentScreen.tabName == "instance" ? translate("app.discord_rpc.instances") : Display.currentScreen.tabName == "discover" ? translate("app.discord_rpc.discover") : Display.currentScreen.tabName == "wardrobe" ? translate("app.discord_rpc.wardrobe") : Display.currentScreen.tabName == "friends" ? translate("app.discord_rpc.friends") : translate("app.discord_rpc.unknown"),
             "state": translate("app.discord_rpc.not_playing"),
             startTimestamp: new Date(),
             largeImageKey: 'icon',
@@ -972,6 +989,13 @@ class TabContent {
         }
         opt.func(val);
         this.selected = val;
+    }
+    setNotifications(val, number) {
+        for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == val) {
+                this.options[i].element.dataset.notifications = number;
+            }
+        }
     }
 }
 
@@ -6633,6 +6657,270 @@ class WardrobeScreen extends Screen {
     }
 }
 
+class FriendsScreen extends Screen {
+    friends = {};
+    presences = {
+        "ONLINE": {
+            "text": translate("app.friends.status.online"),
+            "green": true
+        },
+        "PLAYING_OFFLINE": {
+            "text": translate("app.friends.status.online"),
+            "green": true
+        },
+        "PLAYING_REALMS": {
+            "text": translate("app.friends.status.in_a_realm"),
+            "green": true
+        },
+        "PLAYING_SERVER": {
+            "text": translate("app.friends.status.in_a_world"),
+            "green": true
+        },
+        "PLAYING_HOSTED_SERVER": {
+            "text": translate("app.friends.status.in_a_joinable_world"),
+            "green": true
+        },
+        "OFFLINE": {
+            "text": translate("app.friends.status.offline"),
+            "green": false
+        }
+    }
+
+    constructor() {
+        super("friends");
+    }
+
+    async display(dont_add_to_log, ...args) {
+        await super.display(dont_add_to_log, ...args);
+    }
+
+    async calculateContent() {
+        this.contentElement.innerHTML = "";
+        this.contentElement.className = "instance-content";
+        let titleElement = createElement("div", "title-top");
+        let titleh1 = createElement("h1", "", { textContent: translate("app.friends.title") });
+        titleElement.appendChild(titleh1);
+        this.contentElement.appendChild(titleElement);
+        this.subContentElement = createElement("div", "friends-content");
+        this.contentElement.appendChild(this.subContentElement);
+        this.profile = await getDefaultProfile();
+        if (!this.profile) {
+            this.contentElement.style.padding = "8px";
+            let signInWarning = new NoResultsFound(translate("app.friends.sign_in"));
+            this.contentElement.appendChild(signInWarning.element);
+            return;
+        }
+        let skinButtonContainer = document.createElement("div");
+        skinButtonContainer.className = "skin-button-container";
+        this.subContentElement.appendChild(skinButtonContainer);
+        let refreshButton = document.createElement("button");
+        refreshButton.className = "skin-button";
+        let refreshButtonIcon = document.createElement("i");
+        refreshButtonIcon.className = "fa-solid fa-arrows-rotate";
+        let refreshButtonText = document.createElement("span");
+        refreshButtonText.innerHTML = translate("app.friends.refresh");
+        refreshButton.appendChild(refreshButtonIcon);
+        refreshButton.appendChild(refreshButtonText);
+        refreshButton.onclick = async () => {
+            await this.showFriendsList(true);
+        }
+        let addButton = createElement("button", "skin-button", { innerHTML: '<i class="fa-solid fa-user-plus"></i>' + translate("app.friends.add_friend") });
+        addButton.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.friends.add_friend.title"), "form", [
+                {
+                    "type": "text",
+                    "name": translate("app.friends.add_friend.username"),
+                    "id": "username"
+                }
+            ], [
+                {
+                    "type": "cancel",
+                    "content": translate("app.friends.add_friend.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.friends.add_friend.confirm")
+                }
+            ], [], async (info) => {
+                let action = await this.profile.runFriendAction("add", { name: info.username });
+                if (action.status >= 400) {
+                    displayError(translate("app.friends.error.add"));
+                    return;
+                }
+                this.friends[this.profile.uuid] = action;
+                this.showFriendsList();
+            });
+        }
+        skinButtonContainer.appendChild(refreshButton);
+        skinButtonContainer.appendChild(addButton);
+        let tabElement = document.createElement("div");
+        this.subContentElement.appendChild(tabElement);
+        this.friendsList = createElement("div", "friends-list");
+        this.friendsGroup = createElement("div", "friends-group");
+        this.friendsGroup.dataset.groupTitle = "";
+        this.subContentElement.appendChild(this.friendsList);
+        this.requestList = createElement("div", "friends-list");
+        this.incomingRequestGroup = createElement("div", "friends-group disappearable");
+        this.outgoingRequestGroup = createElement("div", "friends-group disappearable");
+        this.incomingRequestGroup.dataset.groupTitle = translate("app.friends.incoming_requests");
+        this.outgoingRequestGroup.dataset.groupTitle = translate("app.friends.outgoing_requests");
+        this.friendsList.appendChild(this.friendsGroup);
+        this.requestList.appendChild(this.incomingRequestGroup);
+        this.requestList.appendChild(this.outgoingRequestGroup);
+        this.notFoundElement = new NoResultsFound(translate("app.friends.no_requests")).element;
+        this.tabs = new TabContent(tabElement, [
+            {
+                "name": translate("app.friends.friends"),
+                "value": "friends",
+                "func": () => {
+                    this.requestList.remove();
+                    this.subContentElement.appendChild(this.friendsList);
+                }
+            },
+            {
+                "name": translate("app.friends.requests"),
+                "value": "requests",
+                "func": () => {
+                    this.friendsList.remove();
+                    this.subContentElement.appendChild(this.requestList);
+                }
+            }
+        ]);
+        this.showFriendsList();
+    }
+
+    constructFriendElement(friend, buttons, presence) {
+        let friendElement = createElement("div", "friend");
+        let friendHead = createElement("img", "friend-head", { src: `https://mc-heads.net/avatar/${friend.profileId}/40` });
+        friendHead.onerror = () => {
+            friendHead.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=";
+        }
+        let friendInfo = createElement("div", "friend-info");
+        let friendName = createElement("div", "friend-name", { textContent: friend.name });
+        let friendStatus = createElement("div", "friend-status", { textContent: presence ? this.presences[presence.status].text : translate("app.friends.status.offline") });
+        if (presence && this.presences[presence.status].green) {
+            friendStatus.classList.add("green");
+        }
+        let friendActions = createElement("button", "friend-actions", { innerHTML: '<i class="fa-solid fa-ellipsis-vertical"></i>' });
+        friendInfo.appendChild(friendName);
+        friendInfo.appendChild(friendStatus);
+        friendElement.appendChild(friendHead);
+        friendElement.appendChild(friendInfo);
+        friendElement.appendChild(friendActions);
+        friendElement.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
+        new MoreMenu(friendActions, buttons);
+        return friendElement;
+    }
+
+    async showFriendsList(force) {
+        let loading = new LoadingContainer();
+        this.subContentElement.remove();
+        this.contentElement.appendChild(loading.element);
+        this.friendsGroup.innerHTML = "";
+        this.incomingRequestGroup.innerHTML = "";
+        this.outgoingRequestGroup.innerHTML = "";
+        let friends;
+        try {
+            friends = (this.friends[this.profile.uuid] && !force) ? this.friends[this.profile.uuid] : await this.profile.getFriends();
+        } catch (e) {
+            loading.errorOut(translate("app.friends.unable_to_load"), () => {
+                this.showFriendsList(true);
+            });
+            return;
+        }
+        this.friends[this.profile.uuid] = friends;
+        console.log(friends);
+        for (let presence of friends.presence.presence) {
+            friends.presence[presence.profileId.replaceAll("-", "")] = presence;
+        }
+        for (let friend of friends.friends) {
+            let buttons = new ContextMenuButtons([
+                {
+                    "title": translate("app.friends.unfriend"),
+                    "icon": '<i class="fa-solid fa-user-slash"></i>',
+                    "func": async () => {
+                        let action = await this.profile.runFriendAction("remove", friend);
+                        if (action.status >= 400) {
+                            displayError(translate("app.friends.error.unfriend"));
+                            return;
+                        }
+                        this.friends[this.profile.uuid] = action;
+                        this.showFriendsList();
+                    }
+                }
+            ]);
+            let friendElement = this.constructFriendElement(friend, buttons, friends.presence[friend.profileId]);
+            this.friendsGroup.appendChild(friendElement);
+        }
+        if (!friends?.friends || friends.friends.length == 0) {
+            let notFoundElement = new NoResultsFound(translate("app.friends.no_friends")).element;
+            this.friendsGroup.appendChild(notFoundElement);
+        }
+        for (let friend of friends.incomingRequests) {
+            let buttons = new ContextMenuButtons([
+                {
+                    "title": translate("app.friends.accept_request"),
+                    "icon": '<i class="fa-solid fa-user-check"></i>',
+                    "func": async () => {
+                        let action = await this.profile.runFriendAction("add", friend);
+                        if (action.status >= 400) {
+                            displayError(translate("app.friends.error.accept"));
+                            return;
+                        }
+                        this.friends[this.profile.uuid] = action;
+                        this.showFriendsList();
+                    }
+                },
+                {
+                    "title": translate("app.friends.decline_request"),
+                    "icon": '<i class="fa-solid fa-user-xmark"></i>',
+                    "func": async () => {
+                        let action = await this.profile.runFriendAction("remove", friend);
+                        if (action.status >= 400) {
+                            displayError(translate("app.friends.error.decline"));
+                            return;
+                        }
+                        this.friends[this.profile.uuid] = action;
+                        this.showFriendsList();
+                    }
+                }
+            ]);
+            let friendElement = this.constructFriendElement(friend, buttons, friends.presence[friend.profileId]);
+            this.incomingRequestGroup.appendChild(friendElement);
+        }
+        this.tabs.setNotifications("requests", friends?.incomingRequests?.length || 0);
+        for (let friend of friends.outgoingRequests) {
+            let buttons = new ContextMenuButtons([
+                {
+                    "title": translate("app.friends.cancel_request"),
+                    "icon": '<i class="fa-solid fa-ban"></i>',
+                    "func": async () => {
+                        let action = await this.profile.runFriendAction("remove", friend);
+                        if (action.status >= 400) {
+                            displayError(translate("app.friends.error.cancel"));
+                            return;
+                        }
+                        console.log(action);
+                        this.friends[this.profile.uuid] = action;
+                        this.showFriendsList();
+                    }
+                }
+            ]);
+            let friendElement = this.constructFriendElement(friend, buttons, friends.presence[friend.profileId]);
+            this.outgoingRequestGroup.appendChild(friendElement);
+        }
+        this.notFoundElement.remove();
+        if ((!friends?.incomingRequests || friends.incomingRequests.length == 0) && (!friends?.outgoingRequests || friends.outgoingRequests.length == 0)) {
+            this.requestList.appendChild(this.notFoundElement);
+        }
+        loading.element.remove();
+        this.contentElement.appendChild(this.subContentElement);
+    }
+}
+
 let contextmenu = new ContextMenu();
 let homeScreen = new HomeScreen();
 let homeButton = new NavigationButton(document.getElementById("homeButtonEle"), translate("app.page.home"), '<i class="fa-solid fa-house"></i>', homeScreen);
@@ -6644,8 +6932,11 @@ let discoverScreen = new DiscoverScreen();
 let discoverButton = new NavigationButton(document.getElementById("discoverButtonEle"), translate("app.page.discover"), '<i class="fa-solid fa-compass"></i>', discoverScreen);
 discoverScreen.setNavButton(discoverButton);
 let wardrobeScreen = new WardrobeScreen();
-let wardrobeButton = new NavigationButton(document.getElementById("wardrobeButtonEle"), translate("app.page.wardrobe"), '<i class="fa-solid fa-user"></i>', wardrobeScreen);
+let wardrobeButton = new NavigationButton(document.getElementById("wardrobeButtonEle"), translate("app.page.wardrobe"), '<i class="fa-solid fa-shirt"></i>', wardrobeScreen);
 wardrobeScreen.setNavButton(wardrobeButton);
+let friendsScreen = new FriendsScreen();
+let friendsButton = new NavigationButton(document.getElementById("friendsButtonEle"), translate("app.page.friends"), '<i class="fa-solid fa-user"></i>', friendsScreen);
+friendsScreen.setNavButton(friendsButton);
 new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa-solid fa-gear"></i>');
 
 settingsButtonEle.onclick = async () => {
@@ -7289,7 +7580,8 @@ settingsButtonEle.onclick = async () => {
                 { "name": translate("app.settings.page.home"), "value": "home" },
                 { "name": translate("app.settings.page.instances"), "value": "instances" },
                 { "name": translate("app.settings.page.discover"), "value": "discover" },
-                { "name": translate("app.settings.page.wardrobe"), "value": "wardrobe" }
+                { "name": translate("app.settings.page.wardrobe"), "value": "wardrobe" },
+                { "name": translate("app.settings.page.friends"), "value": "friends" }
             ],
             "default": await getDefault("default_page")
         },
@@ -7595,7 +7887,7 @@ settingsButtonEle.onclick = async () => {
     }, undefined, false, true);
 }
 
-let navButtons = [homeButton, instancesButton, discoverButton, wardrobeButton];
+let navButtons = [homeButton, instancesButton, discoverButton, wardrobeButton, friendsButton];
 
 async function toggleMicrosoftSignIn() {
     try {
@@ -7649,6 +7941,8 @@ function setPage(page) {
         discoverScreen.display();
     } else if (page == "wardrobe") {
         wardrobeScreen.display();
+    } else if (page == "friends") {
+        friendsScreen.display();
     }
     live.findLive();
 }

@@ -1540,7 +1540,7 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
             if (loader == "fabric") loader = "fabric-loader";
             if (loader == "quilt") loader = "quilt-loader";
         }
-        
+
         await fsPromises.rm(extractToPath, { recursive: true });
 
         signal.throwIfAborted();
@@ -5536,6 +5536,60 @@ async function installMinecraft(instance_id, loader, game_version, loader_versio
         updateInstance("mc_installed", true, instance_id);
     }
 }
+
+ipcMain.handle('get-friends', async (_, player_info) => {
+    let url = "https://api.minecraftservices.com/friends";
+    const res = await fetch(
+        url,
+        {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${player_info.access_token}`
+            }
+        }
+    );
+    let url2 = "https://api.minecraftservices.com/presence";
+    const res2 = await fetch(
+        url2,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${player_info.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 5, joinInfo: null })
+        }
+    );
+    let j = await res.json();
+    j.status = res.status;
+    let j2 = await res2.json();
+    j.presence = j2;
+    return j;
+});
+
+ipcMain.handle('friend-action', async (_, player_info, action, friend) => {
+    if (action == "add") action = 0;
+    if (action == "remove") action = 1;
+    let profileId = friend.profileId || null;
+    let name = profileId ? null : (friend.name || null);
+    let url = "https://api.minecraftservices.com/friends";
+    const res = await fetch(
+        url,
+        {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bearer ${player_info.access_token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name, profileId, updateType: action })
+        }
+    );
+    console.log(res);
+    let j = await res.json();
+    j.status = res.status;
+    console.log(j);
+    return j;
+});
 
 // update
 try {

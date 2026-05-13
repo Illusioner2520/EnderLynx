@@ -734,6 +734,12 @@ contextBridge.exposeInMainWorld('enderlynx', {
     installMinecraft: async (instance_id, loader, game_version, loader_version) => {
         return await ipcRenderer.invoke('install-minecraft', instance_id, loader, game_version, loader_version);
     },
+    getFriends: async (player_info) => {
+        return await ipcRenderer.invoke('get-friends', player_info);
+    },
+    friendAction: async (player_info, action, friend) => {
+        return await ipcRenderer.invoke('friend-action', player_info, action, friend);
+    },
     getInstance: (...params) => ipcRenderer.sendSync('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
     updateInstance: async (...params) => ipcRenderer.invoke('update-instance', ...params),
