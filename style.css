@@ -180,12 +180,13 @@ body.compact .sidebar {
     display: flex;
     border-radius: 8px;
     cursor: pointer;
-    padding: 8px;
+    padding: 6px;
     transition: background-color .25s, scale .1s;
     align-items: center;
     gap: 8px;
     color: var(--text-color);
     text-decoration: none;
+    position: relative;
 }
 
 .menu-button:active {
@@ -196,12 +197,21 @@ body.compact .sidebar {
     background-color: var(--color-1t);
 }
 
-.menu-button.selected .menu-icon {
+.menu-button::before {
     background-color: var(--accent-color);
+    position: absolute;
+    left: -1px;
+    height: 50%;
+    top: 25%;
+    width: 4px;
+    border-radius: 2px;
+    content: "";
+    opacity: 0;
+    transition: opacity .25s;
 }
 
-.menu-button:hover .menu-icon {
-    background-color: var(--accent-color);
+.menu-button.selected::before {
+    opacity: 1;
 }
 
 .player-switch.not-selected {
@@ -223,14 +233,14 @@ body.compact .sidebar {
 .player-head {
     border-radius: 2px;
     aspect-ratio: 1;
-    height: 40px;
+    height: 32px;
     image-rendering: pixelated;
 }
 
 .player-head-menu {
     border-radius: 2px;
     aspect-ratio: 1;
-    height: 40px;
+    height: 32px;
     image-rendering: pixelated;
 }
 
@@ -532,16 +542,15 @@ body.sidebar-right #player-dropdown {
 }
 
 .menu-icon {
-    height: 40px;
     border-radius: 5px;
-    background-color: var(--color-1t);
     display: flex;
     justify-content: center;
     align-items: center;
     color: var(--text-color);
     aspect-ratio: 1;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     transition: background-color .25s;
+    width: 32px;
 }
 
 body.compact .menu-icon {
@@ -550,7 +559,7 @@ body.compact .menu-icon {
 }
 
 .menu-title {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: bold;
 }
 
@@ -2980,6 +2989,7 @@ dialog[open]::backdrop {
 .loading-container {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     align-items: center;
     background-color: var(--color-1t);
     gap: 20px;
@@ -4388,6 +4398,7 @@ dialog[open]::backdrop {
 
 .markdown-body {
     width: 100%;
+    align-self: start;
 
     h1:first-child {
         margin-block-start: 0;
@@ -6352,4 +6363,10 @@ body.april_fools *::before {
 
 .friends-group.disappearable:not(:has(.friend)) {
     display: none;
+}
+
+.sidebar-navigation-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }

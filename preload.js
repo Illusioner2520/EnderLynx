@@ -98,7 +98,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
         const nets = os.networkInterfaces();
         let ipv4s = [];
         let ipv6s = [];
-        console.log(nets);
         for (const name of Object.keys(nets)) {
             for (const net of nets[name]) {
                 if (net.family == 'IPv4' && !net.internal) {
@@ -365,6 +364,21 @@ contextBridge.exposeInMainWorld('enderlynx', {
             callback(key, value, content_id);
         });
     },
+    onProfileUpdated: (callback) => {
+        ipcRenderer.on('profile-updated', (_event, key, value, content_id) => {
+            callback(key, value, content_id);
+        });
+    },
+    onSkinUpdated: (callback) => {
+        ipcRenderer.on('skin-updated', (_event, key, value, content_id) => {
+            callback(key, value, content_id);
+        });
+    },
+    onCapeUpdated: (callback) => {
+        ipcRenderer.on('cape-updated', (_event, key, value, content_id) => {
+            callback(key, value, content_id);
+        });
+    },
     onPage: async (callback) => {
         pageCallback = callback;
         if (startingPage) callback (startingPage);
@@ -402,18 +416,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     repairMinecraft: async (instance_id, loader, vanilla_version, loader_version, whatToRepair) => {
         return await ipcRenderer.invoke('repair-minecraft', instance_id, loader, vanilla_version, loader_version, whatToRepair);
-    },
-    getForgeVersion: async (mcversion) => {
-        return (await ipcRenderer.invoke('forge-loader-versions', mcversion))[0];
-    },
-    getFabricVersion: async (mcversion) => {
-        return (await ipcRenderer.invoke('fabric-loader-versions', mcversion))[0];
-    },
-    getNeoForgeVersion: async (mcversion) => {
-        return (await ipcRenderer.invoke('neoforge-loader-versions', mcversion))[0];
-    },
-    getQuiltVersion: async (mcversion) => {
-        return (await ipcRenderer.invoke('quilt-loader-versions', mcversion))[0];
     },
     getForgeLoaderVersions: async (mcversion) => {
         return (await ipcRenderer.invoke('forge-loader-versions', mcversion));
@@ -502,14 +504,14 @@ contextBridge.exposeInMainWorld('enderlynx', {
     downloadCape: async (url, id) => {
         return await ipcRenderer.invoke('download-cape', url, id);
     },
-    setCape: async (player_info, cape_id) => {
-        return await ipcRenderer.invoke('set-cape', player_info, cape_id);
+    setCape: async (player_id, cape_id) => {
+        return await ipcRenderer.invoke('set-cape', player_id, cape_id);
     },
-    setSkinFromURL: async (player_info, skin_url, variant) => {
-        return await ipcRenderer.invoke('set-skin-from-url', player_info, skin_url, variant);
+    setSkinFromURL: async (player_id, skin_url, variant) => {
+        return await ipcRenderer.invoke('set-skin-from-url', player_id, skin_url, variant);
     },
-    setSkin: async (player_info, skin_id, variant) => {
-        return await ipcRenderer.invoke('set-skin', player_info, skin_id, variant);
+    setSkin: async (player_id, skin_id, variant) => {
+        return await ipcRenderer.invoke('set-skin', player_id, skin_id, variant);
     },
     getProfile: async (player_id) => {
         return await ipcRenderer.invoke('get-profile', player_id);
@@ -734,11 +736,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
     installMinecraft: async (instance_id, loader, game_version, loader_version) => {
         return await ipcRenderer.invoke('install-minecraft', instance_id, loader, game_version, loader_version);
     },
-    getFriends: async (player_info) => {
-        return await ipcRenderer.invoke('get-friends', player_info);
+    getFriends: async (player_id) => {
+        return await ipcRenderer.invoke('get-friends', player_id);
     },
-    friendAction: async (player_info, action, friend) => {
-        return await ipcRenderer.invoke('friend-action', player_info, action, friend);
+    friendAction: async (player_id, action, friend) => {
+        return await ipcRenderer.invoke('friend-action', player_id, action, friend);
     },
     getInstance: (...params) => ipcRenderer.sendSync('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
@@ -755,13 +757,13 @@ contextBridge.exposeInMainWorld('enderlynx', {
     setDefaultProfile: async (...params) => ipcRenderer.invoke('set-default-profile', ...params),
     getProfiles: async (...params) => ipcRenderer.invoke('get-profiles', ...params),
     getProfileDatabase: async (...params) => ipcRenderer.invoke('get-profile-database', ...params),
-    getProfileFromId: async (...params) => ipcRenderer.invoke('get-profile-from-id', ...params),
+    getProfileFromId: (...params) => ipcRenderer.sendSync('get-profile-from-id', ...params),
     addProfile: async (...params) => ipcRenderer.invoke('add-profile', ...params),
     deleteProfile: async (...params) => ipcRenderer.invoke('delete-profile', ...params),
     updateProfile: async (...params) => ipcRenderer.invoke('update-profile', ...params),
     getSkinsNoDefaults: async (...params) => ipcRenderer.invoke('get-skins-no-defaults', ...params),
     getDefaultSkins: async (...params) => ipcRenderer.invoke('get-default-skins', ...params),
-    getSkin: async (...params) => ipcRenderer.invoke('get-skin', ...params),
+    getSkin: (...params) => ipcRenderer.sendSync('get-skin', ...params),
     updateSkin: async (...params) => ipcRenderer.invoke('update-skin', ...params),
     addSkin: async (...params) => ipcRenderer.invoke('add-skin', ...params),
     deleteSkin: async (...params) => ipcRenderer.invoke('delete-skin', ...params),
@@ -770,7 +772,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     isActiveSkin: async (...params) => ipcRenderer.invoke('is-active-skin', ...params),
     getDefault: async (...params) => ipcRenderer.invoke('get-default', ...params),
     setDefault: async (...params) => ipcRenderer.invoke('set-default', ...params),
-    getCape: async (...params) => ipcRenderer.invoke('get-cape', ...params),
+    getCape: (...params) => ipcRenderer.sendSync('get-cape', ...params),
     getCapes: async (...params) => ipcRenderer.invoke('get-capes', ...params),
     getActiveCape: async (...params) => ipcRenderer.invoke('get-active-cape', ...params),
     addCape: async (...params) => ipcRenderer.invoke('add-cape', ...params),

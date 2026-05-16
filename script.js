@@ -45,6 +45,7 @@ class DefaultOptions {
 }
 
 class Skin {
+    static skins = new Map();
     constructor(skin) {
         if (!skin) return;
         this.id = skin.id;
@@ -62,33 +63,37 @@ class Skin {
         this.head = skin.head;
     }
 
+    static getSkin(skin_id) {
+        if (!this.skins.has(skin_id)) {
+            let newSkin = new Skin(window.enderlynx.getSkin(skin_id));
+            this.skins.set(skin_id, newSkin);
+        }
+        return this.skins.get(skin_id);
+    }
+
     async setModel(model) {
         await window.enderlynx.updateSkin("model", model, this.id);
-        this.model = model;
     }
 
     async setName(name) {
         await window.enderlynx.updateSkin("name", name, this.id);
-        this.name = name;
     }
 
     async delete() {
+        Skin.skins.delete(this.id);
         await window.enderlynx.deleteSkin(this.id);
     }
 
     async setLastUsed(last_used) {
         await window.enderlynx.updateSkin("last_used", last_used, this.id);
-        this.last_used = last_used;
     }
 
     async setFavorited(favorited) {
         await window.enderlynx.updateSkin("favorited", favorited, this.id);
-        this.favorited = favorited;
     }
 
     async setTextureKey(texture_key) {
         await window.enderlynx.updateSkin("texture_key", texture_key, this.id);
-        this.texture_key = texture_key;
     }
 
     getPreview(callback) {
@@ -99,8 +104,6 @@ class Skin {
         renderSkinToDataUrl(this.skin_url, async (v) => {
             await window.enderlynx.updateSkin("preview", v, this.id);
             await window.enderlynx.updateSkin("preview_model", this.model, this.id);
-            this.preview = v;
-            this.preview_model = this.model;
             callback(v);
         }, this.model);
     }
@@ -112,7 +115,6 @@ class Skin {
         }
         skinToHead(this.skin_url, async (v) => {
             await window.enderlynx.updateSkin("head", v, this.id);
-            this.head = v;
             callback(v);
         });
     }
@@ -128,6 +130,7 @@ class Skin {
 }
 
 class Cape {
+    static capes = new Map();
     constructor(cape) {
         if (!cape) return;
         this.id = cape.id;
@@ -136,6 +139,14 @@ class Cape {
         this.cape_id = cape.cape_id;
         this.cape_url = cape.cape_url;
         this.active = Boolean(cape.active);
+    }
+
+    static getCape(cape_id) {
+        if (!this.capes.has(cape_id)) {
+            let newCape = new Cape(window.enderlynx.getCape(cape_id));
+            this.capes.set(cape_id, newCape);
+        }
+        return this.capes.get(cape_id);
     }
 
     async setActive() {
@@ -235,6 +246,36 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
     let content = Content.getContent(content_id);
+    if (content[key] instanceof Date) value = Date(value);
+    if (typeof content[key] == 'boolean') value = Boolean(value);
+    content[key] = value;
+    if (content?.listeners?.get(key)) {
+        content.listeners.get(key)(value);
+    }
+});
+
+window.enderlynx.onProfileUpdated(async (key, value, profile_id) => {
+    let content = Profile.getProfile(profile_id);
+    if (content[key] instanceof Date) value = Date(value);
+    if (typeof content[key] == 'boolean') value = Boolean(value);
+    content[key] = value;
+    if (content?.listeners?.get(key)) {
+        content.listeners.get(key)(value);
+    }
+});
+
+window.enderlynx.onSkinUpdated(async (key, value, skin_id) => {
+    let content = Skin.getSkin(skin_id);
+    if (content[key] instanceof Date) value = Date(value);
+    if (typeof content[key] == 'boolean') value = Boolean(value);
+    content[key] = value;
+    if (content?.listeners?.get(key)) {
+        content.listeners.get(key)(value);
+    }
+});
+
+window.enderlynx.onCapeUpdated(async (key, value, cape_id) => {
+    let content = Cape.getCape(cape_id);
     if (content[key] instanceof Date) value = Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
@@ -466,14 +507,19 @@ async function addInstance(name, date_created, date_modified, last_played, loade
 }
 async function getProfiles() {
     let profiles = await window.enderlynx.getProfiles();
-    return profiles.map(e => new Profile(e));
+    let profileList = [];
+    for (let i = 0; i < profiles.length; i++) {
+        profileList.push(Profile.getProfile(profiles[i].id));
+    }
+    return profileList;
 }
 async function getDefaultProfile() {
     let profile = await window.enderlynx.getDefaultProfile();
-    return profile ? new Profile(profile) : null;
+    return profile ? Profile.getProfile(profile.id) : null;
 }
 async function getProfileFromUUID(uuid) {
-    return new Profile(await window.enderlynx.getProfileDatabase(uuid));
+    let profile = await window.enderlynx.getProfileDatabase(uuid);
+    return Profile.getProfile(profile.id);
 }
 async function getDefault(type) {
     return await window.enderlynx.getDefault(type);
@@ -483,87 +529,62 @@ async function setDefault(type, value) {
 }
 async function getSkinsNoDefaults() {
     let skins = await window.enderlynx.getSkinsNoDefaults();
-    return skins.map(e => new Skin(e));
+    return skins.map(e => Skin.getSkin(e.id));
 }
 async function getDefaultSkins() {
     let skins = await window.enderlynx.getDefaultSkins();
-    return skins.map(e => new Skin(e));
+    return skins.map(e => Skin.getSkin(e.id));
 }
 async function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
-    return new Skin(await window.enderlynx.addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key));
+    let info = await window.enderlynx.addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key);
+    return Skin.getEntry(info.id);
 }
 
 class Profile {
+    static profiles = new Map();
     constructor(profile) {
         if (!profile) return;
         this.id = profile.id;
-        this.access_token = profile.access_token;
-        this.expires = new Date(profile.expires);
         this.name = profile.name;
-        this.refresh_token = profile.refresh_token;
         this.uuid = profile.uuid;
-        this.xuid = profile.xuid;
-        this.is_demo = Boolean(profile.is_demo);
         this.is_default = Boolean(profile.is_default);
     }
+
+    static getProfile(profile_id) {
+        if (!this.profiles.has(profile_id)) {
+            let newProfile = new Profile(window.enderlynx.getProfileFromId(profile_id));
+            this.profiles.set(profile_id, newProfile);
+        }
+        return this.profiles.get(profile_id);
+    }
+
     async setDefault() {
         await window.enderlynx.setDefaultProfile(this.id);
     }
 
-    async setAccessToken(access_token) {
-        await window.enderlynx.updateProfile("access_token", access_token, this.id);
-        this.access_token = access_token;
-    }
-
-    async setExpires(expires) {
-        await window.enderlynx.updateProfile("expires", expires, this.id);
-        this.expires = expires;
-    }
-
-    async setName(name) {
-        await window.enderlynx.updateProfile("name", name, this.id);
-        this.name = name;
-    }
-
-    async setRefreshToken(refresh_token) {
-        await window.enderlynx.updateProfile("refresh_token", refresh_token, this.id);
-        this.refresh_token = refresh_token;
-    }
-
-    async setUuid(uuid) {
-        await window.enderlynx.updateProfile("uuid", uuid, this.id);
-        this.uuid = uuid;
-    }
-
-    async setXuid(xuid) {
-        await window.enderlynx.updateProfile("xuid", xuid, this.id);
-        this.xuid = xuid;
-    }
-
-    async setIsDemo(is_demo) {
-        await window.enderlynx.updateProfile("is_demo", is_demo, this.id);
-        this.is_demo = Boolean(is_demo);
-    }
-
     async delete() {
+        Profile.profiles.delete(this.id);
         await window.enderlynx.deleteProfile(this.uuid);
     }
 
     async getCapes() {
         let capes = await window.enderlynx.getCapes(this.uuid);
-        return capes.map(e => new Cape(e));
+        return capes.map(e => Cape.getCape(e.id));
     }
 
     async addCape(cape_name, cape_id, cape_url) {
-        return new Cape(await window.enderlynx.addCape(cape_name, cape_id, cape_url, this.uuid));
+        let info = await window.enderlynx.addCape(cape_name, cape_id, cape_url, this.uuid);
+        return Cape.getCape(info.id);
     }
 
     async getActiveSkin() {
-        return new Skin(await window.enderlynx.getActiveSkin(this.uuid));
+        let info = await window.enderlynx.getActiveSkin(this.uuid);
+        return Skin.getSkin(info.id);
     }
 
     async getActiveCape() {
-        return new Cape(await window.enderlynx.getActiveCape(this.uuid));
+        let info = await window.enderlynx.getActiveCape(this.uuid);
+        return Cape.getCape(info.id);
     }
 
     async removeActiveCape() {
@@ -572,11 +593,11 @@ class Profile {
     }
 
     async getFriends() {
-        return await window.enderlynx.getFriends(this);
+        return await window.enderlynx.getFriends(this.id);
     }
 
     async runFriendAction(action, friend) {
-        return await window.enderlynx.friendAction(this, action, friend);
+        return await window.enderlynx.friendAction(this.id, action, friend);
     }
 }
 
@@ -717,15 +738,6 @@ class MinecraftAccountSwitcher {
         this.players.push(newPlayerInfo);
         newPlayerInfo.setDefault();
         this.setPlayerInfo();
-        if (Display.currentScreen.tabName == "wardrobe") {
-            wardrobeScreen.display();
-        }
-        if (Display.currentScreen.tabName == "friends") {
-            friendsScreen.display();
-        }
-        if (Display.currentScreen.tabName == 'home') {
-            homeScreen.changeHomeWelcome();
-        }
     }
     selectPlayer(newPlayerInfo) {
         if (!this.players.map(e => e.uuid).includes(newPlayerInfo.uuid)) {
@@ -4893,11 +4905,19 @@ class HomeScreen extends Screen {
             itemDesc1.className = "instance-desc";
             itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
             if (howLongAgo(e.last_played) < 3600000) {
-                setInterval(() => {
+                let interval = setInterval(() => {
+                    if (!document.body.contains(itemDesc1)) {
+                        clearInterval(interval);
+                        return;
+                    }
                     itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
                 }, 60000);
             } else if (howLongAgo(e.last_played) < 86400000) {
-                setInterval(() => {
+                let interval = setInterval(() => {
+                    if (!document.body.contains(itemDesc1)) {
+                        clearInterval(interval);
+                        return;
+                    }
                     itemDesc1.innerHTML = formatTimeRelatively(e.last_played) + " • ";
                 }, 3600000);
             }
@@ -5090,11 +5110,19 @@ class HomeScreen extends Screen {
             itemDesc.className = "instance-desc";
             itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
             if (howLongAgo(e.last_played) < 3600000) {
-                setInterval(() => {
+                let interval = setInterval(() => {
+                    if (!document.body.contains(itemDesc)) {
+                        clearInterval(interval);
+                        return;
+                    }
                     itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
                 }, 60000);
             } else if (howLongAgo(e.last_played) < 86400000) {
-                setInterval(() => {
+                let interval = setInterval(() => {
+                    if (!document.body.contains(itemDesc)) {
+                        clearInterval(interval);
+                        return;
+                    }
                     itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
                 }, 3600000);
             }
@@ -6135,7 +6163,7 @@ class DiscoverScreen extends Screen {
                 "name": translate("app.loader.quilt"),
                 "value": "quilt"
             }
-        ], loaderDropdownElement, loader || "all", (new_loader) => {
+        ], loaderDropdownElement, this.currentTab == "server" ? (!loader ? "all" : (loader == "vanilla" ? "vanilla" : "modpack")) : (loader || "all"), (new_loader) => {
             this.getContent(vanilla_version, new_loader, 1, pageSize, sortBy);
         });
         let paginationBottom = new Pagination(page, this.totalPages, (new_page) => {
@@ -6171,7 +6199,7 @@ class WardrobeScreen extends Screen {
 
     async display(dont_add_to_log, ...args) {
         await super.display(dont_add_to_log, ...args);
-        this.tabs.selectOption("skins");
+        if (this.tabs) this.tabs.selectOption("skins");
     }
 
     async calculateContent() {
@@ -6589,7 +6617,7 @@ class WardrobeScreen extends Screen {
                 loader.style.display = "block";
                 capeImg.style.display = "none";
                 let currentEle = capeEle;
-                let success = await applyCape(this.profile, e);
+                let success = await applyCape(this.profile.id, e);
                 if (success) {
                     let oldEle = document.querySelector(".my-account-option.cape.selected");
                     oldEle.classList.remove("selected");
@@ -6642,7 +6670,7 @@ class WardrobeScreen extends Screen {
             loader.style.display = "block";
             capeImg.style.display = "none";
             let currentEle = event.currentTarget;
-            let success = await applyCape(this.profile, null);
+            let success = await applyCape(this.profile.id, null);
             if (success) {
                 let oldEle = document.querySelector(".my-account-option.cape.selected");
                 oldEle.classList.remove("selected");
@@ -6665,7 +6693,7 @@ class FriendsScreen extends Screen {
             "green": true
         },
         "PLAYING_OFFLINE": {
-            "text": translate("app.friends.status.online"),
+            "text": translate("app.friends.status.in_a_world"),
             "green": true
         },
         "PLAYING_REALMS": {
@@ -6673,7 +6701,7 @@ class FriendsScreen extends Screen {
             "green": true
         },
         "PLAYING_SERVER": {
-            "text": translate("app.friends.status.in_a_world"),
+            "text": translate("app.friends.status.on_a_server"),
             "green": true
         },
         "PLAYING_HOSTED_SERVER": {
@@ -6685,6 +6713,7 @@ class FriendsScreen extends Screen {
             "green": false
         }
     }
+    lastRefreshed = {};
 
     constructor() {
         super("friends");
@@ -6695,12 +6724,15 @@ class FriendsScreen extends Screen {
     }
 
     async calculateContent() {
+        this.loading = new LoadingContainer();
         this.contentElement.innerHTML = "";
         this.contentElement.className = "instance-content";
         let titleElement = createElement("div", "title-top");
         let titleh1 = createElement("h1", "", { textContent: translate("app.friends.title") });
         titleElement.appendChild(titleh1);
         this.contentElement.appendChild(titleElement);
+        let infoElement = createElement("div", "info", { innerHTML: '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.friends.info") });
+        this.contentElement.appendChild(infoElement);
         this.subContentElement = createElement("div", "friends-content");
         this.contentElement.appendChild(this.subContentElement);
         this.profile = await getDefaultProfile();
@@ -6745,7 +6777,19 @@ class FriendsScreen extends Screen {
             ], [], async (info) => {
                 let action = await this.profile.runFriendAction("add", { name: info.username });
                 if (action.status >= 400) {
-                    displayError(translate("app.friends.error.add"));
+                    if (action.details.status == "INVITE_REJECTED") {
+                        displayError(translate("app.friends.error.add.invite_rejected"));
+                    } else if (action.details.status == "NOT_ALLOWED") {
+                        displayError(translate("app.friends.error.add.not_allowed"));
+                    } else if (action.details.status == "ALREADY_FRIENDS") {
+                        displayError(translate("app.friends.error.add.already_friends"));
+                    } else if (action.details.status == "CANNOT_ADD_SELF") {
+                        displayError(translate("app.friends.error.add.cannot_add_self"));
+                    } else if (action.details.status == "UNKNOWN_PROFILE") {
+                        displayError(translate("app.friends.error.add.unknown_profile"));
+                    } else {
+                        displayError(translate("app.friends.error.add"));
+                    }
                     return;
                 }
                 this.friends[this.profile.uuid] = action;
@@ -6798,7 +6842,7 @@ class FriendsScreen extends Screen {
         }
         let friendInfo = createElement("div", "friend-info");
         let friendName = createElement("div", "friend-name", { textContent: friend.name });
-        let friendStatus = createElement("div", "friend-status", { textContent: presence ? this.presences[presence.status].text : translate("app.friends.status.offline") });
+        let friendStatus = createElement("div", "friend-status", { textContent: ""/*presence ? this.presences[presence.status].text : translate("app.friends.status.offline")*/ });
         if (presence && this.presences[presence.status].green) {
             friendStatus.classList.add("green");
         }
@@ -6816,43 +6860,65 @@ class FriendsScreen extends Screen {
     }
 
     async showFriendsList(force) {
-        let loading = new LoadingContainer();
+        this.loading.element.remove();
+        this.loading = new LoadingContainer();
         this.subContentElement.remove();
-        this.contentElement.appendChild(loading.element);
+        this.contentElement.appendChild(this.loading.element);
         this.friendsGroup.innerHTML = "";
         this.incomingRequestGroup.innerHTML = "";
         this.outgoingRequestGroup.innerHTML = "";
         let friends;
         try {
-            friends = (this.friends[this.profile.uuid] && !force) ? this.friends[this.profile.uuid] : await this.profile.getFriends();
+            let refreshByTime = this.lastRefreshed[this.profile.uuid] && new Date() - this.lastRefreshed[this.profile.uuid] > 300000;
+            let refreshFriends = force || !this.friends[this.profile.uuid] || refreshByTime;
+            friends = (!refreshFriends) ? this.friends[this.profile.uuid] : await this.profile.getFriends();
         } catch (e) {
-            loading.errorOut(translate("app.friends.unable_to_load"), () => {
+            this.loading.errorOut(translate("app.friends.unable_to_load"), () => {
                 this.showFriendsList(true);
             });
             return;
         }
+        if (friends.status >= 400) {
+            this.loading.errorOut(translate("app.friends.unable_to_load.code", "%c", friends.status), () => {
+                this.showFriendsList(true);
+            });
+            return;
+        }
+        this.lastRefreshed[this.profile.uuid] = new Date();
         this.friends[this.profile.uuid] = friends;
         console.log(friends);
-        for (let presence of friends.presence.presence) {
+        for (let presence of friends?.presence?.presence || []) {
             friends.presence[presence.profileId.replaceAll("-", "")] = presence;
         }
-        for (let friend of friends.friends) {
+        for (let friend of friends?.friends || []) {
             let buttons = new ContextMenuButtons([
                 {
                     "title": translate("app.friends.unfriend"),
                     "icon": '<i class="fa-solid fa-user-slash"></i>',
-                    "func": async () => {
-                        let action = await this.profile.runFriendAction("remove", friend);
-                        if (action.status >= 400) {
-                            displayError(translate("app.friends.error.unfriend"));
-                            return;
-                        }
-                        this.friends[this.profile.uuid] = action;
-                        this.showFriendsList();
+                    "func": () => {
+                        let dialog = new Dialog();
+                        dialog.showDialog(translate("app.friends.unfriend.title"), "notice", translate("app.friends.unfriend.desc", "%f", friend.name), [
+                            {
+                                "content": translate("app.friends.unfriend.cancel"),
+                                "type": "cancel"
+                            },
+                            {
+                                "content": translate("app.friends.unfriend.confirm"),
+                                "type": "confirm"
+                            }
+                        ], [], async () => {
+                            let action = await this.profile.runFriendAction("remove", friend);
+                            if (action.status >= 400) {
+                                displayError(translate("app.friends.error.unfriend"));
+                                return;
+                            }
+                            this.friends[this.profile.uuid] = action;
+                            this.showFriendsList();
+                        });
                     }
                 }
             ]);
-            let friendElement = this.constructFriendElement(friend, buttons, friends.presence[friend.profileId]);
+            let friendElement = this.constructFriendElement(friend, buttons, friends.presence ? friends.presence[friend.profileId] : null);
             this.friendsGroup.appendChild(friendElement);
         }
         if (!friends?.friends || friends.friends.length == 0) {
@@ -6867,7 +6933,11 @@ class FriendsScreen extends Screen {
                     "func": async () => {
                         let action = await this.profile.runFriendAction("add", friend);
                         if (action.status >= 400) {
-                            displayError(translate("app.friends.error.accept"));
+                            if (action.details.status == "NOT_ALLOWED") {
+                                displayError(translate("app.friends.error.accept.not_allowed"));
+                            } else {
+                                displayError(translate("app.friends.error.accept"));
+                            }
                             return;
                         }
                         this.friends[this.profile.uuid] = action;
@@ -6888,7 +6958,7 @@ class FriendsScreen extends Screen {
                     }
                 }
             ]);
-            let friendElement = this.constructFriendElement(friend, buttons, friends.presence[friend.profileId]);
+            let friendElement = this.constructFriendElement(friend, buttons, friends.presence ? friends.presence[friend.profileId] : null);
             this.incomingRequestGroup.appendChild(friendElement);
         }
         this.tabs.setNotifications("requests", friends?.incomingRequests?.length || 0);
@@ -6909,14 +6979,14 @@ class FriendsScreen extends Screen {
                     }
                 }
             ]);
-            let friendElement = this.constructFriendElement(friend, buttons, friends.presence[friend.profileId]);
+            let friendElement = this.constructFriendElement(friend, buttons, friends.presence ? friends.presence[friend.profileId] : null);
             this.outgoingRequestGroup.appendChild(friendElement);
         }
         this.notFoundElement.remove();
         if ((!friends?.incomingRequests || friends.incomingRequests.length == 0) && (!friends?.outgoingRequests || friends.outgoingRequests.length == 0)) {
             this.requestList.appendChild(this.notFoundElement);
         }
-        loading.element.remove();
+        this.loading.element.remove();
         this.contentElement.appendChild(this.subContentElement);
     }
 }
@@ -7245,7 +7315,7 @@ settingsButtonEle.onclick = async () => {
                 "content": translate("app.settings.options.apply.confirm")
             }
         ], [], async () => {
-            let instances = getInstances();
+            let instances = await getInstances();
             for (let i = 0; i < instances.length; i++) {
                 let instanceInfo = instances[i];
                 try {
@@ -8031,7 +8101,7 @@ class SkinEntry {
             loader.style.display = "block";
             skinImg.style.display = "none";
             let currentEle = skinEle;
-            let success = e.texture_key ? (await applySkinFromURL(default_profile, e)) : (await applySkin(default_profile, e));
+            let success = e.texture_key ? (await applySkinFromURL(default_profile.id, e)) : (await applySkin(default_profile.id, e));
             if (success) {
                 let oldEle = document.querySelector(".my-account-option.skin.selected");
                 if (oldEle) oldEle.classList.remove("selected");
@@ -11106,6 +11176,7 @@ class Dialog {
                         textInput.onkeydown = (e) => {
                             if (e.key == "Enter") {
                                 this.submit();
+                                e.preventDefault();
                             }
                         }
                     }
@@ -12316,6 +12387,10 @@ class LoadingContainer {
         this.element = element;
         let index = 1;
         let interval = setInterval(() => {
+            if (!document.body.contains(this.element)) {
+                clearInterval(this.interval);
+                return;
+            }
             text.innerHTML = translate("app.loading") + ".".repeat(index);
             index++;
         }, 400)
@@ -12368,9 +12443,9 @@ function sanitize(input) {
 
 const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href"] });
 
-async function applyCape(profile, cape) {
+async function applyCape(profile_id, cape) {
     try {
-        await window.enderlynx.setCape(profile, cape ? cape.cape_id : null);
+        await window.enderlynx.setCape(profile_id, cape ? cape.cape_id : null);
         displaySuccess(translate("app.wardrobe.cape.change"));
         return true;
     } catch (e) {
@@ -12379,9 +12454,9 @@ async function applyCape(profile, cape) {
     }
 }
 
-async function applySkin(profile, skin) {
+async function applySkin(profile_id, skin) {
     try {
-        await window.enderlynx.setSkin(profile, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
+        await window.enderlynx.setSkin(profile_id, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
         return true;
@@ -12391,9 +12466,9 @@ async function applySkin(profile, skin) {
     }
 }
 
-async function applySkinFromURL(profile, skin) {
+async function applySkinFromURL(profile_id, skin) {
     try {
-        await window.enderlynx.setSkinFromURL(profile, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
+        await window.enderlynx.setSkinFromURL(profile_id, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
         accountSwitcher.reloadHeads();
         displaySuccess(translate("app.wardrobe.skin.change"));
         return true;

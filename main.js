@@ -2151,7 +2151,7 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
 
     if (new Date(player_info.expires) < new Date()) {
         try {
-            player_info = await getNewAccessToken(player_info.refresh_token);
+            player_info = await getNewAccessToken(player_info.id);
         } catch (err) {
             if (win) win.webContents.send('display-error', translate("app.launch.access_token.offline"));
         }
@@ -2163,7 +2163,7 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
     let globalWrapper = getDefault("global_wrapper");
     let globalPostExit = getDefault("global_post_exit_hook");
     try {
-        await fixProfile(player_info);
+        await fixProfile(player_info, player_id);
         if (!quickPlay && instance_info.source_server) {
             quickPlay = { "type": "multiplayer", "info": instance_info.source_server };
         }
@@ -2180,11 +2180,13 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
     }
 }
 
-async function fixProfile(player_info) {
+async function fixProfile(player_info, player_id) {
     if (player_info.expires instanceof Date) {
         player_info.expires = player_info.expires.toISOString();
     }
     db.prepare("UPDATE profiles SET access_token = ?, expires = ?, name = ?, refresh_token = ?, xuid = ?, is_demo = ? WHERE uuid = ?").run(player_info.access_token, player_info.expires, player_info.name, player_info.refresh_token, player_info.xuid, Number(player_info.is_demo), player_info.uuid);
+    if (win && win.webContents) win.webContents.send('profile-updated', "name", player_info.name, player_id);
+    if (win && win.webContents) win.webContents.send('profile-updated', "uuid", player_info.uuid, player_id);
     if (!player_info.capes || !player_info.skins) return;
     try {
         for (const e of player_info.capes) {
@@ -2287,13 +2289,14 @@ async function repairMinecraft(instance_id, loader, vanilla_version, loader_vers
     }
 }
 
-async function getNewAccessToken(refresh_token) {
+async function getNewAccessToken(player_id) {
+    let player_info = getProfileFromId(player_id);
     let date = new Date();
     date.setHours(date.getHours() + 1);
     const authManager = new Auth("select_account");
-    const xboxManager = await authManager.refresh(refresh_token);
+    const xboxManager = await authManager.refresh(player_info.refresh_token);
     const token = await xboxManager.getMinecraft();
-    return {
+    let info =  {
         "access_token": token.mcToken,
         "uuid": token.profile.id,
         "refresh_token": token.parent.msToken.refresh_token,
@@ -2304,6 +2307,8 @@ async function getNewAccessToken(refresh_token) {
         "xuid": token.xuid,
         "expires": date.toISOString()
     }
+    fixProfile(info, player_id);
+    return info;
 }
 
 function parseJavaArgs(input) {
@@ -3382,7 +3387,7 @@ ipcMain.handle('trigger-microsoft-login', async () => {
     if (players.includes(info.uuid)) {
         let player = getProfileDatabase(info.uuid);
         setDefaultProfile(player.id);
-        await fixProfile(info);
+        await fixProfile(info, player.id);
     } else {
         if (!info.name) {
             win.webContents.send('display-error', translate("app.login_error.no_username"));
@@ -3390,7 +3395,7 @@ ipcMain.handle('trigger-microsoft-login', async () => {
         }
         let newPlayer = addProfile(info.access_token, info.expires, info.name, info.refresh_token, info.uuid, info.xuid, info.is_demo, false);
         setDefaultProfile(newPlayer.id);
-        await fixProfile(info);
+        await fixProfile(info, newPlayer.id);
     }
     return info;
 });
@@ -3786,12 +3791,13 @@ ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
     }
 });
 
-ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
+ipcMain.handle('set-cape', async (_, player_id, cape_id) => {
+    let player_info = getProfileFromId(player_id);
     let date = new Date();
     date.setHours(date.getHours() - 1);
     if (new Date(player_info.expires) < date) {
         try {
-            player_info = await getNewAccessToken(player_info.refresh_token);
+            player_info = await getNewAccessToken(player_info.id);
         } catch (err) {
             throw new Error(translate("app.access_token.unable"));
         }
@@ -3810,7 +3816,7 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
         );
 
         let skin_info = await res.json();
-        await fixProfile({ ...player_info, ...skin_info })
+        await fixProfile({ ...player_info, ...skin_info }, player_info.id)
 
         if (!res.ok) {
             throw new Error(translate("app.cape.unable"));
@@ -3828,7 +3834,7 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
         );
 
         let skin_info = await res.json();
-        await fixProfile({ ...player_info, ...skin_info })
+        await fixProfile({ ...player_info, ...skin_info }, player_info.id)
 
         if (!res.ok) {
             throw new Error(translate("app.cape.unable"));
@@ -3837,11 +3843,12 @@ ipcMain.handle('set-cape', async (_, player_info, cape_id) => {
     }
 });
 
-ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) => {
+ipcMain.handle('set-skin-from-url', async (_, player_id, skin_url, variant) => {
+    let player_info = getProfileFromId(player_id);
     let date = new Date();
     if (new Date(player_info.expires) < date) {
         try {
-            player_info = await getNewAccessToken(player_info.refresh_token);
+            player_info = await getNewAccessToken(player_info.id);
         } catch (err) {
             throw new Error(translate("app.access_token.unable"));
         }
@@ -3860,7 +3867,7 @@ ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) =>
     );
 
     let skin_info = await res.json();
-    await fixProfile({ ...player_info, ...skin_info })
+    await fixProfile({ ...player_info, ...skin_info }, player_info.id)
 
     if (!res.ok) {
         throw new Error(translate("app.skin.unable"));
@@ -3868,11 +3875,12 @@ ipcMain.handle('set-skin-from-url', async (_, player_info, skin_url, variant) =>
     return { "status": res.status, "player_info": player_info, "skin_info": skin_info };
 });
 
-ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
+ipcMain.handle('set-skin', async (_, player_id, skin_id, variant) => {
+    let player_info = getProfileFromId(player_id);
     let date = new Date();
     if (new Date(player_info.expires) < date) {
         try {
-            player_info = await getNewAccessToken(player_info.refresh_token);
+            player_info = await getNewAccessToken(player_info.id);
         } catch (err) {
             throw new Error(translate("app.access_token.unable"));
         }
@@ -3919,7 +3927,7 @@ ipcMain.handle('set-skin', async (_, player_info, skin_id, variant) => {
                     reject(new Error(errorMsg));
                 } else {
                     let skin_info = JSON.parse(data);
-                    await fixProfile({ ...player_info, ...skin_info })
+                    await fixProfile({ ...player_info, ...skin_info }, player_info.id)
                     try {
                         resolve({ "status": res.statusCode, "player_info": player_info, "skin_info": skin_info });
                     } catch (e) {
@@ -3942,7 +3950,7 @@ ipcMain.handle('get-profile', async (_, player_id) => {
     let player_info = getProfileFromId(player_id);
     if (new Date(player_info.expires) < new Date()) {
         try {
-            player_info = await getNewAccessToken(player_info.refresh_token);
+            player_info = await getNewAccessToken(player_info.id);
         } catch (err) {
             throw new Error(translate("app.access_token.unable"));
         }
@@ -3956,7 +3964,7 @@ ipcMain.handle('get-profile', async (_, player_id) => {
 
     let skin_and_capes = await res.json();
 
-    await fixProfile({ ...player_info, ...skin_and_capes });
+    await fixProfile({ ...player_info, ...skin_and_capes }, player_info.id);
 
     if (!res.ok) throw new Error(translate("app.profile.unable"));
 
@@ -4865,6 +4873,7 @@ function updateProfile(key, value, profile_id) {
     if (typeof value === "boolean") value = Number(value);
     let allowedKeys = ["access_token", "expires", "name", "refresh_token", "uuid", "xuid", "is_demo"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
+    if (win && win.webContents && ["name", "uuid"].includes(key)) win.webContents.send('profile-updated', key, value, profile_id);
     return db.prepare(`UPDATE profiles SET ${key} = ? WHERE id = ?`).run(value, profile_id);
 }
 
@@ -4899,6 +4908,7 @@ function updateSkin(key, value, skin_id) {
     if (typeof value === "boolean") value = Number(value);
     let allowedKeys = ["model", "name", "last_used", "favorited", "texture_key", "head", "active_uuid", "preview", "preview_model"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
+    if (win && win.webContents) win.webContents.send('skin-updated', key, value, skin_id);
     return db.prepare(`UPDATE skins SET ${key} = ? WHERE id = ?`).run(value, skin_id);
 }
 function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
@@ -4972,11 +4982,17 @@ function addCape(cape_name, cape_id, cape_url, uuid) {
 }
 function setCapeActive(cape_id) {
     let cape = getCape(cape_id);
+    let activeCape = getActiveCape(cape.uuid);
     db.prepare("UPDATE capes SET active = ? WHERE uuid = ?").run(0, cape.uuid);
-    return db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(1, cape_id);
+    if (win && win.webContents) win.webContents.send('cape-updated', "active", false, activeCape?.id);
+    let info = db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(1, cape_id);
+    if (win && win.webContents) win.webContents.send('cape-updated', "active", true, cape_id);
+    return info;
 }
 function removeCapeActive(cape_id) {
-    return db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(0, cape_id);
+    let info = db.prepare("UPDATE capes SET active = ? WHERE id = ?").run(0, cape_id);
+    if (win && win.webContents) win.webContents.send('cape-updated', "active", false, cape_id);
+    return info;
 }
 
 // default options management
@@ -5297,14 +5313,14 @@ ipcMain.handle('get-default-profile', (_, ...params) => getDefaultProfile(...par
 ipcMain.handle('set-default-profile', (_, ...params) => setDefaultProfile(...params));
 ipcMain.handle('get-profiles', (_, ...params) => getProfiles(...params));
 ipcMain.handle('get-profile-database', (_, ...params) => getProfileDatabase(...params));
-ipcMain.handle('get-profile-from-id', (_, ...params) => getProfileFromId(...params));
+ipcMain.on('get-profile-from-id', (_, ...params) => _.returnValue = getProfileFromId(...params));
 ipcMain.handle('add-profile', (_, ...params) => addProfile(...params));
 ipcMain.handle('delete-profile', (_, ...params) => deleteProfile(...params));
 ipcMain.handle('update-profile', (_, ...params) => updateProfile(...params));
 ipcMain.handle('get-skins', (_, ...params) => getSkins(...params));
 ipcMain.handle('get-skins-no-defaults', (_, ...params) => getSkinsNoDefaults(...params));
 ipcMain.handle('get-default-skins', (_, ...params) => getDefaultSkins(...params));
-ipcMain.handle('get-skin', (_, ...params) => getSkin(...params));
+ipcMain.on('get-skin', (_, ...params) => _.returnValue = getSkin(...params));
 ipcMain.handle('update-skin', (_, ...params) => updateSkin(...params));
 ipcMain.handle('add-skin', (_, ...params) => addSkin(...params));
 ipcMain.handle('delete-skin', (_, ...params) => deleteSkin(...params));
@@ -5313,7 +5329,7 @@ ipcMain.handle('set-active-skin', (_, ...params) => setActiveSkin(...params));
 ipcMain.handle('is-active-skin', (_, ...params) => isActiveSkin(...params));
 ipcMain.handle('get-default', (_, ...params) => getDefault(...params));
 ipcMain.handle('set-default', (_, ...params) => setDefault(...params));
-ipcMain.handle('get-cape', (_, ...params) => getCape(...params));
+ipcMain.on('get-cape', (_, ...params) => _.returnValue = getCape(...params));
 ipcMain.handle('get-capes', (_, ...params) => getCapes(...params));
 ipcMain.handle('get-active-cape', (_, ...params) => getActiveCape(...params));
 ipcMain.handle('add-cape', (_, ...params) => addCape(...params));
@@ -5508,16 +5524,15 @@ async function installModpack(info, type, instance_id, name) {
 
 async function installMinecraft(instance_id, loader, game_version, loader_version) {
     if (!loader_version) {
-        let loader_version = "";
         try {
             if (loader == "fabric") {
-                loader_version = Fabric.getVersions(game_version);
+                loader_version = (await Fabric.getVersions(game_version))[0];
             } else if (loader == "forge") {
-                loader_version = Forge.getVersions(game_version);
+                loader_version = (await Forge.getVersions(game_version))[0];
             } else if (loader == "neoforge") {
-                loader_version = NeoForge.getVersions(game_version);
+                loader_version = (await NeoForge.getVersions(game_version))[0];
             } else if (loader == "quilt") {
-                loader_version = Quilt.getVersions(game_version);
+                loader_version = (await Quilt.getVersions(game_version))[0];
             }
         } catch (e) {
             win.webContents.send('display-error', translate("app.instances.failed_to_create"));
@@ -5537,7 +5552,15 @@ async function installMinecraft(instance_id, loader, game_version, loader_versio
     }
 }
 
-ipcMain.handle('get-friends', async (_, player_info) => {
+ipcMain.handle('get-friends', async (_, player_id) => {
+    let player_info = getProfileFromId(player_id);
+    if (new Date(player_info.expires) < new Date()) {
+        try {
+            player_info = await getNewAccessToken(player_info.id);
+        } catch (err) {
+            throw new Error(translate("app.access_token.unable"));
+        }
+    }
     let url = "https://api.minecraftservices.com/friends";
     const res = await fetch(
         url,
@@ -5548,26 +5571,34 @@ ipcMain.handle('get-friends', async (_, player_info) => {
             }
         }
     );
-    let url2 = "https://api.minecraftservices.com/presence";
-    const res2 = await fetch(
-        url2,
-        {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${player_info.access_token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 5, joinInfo: null })
-        }
-    );
+    // let url2 = "https://api.minecraftservices.com/presence";
+    // const res2 = await fetch(
+    //     url2,
+    //     {
+    //         method: 'POST',
+    //         headers: {
+    //             Authorization: `Bearer ${player_info.access_token}`,
+    //             'Content-Type': 'application/json'
+    //         },
+    //         body: JSON.stringify({ status: 5, joinInfo: null })
+    //     }
+    // );
     let j = await res.json();
     j.status = res.status;
-    let j2 = await res2.json();
-    j.presence = j2;
+    // let j2 = await res2.json();
+    // j.presence = j2;
     return j;
 });
 
-ipcMain.handle('friend-action', async (_, player_info, action, friend) => {
+ipcMain.handle('friend-action', async (_, player_id, action, friend) => {
+    let player_info = getProfileFromId(player_id);
+    if (new Date(player_info.expires) < new Date()) {
+        try {
+            player_info = await getNewAccessToken(player_info.id);
+        } catch (err) {
+            throw new Error(translate("app.access_token.unable"));
+        }
+    }
     if (action == "add") action = 0;
     if (action == "remove") action = 1;
     let profileId = friend.profileId || null;
