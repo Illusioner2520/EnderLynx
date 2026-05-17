@@ -126,7 +126,7 @@ jobs:
         run: npm run build:linux
 
       - name: Run build script MacOS
-        if: runner.os == 'Linux'
+        if: runner.os == 'macOS'
         run: npm run build:macos
 
       - name: Rename Windows artifacts
