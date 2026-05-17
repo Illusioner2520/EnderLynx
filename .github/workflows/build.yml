@@ -168,5 +168,6 @@ jobs:
             dist/*.dmg
             dist/*.deb
             dist/*.rpm
+            dist/*.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
