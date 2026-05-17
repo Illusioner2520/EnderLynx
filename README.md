@@ -89,7 +89,7 @@ Make sure that you have Node and Rust installed such that it can run `npm` and `
 Note for Linux:
 - `.deb` needs `fakeroot` and `dpkg` installed
 - `.rpm` needs `rpm` installed
-- `.flatpak` needs `flatpak`, `flatpak-builder` and `elfutils` installed
+- `.flatpak` needs `flatpak`, `flatpak-builder` and `elfutils` installed  
 Run: `npm run build:linux`
 
 ### MacOS
