@@ -121,9 +121,13 @@ jobs:
         if: runner.os == 'Windows'
         run: npm run build:windows
 
-      - name: Run build script Unix
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: npm run build:unix
+      - name: Run build script Linux
+        if: runner.os == 'Linux'
+        run: npm run build:linux
+
+      - name: Run build script MacOS
+        if: runner.os == 'Linux'
+        run: npm run build:macos
 
       - name: Rename Windows artifacts
         if: runner.os == 'Windows'

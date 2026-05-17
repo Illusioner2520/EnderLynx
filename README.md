@@ -25,8 +25,9 @@ Currently, EnderLynx supports Windows and Linux. We offer a macOS distribution, 
    - 🧑‍🦰 Includes all default skins and skins from official skin packs
    - ↩️ Import skins from a file, username or URL
    - ⭐ Favorite skins to come back to them later
+ - 👥 View and edit your Minecraft Java friends list
  - 🔗 Share instances through a new .elpack file format
- - 📁 Add instances from a CurseForge .zip, Modrinth .mrpack or a CurseForge profile code
+ - 📁 Add instances from a CurseForge .zip, Modrinth .mrpack, MultiMC/Prism .zip or a CurseForge profile code
  - 🔔 Includes the most recent Minecraft news on the home page
  - ❓ Includes a random assortment of modpacks to discover on the home page
  - 🎁 Manage mods, resource packs and shaders, including the ability to disable.
@@ -82,8 +83,16 @@ The Windows installer will be at `installer/EnderLynxInstaller.exe`
 Make sure that you have Node, Rust and NSIS installed such that it can run `npm`, `cargo` and `makensis`  
 Run: `npm run build:windows`
 
-### Unix
+### Linux
 
 Make sure that you have Node and Rust installed such that it can run `npm` and `cargo`  
-Note for Linux: make sure you have `fakeroot` and `dpkg` installed to make the `.deb` and `rpm` installed to make the `.rpm`  
-Run: `npm run build:unix`
+Note for Linux:
+- `.deb` needs `fakeroot` and `dpkg` installed
+- `.rpm` needs `rpm` installed
+- `.flatpak` needs `flatpak`, `flatpak-builder` and `elfutils` installed
+Run: `npm run build:linux`
+
+### MacOS
+
+Make sure that you have Node and Rust installed such that it can run `npm` and `cargo`  
+Run: `npm run build:macos`
