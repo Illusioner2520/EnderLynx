@@ -6185,7 +6185,7 @@ class DiscoverScreen extends Screen {
             let content = results.projects[i];
             let entry = new ContentSearchEntry(content, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (button) => {
                 installButtonClick(content, undefined, this.instance?.instance_id, button, undefined, undefined, this.discover_content_states)
-            }, this.instance?.instance_id, vanilla_version, loader, content_ids.includes(content.id), false, this.currentTab, undefined, this.discover_content_states);
+            }, this.instance?.instance_id, vanilla_version, this.currentTab == "server" ? null : loader, content_ids.includes(content.id), false, this.currentTab, undefined, this.discover_content_states);
             this.discoverList.appendChild(entry.element);
         }
         this.discoverList.appendChild(paginationBottom.element);
