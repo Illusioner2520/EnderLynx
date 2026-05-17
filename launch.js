@@ -1746,6 +1746,7 @@ class NeoForge {
         } else {
             start = "0." + mcVersion;
         }
+        start += ".";
         const res = await fetch('https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge');
         const data = (await res.json()).versions;
         let versions = [];
