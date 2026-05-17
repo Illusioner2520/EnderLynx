@@ -6163,7 +6163,7 @@ class DiscoverScreen extends Screen {
                 "name": translate("app.loader.quilt"),
                 "value": "quilt"
             }
-        ], loaderDropdownElement, this.currentTab == "server" ? (!loader ? "all" : (loader == "vanilla" ? "vanilla" : "modpack")) : (loader || "all"), (new_loader) => {
+        ], loaderDropdownElement, this.currentTab == "server" ? (!loader ? "all" : (loader == "vanilla" ? "vanilla" : "all")) : (loader || "all"), (new_loader) => {
             this.getContent(vanilla_version, new_loader, 1, pageSize, sortBy);
         });
         let paginationBottom = new Pagination(page, this.totalPages, (new_page) => {
