@@ -20,21 +20,14 @@ module.exports = {
     },
     icon: path.resolve(__dirname, 'resources/icons/icon'),
     ignore: [
-      /^\/java($|\/)/,
-      /^\/minecraft($|\/)/,
-      /^\/temp_icons($|\/)/,
       /^\/\.github($|\/)/,
       /^\/installer($|\/)/,
       /^\/updater($|\/)/,
       /\.gitignore$/,
       /\.devdbrc$/,
-      /app\.db$/,
-      /app\.db-shm$/,
-      /app\.db-wal$/,
       /credits\.txt$/,
       /forge\.config\.js$/,
       /package-lock\.json$/,
-      /updater\.js$/,
       /README\.md$/,
       /LICENSE$/
     ]
@@ -91,6 +84,19 @@ module.exports = {
           productName: "EnderLynx",
           genericName: "Minecraft Launcher",
           license: "MIT",
+          icon: "./resources/icons/icon.png",
+          categories: ['Game'],
+          mimeType: ['application/zip', 'application/x-zip-compressed']
+        }
+      },
+    },
+    {
+      name: '@electron-forge/maker-flatpak',
+      config: {
+        options: {
+          id: "me.illusioner.enderlynx",
+          productName: "EnderLynx",
+          genericName: "Minecraft Launcher",
           icon: "./resources/icons/icon.png",
           categories: ['Game'],
           mimeType: ['application/zip', 'application/x-zip-compressed']
