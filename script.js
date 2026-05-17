@@ -9916,7 +9916,7 @@ class VersionList {
             return v;
         } else if (loader == "neoforge") {
             if (version_cache["neoforge"]) return version_cache["neoforge"];
-            let v = await window.enderlynx.getNeoForgeVersions();
+            let v = sortByVersion(await window.enderlynx.getNeoForgeVersions(), true);
             version_cache["neoforge"] = v;
             return v;
         } else if (loader == "quilt") {
