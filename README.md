@@ -86,11 +86,11 @@ Run: `npm run build:windows`
 ### Linux
 
 Make sure that you have Node and Rust installed such that it can run `npm` and `cargo`  
+Run: `npm run build:linux`  
 Note for Linux:
 - `.deb` needs `fakeroot` and `dpkg` installed
 - `.rpm` needs `rpm` installed
-- `.flatpak` needs `flatpak`, `flatpak-builder` and `elfutils` installed  
-Run: `npm run build:linux`
+- `.flatpak` needs `flatpak`, `flatpak-builder` and `elfutils` installed
 
 ### MacOS
 
