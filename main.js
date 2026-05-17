@@ -3315,11 +3315,11 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         win.webContents.send('progress-update', translate("app.downloading.update"), 100, translate("app.done"), processId, "done", cancelId);
 
-        let updaterPath = path.join(tempDir, "up.exe");
         let sourceDir = path.resolve(tempDir);
-        if (os.platform() != 'win32' && os.platform() != 'darwin') {
-            sourceDir = path.join(sourceDir, (await fsPromises.readdir(sourceDir))[0]);
-        }
+        let oldUpdaterPath = path.join(sourceDir, "resources", "app.asar.unpacked", "up.exe");
+        let updaterPath = path.join(user_path, "updater", "up.exe");
+        await fsPromises.copyFile(oldUpdaterPath, updaterPath);
+
         const targetDir = path.dirname(process.execPath);
         const exeToLaunch = process.execPath;
         const oldPid = process.pid.toString();

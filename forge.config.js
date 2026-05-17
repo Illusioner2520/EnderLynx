@@ -15,7 +15,8 @@ module.exports = {
     asar: {
       unpack: [
         '**/node_modules/@img/**',
-        '**/node_modules/create-desktop-shortcuts/src/*.vbs'
+        '**/node_modules/create-desktop-shortcuts/src/*.vbs',
+        '**/up.exe'
       ]
     },
     icon: path.resolve(__dirname, 'resources/icons/icon'),
