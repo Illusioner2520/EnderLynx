@@ -97,7 +97,7 @@ async function moveFiles() {
     let updaterData;
     try {
         updaterData = await fsPromises.readFile(srcConfigPath);
-        let updaterName = "updater.exe";
+        let updaterName = "up.exe";
         if (os.platform() != 'win32') updaterName = "updater";
         await fsPromises.writeFile(path.resolve(user_path, "updater", updaterName), updaterData);
         if (os.platform() != 'win32') {
@@ -3330,7 +3330,7 @@ async function downloadUpdate(download_url, new_version, checksum) {
 
         win.webContents.send('progress-update', translate("app.downloading.update"), 100, translate("app.done"), processId, "done", cancelId);
 
-        let updaterPath = path.join(user_path, "updater", "updater.exe");
+        let updaterPath = path.join(user_path, "updater", "up.exe");
         if (os.platform() != 'win32') updaterPath = path.join(user_path, "updater", "updater");
         let sourceDir = path.resolve(tempDir);
         if (os.platform() != 'win32' && os.platform() != 'darwin') {
