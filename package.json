@@ -6,7 +6,7 @@
     "start": "electron-forge start",
     "make": "electron-forge make",
     "installer": "makensis installer/installer.nsi",
-    "updater:windows": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe updater.exe",
+    "updater:windows": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe up.exe",
     "build:windows": "electron-rebuild && npm run updater:windows && npm run make && npm run installer",
     "build:linux": "flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo && electron-rebuild && npm run make",
     "build:macos": "electron-rebuild && npm run make"
