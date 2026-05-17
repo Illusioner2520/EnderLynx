@@ -13473,9 +13473,9 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             ], [], () => { });
                             e.getChangelog((v) => {
                                 if (e.uses_markdown_description) {
-                                    element.innerHTML = parseModrinthMarkdown(v);
+                                    element.innerHTML = parseModrinthMarkdown(v) || translate("app.discover.no_changelog");
                                 } else {
-                                    element.innerHTML = v;
+                                    element.innerHTML = v || translate("app.discover.no_changelog");
                                 }
                                 afterMarkdownParse();
                             }, (err) => {

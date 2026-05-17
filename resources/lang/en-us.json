@@ -1251,5 +1251,6 @@
     "app.friends.error.add.already_friends": "Failed to send request. You are already friends with that player.",
     "app.friends.error.add.cannot_add_self": "Failed to send request. That is yourself.",
     "app.friends.error.add.unknown_profile": "Failed to send request. There is no known account with that username",
-    "app.friends.info": "This is your Minecraft Java friends list and links to your Xbox friends, meaning that anything you do here will be reflected in your Xbox friends list."
+    "app.friends.info": "This is your Minecraft Java friends list and links to your Xbox friends, meaning that anything you do here will be reflected in your Xbox friends list.",
+    "app.discover.no_changelog": "No Changelog Specified"
 }
