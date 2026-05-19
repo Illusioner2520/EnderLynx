@@ -3000,7 +3000,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.content.view"),
                                 "icon": '<i class="fa-solid fa-circle-info"></i>',
                                 "func": async () => {
-                                    displayContentInfo(e.source, undefined, parseInt(e.source_info), this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList, {});
+                                    displayContentInfo(e.source, undefined, e.source_info, this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList, {});
                                 }
                             } : null,
                             e.source == "vanilla_tweaks" && !this.instance.locked ? {
@@ -6044,7 +6044,7 @@ class DiscoverScreen extends Screen {
         let instance_content = [];
         if (this.instance) instance_content = await this.instance.getContent();
         if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currenTab == "server") loader = null;
-        let content_ids = instance_content.map(e => Number.isNaN(Number(e.source_info)) ? e.source_info : Number(e.source_info));
+        let content_ids = instance_content.map(e => e.source_info);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
         this.discoverList.appendChild(loading.element);
@@ -8767,7 +8767,7 @@ async function showInstanceSettings(instanceInfo) {
             "tab": "modpack",
             "icon": '<i class="fa-solid fa-eye"></i>',
             "func": () => {
-                displayContentInfo(instanceInfo.install_source, undefined, instanceInfo.install_source == "curseforge" ? parseInt(instanceInfo.install_id) : instanceInfo.install_id, instanceInfo.instance_id);
+                displayContentInfo(instanceInfo.install_source, undefined, instanceInfo.install_id, instanceInfo.instance_id);
             }
         } : null,
         instanceInfo.installed_version ? {
@@ -8781,7 +8781,7 @@ async function showInstanceSettings(instanceInfo) {
             "source": async () => {
                 return await getModpackVersions(instanceInfo.install_source, instanceInfo.install_id);
             },
-            "default": instanceInfo.install_source == "curseforge" ? Number(instanceInfo.installed_version) : instanceInfo.installed_version
+            "default": instanceInfo.installed_version
         } : null,
         instanceInfo.installed_version ? {
             "type": "toggle",
@@ -9786,12 +9786,6 @@ window.enderlynx.onProgressUpdate((title, progress, task, id, status, cancelFunc
 
 window.enderlynx.onContentInstallUpdate((content_id, percent) => {
     if (percent >= 100) percent = 0;
-    if (!global_discover_content_states[content_id]) {
-        content_id = Number(content_id);
-    }
-    if (!global_discover_content_states[content_id]) {
-        content_id = content_id.toString();
-    }
     if (global_discover_content_states[content_id]) global_discover_content_states[content_id].forEach(e => {
         e.style.setProperty("--percent-preview", percent + "%");
     });
@@ -12341,7 +12335,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let instance_id = instance.instance_id;
     let content = await instance.getContent();
     let modrinth_ids = content.filter(e => e.source == "modrinth").map(e => e.source_info);
-    let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => Number(e.source_info));
+    let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => e.source_info);
     let initialContent = await addContent(instance_id, project_type, version.download_url, version.filename, data_pack_world, project_id);
     if (isUpdate) return initialContent;
     let version_number = version.version_number || "";
@@ -12355,7 +12349,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     if (dependencies && project_type != "world" && project_type != "datapack") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
-            if (modrinth_ids.includes(dependency.project_id) || curseforge_ids.includes(Number(dependency.project_id))) continue;
+            if (modrinth_ids.includes(dependency.project_id) || curseforge_ids.includes(dependency.project_id)) continue;
             let project = await Project.getFromId(dependency.project_id, source);
             await project.getAuthors();
             if (dependency.version_id) {
@@ -12653,7 +12647,6 @@ async function isWorldPinned(world_id, instance_id, world_type) {
 }
 
 async function getModpackVersions(source, content_id) {
-    if (source == "curseforge") content_id = Number(content_id);
     let project = new Project();
     await project.getAllVersions(content_id, source);
     return project.versions.map(e => ({ "name": e.name, "value": e.version_id, "pass": e }));
@@ -13085,14 +13078,12 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 let installedVersion = "";
                 if (instance_id) instance_content = await (Instance.getInstance(instance_id)).getContent();
                 content_ids = instance_content.map(e => e.source_info);
-                if (typeof content.id == 'number') content_ids = content_ids.map(e => Number(e));
                 if (content_ids.includes(content.id)) {
                     installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
                 }
                 if ((content.project_type == "modpack" || content.project_type == "server") && instance_id) {
                     installedVersion = (Instance.getInstance(instance_id)).installed_version;
                 }
-                if (typeof content.id == 'number') installedVersion = Number(installedVersion);
 
                 tabContent.innerHTML = "";
                 let topFilters = document.createElement("div");
@@ -14546,7 +14537,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 installButton.onclick = () => { };
                 let theContent = null;
                 for (let i = 0; i < contentList.length; i++) {
-                    if (contentList[i].source_info == project_id || (source == "curseforge" && Number(contentList[i].source_info) == Number(project_id))) {
+                    if (contentList[i].source_info == project_id) {
                         theContent = contentList[i];
                     }
                 }
@@ -14561,7 +14552,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 installButton.onclick = () => {
                     updateToSpecificVersion(updates[updatesIndex]);
                 }
-            } else if (version && contentForThisInstance[0] && (source == "curseforge" ? Number(contentForThisInstance[0].version_id) != Number(version.version_id) : contentForThisInstance[0].version_id != version.version_id)) {
+            } else if (version && contentForThisInstance[0] && contentForThisInstance[0].version_id != version.version_id) {
                 installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
                 installButton.onclick = () => {
                     updateToSpecificVersion(version);

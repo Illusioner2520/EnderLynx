@@ -4775,10 +4775,18 @@ ipcMain.handle('stop-watching-file', (_, filepath) => {
 
 // Instance management
 function getInstance(instance_id) {
-    return db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
+    let info = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
+    if (info.install_id?.endsWith(".0")) info.install_id = Number(info.install_id).toString();
+    if (info.installed_version?.endsWith(".0")) info.installed_version = Number(info.installed_version).toString();
+    return info;
 }
 function getInstances() {
-    return db.prepare("SELECT * FROM instances").all();
+    let info = db.prepare("SELECT * FROM instances").all();
+    for (let i of info) {
+        if (i.install_id?.endsWith(".0")) i.install_id = Number(i.install_id).toString();
+        if (i.installed_version?.endsWith(".0")) i.installed_version = Number(i.installed_version).toString();
+    }
+    return info;
 }
 function updateInstance(key, value, instance_id) {
     if (value instanceof Date) value = value.toISOString();
@@ -4804,10 +4812,18 @@ function addInstance(name, date_created, date_modified, last_played, loader, van
 
 // Content management
 function getContent(content_id) {
-    return db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(content_id);
+    let info = db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(content_id);
+    if (info.source_info?.endsWith(".0")) info.source_info = Number(info.source_info).toString();
+    if (info.version_id?.endsWith(".0")) info.version_id = Number(info.version_id).toString();
+    return info;
 }
 function getInstanceContentDatabase(instance_id) {
-    return db.prepare("SELECT * FROM content WHERE instance = ?").all(instance_id);
+    let info = db.prepare("SELECT * FROM content WHERE instance = ?").all(instance_id);
+    for (let i in info) {
+        if (i.source_info?.endsWith(".0")) i.source_info = Number(i.source_info).toString();
+        if (i.version_id?.endsWith(".0")) i.version_id = Number(i.version_id).toString();
+    }
+    return info;
 }
 function updateContent(key, value, content_id) {
     if (value instanceof Date) value = value.toISOString();
@@ -4825,7 +4841,12 @@ function deleteContentDatabase(content_id) {
     return db.prepare("DELETE FROM content WHERE id = ?").run(content_id);
 }
 function getContentBySourceInfo(source_info) {
-    return db.prepare("SELECT * FROM content WHERE source_info = ?").all(source_info);
+    let info = db.prepare("SELECT * FROM content WHERE source_info = ? OR source_info = ?").all(source_info, source_info + ".0");
+    for (let i in info) {
+        if (i.source_info?.endsWith(".0")) i.source_info = Number(i.source_info).toString();
+        if (i.version_id?.endsWith(".0")) i.version_id = Number(i.version_id).toString();
+    }
+    return info;
 }
 
 // Profile management

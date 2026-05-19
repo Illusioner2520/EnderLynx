@@ -71,7 +71,7 @@ class Project {
     applyInfoFromCurseForge(urlInfo) {
         if (!urlInfo) throw new Error("Failed to fetch");
         this.source = "curseforge";
-        this.id = urlInfo.id;
+        this.id = urlInfo.id.toString();
         this.gallery = urlInfo.screenshots.map(e => new GalleryImage(e, "curseforge"));
         this.name = urlInfo.name;
         this.slug = urlInfo.slug;
@@ -80,20 +80,20 @@ class Project {
         this.links.wiki = urlInfo.links?.wikiUrl;
         this.links.issues = urlInfo.links?.issuesUrl;
         this.links.source = urlInfo.links?.sourceUrl;
-        this.links.mastodon = urlInfo.socialLinks?.filter(e => e.type == 1)[0]?.url,
-            this.links.discord = urlInfo.socialLinks?.filter(e => e.type == 2)[0]?.url,
-            this.links.website = urlInfo.socialLinks?.filter(e => e.type == 3)[0]?.url,
-            this.links.facebook = urlInfo.socialLinks?.filter(e => e.type == 4)[0]?.url,
-            this.links.twitter = urlInfo.socialLinks?.filter(e => e.type == 5)[0]?.url,
-            this.links.instagram = urlInfo.socialLinks?.filter(e => e.type == 6)[0]?.url,
-            this.links.patreon = urlInfo.socialLinks?.filter(e => e.type == 7)[0]?.url,
-            this.links.twitch = urlInfo.socialLinks?.filter(e => e.type == 8)[0]?.url,
-            this.links.reddit = urlInfo.socialLinks?.filter(e => e.type == 9)[0]?.url,
-            this.links.youtube = urlInfo.socialLinks?.filter(e => e.type == 10)[0]?.url,
-            this.links.tiktok = urlInfo.socialLinks?.filter(e => e.type == 11)[0]?.url,
-            this.links.pinterest = urlInfo.socialLinks?.filter(e => e.type == 12)[0]?.url,
-            this.links.github = urlInfo.socialLinks?.filter(e => e.type == 13)[0]?.url,
-            this.links.bluesky = urlInfo.socialLinks?.filter(e => e.type == 14)[0]?.url
+        this.links.mastodon = urlInfo.socialLinks?.filter(e => e.type == 1)[0]?.url;
+        this.links.discord = urlInfo.socialLinks?.filter(e => e.type == 2)[0]?.url;
+        this.links.website = urlInfo.socialLinks?.filter(e => e.type == 3)[0]?.url;
+        this.links.facebook = urlInfo.socialLinks?.filter(e => e.type == 4)[0]?.url;
+        this.links.twitter = urlInfo.socialLinks?.filter(e => e.type == 5)[0]?.url;
+        this.links.instagram = urlInfo.socialLinks?.filter(e => e.type == 6)[0]?.url;
+        this.links.patreon = urlInfo.socialLinks?.filter(e => e.type == 7)[0]?.url;
+        this.links.twitch = urlInfo.socialLinks?.filter(e => e.type == 8)[0]?.url;
+        this.links.reddit = urlInfo.socialLinks?.filter(e => e.type == 9)[0]?.url;
+        this.links.youtube = urlInfo.socialLinks?.filter(e => e.type == 10)[0]?.url;
+        this.links.tiktok = urlInfo.socialLinks?.filter(e => e.type == 11)[0]?.url;
+        this.links.pinterest = urlInfo.socialLinks?.filter(e => e.type == 12)[0]?.url;
+        this.links.github = urlInfo.socialLinks?.filter(e => e.type == 13)[0]?.url;
+        this.links.bluesky = urlInfo.socialLinks?.filter(e => e.type == 14)[0]?.url;
         this.summary = urlInfo.summary;
         this.downloads = urlInfo.downloadCount;
         this.project_type = Project.curseforge_project_type_conversion[urlInfo.classId];
@@ -344,8 +344,8 @@ class ProjectVersion {
                 this.project_type = "mod";
             }
         } else if (source == "curseforge") {
-            this.version_id = info.id;
-            this.project_id = info.modId;
+            this.version_id = info.id.toString();
+            this.project_id = info.modId.toString();
             this.name = info.displayName || info.id;
             this.version_number = "";
             this.filename = info.fileName;
@@ -355,7 +355,7 @@ class ProjectVersion {
             this.download_url = info.downloadUrl;
             this.game_versions = info.sortableGameVersions.map(e => e.gameVersion).filter(e => e);
             this.loaders = info.sortableGameVersions.filter(e => !e.gameVersion).map(e => e.gameVersionName.toLowerCase()).filter(e => e != "client" && e != "server");
-            this.required_dependencies = info.dependencies.filter(e => e.relationType == 3).map(e => ({ project_id: e.modId }));
+            this.required_dependencies = info.dependencies.filter(e => e.relationType == 3).map(e => ({ project_id: e.modId.toString() }));
         }
     }
     async getChangelog(callback, errorCallback) {
@@ -429,7 +429,7 @@ class Author {
             this.name = info.name;
             this.url = info.url;
             this.avatar = info.avatarUrl;
-            this.id = info.id;
+            this.id = info.id.toString();
             this.bio = "";
             this.role = "";
         } else {
