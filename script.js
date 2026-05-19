@@ -4454,7 +4454,7 @@ class InstanceScreen extends Screen {
             this.filesSaveButton = saveButton;
             this.filesSearch.appendChild(saveButton);
         } else {
-            let extensionsToNotEdit = ["png", "jpg", "jpeg", "webp", "avif", "dat", "dat_old", "apng", "mca", "zip", "jar"];
+            let extensionsToNotEdit = ["png", "jpg", "jpeg", "webp", "avif", "dat", "dat_old", "apng", "mca", "zip", "jar", "nbt"];
             for (let i = 0; i < files.length; i++) {
                 let file = files[i];
                 fileList.push(
