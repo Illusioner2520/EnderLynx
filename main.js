@@ -4987,7 +4987,6 @@ function getDefaultOption(key) {
     return db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key)?.value;
 }
 function setDefaultOption(key, value, version) {
-    console.log(key + " -> " + value + " (" + version + ")");
     if (key == "version") {
         let findVersion = db.prepare("SELECT * FROM options_defaults WHERE version = ?").get(version);
         if (findVersion) {

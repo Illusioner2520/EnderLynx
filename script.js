@@ -32,7 +32,6 @@ class DefaultOptions {
     }
 
     async setDefault(key, value) {
-        console.log("setting default we woo we woo");
         await window.enderlynx.setDefaultOption(key, value, this.version);
     }
 
@@ -4321,7 +4320,6 @@ class InstanceScreen extends Screen {
             }
 
             if (e.key == "version" && Number(e.value) != this.instance.attempted_options_txt_version) {
-                console.log("chicken nugget");
                 defaultOptions.setDefault(e.key, e.value);
             }
 
