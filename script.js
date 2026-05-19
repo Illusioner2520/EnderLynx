@@ -32,7 +32,8 @@ class DefaultOptions {
     }
 
     async setDefault(key, value) {
-        await window.enderlynx.setDefaultOption(key, value);
+        console.log("setting default we woo we woo");
+        await window.enderlynx.setDefaultOption(key, value, this.version);
     }
 
     async deleteDefault(key) {
@@ -4315,7 +4316,12 @@ class InstanceScreen extends Screen {
                 inputElement.disabled = true;
             }
 
+            if (e.key == "version") {
+                console.log(e.value + " vs " + this.instance.attempted_options_txt_version);
+            }
+
             if (e.key == "version" && Number(e.value) != this.instance.attempted_options_txt_version) {
+                console.log("chicken nugget");
                 defaultOptions.setDefault(e.key, e.value);
             }
 

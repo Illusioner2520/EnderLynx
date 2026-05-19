@@ -4986,7 +4986,16 @@ function getDefaultOptionsVersions() {
 function getDefaultOption(key) {
     return db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key)?.value;
 }
-function setDefaultOption(key, value) {
+function setDefaultOption(key, value, version) {
+    console.log(key + " -> " + value + " (" + version + ")");
+    if (key == "version") {
+        let findVersion = db.prepare("SELECT * FROM options_defaults WHERE version = ?").get(version);
+        if (findVersion) {
+            return db.prepare("UPDATE options_defaults SET value = ? WHERE key = ? AND version = ?").run(value, key, version);
+        } else {
+            return db.prepare("INSERT INTO options_defaults (key, value, version) VALUES (?, ?, ?)").run(key, value, version);
+        }
+    }
     if (!getDefaultOption(key)) {
         return db.prepare("INSERT INTO options_defaults (key, value) VALUES (?, ?)").run(key, value);
     }
