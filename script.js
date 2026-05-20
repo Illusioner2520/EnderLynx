@@ -14422,23 +14422,14 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 {
                     "type": "multi-select",
                     "name": translate("app.instances.loader"),
-                    "options": [
-                        { "name": loaders["vanilla"], "value": "vanilla" },
-                        { "name": loaders["fabric"], "value": "fabric" },
-                        { "name": loaders["forge"], "value": "forge" },
-                        { "name": loaders["neoforge"], "value": "neoforge" },
-                        { "name": loaders["quilt"], "value": "quilt" }
-                    ],
+                    "options": content_loaders?.map(e => ({name: loaders[e], value: e})) || "vanilla",
                     "id": "loader"
                 },
                 {
                     "type": "dropdown",
                     "name": translate("app.instances.game_version"),
-                    "options": [],
                     "id": "game_version",
-                    "input_source": "loader",
-                    "source": VersionList.getVersions,
-                    "default": await VersionList.getLatestRelease()
+                    "options": sortByVersion(game_versions, true).map(e => ({name: e, value: e}))
                 }
             ], [
                 { "content": translate("app.instances.cancel"), "type": "cancel" },
