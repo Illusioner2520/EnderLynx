@@ -5689,6 +5689,15 @@ try {
         case "0.8.0":
         case "0.8.1":
             db.prepare("ALTER TABLE profiles DROP COLUMN client_id;").run();
+        case "0.9.0":
+        case "0.9.1":
+        case "0.10.0":
+        case "0.10.1":
+            db.prepare("DELETE FROM options_defaults WHERE key = ? AND (version = ? OR version IS NULL)").run("version", "");
+            db.prepare("UPDATE content SET source_info = substr(source_info, 1, length(source_info) - 2) WHERE source_info LIKE '%.0';").run();
+            db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
+            db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
+            db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
     }
 } catch (e) { }
 
