@@ -14386,7 +14386,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
         }
         let installGrid = document.createElement("div");
         installGrid.className = "install-grid";
-        let contentOther = await window.enderlynx.getContentBySourceInfo(source == "curseforge" ? project_id.toString() + ".0" : project_id);
+        let contentOther = await window.enderlynx.getContentBySourceInfo(project_id);
         let instanceIdsWithContent = contentOther.map(e => e.instance);
         let instancesWithContent = [];
         for (let i = 0; i < instanceIdsWithContent.length; i++) {
@@ -14422,13 +14422,13 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 {
                     "type": "multi-select",
                     "name": translate("app.instances.loader"),
-                    "options": content_loaders?.length ? (content_loaders?.map(e => ({ name: loaders[e], value: e })) || "vanilla") : [
-                        { "name": loaders["vanilla"], "value": "vanilla" },
+                    "options": content_loaders?.length && project_type == "mod" ? (content_loaders?.map(e => ({ name: loaders[e], value: e })) || "vanilla") : [
+                        project_type != "shader" ? { "name": loaders["vanilla"], "value": "vanilla" } : null,
                         { "name": loaders["fabric"], "value": "fabric" },
                         { "name": loaders["forge"], "value": "forge" },
                         { "name": loaders["neoforge"], "value": "neoforge" },
                         { "name": loaders["quilt"], "value": "quilt" }
-                    ],
+                    ].filter(e => e),
                     "id": "loader"
                 },
                 {
