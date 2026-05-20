@@ -14451,7 +14451,7 @@ async function installButtonClick(content, version, instance_id, button, dialog_
                 instance.display();
                 await installContent(source, content, version, instance);
                 await instance.setInstalling(false);
-                await window.enderlynx.installMinecraft(instance_id, loader, game_version);
+                await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
             });
         }
 
