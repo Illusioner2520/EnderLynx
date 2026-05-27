@@ -302,9 +302,6 @@ class ProjectVersionList {
     constructor(version_id_list, source) {
         this.version_id_list = version_id_list;
         this.source = source;
-        if (this.source == "curseforge") {
-            this.version_id_list = this.version_id_list.map(e => Number(e));
-        }
     }
 
     async getVersions() {
@@ -396,7 +393,44 @@ class ProjectVersion {
             return this.dependencies_cache;
         }
         try {
-            // get dependency info
+            let project_ids = this.dependencies.map(e => e.project_id).filter(e => e);
+            let version_ids = this.dependencies.map(e => e.version_id).filter(e => e);
+            let projectList = new ProjectList(project_ids, this.source);
+            await projectList.getProjects();
+            let versionList = new ProjectVersionList(version_ids, this.source);
+            await versionList.getVersions();
+            let dependencies = [];
+            let info = {};
+            for (let i = 0; i < this.dependencies.length; i++) {
+                if (this.dependencies[i].project_id) {
+                    info[this.dependencies[i].project_id] = {
+                        "type": this.dependencies[i].type
+                    };
+                } else {
+                    dependencies.push({
+                        "file_name": this.dependencies[i].file_name,
+                        "type": this.dependencies[i].type
+                    });
+                }
+            }
+            for (let i = 0; i < projectList.projects.length; i++) {
+                let project = projectList.projects[i];
+                if (info[project.id]) {
+                    info[project.id].project = project;
+                }
+            }
+            for (let i = 0; i < versionList.versions.length; i++) {
+                let version = projectList.versions[i];
+                if (info[version.project_id]) {
+                    info[version.project_id].version = version;
+                }
+            }
+            for (let key in info) {
+                dependencies.push(info[key]);
+            }
+            this.dependencies_cache = dependencies;
+            callback(dependencies);
+            return dependencies;
         } catch (err) {
             errorCallback(err);
             return false;

@@ -13496,7 +13496,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                                 }
                             ], [], () => { });
                             e.getDependencies((v) => {
-                                // show dependencies here
+                                console.log(v);
                             }, (err) => {
                                 loader.errorOut(err, () => {
                                     dialog.closeDialog();
