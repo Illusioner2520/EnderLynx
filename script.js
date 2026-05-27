@@ -13448,7 +13448,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         // Changelog Button
                         let changeLogButton = document.createElement("button");
                         changeLogButton.className = "version-file-changelog";
-                        changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>' + translate("app.discover.changelog");
+                        changeLogButton.innerHTML = '<i class="fa-solid fa-book"></i>';
                         changeLogButton.setAttribute("title", translate("app.discover.changelog.tooltip"));
                         changeLogButton.onclick = () => {
                             let dialog = new Dialog();
@@ -13477,6 +13477,34 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             });
                         }
                         versionEle.appendChild(changeLogButton);
+
+                        // Dependency Button
+                        let dependencyButton = document.createElement("button");
+                        dependencyButton.className = "version-file-dependency";
+                        dependencyButton.innerHTML = '<i class="fa-solid fa-list-ul"></i>';
+                        dependencyButton.setAttribute("title", translate("app.discover.dependency.tooltip"));
+                        dependencyButton.onclick = () => {
+                            let dialog = new Dialog();
+                            let element = document.createElement('div');
+                            element.className = "dependency-list";
+                            let loader = new LoadingContainer();
+                            element.appendChild(loader.element);
+                            dialog.showDialog(translate("app.discover.dependency.title", "%v", e.name), "notice", element, [
+                                {
+                                    "type": "confirm",
+                                    "content": translate("app.discover.dependency.done")
+                                }
+                            ], [], () => { });
+                            e.getDependencies((v) => {
+                                // show dependencies here
+                            }, (err) => {
+                                loader.errorOut(err, () => {
+                                    dialog.closeDialog();
+                                    dependencyButton.click();
+                                });
+                            });
+                        }
+                        versionEle.appendChild(dependencyButton);
 
                         wrapper.appendChild(versionEle);
 

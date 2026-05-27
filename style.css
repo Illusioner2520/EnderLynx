@@ -4396,6 +4396,11 @@ dialog[open]::backdrop {
     background-color: var(--color-2t);
 }
 
+.dependency-list {
+    width: 100%;
+    align-self: start;
+}
+
 .markdown-body {
     width: 100%;
     align-self: start;
@@ -4663,11 +4668,11 @@ dialog[open]::backdrop {
     background-color: var(--color-1);
     border-radius: 8px;
     display: grid;
-    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto auto;
+    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto auto auto;
 }
 
 .version-files-wrapper:not(:has(.version-file-changelog)) {
-    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto;
+    grid-template-columns: auto 1fr 1fr 1fr 1fr 1fr auto auto;
 }
 
 .version-file {
@@ -4678,7 +4683,7 @@ dialog[open]::backdrop {
     border-top-style: solid;
     border-width: 1px;
     border-color: var(--color-1t);
-    grid-column: span 8;
+    grid-column: span 9;
     align-content: center;
 }
 
@@ -4691,12 +4696,12 @@ dialog[open]::backdrop {
     grid-template-columns: subgrid;
     gap: 10px;
     padding: 10px;
-    grid-column: span 8;
+    grid-column: span 9;
     align-content: center;
 }
 
 .version-files-wrapper:not(:has(.version-file-changelog)) .version-file-top {
-    grid-column: span 7;
+    grid-column: span 8;
 }
 
 .version-file-channel {
@@ -4805,11 +4810,12 @@ dialog[open]::backdrop {
     background-color: transparent;
     border-radius: 8px;
     padding: 8px;
-    width: max-content;
+    width: calc(1lh + 20px);
     cursor: pointer;
     transition: background-color .25s, scale .1s;
     display: flex;
     gap: 8px;
+    justify-content: center;
     align-items: center;
     font-size: 1rem;
     font-weight: bold;
@@ -4826,6 +4832,36 @@ dialog[open]::backdrop {
 }
 
 .version-file-changelog:hover {
+    background-color: var(--color-1t);
+}
+
+.version-file-dependency {
+    background-color: transparent;
+    border-radius: 8px;
+    padding: 8px;
+    width: calc(1lh + 20px);
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+    border-style: solid;
+    border-color: var(--text-color);
+    border-width: 2px;
+    color: var(--text-color);
+    align-self: center;
+    margin-left: auto;
+    aspect-ratio: 1;
+}
+
+.version-file-dependency:active {
+    scale: .95;
+}
+
+.version-file-dependency:hover {
     background-color: var(--color-1t);
 }
 

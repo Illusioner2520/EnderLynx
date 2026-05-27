@@ -28,6 +28,14 @@ class Project {
         2: "beta",
         3: "alpha"
     }
+    static curseforge_dependency_type_conversion = {
+        1: "embedded",
+        2: "optional",
+        3: "required",
+        4: "tool",
+        5: "incompatible",
+        6: "include"
+    }
     constructor() { }
     applyInfoFromModrinth(urlInfo) {
         if (!urlInfo) throw new Error("Failed to fetch");
@@ -343,6 +351,7 @@ class ProjectVersion {
             } else if (info.project_types.includes("mod")) {
                 this.project_type = "mod";
             }
+            this.dependencies = info.dependencies.map(e => ({ version_id: e.version_id, project_id: e.project_id, type: e.dependency_type, file_name: e.file_name }));
         } else if (source == "curseforge") {
             this.version_id = info.id.toString();
             this.project_id = info.modId.toString();
@@ -356,6 +365,7 @@ class ProjectVersion {
             this.game_versions = info.sortableGameVersions.map(e => e.gameVersion).filter(e => e);
             this.loaders = info.sortableGameVersions.filter(e => !e.gameVersion).map(e => e.gameVersionName.toLowerCase()).filter(e => e != "client" && e != "server");
             this.required_dependencies = info.dependencies.filter(e => e.relationType == 3).map(e => ({ project_id: e.modId.toString() }));
+            this.dependencies = info.dependencies.map(e => ({ project_id: e.modId.toString(), type: Project.curseforge_dependency_type_conversion[e.relationType] }));
         }
     }
     async getChangelog(callback, errorCallback) {
@@ -375,6 +385,18 @@ class ProjectVersion {
             }
             callback(this.changelog);
             return this.changelog;
+        } catch (err) {
+            errorCallback(err);
+            return false;
+        }
+    }
+    async getDependencies(callback, errorCallback) {
+        if (this.dependencies_cache) {
+            callback(this.dependencies_cache);
+            return this.dependencies_cache;
+        }
+        try {
+            // get dependency info
         } catch (err) {
             errorCallback(err);
             return false;
