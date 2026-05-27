@@ -584,12 +584,12 @@ class Profile {
 
     async getActiveCape() {
         let info = await window.enderlynx.getActiveCape(this.uuid);
-        return Cape.getCape(info.id);
+        return info ? Cape.getCape(info.id) : null;
     }
 
     async removeActiveCape() {
         let cape = await this.getActiveCape();
-        await cape.removeActive();
+        if (cape) await cape.removeActive();
     }
 
     async getFriends() {
