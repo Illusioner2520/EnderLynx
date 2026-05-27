@@ -537,7 +537,7 @@ async function getDefaultSkins() {
 }
 async function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
     let info = await window.enderlynx.addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key);
-    return Skin.getEntry(info.id);
+    return Skin.getSkin(info.id);
 }
 
 class Profile {
