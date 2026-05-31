@@ -4397,8 +4397,64 @@ dialog[open]::backdrop {
 }
 
 .dependency-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     width: 100%;
     align-self: start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dependency {
+    background-color: var(--color-1t);
+    border-radius: 8px;
+    display: flex;
+    padding: 8px;
+    gap: 8px;
+    align-items: center;
+    transition: backgroun-color .25s, scale .1s;
+}
+
+button.dependency {
+    cursor: pointer;
+}
+
+button.dependency:hover {
+    background-color: var(--color-2t);
+}
+
+button.dependency:active {
+    scale: .95;
+}
+
+.dependency-image {
+    height: 40px;
+    border-radius: 5px;
+    width: 40px;
+    image-rendering: pixelated;
+    object-fit: contain;
+    background-color: var(--color-1);
+}
+
+.dependency-info {
+    overflow: hidden;
+}
+
+.dependency-title {
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.dependency-sub {
+    color: var(--subtle-text-color);
+    font-size: .8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
 
 .markdown-body {

@@ -6043,7 +6043,7 @@ class DiscoverScreen extends Screen {
         if (vanilla_version == "all") vanilla_version = null;
         let instance_content = [];
         if (this.instance) instance_content = await this.instance.getContent();
-        if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currenTab == "server") loader = null;
+        if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currentTab == "server") loader = null;
         let content_ids = instance_content.map(e => e.source_info);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
@@ -13494,9 +13494,37 @@ async function displayContentInfo(content_source, content, content_id, instance_
                                     "type": "confirm",
                                     "content": translate("app.discover.dependency.done")
                                 }
-                            ], [], () => { });
+                            ], [], () => { }, () => { });
                             e.getDependencies((v) => {
-                                console.log(v);
+                                element.innerHTML = "";
+                                v.sort((a,b) => {
+                                    return (a?.project?.name || a.file_name).localeCompare(b?.project?.name || b.file_name);
+                                });
+                                for (let i = 0; i < v.length; i++) {
+                                    let info = v[i];
+                                    let dependencyElement = createElement(info.project ? "button" : "div", "dependency");
+                                    let imageElement = createElement("img", "dependency-image");
+                                    imageElement.src = info?.project?.icon || getDefaultImage(info?.project?.name || info.file_name);
+                                    let infoElement = createElement("div", "dependency-info");
+                                    let titleElement = createElement("div", "dependency-title");
+                                    titleElement.textContent = info?.project?.name || info.file_name;
+                                    let subElement = createElement("div", "dependency-sub");
+                                    subElement.textContent = info.version ? translate(`app.discover.dependency.${info.type}.version`, "%v", info.file_name || info.version.version_number || info.version.name || info.version.version_id) : translate(`app.discover.dependency.${info.type}`);
+                                    infoElement.appendChild(titleElement);
+                                    infoElement.appendChild(subElement);
+                                    dependencyElement.appendChild(imageElement);
+                                    dependencyElement.appendChild(infoElement);
+                                    element.appendChild(dependencyElement);
+                                    if (info.project) {
+                                        dependencyElement.onclick = () => {
+                                            dialog.closeDialog();
+                                            displayContentInfo(info.project.source, info.project, info.project.id);
+                                        }
+                                    }
+                                }
+                                if (v.length == 0) {
+                                    element.textContent = translate("app.discover.dependency.no_dependencies");
+                                }
                             }, (err) => {
                                 loader.errorOut(err, () => {
                                     dialog.closeDialog();

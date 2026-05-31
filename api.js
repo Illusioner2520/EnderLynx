@@ -34,7 +34,7 @@ class Project {
         3: "required",
         4: "tool",
         5: "incompatible",
-        6: "include"
+        6: "embedded"
     }
     constructor() { }
     applyInfoFromModrinth(urlInfo) {
@@ -250,6 +250,7 @@ class ProjectList {
 
     async getProjects() {
         this.projects = [];
+        if (this.project_id_list.length == 0) return;
         if (this.source == "modrinth") {
             let url = `https://api.modrinth.com/v3/projects?ids=["${this.project_id_list.join('","')}"]`;
             let urlInfo = await (await fetch(url)).json();
@@ -306,6 +307,7 @@ class ProjectVersionList {
 
     async getVersions() {
         this.versions = [];
+        if (this.version_id_list.length == 0) return;
         if (this.source == "modrinth") {
             let url = `https://api.modrinth.com/v3/versions?ids=["${this.version_id_list.join('","')}"]`;
             let urlInfo = await (await fetch(url)).json();
@@ -420,7 +422,7 @@ class ProjectVersion {
                 }
             }
             for (let i = 0; i < versionList.versions.length; i++) {
-                let version = projectList.versions[i];
+                let version = versionList.versions[i];
                 if (info[version.project_id]) {
                     info[version.project_id].version = version;
                 }

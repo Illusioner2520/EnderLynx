@@ -1166,7 +1166,7 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
     }
 });
 
-async function processCfZipWithoutID(instance_id, info, title = ".zip file") {
+async function processCfZip(instance_id, info, title = ".zip file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
@@ -1796,174 +1796,6 @@ async function processElPack(instance_id, info, title = ".elpack file") {
         return { "error": true };
     }
 }
-async function processCfZip(instance_id, info, cf_id, title = ".zip file") {
-    let max_downloads = getMaxConcurrentDownloads();
-    let processId = generateNewProcessId();
-    let cancelId = generateNewCancelId();
-    let abortController = new AbortController();
-    cancelFunctions[cancelId] = abortController;
-    let signal = abortController.signal;
-    try {
-        win.webContents.send('progress-update', translate("app.installing", "%t", title), 0, translate("app.installing.beginning"), processId, "good", cancelId);
-        const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
-
-        let extractToPath = path.resolve(user_path, `minecraft/instances/${instance_id}/cfzip`);
-
-        if (!fs.existsSync(extractToPath)) {
-            fs.mkdirSync(extractToPath, { recursive: true });
-        }
-        signal.throwIfAborted();
-
-        await new Promise((resolve) => zip.extractAllToAsync(extractToPath, true, false, (v) => {
-            resolve(v);
-        }));
-
-        let srcDir = path.resolve(user_path, `minecraft/instances/${instance_id}/cfzip/overrides`);
-        let destDir = path.resolve(user_path, `minecraft/instances/${instance_id}`);
-
-        fs.mkdirSync(srcDir, { recursive: true });
-        fs.mkdirSync(destDir, { recursive: true });
-
-        const files = await fsPromises.readdir(srcDir);
-
-        for (const file of files) {
-            signal.throwIfAborted();
-            win.webContents.send('progress-update', translate("app.installing", "%t", title), 5, translate("app.installing.override", "%o", file), processId, "good", cancelId);
-            const srcPath = path.join(srcDir, file);
-            const destPath = path.join(destDir, file);
-
-            if (fs.existsSync(destPath)) {
-                await fsPromises.rm(srcPath, { recursive: true, force: true });
-                continue;
-            }
-            try {
-                await fsPromises.cp(srcPath, destPath, { recursive: true });
-                await fsPromises.rm(srcPath, { recursive: true, force: true });
-            } catch (err) {
-                throw new (translate("app.installing.override.fail", "%o", file));
-            }
-        }
-
-        let manifest_json = await fsPromises.readFile(path.resolve(extractToPath, "manifest.json"));
-        manifest_json = JSON.parse(manifest_json);
-
-        let dependency_res;
-        if (cf_id) dependency_res = await fetch(`https://www.curseforge.com/api/v1/mods/${cf_id}/dependencies?index=0&pageSize=1000`)
-        let dependency_json;
-        if (cf_id) dependency_json = await dependency_res.json()
-
-        let content = [];
-        let project_ids = [];
-
-        const limit = pLimit(max_downloads);
-
-        let allocated_ram = manifest_json.minecraft?.recommendedRam;
-
-        signal.throwIfAborted();
-        win.webContents.send('progress-update', translate("app.installing", "%t", title), 10, translate("app.installing.downloading", "%a", 1, "%b", manifest_json.files.length), processId, "good", cancelId);
-
-        let count = 0;
-
-        const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
-            signal.throwIfAborted();
-            let dependency_item = cf_id ? dependency_json.data.find(dep => dep.id === file.projectID) : null;
-
-            let folder = "mods";
-            if (dependency_item?.categoryClass?.slug == "texture-packs") folder = "resourcepacks";
-            else if (dependency_item?.categoryClass?.slug == "shaders") folder = "shaderpacks";
-            let type = "mod";
-            if (dependency_item?.categoryClass?.slug == "texture-packs") type = "resource_pack";
-            else if (dependency_item?.categoryClass?.slug == "shaders") type = "shader";
-            let file_name = "";
-            try {
-                file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${file.projectID}/files/${file.fileID}/download`, path.resolve(destDir, folder));
-            } catch (e) {
-                let res = await fetch(`https://api.curse.tools/v1/cf/mods/${file.projectID}/files/${file.fileID}`);
-                let res_json = await res.json();
-                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(destDir, folder));
-            }
-
-            if (cf_id && dependency_item) {
-                project_ids.push(null);
-                content.push({
-                    "author": dependency_item?.authorName ?? "",
-                    "disabled": false,
-                    "file_name": file_name,
-                    "image": dependency_item?.logoUrl ?? "",
-                    "source": "curseforge",
-                    "source_id": file.projectID,
-                    "type": type,
-                    "version": "",
-                    "version_id": file.fileID,
-                    "name": dependency_item?.name ?? file_name
-                })
-            } else {
-                project_ids.push(file.projectID);
-                content.push({
-                    "source": "curseforge",
-                    "source_id": file.projectID,
-                    "version_id": file.fileID,
-                    "disabled": false,
-                    "type": type,
-                    "version": "",
-                    "file_name": file_name
-                });
-            }
-            signal.throwIfAborted();
-            if (count == manifest_json.files.length - 1) {
-                win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
-            } else {
-                win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / manifest_json.files.length) * 84 + 10, `Downloading file ${count + 2} of ${manifest_json.files.length}`, processId, "good", cancelId);
-            }
-            count++;
-        }));
-        await Promise.all(downloadPromises);
-
-        if (project_ids.filter(e => e).length) {
-            let cfData = [];
-            try {
-                const response = await fetch("https://api.curse.tools/v1/mods", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ modIds: project_ids.filter(e => e), filterPcOnly: false }),
-                    signal
-                });
-                if (response.ok) {
-                    const json = await response.json();
-                    cfData = json.data || [];
-                }
-            } catch (e) {
-                cfData = [];
-            }
-
-            cfData.forEach(e => {
-                content.forEach(item => {
-                    if (Number(item.source_id) == Number(e.id)) {
-                        item.name = e.name;
-                        item.image = e.logo.thumbnailUrl;
-                        item.author = e.authors.map(e => e.name).join(", ");
-                    }
-                });
-            });
-        }
-
-        await fsPromises.rm(extractToPath, { recursive: true });
-
-        signal.throwIfAborted();
-        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
-        return ({
-            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
-            "content": content,
-            "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
-            "vanilla_version": manifest_json.minecraft.version,
-            "allocated_ram": allocated_ram,
-            "name": manifest_json.name
-        })
-    } catch (err) {
-        win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, err, processId, "error", cancelId);
-        return { "error": true };
-    }
-}
 async function processMMCZip(instance_id, info, title = ".zip file") {
     let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
@@ -2370,7 +2202,7 @@ async function processPackFile(info, instance_id, title) {
         return await processMrPack(instance_id, info, null, title);
     } else if (extension == ".zip") {
         let zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
-        if (zip.getEntry("manifest.json")) return await processCfZipWithoutID(instance_id, info, title);
+        if (zip.getEntry("manifest.json")) return await processCfZip(instance_id, info, title);
         return await processMMCZip(instance_id, info, title);
     } else if (extension == ".elpack") {
         return await processElPack(instance_id, info, title);

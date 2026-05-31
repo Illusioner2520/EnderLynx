@@ -1256,5 +1256,16 @@
     "app.friends.error.add.cannot_add_self": "Failed to send request. That is yourself.",
     "app.friends.error.add.unknown_profile": "Failed to send request. There is no known account with that username",
     "app.friends.info": "This is your Minecraft Java friends list and links to your Xbox friends, meaning that anything you do here will be reflected in your Xbox friends list.",
-    "app.discover.no_changelog": "No Changelog Specified"
+    "app.discover.no_changelog": "No Changelog Specified",
+    "app.discover.dependency.required": "Required",
+    "app.discover.dependency.required.version": "Version %v is required",
+    "app.discover.dependency.optional": "Optional",
+    "app.discover.dependency.optional.version": "Version %v is optional",
+    "app.discover.dependency.embedded": "Embedded",
+    "app.discover.dependency.embedded.version": "Version %v is embedded",
+    "app.discover.dependency.incompatible": "Incompatible",
+    "app.discover.dependency.incompatible.version": "Version %v is incompatible",
+    "app.discover.dependency.tool": "Tool",
+    "app.discover.dependency.tool.version": "Version %v is a tool",
+    "app.discover.dependency.no_dependencies": "No Dependencies"
 }
