@@ -521,7 +521,8 @@ body.sidebar-right #player-dropdown {
 *:focus-visible,
 .search-bar:has(.search-input:focus-visible),
 .search-dropdown:has(.dropdown-button:focus-visible),
-.details:has(.details-top:focus-visible) {
+.details:has(.details-top:focus-visible),
+.wardrobe-default-skin-details:has(.details-top:focus-visible) {
     outline-style: solid;
     outline-color: var(--secondary-accent-color);
     outline-width: 3.5px;
@@ -3158,6 +3159,7 @@ dialog[open]::backdrop {
     max-height: 100%;
     background: repeating-conic-gradient(var(--color-1) 0 25%, color-mix(in srgb, var(--color-2), var(--color-1)) 0 50%) 50% / 50px 50px;
     cursor: move;
+    display: block;
 }
 
 .skin-render-container {
@@ -5035,7 +5037,8 @@ dialog {
     position: absolute;
 }
 
-.details {
+.details,
+.wardrobe-default-skin-details {
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -5075,7 +5078,8 @@ dialog {
     font-size: 1.3rem;
 }
 
-.details.open>*>.details-top-chevron {
+.details.open>*>.details-top-chevron
+.wardrobe-default-skin-details>*>.details-top-chevron {
     rotate: 180deg;
 }
 
@@ -5095,6 +5099,21 @@ dialog {
     display: block;
     opacity: 1;
 
+    @starting-style {
+        height: 0px;
+        padding-block: 0px;
+        opacity: 0;
+    }
+}
+
+.wardrobe-default-skin-details.open>.details-content {
+    height: max-content;
+    padding-block: 8px;
+    display: block;
+    opacity: 1;
+}
+
+.wardrobe-default-skin-details.open.animate>.details-content {
     @starting-style {
         height: 0px;
         padding-block: 0px;
@@ -6461,4 +6480,9 @@ body.april_fools *::before {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+.wardrobe-default-skin-details:has(.my-account-option-list-skin:empty) {
+    display: none;
+    transition: none;
 }

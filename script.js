@@ -6320,12 +6320,12 @@ class WardrobeScreen extends Screen {
 
         this.showCapes();
 
+        this.defaultSkinEntryList = [];
         getDefaultSkins((info) => {
             let tags = info.tags;
             let skins = info.skins;
-            console.log(skins);
             for (let i = 0; i < tags.length; i++) {
-                let detailsWrapper = createElement("div", "details");
+                let detailsWrapper = createElement("div", "details wardrobe-default-skin-details");
                 skinOptions.appendChild(detailsWrapper);
                 let defaultSkinList = createElement("div", "my-account-option-list-skin");
                 let detailsTop = createElement("button", "details-top");
@@ -6340,13 +6340,13 @@ class WardrobeScreen extends Screen {
                 detailsWrapper.appendChild(detailContent);
                 detailContent.appendChild(defaultSkinList);
                 let skinsWithTag = skins.filter(e => e.tag == tags[i]);
-                console.log(skinsWithTag);
                 skinsWithTag.forEach(e => {
                     let skinEntry = new SkinEntry(e, false, this.skinViewer, this.profile, () => {
                         this.showContent()
                     }, (noAnimate) => {
                         this.filterSkins(noAnimate);
                     });
+                    this.defaultSkinEntryList.push({ skinList: defaultSkinList, skinEntry });
                     defaultSkinList.appendChild(skinEntry.element);
                 });
                 detailsTop.onclick = () => {
@@ -6354,6 +6354,10 @@ class WardrobeScreen extends Screen {
                         detailsWrapper.classList.remove("open");
                     } else {
                         detailsWrapper.classList.add("open");
+                        detailsWrapper.classList.add("animate");
+                        setTimeout(() => {
+                            detailsWrapper.classList.remove("animate");
+                        }, 250);
                     }
                 }
             }
@@ -6538,8 +6542,10 @@ class WardrobeScreen extends Screen {
         if (!noAnimate) animateGridReorderStart(".skin");
         let search = this.searchbar.value.toLowerCase().trim();
         let sort = this.sortdropdown.value;
+        this.defaultSkinEntryList.forEach(e => e.skinEntry.element.remove());
         this.skinEntries.forEach(e => e.element.remove());
-        let filteredEntries = this.skinEntries.filter(e => e.skin.name.toLowerCase().includes(search));
+        let filteredEntries = this.skinEntries.filter(e => e.name.toLowerCase().includes(search));
+        let filteredDefaultSkinEntries = this.defaultSkinEntryList.filter(e => e.skinEntry.name.toLowerCase().includes(search));
         filteredEntries.sort((a, b) => {
             if (sort == "last_used") {
                 let c = a.skin.last_used;
@@ -6550,8 +6556,8 @@ class WardrobeScreen extends Screen {
                 if (isNaN(d)) d = 0;
                 return d - c;
             }
-            let av = a.skin.name.toLowerCase();
-            let bv = b.skin.name.toLowerCase();
+            let av = a.name.toLowerCase();
+            let bv = b.name.toLowerCase();
             if (av > bv) return 1;
             if (av < bv) return -1;
             return 0;
@@ -6566,6 +6572,9 @@ class WardrobeScreen extends Screen {
         }
         filteredEntries.forEach(e => {
             this.skinList.appendChild(e.element);
+        });
+        filteredDefaultSkinEntries.forEach(e => {
+            e.skinList.appendChild(e.skinEntry.element);
         });
         if (!noAnimate) animateGridReorderEnd(".skin");
     }
@@ -6592,28 +6601,6 @@ class WardrobeScreen extends Screen {
         this.filterSkins(true);
         if (!noAnimate) animateGridReorderEnd(".skin");
     }
-
-    // async showDefSkins() {
-    //     this.detailChevron.innerHTML = '<i class="spinner"></i>';
-    //     let eles = document.querySelectorAll(".my-account-option.default-skin");
-    //     if (eles.length == 0) {
-    //         let defaultSkins = await getDefaultSkins();
-    //         defaultSkins.forEach(e => {
-    //             let skinEntry = new SkinEntry(e, false, this.skinViewer, this.profile, () => {
-    //                 this.showContent()
-    //             }, (noAnimate) => {
-    //                 this.filterSkins(noAnimate);
-    //             });
-    //             this.defaultSkinList.appendChild(skinEntry.element);
-    //         });
-    //     }
-    //     this.detailsWrapper.classList.add("open");
-    //     this.detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-    // }
-
-    // hideDefSkins() {
-    //     this.detailsWrapper.classList.remove("open");
-    // }
 
     async showCapes() {
         this.capeList.innerHTML = "";
@@ -8110,6 +8097,7 @@ function animateGridReorderEnd(querySelector, pseudoElements) {
 class SkinEntry {
     constructor(e, allowEditing, skinViewer, default_profile, showContent, filterSkins) {
         this.skin = e;
+        this.name = allowEditing ? e.name : translate(e.name);
         let skinEle = document.createElement("div");
         let equipSkin = async () => {
             loader.style.display = "block";
@@ -8337,7 +8325,7 @@ class SkinEntry {
         skinEle.appendChild(loader);
         skinEle.appendChild(skinName);
         skinEle.dataset.id = e.id;
-        skinName.textContent = allowEditing ? e.name : translate(e.name);
+        skinName.textContent = this.name;
         skinName.className = "skin-name";
         if (e.name.toLowerCase() == "dinnerbone" || e.name.toLowerCase() == "grumm" || e.name.toLowerCase() == "dinnerbone's skin" || e.name.toLowerCase() == "grumm's skin") {
             skinImg.classList.add("dinnerbone");
