@@ -66,7 +66,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name T
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT, favorited INTEGER, last_used TEXT, preview TEXT, preview_model TEXT, head TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT, favorited INTEGER, last_used TEXT, preview TEXT, preview_model TEXT, head TEXT, tag TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
@@ -4724,18 +4724,19 @@ function getSkinsNoDefaults() {
 async function getDefaultSkins() {
     let skins = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
     let defaultSkins = JSON.parse(await fsPromises.readFile(path.resolve(__dirname, "resources/default_skins.json"), 'utf-8'));
+    let tags = [...new Set(defaultSkins.map(e => e.tag))];
     let texture_keys = skins.map(e => e.texture_key);
     for (let i = 0; i < defaultSkins.length; i++) {
         let e = defaultSkins[i];
         if (!texture_keys.includes(e.texture_key)) {
             let info = await downloadSkin(e.url);
-            db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key) VALUES (?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, 1, "", e.texture_key);
+            db.prepare("INSERT INTO skins (name, model, skin_id, skin_url, default_skin, active_uuid, texture_key, tag) VALUES (?,?,?,?,?,?,?,?)").run(e.name, e.model, info.hash, info.dataUrl, 1, "", e.texture_key, e.tag);
         } else {
-            db.prepare("UPDATE skins SET name = ?, model = ? WHERE texture_key = ?").run(e.name, e.model, e.texture_key);
+            db.prepare("UPDATE skins SET name = ?, model = ?, tag = ? WHERE texture_key = ?").run(e.name, e.model, e.tag, e.texture_key);
         }
     }
     let skinsAgain = db.prepare("SELECT * FROM skins WHERE default_skin = ?").all(1);
-    return skinsAgain;
+    return { tags, skins: skinsAgain };
 }
 function getSkin(skin_id) {
     return db.prepare("SELECT * FROM skins WHERE id = ? LIMIT 1").get(skin_id);
@@ -5530,6 +5531,8 @@ try {
             db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
             db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
             db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
+        case "0.10.2":
+            db.prepare("ALTER TABLE skins ADD tag TEXT").run();
     }
 } catch (e) { }
 
