@@ -3259,22 +3259,6 @@ ipcMain.handle('get-world-files', async (_, instance_id, world_id) => {
     return await getAllFilesRecursive(dirPath, undefined, true);
 });
 
-ipcMain.handle('set-world-dat', async (_, instance_id, world_id, datInfo) => {
-    let files = Object.keys(datInfo);
-    const worldPath = path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id);
-    try {
-        for (let i = 0; i < files.length; i++) {
-            let filePath = path.resolve(worldPath, files[i]);
-            const newBuffer = nbt.writeUncompressed(datInfo[files[i]]);
-            const newerBuffer = zlib.gzipSync(newBuffer);
-            await fsPromises.writeFile(filePath, newerBuffer);
-        }
-        return true;
-    } catch (e) {
-        return false;
-    }
-})
-
 function readElPack(info) {
     try {
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
