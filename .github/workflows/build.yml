@@ -82,6 +82,7 @@ jobs:
         shell: bash
 
       - name: Install Rust
+        if: runner.os == 'Windows'
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
