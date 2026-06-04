@@ -6271,6 +6271,7 @@ class WardrobeScreen extends Screen {
         let activeScreen = document.createElement("div");
         ele.appendChild(optionsContainer);
         let skinOptions = document.createElement("div");
+        this.skinOptions = skinOptions;
         skinOptions.className = "my-account-option-box";
         activeScreen.appendChild(skinOptions);
         let fileDrop = createElement("div", "small-drop-overlay drop-overlay");
@@ -6322,45 +6323,8 @@ class WardrobeScreen extends Screen {
 
         this.defaultSkinEntryList = [];
         getDefaultSkins((info) => {
-            let tags = info.tags;
-            let skins = info.skins;
-            for (let i = 0; i < tags.length; i++) {
-                let detailsWrapper = createElement("div", "details wardrobe-default-skin-details");
-                skinOptions.appendChild(detailsWrapper);
-                let defaultSkinList = createElement("div", "my-account-option-list-skin");
-                let detailsTop = createElement("button", "details-top");
-                let detailTitle = createElement("span", "details-top-text");
-                detailTitle.textContent = translate(tags[i]);
-                let detailChevron = createElement("span", "details-top-chevron");
-                detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
-                detailsTop.appendChild(detailTitle);
-                detailsTop.appendChild(detailChevron);
-                let detailContent = createElement("div", "details-content");
-                detailsWrapper.appendChild(detailsTop);
-                detailsWrapper.appendChild(detailContent);
-                detailContent.appendChild(defaultSkinList);
-                let skinsWithTag = skins.filter(e => e.tag == tags[i]);
-                skinsWithTag.forEach(e => {
-                    let skinEntry = new SkinEntry(e, false, this.skinViewer, this.profile, () => {
-                        this.showContent()
-                    }, (noAnimate) => {
-                        this.filterSkins(noAnimate);
-                    });
-                    this.defaultSkinEntryList.push({ skinList: defaultSkinList, skinEntry });
-                    defaultSkinList.appendChild(skinEntry.element);
-                });
-                detailsTop.onclick = () => {
-                    if (detailsWrapper.classList.contains("open")) {
-                        detailsWrapper.classList.remove("open");
-                    } else {
-                        detailsWrapper.classList.add("open");
-                        detailsWrapper.classList.add("animate");
-                        setTimeout(() => {
-                            detailsWrapper.classList.remove("animate");
-                        }, 250);
-                    }
-                }
-            }
+            this.defaultSkinInfo = info;
+            this.showDefaultSkins();
         });
 
         this.skinEntries = [];
@@ -6387,6 +6351,7 @@ class WardrobeScreen extends Screen {
                 await window.enderlynx.getProfile(profile.id);
                 refreshButtonIcon.classList.remove("spinning");
                 this.showContent();
+                this.showDefaultSkins();
                 this.showCapes();
                 accountSwitcher.reloadHeads();
             } catch (e) {
@@ -6600,6 +6565,49 @@ class WardrobeScreen extends Screen {
         });
         this.filterSkins(true);
         if (!noAnimate) animateGridReorderEnd(".skin");
+    }
+
+    async showDefaultSkins() {
+        [...document.querySelectorAll(".wardrobe-default-skin-details")].forEach(e => e.remove());
+        let tags = this.defaultSkinInfo.tags;
+        let skins = this.defaultSkinInfo.skins;
+        for (let i = 0; i < tags.length; i++) {
+            let detailsWrapper = createElement("div", "details wardrobe-default-skin-details");
+            this.skinOptions.appendChild(detailsWrapper);
+            let defaultSkinList = createElement("div", "my-account-option-list-skin");
+            let detailsTop = createElement("button", "details-top");
+            let detailTitle = createElement("span", "details-top-text");
+            detailTitle.textContent = translate(tags[i]);
+            let detailChevron = createElement("span", "details-top-chevron");
+            detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+            detailsTop.appendChild(detailTitle);
+            detailsTop.appendChild(detailChevron);
+            let detailContent = createElement("div", "details-content");
+            detailsWrapper.appendChild(detailsTop);
+            detailsWrapper.appendChild(detailContent);
+            detailContent.appendChild(defaultSkinList);
+            let skinsWithTag = skins.filter(e => e.tag == tags[i]);
+            skinsWithTag.forEach(e => {
+                let skinEntry = new SkinEntry(e, false, this.skinViewer, this.profile, () => {
+                    this.showContent()
+                }, (noAnimate) => {
+                    this.filterSkins(noAnimate);
+                });
+                this.defaultSkinEntryList.push({ skinList: defaultSkinList, skinEntry });
+                defaultSkinList.appendChild(skinEntry.element);
+            });
+            detailsTop.onclick = () => {
+                if (detailsWrapper.classList.contains("open")) {
+                    detailsWrapper.classList.remove("open");
+                } else {
+                    detailsWrapper.classList.add("open");
+                    detailsWrapper.classList.add("animate");
+                    setTimeout(() => {
+                        detailsWrapper.classList.remove("animate");
+                    }, 250);
+                }
+            }
+        }
     }
 
     async showCapes() {
@@ -8151,8 +8159,10 @@ class SkinEntry {
                     ], [], async (info) => {
                         await e.setName(info.name);
                         if (!info.name) await e.setName(translate("app.wardrobe.unnamed"));
+                        let needsToBeReequipped = false;
+                        if (e.model != info.model) needsToBeReequipped = true;
                         await e.setModel(info.model);
-                        if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
+                        if (needsToBeReequipped && e.active_uuid.includes(";" + default_profile.uuid + ";")) {
                             await equipSkin();
                         }
                         showContent(true);
@@ -8331,6 +8341,8 @@ class SkinEntry {
             skinImg.classList.add("dinnerbone");
         }
         this.element = skinEle;
+        console.log(e);
+        console.log(e.active_uuid);
         if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
             skinEle.classList.add("selected");
         }
@@ -13499,7 +13511,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             ], [], () => { }, () => { });
                             e.getDependencies((v) => {
                                 element.innerHTML = "";
-                                v.sort((a,b) => {
+                                v.sort((a, b) => {
                                     return (a?.project?.name || a.file_name).localeCompare(b?.project?.name || b.file_name);
                                 });
                                 for (let i = 0; i < v.length; i++) {
