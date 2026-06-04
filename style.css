@@ -5078,8 +5078,7 @@ dialog {
     font-size: 1.3rem;
 }
 
-.details.open>*>.details-top-chevron
-.wardrobe-default-skin-details>*>.details-top-chevron {
+.details.open>*>.details-top-chevron {
     rotate: 180deg;
 }
 
