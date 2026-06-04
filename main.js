@@ -4644,7 +4644,7 @@ function getInstanceContentDatabase(instance_id) {
 function updateContent(key, value, content_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["name", "author", "disabled", "image", "file_name", "source", "type", "version", "version_id", "instance", "source_info TEXT"];
+    let allowedKeys = ["name", "author", "disabled", "image", "file_name", "source", "type", "version", "version_id", "instance", "source_info"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
     if (win && win.webContents) win.webContents.send('content-updated', key, value, content_id);
     return db.prepare(`UPDATE content SET ${key} = ? WHERE id = ?`).run(value, content_id);
