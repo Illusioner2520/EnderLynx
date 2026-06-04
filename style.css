@@ -6485,3 +6485,7 @@ body.april_fools *::before {
     display: none;
     transition: none;
 }
+
+.my-account-option-list-skin:empty {
+    display: none;
+}
