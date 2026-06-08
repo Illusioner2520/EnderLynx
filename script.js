@@ -517,6 +517,731 @@ class Instance {
     async stop() {
         return await window.enderlynx.stopInstance(this.instance_id);
     }
+
+    showRepairDialog() {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.instances.repair.title"), "form", [
+            {
+                "type": "notice",
+                "content": this.install_source == "custom" ? translate("app.instances.repair.notice") : translate("app.instances.repair.notice_modpack")
+            },
+            {
+                "type": "toggle",
+                "name": translate("app.instances.repair.minecraft"),
+                "desc": translate("app.instances.repair.minecraft.description"),
+                "id": "minecraft",
+                "default": false
+            },
+            {
+                "type": "toggle",
+                "name": translate("app.instances.repair.java"),
+                "desc": translate("app.instances.repair.java.description"),
+                "id": "java",
+                "default": false
+            },
+            {
+                "type": "toggle",
+                "name": translate("app.instances.repair.assets"),
+                "desc": translate("app.instances.repair.assets.description"),
+                "id": "assets",
+                "default": false
+            },
+            this.loader != "vanilla" ? {
+                "type": "toggle",
+                "name": translate("app.instances.repair.mod_loader", "%l", loaders[this.loader]),
+                "desc": translate("app.instances.repair.mod_loader.description", "%l", loaders[this.loader]),
+                "id": "mod_loader",
+                "default": false
+            } : null
+        ].filter(e => e), [
+            {
+                "type": "cancel",
+                "content": translate("app.instances.repair.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.instances.repair.confirm")
+            }
+        ], [], async (info) => {
+            let whatToRepair = [];
+            if (info.minecraft) whatToRepair.push("minecraft");
+            if (info.java) whatToRepair.push("java");
+            if (info.assets) whatToRepair.push("assets");
+            if (info.mod_loader) whatToRepair.push("mod_loader");
+            this.repair(whatToRepair);
+        });
+    }
+
+    async repair() {
+        await this.setMcInstalled(false);
+        await this.setFailed(false);
+        let r = await window.enderlynx.repairMinecraft(this.instance_id, this.loader, this.vanilla_version, this.loader_version, whatToRepair);
+        if (r.error) {
+            await this.setFailed(true);
+        } else {
+            if (whatToRepair.includes("java")) {
+                await this.setJavaVersion(r.java_version);
+            }
+            await this.setMcInstalled(true);
+        }
+        await this.setProvidedJavaArgs(r.java_args);
+        if (!this.uses_custom_java_args) {
+            await this.setJavaArgs(r.java_args);
+        }
+    }
+
+    async showSettingsDialog() {
+        let dialog = new Dialog();
+        let resettingJavaArgs = false;
+        let resettingJavaInstallation = false;
+        let default_java_installation = await window.enderlynx.getJavaInstallation(this.java_version);
+        dialog.showDialog(translate("app.instances.settings.title"), "form", [
+            {
+                "type": "image-upload",
+                "name": translate("app.instances.settings.icon"),
+                "id": "icon",
+                "default": this.image,
+                "tab": "general",
+                "image_code": this.instance_id
+            },
+            {
+                "type": "text",
+                "name": translate("app.instances.settings.name"),
+                "id": "name",
+                "default": this.name,
+                "tab": "general",
+                "maxlength": 50
+            },
+            {
+                "type": "text",
+                "name": translate("app.instances.settings.group"),
+                "id": "group",
+                "default": this.group_id,
+                "tab": "general",
+                "desc": translate("app.instances.settings.group.description")
+            },
+            this.locked ? null : {
+                "type": "multi-select",
+                "name": translate("app.instances.settings.loader"),
+                "options": [
+                    { "name": translate("app.loader.vanilla"), "value": "vanilla" },
+                    { "name": translate("app.loader.fabric"), "value": "fabric" },
+                    { "name": translate("app.loader.forge"), "value": "forge" },
+                    { "name": translate("app.loader.neoforge"), "value": "neoforge" },
+                    { "name": translate("app.loader.quilt"), "value": "quilt" }
+                ],
+                "id": "loader",
+                "default": this.loader,
+                "tab": "installation"
+            },
+            this.locked ? null : {
+                "type": "dropdown",
+                "name": translate("app.instances.settings.game_version"),
+                "options": [],
+                "id": "game_version",
+                "default": this.vanilla_version,
+                "tab": "installation",
+                "input_source": "loader",
+                "source": VersionList.getVersions
+            },
+            this.locked ? null : {
+                "type": "loader-version-dropdown",
+                "name": "",
+                "options": [],
+                "id": "loader_version",
+                "default": this.loader_version,
+                "tab": "installation",
+                "loader_source": "loader",
+                "game_version_source": "game_version"
+            },
+            this.locked ? null : {
+                "type": "toggle",
+                "name": translate("app.instances.settings.update_content"),
+                "default": true,
+                "tab": "installation",
+                "desc": translate("app.instances.settings.update_content.description"),
+                "id": "update_content"
+            },
+            this.installed_version ? {
+                "type": "notice",
+                "content": translate("app.instances.settings.modpack.installed_via", "%c", translate("app.discover." + this.install_source)),
+                "tab": "modpack"
+            } : null,
+            this.installed_version ? {
+                "type": "button",
+                "name": translate("app.instances.settings.modpack.view"),
+                "tab": "modpack",
+                "icon": '<i class="fa-solid fa-eye"></i>',
+                "func": () => {
+                    displayContentInfo(this.install_source, undefined, this.install_id, this.instance_id);
+                }
+            } : null,
+            this.installed_version ? {
+                "type": "dropdown",
+                "name": translate("app.instances.settings.modpack.version.title"),
+                "desc": translate("app.instances.settings.modpack.version.description"),
+                "tab": "modpack",
+                "id": "modpack_version",
+                "options": [],
+                "input_source": "",
+                "source": async () => {
+                    return await getModpackVersions(this.install_source, this.install_id);
+                },
+                "default": this.installed_version
+            } : null,
+            this.installed_version ? {
+                "type": "toggle",
+                "name": translate("app.modpack.repair"),
+                "tab": "modpack",
+                "id": "modpack_reinstall"
+            } : null,
+            {
+                "type": "text",
+                "name": translate("app.instances.settings.linked_server"),
+                "id": "source_server",
+                "tab": this.installed_version ? "modpack" : "installation",
+                "default": this.source_server,
+                "desc": translate("app.instances.settings.linked_server.description")
+            },
+            {
+                "type": "number",
+                "name": translate("app.instances.settings.width"),
+                "id": "width",
+                "default": this.window_width ?? 854,
+                "tab": "window",
+                "desc": translate("app.instances.settings.width.description")
+            },
+            {
+                "type": "number",
+                "name": translate("app.instances.settings.height"),
+                "id": "height",
+                "default": this.window_height ?? 480,
+                "tab": "window",
+                "desc": translate("app.instances.settings.height.description")
+            },
+            {
+                "type": "slider",
+                "name": translate("app.instances.settings.ram"),
+                "id": "allocated_ram",
+                "default": this.allocated_ram ?? 4096,
+                "tab": "java",
+                "min": 512,
+                "max": window.enderlynx.getTotalRAM(),
+                "increment": 64,
+                "unit": translate("app.instances.settings.ram.unit"),
+                "desc": translate("app.instances.settings.ram.description")
+            },
+            {
+                "type": "text",
+                "name": translate("app.instances.settings.java_installation"),
+                "id": "java_path",
+                "default": this.uses_custom_java_installation ? this.java_path : default_java_installation,
+                "tab": "java",
+                "desc": translate("app.instances.settings.java_installation.description." + window.enderlynx.ostype()).replace("%v", this.java_version),
+                "buttons": [
+                    {
+                        "name": translate("app.instances.settings.java_installation.detect"),
+                        "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
+                        "func": async (v, b, i) => {
+                            b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.detect.searching");
+                            let dialog = new Dialog();
+                            let results = await window.enderlynx.detectJavaInstallations(this.java_version);
+                            dialog.showDialog(translate("app.instances.settings.java_installation.detect.title"), "form", [
+                                {
+                                    "type": "dropdown",
+                                    "id": "java_path",
+                                    "name": translate("app.instances.settings.java_installation.detect.java_path"),
+                                    "options": results.map(e => ({ "name": e.path, "value": e.path }))
+                                }
+                            ], [
+                                { "type": "cancel", "content": translate("app.instances.settings.java_installation.detect.cancel") },
+                                { "type": "confirm", "content": translate("app.instances.settings.java_installation.detect.confirm") }
+                            ], [], (info) => {
+                                i.value = info.java_path;
+                            });
+                            b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>' + translate("app.instances.settings.java_installation.detect");
+                        }
+                    },
+                    {
+                        "name": translate("app.instances.settings.java_installation.browse"),
+                        "icon": '<i class="fa-solid fa-folder"></i>',
+                        "func": async (v, b, i) => {
+                            let newValue = await window.enderlynx.triggerFileBrowse(v);
+                            if (newValue) i.value = newValue;
+                        }
+                    },
+                    {
+                        "name": translate("app.instances.settings.java_installation.test"),
+                        "icon": '<i class="fa-solid fa-play"></i>',
+                        "func": async (v, b) => {
+                            let num = Math.floor(Math.random() * 10000);
+                            b.setAttribute("data-num", num);
+                            b.classList.remove("failed");
+                            b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
+                            let success = await window.enderlynx.testJavaInstallation(v);
+                            if (success) {
+                                b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
+                            } else {
+                                b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
+                                b.classList.add("failed");
+                            }
+                            setTimeout(() => {
+                                if (b.getAttribute("data-num") == num) {
+                                    b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
+                                    b.classList.remove("failed");
+                                }
+                            }, 3000);
+                        }
+                    },
+                    {
+                        "name": translate("app.instances.settings.java_installation.test.reset"),
+                        "icon": '<i class="fa-solid fa-rotate-left"></i>',
+                        "func": async (v, b, i) => {
+                            b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.reset.resetting");
+                            let java_path = default_java_installation;
+                            i.value = java_path;
+                            resettingJavaInstallation = true;
+                            b.innerHTML = '<i class="fa-solid fa-rotate-left"></i>' + translate("app.instances.settings.java_installation.test.reset")
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "id": "java_args",
+                "name": translate("app.instances.settings.custom_args"),
+                "default": this.java_args,
+                "tab": "java",
+                "buttons": [
+                    {
+                        "name": translate("app.instances.settings.java_args.reset"),
+                        "icon": '<i class="fa-solid fa-rotate-left"></i>',
+                        "func": (v, b, i) => {
+                            i.value = this.provided_java_args;
+                            resettingJavaArgs = true;
+                        }
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "id": "env_vars",
+                "name": translate("app.instances.settings.custom_env_vars"),
+                "default": this.env_vars,
+                "tab": "launch_hooks"
+            },
+            {
+                "type": "text",
+                "id": "pre_launch_hook",
+                "name": translate("app.instances.settings.pre_launch_hook"),
+                "default": this.pre_launch_hook,
+                "tab": "launch_hooks"
+            },
+            {
+                "type": "text",
+                "id": "post_launch_hook",
+                "name": translate("app.instances.settings.post_launch_hook"),
+                "default": this.post_launch_hook,
+                "tab": "launch_hooks"
+            },
+            {
+                "type": "text",
+                "id": "wrapper",
+                "name": translate("app.instances.settings.wrapper"),
+                "default": this.wrapper,
+                "tab": "launch_hooks"
+            },
+            {
+                "type": "text",
+                "id": "post_exit_hook",
+                "name": translate("app.instances.settings.post_exit_hook"),
+                "default": this.post_exit_hook,
+                "tab": "launch_hooks",
+                "desc": translate("app.post_exit.notice")
+            }
+        ].filter(e => e), [
+            { "type": "cancel", "content": translate("app.instances.settings.cancel") },
+            { "type": "confirm", "content": translate("app.instances.settings.confirm") }
+        ], [
+            { "name": translate("app.instances.settings.tab.general"), "value": "general" },
+            this.locked ? null : { "name": translate("app.instances.settings.tab.installation"), "value": "installation" },
+            this.installed_version ? { "name": translate("app.instances.settings.tab.modpack"), "value": "modpack" } : null,
+            { "name": translate("app.instances.settings.tab.window"), "value": "window" },
+            { "name": translate("app.instances.settings.tab.java"), "value": "java" },
+            { "name": translate("app.instances.settings.tab.launch_hooks"), "value": "launch_hooks" }
+        ].filter(e => e), async (info) => {
+            await this.setDateModified(new Date());
+            await this.setName(info.name);
+            await this.setImage(info.icon);
+            await this.setGroup(info.group);
+            await this.setWindowWidth(info.width);
+            await this.setWindowHeight(info.height);
+            await this.setAllocatedRam(info.allocated_ram);
+            await this.setSourceServer(info.source_server);
+            if (resettingJavaInstallation && info.java_path == default_java_installation) {
+                await this.setUsesCustomJavaInstallation(false);
+                await this.setJavaPath(null);
+            } else if (info.java_path != this.java_path && info.java_path != default_java_installation) {
+                await this.setUsesCustomJavaInstallation(true);
+                await this.setJavaPath(info.java_path);
+            }
+            if (resettingJavaArgs && info.java_args == this.provided_java_args) {
+                await this.setUsesCustomJavaArgs(false);
+            } else if (info.java_args != this.java_args && info.java_args != this.provided_java_args) {
+                await this.setUsesCustomJavaArgs(true);
+            }
+            await this.setJavaArgs(info.java_args);
+            await this.setEnvVars(info.env_vars);
+            await this.setPreLaunchHook(info.pre_launch_hook);
+            await this.setPostLaunchHook(info.post_launch_hook);
+            await this.setWrapper(info.wrapper);
+            await this.setPostExitHook(info.post_exit_hook);
+            if (info.modpack_version && (info.modpack_version != this.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
+                let source = this.install_source;
+                let modpack_info = info.modpack_version_pass;
+                runModpackUpdate(this, source, modpack_info);
+                return;
+            }
+            if (this.loader == info.loader && this.vanilla_version == info.game_version && this.loader_version == info.loader_version) {
+                return;
+            }
+            if ([info.game_version, info.loader_version].includes("loading")) {
+                return;
+            }
+            if (!info.loader || !info.game_version) return;
+            await this.setLoader(info.loader);
+            await this.setVanillaVersion(info.game_version, true);
+            await this.setLoaderVersion(info.loader_version);
+            await this.setMcInstalled(false);
+            await this.setFailed(false);
+            let r = await window.enderlynx.downloadMinecraft(this.instance_id, info.loader, info.game_version, info.loader_version);
+            if (r.error) {
+                await this.setFailed(true);
+            } else {
+                await this.setJavaVersion(r.java_version);
+                await this.setProvidedJavaArgs(r.java_args);
+                if (!this.uses_custom_java_args) {
+                    await this.setJavaArgs(r.java_args);
+                }
+                if (info.update_content) {
+                    let content = await this.getContent();
+                    let processId = Math.random();
+                    let cancel = false;
+                    for (let i = 0; i < content.length; i++) {
+                        log.sendData([{
+                            "title": "Updating Content",
+                            "progress": i / content.length * 100,
+                            "desc": `Updating ${i + 1} of ${content.length}`,
+                            "id": processId,
+                            "status": "good",
+                            "cancel": () => {
+                                cancel = true;
+                            }
+                        }]);
+                        let c = content[i];
+                        try {
+                            await updateContent(c.source, c, new Project(), undefined, this);
+                        } catch (e) {
+                            displayError(translate("app.content.update_failed").replace("%c", c.name));
+                        }
+                        if (cancel) {
+                            log.sendData([{
+                                "title": "Updating Content",
+                                "progress": 100,
+                                "desc": "Canceled by User",
+                                "id": processId,
+                                "status": "error",
+                                "cancel": () => { }
+                            }]);
+                            this.instanceScreen.showContent();
+                            return;
+                        }
+                    }
+                    log.sendData([{
+                        "title": "Updating Content",
+                        "progress": 100,
+                        "desc": "Done",
+                        "id": processId,
+                        "status": "done",
+                        "cancel": () => { }
+                    }]);
+                    displaySuccess(translate("app.instances.updated_all").replace("%i", this.name));
+                    this.instanceScreen.showContent();
+                }
+                await this.setMcInstalled(true);
+            }
+        }, () => { }, undefined, false, true);
+    }
+
+    async showShareDialog() {
+        document.body.classList.add("loading");
+        let options = await window.enderlynx.getInstanceFiles(this.instance_id);
+        document.body.classList.remove("loading");
+        let content = await this.getContent();
+        let contentSpecific = [];
+        let contentMap = {};
+        content.forEach(e => {
+            let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+            let content_file = content_folder + "/" + e.file_name;
+            let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
+            contentSpecific.push(replace);
+            contentMap[replace] = e;
+            let index = options.indexOf(content_file);
+            if (index < 0) return;
+            options[index] = replace;
+        });
+
+        let distributionToggleWrapper = document.createElement("div");
+        let labelWrapper = document.createElement("div");
+        labelWrapper.className = "label-wrapper";
+        let label = document.createElement("label");
+        label.className = "dialog-label";
+        let labelDesc = document.createElement("label");
+        labelDesc.className = "dialog-label-desc";
+        let toggleEle = document.createElement("button");
+        let distributionToggle = new Toggle(toggleEle, () => {
+            updateDistributionInfo(out, overrides, packVersion, name);
+        }, false);
+        distributionToggleWrapper.className = "dialog-text-label-wrapper-horizontal";
+        distributionToggleWrapper.classList.add("dialog-wrapper-hidden");
+        distributionToggleWrapper.appendChild(toggleEle);
+        distributionToggleWrapper.appendChild(labelWrapper);
+        labelWrapper.appendChild(label);
+        labelWrapper.appendChild(labelDesc);
+
+        let distributionInfo = document.createElement("div");
+        distributionInfo.className = "info";
+        distributionInfo.classList.add("dialog-wrapper-hidden");
+
+        let overrides = [];
+        let out = "elpack";
+        let packVersion = "";
+        let name = this.name;
+
+        let updateDistributionInfo = (out, overrides, packVersion, name) => {
+            let distributionWarnings = [];
+            if (out == "mrpack") {
+                let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "modrinth");
+                if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.modrinth.eco", "%l", content_specific.map(e => e.name).join(", ")));
+                if (!packVersion) distributionWarnings.push(translate("app.distribution.modrinth.version"));
+            } else if (out == "cf_zip") {
+                let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "curseforge");
+                if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.curseforge.eco", "%l", content_specific.map(e => e.name).join(", ")));
+            }
+            if (out != "elpack") {
+                if (!name) distributionWarnings.push(translate("app.distribution.name"));
+            }
+            if (!distributionToggle.toggled) distributionWarnings = [];
+            if (distributionWarnings.length) {
+                distributionInfo.classList.add("shown");
+                distributionInfo.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span style="display: flex;flex-direction: column;gap: 4px;"><b>' + translate("app.distribution.warnings") + "</b>" + distributionWarnings.map(e => `<span>${e}</span>`).join("") + "</span>";
+            } else {
+                distributionInfo.classList.remove("shown");
+            }
+        }
+
+        let updateToggle = (v) => {
+            if (v == "elpack") distributionToggleWrapper.classList.remove("shown");
+            if (v == "mrpack") {
+                distributionToggleWrapper.classList.add("shown");
+                label.innerHTML = translate("app.instances.share.distribution", "%p", translate("app.discover.modrinth"));
+                labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", translate("app.discover.modrinth"));
+            }
+            if (v == "cf_zip") {
+                distributionToggleWrapper.classList.add("shown");
+                label.innerHTML = translate("app.instances.share.distribution", "%p", translate("app.discover.curseforge"));
+                labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", translate("app.discover.curseforge"));
+            }
+            updateDistributionInfo(v, overrides, packVersion, name);
+        }
+
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.instances.share.title"), "form", [
+            {
+                "type": "notice",
+                "content": distributionInfo
+            },
+            {
+                "type": "text",
+                "name": translate("app.instances.share.name"),
+                "id": "name",
+                "default": this.name,
+                "oninput": (v) => {
+                    name = v;
+                    updateDistributionInfo(out, overrides, packVersion, v);
+                }
+            },
+            {
+                "type": "text",
+                "name": translate("app.instances.share.version"),
+                "id": "version",
+                "default": "",
+                "oninput": (v) => {
+                    packVersion = v;
+                    updateDistributionInfo(out, overrides, v, name);
+                }
+            },
+            {
+                "type": "multi-select",
+                "name": translate("app.instances.share.out"),
+                "id": "out",
+                "default": "elpack",
+                "options": [
+                    {
+                        "name": translate("app.instances.share.elpack"),
+                        "value": "elpack"
+                    },
+                    {
+                        "name": translate("app.instances.share.mrpack"),
+                        "value": "mrpack"
+                    },
+                    {
+                        "name": translate("app.instances.share.cf_zip"),
+                        "value": "cf_zip"
+                    }
+                ],
+                "onchange": (v) => {
+                    out = v;
+                    updateToggle(v);
+                }
+            },
+            {
+                "type": "notice",
+                "content": distributionToggleWrapper
+            },
+            {
+                "type": "files",
+                "name": translate("app.instances.share.files"),
+                "id": "files",
+                "options": options,
+                "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts"],
+                "onchange": (v) => {
+                    overrides = v;
+                    updateDistributionInfo(out, v, packVersion, name);
+                }
+            }
+        ], [
+            {
+                "type": "cancel",
+                "content": translate("app.instances.share.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.instances.share.confirm")
+            }
+        ], [], (info) => {
+            let nonContentSpecific = info.files.filter(e => !contentSpecific.includes(e));
+            let yesContentSpecific = info.files.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]);
+            yesContentSpecific = yesContentSpecific.filter(e => {
+                if (e.source != "player_install") return true;
+                let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                let content_file = content_folder + "/" + e.file_name;
+                nonContentSpecific.push(content_file);
+                return false;
+            });
+            if (info.out == "elpack") {
+                createElPack(this, yesContentSpecific, nonContentSpecific, info.version);
+            } else if (info.out == "mrpack") {
+                yesContentSpecific = yesContentSpecific.filter(e => {
+                    if (e.source == "modrinth") return true;
+                    let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                    let content_file = content_folder + "/" + e.file_name;
+                    nonContentSpecific.push(content_file);
+                    return false;
+                });
+                createMrPack(this, yesContentSpecific, nonContentSpecific, info.version);
+            } else if (info.out == "cf_zip") {
+                yesContentSpecific = yesContentSpecific.filter(e => {
+                    if (e.source == "curseforge") return true;
+                    let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                    let content_file = content_folder + "/" + e.file_name;
+                    nonContentSpecific.push(content_file);
+                    return false;
+                });
+                createCfZip(this, yesContentSpecific, nonContentSpecific, info.version);
+            }
+        });
+    }
+
+    async showDuplicateDialog() {
+        let dialog = new Dialog();
+        if (!this.mc_installed || this.installing) {
+            dialog.showDialog(translate("app.instances.duplicate.title", "%i", this.name), "notice", translate("app.instances.duplicate.installing.notice"), [
+                {
+                    "type": "cancel",
+                    "content": translate("app.instances.duplicate.close")
+                }
+            ], [], () => { });
+            return;
+        }
+        dialog.showDialog(translate("app.instances.duplicate.title", "%i", this.name), "form", [
+            {
+                "type": "image-upload",
+                "default": this.image,
+                "id": "icon",
+                "name": translate("app.instances.icon")
+            },
+            {
+                "type": "text",
+                "default": translate("app.instances.duplicate.new_name", "%i", this.name),
+                "id": "name",
+                "name": translate("app.instances.name"),
+                "maxlength": 50
+            },
+            {
+                "type": "notice",
+                "content": translate("app.instances.duplicate.notice")
+            }
+        ], [
+            {
+                "type": "cancel",
+                "content": translate("app.instances.duplicate.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.instances.duplicate.confirm")
+            }
+        ], [], async (info) => {
+            let new_instance_id = await window.enderlynx.getInstanceFolderName(info.name);
+            let success = await window.enderlynx.duplicateInstance(this.instance_id, new_instance_id, info.name, info.icon);
+            if (!success) displayError(translate("app.instances.duplicate.fail"));
+            let newInstance = Instance.getInstance(new_instance_id);
+            newInstance.display();
+        })
+    }
+
+    async showDeleteDialog(callback) {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
+            "content": translate("app.instances.delete.confirm.description").replace("%i", this.name),
+            "type": "notice"
+        }, {
+            "type": "toggle",
+            "name": translate("app.instances.delete.files"),
+            "default": true,
+            "id": "delete"
+        }], [
+            {
+                "type": "cancel",
+                "content": translate("app.instances.delete.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.instances.delete.confirm")
+            }
+        ], [], async (info) => {
+            this.delete();
+            callback();
+            if (info.delete) {
+                try {
+                    await window.enderlynx.deleteInstanceFiles(this.instance_id);
+                } catch (e) {
+                    displayError(translate("app.instances.delete.files.fail"));
+                }
+            }
+        });
+
+    }
 }
 
 async function getInstances() {
@@ -850,7 +1575,6 @@ async function getPlayerHead(profile, callback) {
         return;
     }
     let skin = await profile.getActiveSkin();
-    // if no skin is set, just display steve for now
     if (!skin) {
         callback("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAANNJREFUKFNjNFYR/M/AwMDAw8YCouDgy68/DD9+/WFgVJHg+M/PwwmWgCkCSYLYIJpRW473f4GrDYOEmCgDCxcvw59vnxm+//zN8PHjB4aZh04yMM5O9vzPzy/AwMnOCjYFJAkDIEWMq4oi/4f2LmMItutiiDC9ANa5/ZYDw9pDZQyri6MQJoB0HTh3HazZwUgTTINNmBBp//8/63+GXccvMejJqoIlTt++yuDraMLw6etvBsYpCXb/337+zXDw1EUGdg42hp8/foFpCz1NBj5uVgYAzxRTZRWSVwUAAAAASUVORK5CYII=");
         return;
@@ -931,7 +1655,7 @@ class LiveMinecraft {
     setLive(instanceInfo) {
         this.nameElement.textContent = instanceInfo.name;
         this.element.classList.add("minecraft-live");
-        this.stopButton.onclick = () => {
+        this.stopButton.onclick = async () => {
             await instanceInfo.stop();
             this.findLive();
         }
@@ -956,7 +1680,7 @@ class LiveMinecraft {
             {
                 "title": translate("app.live.context.stop"),
                 "icon": '<i class="fa-regular fa-circle-stop"></i>',
-                "func": () => {
+                "func": async () => {
                     await instanceInfo.stop();
                     this.findLive();
                 }
@@ -1129,15 +1853,15 @@ class MoreMenu {
             this.element.appendChild(buttonElement);
         }
     }
-}
 
-function clearMoreMenus() {
-    [...document.getElementsByClassName("more-menu")].forEach(e => {
-        let id = e.id;
-        if (!document.querySelector(`[popovertarget="${id}"]`)) {
-            e.remove();
-        }
-    });
+    static clearMenus() {
+        [...document.getElementsByClassName("more-menu")].forEach(e => {
+            let id = e.id;
+            if (!document.querySelector(`[popovertarget="${id}"]`)) {
+                e.remove();
+            }
+        });
+    }
 }
 
 let ignoreNextPointerUp = false;
@@ -1973,7 +2697,7 @@ class ContentList {
         this.contentElement = contentMainElement;
         fragment.appendChild(contentMainElement);
         element.appendChild(fragment);
-        this.offset = getRelativeOffset(contentMainElement, this.scrollElement);
+        this.offset = ContentList.getRelativeOffset(contentMainElement, this.scrollElement);
         this.applyFilters("", "all");
     }
 
@@ -2133,19 +2857,20 @@ class ContentList {
         this.floatingControls.classList.remove("shown");
         this.countElement.textContent = translate("app.list.count", "%c", 0);
     }
-}
 
-function getRelativeOffset(child, ancestor) {
-    let offset = 0;
-    let el = child;
+    static getRelativeOffset(child, ancestor) {
+        let offset = 0;
+        let el = child;
 
-    while (el && el !== ancestor) {
-        offset += el.offsetTop;
-        el = el.offsetParent;
+        while (el && el !== ancestor) {
+            offset += el.offsetTop;
+            el = el.offsetParent;
+        }
+
+        return offset;
     }
-
-    return offset;
 }
+
 
 async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown) {
     let content = await contentInfo.instance_info.getContent();
@@ -2597,7 +3322,7 @@ class InstanceScreen extends Screen {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": translate("app.button.instances.duplicate"),
                 "func": (e) => {
-                    duplicateInstance(this.instance);
+                    this.instance.showDuplicateDialog();
                 }
             },
             {
@@ -2611,21 +3336,21 @@ class InstanceScreen extends Screen {
                 "icon": '<i class="fa-solid fa-share"></i>',
                 "title": translate("app.button.instances.share"),
                 "func": (e) => {
-                    openInstanceShareDialog(this.instance);
+                    this.instance.showShareDialog();
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-wrench"></i>',
                 "title": translate("app.button.instances.repair"),
                 "func": () => {
-                    showRepairDialog(this.instance);
+                    this.instance.showRepairDialog();
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
                 "func": async (e) => {
-                    showInstanceSettings(this.instance);
+                    this.instance.showSettingsDialog();
                 }
             },
             {
@@ -2648,34 +3373,8 @@ class InstanceScreen extends Screen {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.button.instances.delete"),
                 "func": (e) => {
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                        "content": translate("app.instances.delete.confirm.description").replace("%i", this.instance.name),
-                        "type": "notice"
-                    }, {
-                        "type": "toggle",
-                        "name": translate("app.instances.delete.files"),
-                        "default": false,
-                        "id": "delete"
-                    }], [
-                        {
-                            "type": "cancel",
-                            "content": translate("app.instances.delete.cancel")
-                        },
-                        {
-                            "type": "confirm",
-                            "content": translate("app.instances.delete.confirm")
-                        }
-                    ], [], async (info) => {
-                        this.instance.delete();
+                    this.instance.showDeleteDialog(() => {
                         instancesScreen.display();
-                        if (info.delete) {
-                            try {
-                                await window.enderlynx.deleteInstanceFiles(this.instance.instance_id);
-                            } catch (e) {
-                                displayError(translate("app.instances.delete.files.fail"));
-                            }
-                        }
                     });
                 },
                 "danger": true
@@ -2805,7 +3504,7 @@ class InstanceScreen extends Screen {
         this.tabElement.innerHTML = "";
         this.tabElement.appendChild(loading.element);
         await this.requestFrame();
-        clearMoreMenus();
+        MoreMenu.clearMenus();
         let fileDrop = createElement("div", "small-drop-overlay drop-overlay");
         fileDrop.dataset.action = "content-import";
         fileDrop.dataset.instanceId = this.instance.instance_id;
@@ -3248,7 +3947,7 @@ class InstanceScreen extends Screen {
         this.tabElement.innerHTML = "";
         this.tabElement.appendChild(loading.element);
         await this.requestFrame();
-        clearMoreMenus();
+        MoreMenu.clearMenus();
         let searchAndFilter = document.createElement("div");
         searchAndFilter.classList.add("search-and-filter-v2");
         let importWorlds = document.createElement("button");
@@ -3747,7 +4446,7 @@ class InstanceScreen extends Screen {
         this.tabElement.appendChild(fileDrop);
         this.tabElement.appendChild(searchAndFilter);
         this.tabElement.appendChild(contentListWrap);
-        clearMoreMenus();
+        MoreMenu.clearMenus();
     }
 
     async showLogs() {
@@ -3756,7 +4455,7 @@ class InstanceScreen extends Screen {
         this.tabElement.innerHTML = "";
         this.tabElement.appendChild(loading.element);
         await this.requestFrame();
-        clearMoreMenus();
+        MoreMenu.clearMenus();
         let deleteButton = document.createElement("button");
         let searchAndFilter = document.createElement("div");
         searchAndFilter.classList.add("search-and-filter-v2");
@@ -3998,7 +4697,7 @@ class InstanceScreen extends Screen {
         this.tabElement.innerHTML = "";
         this.tabElement.appendChild(loading.element);
         await this.requestFrame();
-        clearMoreMenus();
+        MoreMenu.clearMenus();
         let values = await window.enderlynx.getInstanceOptions(this.instance.instance_id);
         let searchAndFilter = document.createElement("div");
         searchAndFilter.classList.add("search-and-filter-v2");
@@ -4390,7 +5089,7 @@ class InstanceScreen extends Screen {
         this.filesDropdownElement = typeDropdown;
         this.filesSearch = searchAndFilter;
         this.filesBreadcrumb = filesBreadcrumb;
-        clearMoreMenus();
+        MoreMenu.clearMenus();
         await this.setFilesPath("");
     }
 
@@ -4723,7 +5422,7 @@ class InstanceScreen extends Screen {
         this.tabElement.innerHTML = "";
         this.tabElement.appendChild(loading.element);
         await this.requestFrame();
-        clearMoreMenus();
+        MoreMenu.clearMenus();
         let fragment = document.createDocumentFragment();
         let galleryElement = document.createElement("div");
         galleryElement.className = "gallery";
@@ -5221,21 +5920,21 @@ class HomeScreen extends Screen {
                     "icon": '<i class="fa-solid fa-share"></i>',
                     "title": translate("app.button.instances.share"),
                     "func": (e) => {
-                        openInstanceShareDialog(instanceInfo);
+                        instanceInfo.showShareDialog();
                     }
                 },
                 {
                     "icon": '<i class="fa-solid fa-wrench"></i>',
                     "title": translate("app.button.instances.repair"),
                     "func": () => {
-                        showRepairDialog(instanceInfo);
+                        instanceInfo.showRepairDialog();
                     }
                 },
                 {
                     "icon": '<i class="fa-solid fa-gear"></i>',
                     "title": translate("app.button.instances.open_settings"),
                     "func": async (e) => {
-                        showInstanceSettings(instanceInfo);
+                        instanceInfo.showSettingsDialog();
                     }
                 },
                 {
@@ -5265,36 +5964,10 @@ class HomeScreen extends Screen {
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "title": translate("app.button.instances.delete"),
                     "func": (e) => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                            "content": translate("app.instances.delete.confirm.description").replace("%i", instanceInfo.name),
-                            "type": "notice"
-                        }, {
-                            "type": "toggle",
-                            "name": translate("app.instances.delete.files"),
-                            "default": false,
-                            "id": "delete"
-                        }], [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.instances.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.instances.delete.confirm")
-                            }
-                        ], [], async (info) => {
-                            instanceInfo.delete();
+                        instanceInfo.showDeleteDialog(() => {
                             pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
                             lastPlayedInstancesList = lastPlayedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
                             this.updateHomeGrid();
-                            if (info.delete) {
-                                try {
-                                    await window.enderlynx.deleteInstanceFiles(instanceInfo.instance_id);
-                                } catch (e) {
-                                    displayError(translate("app.instances.delete.files.fail"));
-                                }
-                            }
                         });
                     },
                     "danger": true
@@ -5711,21 +6384,21 @@ class InstancesScreen extends Screen {
                     "icon": '<i class="fa-solid fa-share"></i>',
                     "title": translate("app.button.instances.share"),
                     "func": (e) => {
-                        openInstanceShareDialog(instances[i]);
+                        instances[i].showShareDialog();
                     }
                 },
                 {
                     "icon": '<i class="fa-solid fa-wrench"></i>',
                     "title": translate("app.button.instances.repair"),
                     "func": () => {
-                        showRepairDialog(instances[i]);
+                        instances[i].showRepairDialog();
                     }
                 },
                 {
                     "icon": '<i class="fa-solid fa-gear"></i>',
                     "title": translate("app.button.instances.open_settings"),
                     "func": async (e) => {
-                        showInstanceSettings(instances[i]);
+                        instances[i].showSettingsDialog();
                     }
                 },
                 {
@@ -5750,36 +6423,9 @@ class InstancesScreen extends Screen {
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "title": translate("app.button.instances.delete"),
                     "func": (e) => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-                            "content": translate("app.instances.delete.confirm.description").replace("%i", instances[i].name),
-                            "type": "notice"
-                        }, {
-                            "type": "toggle",
-                            "name": translate("app.instances.delete.files"),
-                            "default": false,
-                            "id": "delete"
-                        }], [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.instances.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.instances.delete.confirm")
-                            }
-                        ], [], async (info) => {
-                            instances[i].delete();
+                        instances[i].showDeleteDialog(() => {
                             animateGridReorderStart(".instance-item");
                             instancesScreen.display(true, true);
-                            if (info.delete) {
-                                try {
-                                    await window.enderlynx.deleteInstanceFiles(instances[i].instance_id);
-                                } catch (e) {
-                                    displayError(translate("app.instances.delete.files.fail"));
-                                }
-                            }
-                            animateGridReorderEnd(".instance-item");
                         });
                     },
                     "danger": true
@@ -6002,7 +6648,7 @@ class DiscoverScreen extends Screen {
         } else {
             this.contentTabSelect("resourcepack");
         }
-        clearMoreMenus();
+        MoreMenu.clearMenus();
     }
 
     contentTabSelect(tab) {
@@ -8711,443 +9357,6 @@ async function getServerLastPlayed(instance_id, ip) {
     return new Date(result ? result : null);
 }
 
-async function showInstanceSettings(instanceInfo) {
-    let dialog = new Dialog();
-    let resettingJavaArgs = false;
-    let resettingJavaInstallation = false;
-    let default_java_installation = await window.enderlynx.getJavaInstallation(instanceInfo.java_version);
-    dialog.showDialog(translate("app.instances.settings.title"), "form", [
-        {
-            "type": "image-upload",
-            "name": translate("app.instances.settings.icon"),
-            "id": "icon",
-            "default": instanceInfo.image,
-            "tab": "general",
-            "image_code": instanceInfo.instance_id
-        },
-        {
-            "type": "text",
-            "name": translate("app.instances.settings.name"),
-            "id": "name",
-            "default": instanceInfo.name,
-            "tab": "general",
-            "maxlength": 50
-        },
-        {
-            "type": "text",
-            "name": translate("app.instances.settings.group"),
-            "id": "group",
-            "default": instanceInfo.group_id,
-            "tab": "general",
-            "desc": translate("app.instances.settings.group.description")
-        },
-        instanceInfo.locked ? null : {
-            "type": "multi-select",
-            "name": translate("app.instances.settings.loader"),
-            "options": [
-                { "name": translate("app.loader.vanilla"), "value": "vanilla" },
-                { "name": translate("app.loader.fabric"), "value": "fabric" },
-                { "name": translate("app.loader.forge"), "value": "forge" },
-                { "name": translate("app.loader.neoforge"), "value": "neoforge" },
-                { "name": translate("app.loader.quilt"), "value": "quilt" }
-            ],
-            "id": "loader",
-            "default": instanceInfo.loader,
-            "tab": "installation"
-        },
-        instanceInfo.locked ? null : {
-            "type": "dropdown",
-            "name": translate("app.instances.settings.game_version"),
-            "options": [],
-            "id": "game_version",
-            "default": instanceInfo.vanilla_version,
-            "tab": "installation",
-            "input_source": "loader",
-            "source": VersionList.getVersions
-        },
-        instanceInfo.locked ? null : {
-            "type": "loader-version-dropdown",
-            "name": "",
-            "options": [],
-            "id": "loader_version",
-            "default": instanceInfo.loader_version,
-            "tab": "installation",
-            "loader_source": "loader",
-            "game_version_source": "game_version"
-        },
-        instanceInfo.locked ? null : {
-            "type": "toggle",
-            "name": translate("app.instances.settings.update_content"),
-            "default": true,
-            "tab": "installation",
-            "desc": translate("app.instances.settings.update_content.description"),
-            "id": "update_content"
-        },
-        instanceInfo.installed_version ? {
-            "type": "notice",
-            "content": translate("app.instances.settings.modpack.installed_via", "%c", translate("app.discover." + instanceInfo.install_source)),
-            "tab": "modpack"
-        } : null,
-        instanceInfo.installed_version ? {
-            "type": "button",
-            "name": translate("app.instances.settings.modpack.view"),
-            "tab": "modpack",
-            "icon": '<i class="fa-solid fa-eye"></i>',
-            "func": () => {
-                displayContentInfo(instanceInfo.install_source, undefined, instanceInfo.install_id, instanceInfo.instance_id);
-            }
-        } : null,
-        instanceInfo.installed_version ? {
-            "type": "dropdown",
-            "name": translate("app.instances.settings.modpack.version.title"),
-            "desc": translate("app.instances.settings.modpack.version.description"),
-            "tab": "modpack",
-            "id": "modpack_version",
-            "options": [],
-            "input_source": "",
-            "source": async () => {
-                return await getModpackVersions(instanceInfo.install_source, instanceInfo.install_id);
-            },
-            "default": instanceInfo.installed_version
-        } : null,
-        instanceInfo.installed_version ? {
-            "type": "toggle",
-            "name": translate("app.modpack.repair"),
-            "tab": "modpack",
-            "id": "modpack_reinstall"
-        } : null,
-        {
-            "type": "text",
-            "name": translate("app.instances.settings.linked_server"),
-            "id": "source_server",
-            "tab": instanceInfo.installed_version ? "modpack" : "installation",
-            "default": instanceInfo.source_server,
-            "desc": translate("app.instances.settings.linked_server.description")
-        },
-        {
-            "type": "number",
-            "name": translate("app.instances.settings.width"),
-            "id": "width",
-            "default": instanceInfo.window_width ?? 854,
-            "tab": "window",
-            "desc": translate("app.instances.settings.width.description")
-        },
-        {
-            "type": "number",
-            "name": translate("app.instances.settings.height"),
-            "id": "height",
-            "default": instanceInfo.window_height ?? 480,
-            "tab": "window",
-            "desc": translate("app.instances.settings.height.description")
-        },
-        {
-            "type": "slider",
-            "name": translate("app.instances.settings.ram"),
-            "id": "allocated_ram",
-            "default": instanceInfo.allocated_ram ?? 4096,
-            "tab": "java",
-            "min": 512,
-            "max": window.enderlynx.getTotalRAM(),
-            "increment": 64,
-            "unit": translate("app.instances.settings.ram.unit"),
-            "desc": translate("app.instances.settings.ram.description")
-        },
-        {
-            "type": "text",
-            "name": translate("app.instances.settings.java_installation"),
-            "id": "java_path",
-            "default": instanceInfo.uses_custom_java_installation ? instanceInfo.java_path : default_java_installation,
-            "tab": "java",
-            "desc": translate("app.instances.settings.java_installation.description." + window.enderlynx.ostype()).replace("%v", instanceInfo.java_version),
-            "buttons": [
-                {
-                    "name": translate("app.instances.settings.java_installation.detect"),
-                    "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
-                    "func": async (v, b, i) => {
-                        b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.detect.searching");
-                        let dialog = new Dialog();
-                        let results = await window.enderlynx.detectJavaInstallations(instanceInfo.java_version);
-                        dialog.showDialog(translate("app.instances.settings.java_installation.detect.title"), "form", [
-                            {
-                                "type": "dropdown",
-                                "id": "java_path",
-                                "name": translate("app.instances.settings.java_installation.detect.java_path"),
-                                "options": results.map(e => ({ "name": e.path, "value": e.path }))
-                            }
-                        ], [
-                            { "type": "cancel", "content": translate("app.instances.settings.java_installation.detect.cancel") },
-                            { "type": "confirm", "content": translate("app.instances.settings.java_installation.detect.confirm") }
-                        ], [], (info) => {
-                            i.value = info.java_path;
-                        });
-                        b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>' + translate("app.instances.settings.java_installation.detect");
-                    }
-                },
-                {
-                    "name": translate("app.instances.settings.java_installation.browse"),
-                    "icon": '<i class="fa-solid fa-folder"></i>',
-                    "func": async (v, b, i) => {
-                        let newValue = await window.enderlynx.triggerFileBrowse(v);
-                        if (newValue) i.value = newValue;
-                    }
-                },
-                {
-                    "name": translate("app.instances.settings.java_installation.test"),
-                    "icon": '<i class="fa-solid fa-play"></i>',
-                    "func": async (v, b) => {
-                        let num = Math.floor(Math.random() * 10000);
-                        b.setAttribute("data-num", num);
-                        b.classList.remove("failed");
-                        b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
-                        let success = await window.enderlynx.testJavaInstallation(v);
-                        if (success) {
-                            b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
-                        } else {
-                            b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
-                            b.classList.add("failed");
-                        }
-                        setTimeout(() => {
-                            if (b.getAttribute("data-num") == num) {
-                                b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
-                                b.classList.remove("failed");
-                            }
-                        }, 3000);
-                    }
-                },
-                {
-                    "name": translate("app.instances.settings.java_installation.test.reset"),
-                    "icon": '<i class="fa-solid fa-rotate-left"></i>',
-                    "func": async (v, b, i) => {
-                        b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.reset.resetting");
-                        let java_path = default_java_installation;
-                        i.value = java_path;
-                        resettingJavaInstallation = true;
-                        b.innerHTML = '<i class="fa-solid fa-rotate-left"></i>' + translate("app.instances.settings.java_installation.test.reset")
-                    }
-                }
-            ]
-        },
-        {
-            "type": "text",
-            "id": "java_args",
-            "name": translate("app.instances.settings.custom_args"),
-            "default": instanceInfo.java_args,
-            "tab": "java",
-            "buttons": [
-                {
-                    "name": translate("app.instances.settings.java_args.reset"),
-                    "icon": '<i class="fa-solid fa-rotate-left"></i>',
-                    "func": (v, b, i) => {
-                        i.value = instanceInfo.provided_java_args;
-                        resettingJavaArgs = true;
-                    }
-                }
-            ]
-        },
-        {
-            "type": "text",
-            "id": "env_vars",
-            "name": translate("app.instances.settings.custom_env_vars"),
-            "default": instanceInfo.env_vars,
-            "tab": "launch_hooks"
-        },
-        {
-            "type": "text",
-            "id": "pre_launch_hook",
-            "name": translate("app.instances.settings.pre_launch_hook"),
-            "default": instanceInfo.pre_launch_hook,
-            "tab": "launch_hooks"
-        },
-        {
-            "type": "text",
-            "id": "post_launch_hook",
-            "name": translate("app.instances.settings.post_launch_hook"),
-            "default": instanceInfo.post_launch_hook,
-            "tab": "launch_hooks"
-        },
-        {
-            "type": "text",
-            "id": "wrapper",
-            "name": translate("app.instances.settings.wrapper"),
-            "default": instanceInfo.wrapper,
-            "tab": "launch_hooks"
-        },
-        {
-            "type": "text",
-            "id": "post_exit_hook",
-            "name": translate("app.instances.settings.post_exit_hook"),
-            "default": instanceInfo.post_exit_hook,
-            "tab": "launch_hooks",
-            "desc": translate("app.post_exit.notice")
-        }
-    ].filter(e => e), [
-        { "type": "cancel", "content": translate("app.instances.settings.cancel") },
-        { "type": "confirm", "content": translate("app.instances.settings.confirm") }
-    ], [
-        { "name": translate("app.instances.settings.tab.general"), "value": "general" },
-        instanceInfo.locked ? null : { "name": translate("app.instances.settings.tab.installation"), "value": "installation" },
-        instanceInfo.installed_version ? { "name": translate("app.instances.settings.tab.modpack"), "value": "modpack" } : null,
-        { "name": translate("app.instances.settings.tab.window"), "value": "window" },
-        { "name": translate("app.instances.settings.tab.java"), "value": "java" },
-        { "name": translate("app.instances.settings.tab.launch_hooks"), "value": "launch_hooks" }
-    ].filter(e => e), async (info) => {
-        await instanceInfo.setDateModified(new Date());
-        await instanceInfo.setName(info.name);
-        await instanceInfo.setImage(info.icon);
-        await instanceInfo.setGroup(info.group);
-        await instanceInfo.setWindowWidth(info.width);
-        await instanceInfo.setWindowHeight(info.height);
-        await instanceInfo.setAllocatedRam(info.allocated_ram);
-        await instanceInfo.setSourceServer(info.source_server);
-        if (resettingJavaInstallation && info.java_path == default_java_installation) {
-            await instanceInfo.setUsesCustomJavaInstallation(false);
-            await instanceInfo.setJavaPath(null);
-        } else if (info.java_path != instanceInfo.java_path && info.java_path != default_java_installation) {
-            await instanceInfo.setUsesCustomJavaInstallation(true);
-            await instanceInfo.setJavaPath(info.java_path);
-        }
-        if (resettingJavaArgs && info.java_args == instanceInfo.provided_java_args) {
-            await instanceInfo.setUsesCustomJavaArgs(false);
-        } else if (info.java_args != instanceInfo.java_args && info.java_args != instanceInfo.provided_java_args) {
-            await instanceInfo.setUsesCustomJavaArgs(true);
-        }
-        await instanceInfo.setJavaArgs(info.java_args);
-        await instanceInfo.setEnvVars(info.env_vars);
-        await instanceInfo.setPreLaunchHook(info.pre_launch_hook);
-        await instanceInfo.setPostLaunchHook(info.post_launch_hook);
-        await instanceInfo.setWrapper(info.wrapper);
-        await instanceInfo.setPostExitHook(info.post_exit_hook);
-        if (info.modpack_version && (info.modpack_version != instanceInfo.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
-            let source = instanceInfo.install_source;
-            let modpack_info = info.modpack_version_pass;
-            runModpackUpdate(instanceInfo, source, modpack_info);
-            return;
-        }
-        if (instanceInfo.loader == info.loader && instanceInfo.vanilla_version == info.game_version && instanceInfo.loader_version == info.loader_version) {
-            return;
-        }
-        if ([info.game_version, info.loader_version].includes("loading")) {
-            return;
-        }
-        if (!info.loader || !info.game_version) return;
-        await instanceInfo.setLoader(info.loader);
-        await instanceInfo.setVanillaVersion(info.game_version, true);
-        await instanceInfo.setLoaderVersion(info.loader_version);
-        await instanceInfo.setMcInstalled(false);
-        await instanceInfo.setFailed(false);
-        let r = await window.enderlynx.downloadMinecraft(instanceInfo.instance_id, info.loader, info.game_version, info.loader_version);
-        if (r.error) {
-            await instanceInfo.setFailed(true);
-        } else {
-            await instanceInfo.setJavaVersion(r.java_version);
-            await instanceInfo.setProvidedJavaArgs(r.java_args);
-            if (!instanceInfo.uses_custom_java_args) {
-                await instanceInfo.setJavaArgs(r.java_args);
-            }
-            if (info.update_content) {
-                let content = await instanceInfo.getContent();
-                let processId = Math.random();
-                let cancel = false;
-                for (let i = 0; i < content.length; i++) {
-                    log.sendData([{
-                        "title": "Updating Content",
-                        "progress": i / content.length * 100,
-                        "desc": `Updating ${i + 1} of ${content.length}`,
-                        "id": processId,
-                        "status": "good",
-                        "cancel": () => {
-                            cancel = true;
-                        }
-                    }]);
-                    let c = content[i];
-                    try {
-                        await updateContent(c.source, c, new Project(), undefined, instanceInfo);
-                    } catch (e) {
-                        displayError(translate("app.content.update_failed").replace("%c", c.name));
-                    }
-                    if (cancel) {
-                        log.sendData([{
-                            "title": "Updating Content",
-                            "progress": 100,
-                            "desc": "Canceled by User",
-                            "id": processId,
-                            "status": "error",
-                            "cancel": () => { }
-                        }]);
-                        instanceInfo.instanceScreen.showContent();
-                        return;
-                    }
-                }
-                log.sendData([{
-                    "title": "Updating Content",
-                    "progress": 100,
-                    "desc": "Done",
-                    "id": processId,
-                    "status": "done",
-                    "cancel": () => { }
-                }]);
-                displaySuccess(translate("app.instances.updated_all").replace("%i", instanceInfo.name));
-                instanceInfo.instanceScreen.showContent();
-            }
-            await instanceInfo.setMcInstalled(true);
-        }
-    }, () => { }, undefined, false, true);
-}
-
-function showRepairDialog(instanceInfo) {
-    let dialog = new Dialog();
-    dialog.showDialog(translate("app.instances.repair.title"), "form", [
-        {
-            "type": "notice",
-            "content": instanceInfo.install_source == "custom" ? translate("app.instances.repair.notice") : translate("app.instances.repair.notice_modpack")
-        },
-        {
-            "type": "toggle",
-            "name": translate("app.instances.repair.minecraft"),
-            "desc": translate("app.instances.repair.minecraft.description"),
-            "id": "minecraft",
-            "default": false
-        },
-        {
-            "type": "toggle",
-            "name": translate("app.instances.repair.java"),
-            "desc": translate("app.instances.repair.java.description"),
-            "id": "java",
-            "default": false
-        },
-        {
-            "type": "toggle",
-            "name": translate("app.instances.repair.assets"),
-            "desc": translate("app.instances.repair.assets.description"),
-            "id": "assets",
-            "default": false
-        },
-        instanceInfo.loader != "vanilla" ? {
-            "type": "toggle",
-            "name": translate("app.instances.repair.mod_loader", "%l", loaders[instanceInfo.loader]),
-            "desc": translate("app.instances.repair.mod_loader.description", "%l", loaders[instanceInfo.loader]),
-            "id": "mod_loader",
-            "default": false
-        } : null
-    ].filter(e => e), [
-        {
-            "type": "cancel",
-            "content": translate("app.instances.repair.cancel")
-        },
-        {
-            "type": "confirm",
-            "content": translate("app.instances.repair.confirm")
-        }
-    ], [], async (info) => {
-        let whatToRepair = [];
-        if (info.minecraft) whatToRepair.push("minecraft");
-        if (info.java) whatToRepair.push("java");
-        if (info.assets) whatToRepair.push("assets");
-        if (info.mod_loader) whatToRepair.push("mod_loader");
-        repairInstance(instanceInfo, whatToRepair);
-    });
-}
-
 function isNotDisplayNone(element) {
     return element.checkVisibility({ checkDisplayNone: true });
 }
@@ -11822,107 +12031,6 @@ async function applySkinFromURL(profile_id, skin) {
 
 document.getElementsByClassName("toasts")[0].showPopover();
 
-async function duplicateInstance(instanceInfo) {
-    let dialog = new Dialog();
-    if (!instanceInfo.mc_installed || instanceInfo.installing) {
-        dialog.showDialog(translate("app.instances.duplicate.title", "%i", instanceInfo.name), "notice", translate("app.instances.duplicate.installing.notice"), [
-            {
-                "type": "cancel",
-                "content": translate("app.instances.duplicate.close")
-            }
-        ], [], () => { });
-        return;
-    }
-    dialog.showDialog(translate("app.instances.duplicate.title", "%i", instanceInfo.name), "form", [
-        {
-            "type": "image-upload",
-            "default": instanceInfo.image,
-            "id": "icon",
-            "name": translate("app.instances.icon")
-        },
-        {
-            "type": "text",
-            "default": translate("app.instances.duplicate.new_name", "%i", instanceInfo.name),
-            "id": "name",
-            "name": translate("app.instances.name"),
-            "maxlength": 50
-        },
-        {
-            "type": "notice",
-            "content": translate("app.instances.duplicate.notice")
-        }
-    ], [
-        {
-            "type": "cancel",
-            "content": translate("app.instances.duplicate.cancel")
-        },
-        {
-            "type": "confirm",
-            "content": translate("app.instances.duplicate.confirm")
-        }
-    ], [], async (info) => {
-        let new_instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-        try {
-            let success = await window.enderlynx.duplicateInstanceFiles(instanceInfo.instance_id, new_instance_id);
-            let oldContent = await instanceInfo.getContent();
-            if (!success) throw new Error();
-            let newInstance = await addInstance(
-                info.name,
-                new Date(),
-                new Date(),
-                "",
-                instanceInfo.loader,
-                instanceInfo.vanilla_version,
-                instanceInfo.loader_version,
-                instanceInfo.locked,
-                instanceInfo.downloaded,
-                instanceInfo.group_id,
-                info.icon,
-                new_instance_id,
-                0,
-                instanceInfo.install_source,
-                instanceInfo.install_id,
-                false,
-                true
-            );
-            await newInstance.setJavaArgs(instanceInfo.java_args);
-            await newInstance.setProvidedJavaArgs(instanceInfo.provided_java_args);
-            await newInstance.setUsesCustomJavaArgs(instanceInfo.uses_custom_java_args);
-            await newInstance.setUsesCustomJavaInstallation(instanceInfo.uses_custom_java_installation);
-            await newInstance.setJavaPath(instanceInfo.java_path);
-            await newInstance.setJavaVersion(instanceInfo.java_version);
-            await newInstance.setAllocatedRam(instanceInfo.allocated_ram);
-            await newInstance.setEnvVars(instanceInfo.env_vars);
-            await newInstance.setPostExitHook(instanceInfo.post_exit_hook);
-            await newInstance.setPreLaunchHook(instanceInfo.pre_launch_hook);
-            await newInstance.setPostLaunchHook(instanceInfo.post_launch_hook);
-            await newInstance.setWrapper(instanceInfo.wrapper);
-            await newInstance.setWindowHeight(instanceInfo.window_height);
-            await newInstance.setWindowWidth(instanceInfo.window_width);
-            await newInstance.setInstalledVersion(instanceInfo.installed_version);
-            await newInstance.setSourceServer(instanceInfo.source_server);
-            for (let c of oldContent) {
-                await newInstance.addContent(
-                    c.name,
-                    c.author,
-                    c.image,
-                    c.file_name,
-                    c.source,
-                    c.type,
-                    c.version,
-                    c.source_info,
-                    c.disabled,
-                    c.version_id
-                );
-            }
-            newInstance.display();
-        } catch (e) {
-            displayError(translate("app.instances.duplicate.fail"));
-            throw e;
-        }
-    })
-}
-
 async function getRecentlyPlayedWorlds(ignore_world_ids = []) {
     let all_servers = await window.enderlynx.getAllServers((await getInstances()).map(e => e.instance_id));
     let allServersMapped = [];
@@ -13559,24 +13667,6 @@ function fixPathForImage(path) {
     return path.replaceAll(" ", "%20").replaceAll("#", "%23");
 }
 
-async function repairInstance(instance, whatToRepair) {
-    await instance.setMcInstalled(false);
-    await instance.setFailed(false);
-    let r = await window.enderlynx.repairMinecraft(instance.instance_id, instance.loader, instance.vanilla_version, instance.loader_version, whatToRepair);
-    if (r.error) {
-        await instance.setFailed(true);
-    } else {
-        if (whatToRepair.includes("java")) {
-            await instance.setJavaVersion(r.java_version);
-        }
-        await instance.setMcInstalled(true);
-    }
-    await instance.setProvidedJavaArgs(r.java_args);
-    if (!instance.uses_custom_java_args) {
-        await instance.setJavaArgs(r.java_args);
-    }
-}
-
 let plugin_loaders = ["folia", "spigot", "paper", "bungeecord", "purpur", "waterfall", "velocity", "bukkit", "sponge"];
 async function installButtonClick(content, version, instance_id, button, dialog_to_close, oncomplete = () => { }, states) {
     let count = 0;
@@ -14199,196 +14289,6 @@ let importInstanceFromContentProvider = (info) => {
 }
 
 window.enderlynx.onOpenFile(importInstance);
-
-async function openInstanceShareDialog(instanceInfo) {
-    document.body.classList.add("loading");
-    let options = await window.enderlynx.getInstanceFiles(instanceInfo.instance_id);
-    document.body.classList.remove("loading");
-    let content = await instanceInfo.getContent();
-    let contentSpecific = [];
-    let contentMap = {};
-    content.forEach(e => {
-        let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-        let content_file = content_folder + "/" + e.file_name;
-        let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
-        contentSpecific.push(replace);
-        contentMap[replace] = e;
-        let index = options.indexOf(content_file);
-        if (index < 0) return;
-        options[index] = replace;
-    });
-
-    let distributionToggleWrapper = document.createElement("div");
-    let labelWrapper = document.createElement("div");
-    labelWrapper.className = "label-wrapper";
-    let label = document.createElement("label");
-    label.className = "dialog-label";
-    let labelDesc = document.createElement("label");
-    labelDesc.className = "dialog-label-desc";
-    let toggleEle = document.createElement("button");
-    let distributionToggle = new Toggle(toggleEle, () => {
-        updateDistributionInfo(out, overrides, packVersion, name);
-    }, false);
-    distributionToggleWrapper.className = "dialog-text-label-wrapper-horizontal";
-    distributionToggleWrapper.classList.add("dialog-wrapper-hidden");
-    distributionToggleWrapper.appendChild(toggleEle);
-    distributionToggleWrapper.appendChild(labelWrapper);
-    labelWrapper.appendChild(label);
-    labelWrapper.appendChild(labelDesc);
-
-    let distributionInfo = document.createElement("div");
-    distributionInfo.className = "info";
-    distributionInfo.classList.add("dialog-wrapper-hidden");
-
-    let overrides = [];
-    let out = "elpack";
-    let packVersion = "";
-    let name = instanceInfo.name;
-
-    let updateDistributionInfo = (out, overrides, packVersion, name) => {
-        let distributionWarnings = [];
-        if (out == "mrpack") {
-            let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "modrinth");
-            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.modrinth.eco", "%l", content_specific.map(e => e.name).join(", ")));
-            if (!packVersion) distributionWarnings.push(translate("app.distribution.modrinth.version"));
-        } else if (out == "cf_zip") {
-            let content_specific = overrides.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]).filter(e => e.source != "curseforge");
-            if (content_specific.length > 0) distributionWarnings.push(translate("app.distribution.curseforge.eco", "%l", content_specific.map(e => e.name).join(", ")));
-        }
-        if (out != "elpack") {
-            if (!name) distributionWarnings.push(translate("app.distribution.name"));
-        }
-        if (!distributionToggle.toggled) distributionWarnings = [];
-        if (distributionWarnings.length) {
-            distributionInfo.classList.add("shown");
-            distributionInfo.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span style="display: flex;flex-direction: column;gap: 4px;"><b>' + translate("app.distribution.warnings") + "</b>" + distributionWarnings.map(e => `<span>${e}</span>`).join("") + "</span>";
-        } else {
-            distributionInfo.classList.remove("shown");
-        }
-    }
-
-    let updateToggle = (v) => {
-        if (v == "elpack") distributionToggleWrapper.classList.remove("shown");
-        if (v == "mrpack") {
-            distributionToggleWrapper.classList.add("shown");
-            label.innerHTML = translate("app.instances.share.distribution", "%p", translate("app.discover.modrinth"));
-            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", translate("app.discover.modrinth"));
-        }
-        if (v == "cf_zip") {
-            distributionToggleWrapper.classList.add("shown");
-            label.innerHTML = translate("app.instances.share.distribution", "%p", translate("app.discover.curseforge"));
-            labelDesc.innerHTML = translate("app.instances.share.distribution.description", "%p", translate("app.discover.curseforge"));
-        }
-        updateDistributionInfo(v, overrides, packVersion, name);
-    }
-
-    let dialog = new Dialog();
-    dialog.showDialog(translate("app.instances.share.title"), "form", [
-        {
-            "type": "notice",
-            "content": distributionInfo
-        },
-        {
-            "type": "text",
-            "name": translate("app.instances.share.name"),
-            "id": "name",
-            "default": instanceInfo.name,
-            "oninput": (v) => {
-                name = v;
-                updateDistributionInfo(out, overrides, packVersion, v);
-            }
-        },
-        {
-            "type": "text",
-            "name": translate("app.instances.share.version"),
-            "id": "version",
-            "default": "",
-            "oninput": (v) => {
-                packVersion = v;
-                updateDistributionInfo(out, overrides, v, name);
-            }
-        },
-        {
-            "type": "multi-select",
-            "name": translate("app.instances.share.out"),
-            "id": "out",
-            "default": "elpack",
-            "options": [
-                {
-                    "name": translate("app.instances.share.elpack"),
-                    "value": "elpack"
-                },
-                {
-                    "name": translate("app.instances.share.mrpack"),
-                    "value": "mrpack"
-                },
-                {
-                    "name": translate("app.instances.share.cf_zip"),
-                    "value": "cf_zip"
-                }
-            ],
-            "onchange": (v) => {
-                out = v;
-                updateToggle(v);
-            }
-        },
-        {
-            "type": "notice",
-            "content": distributionToggleWrapper
-        },
-        {
-            "type": "files",
-            "name": translate("app.instances.share.files"),
-            "id": "files",
-            "options": options,
-            "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts"],
-            "onchange": (v) => {
-                overrides = v;
-                updateDistributionInfo(out, v, packVersion, name);
-            }
-        }
-    ], [
-        {
-            "type": "cancel",
-            "content": translate("app.instances.share.cancel")
-        },
-        {
-            "type": "confirm",
-            "content": translate("app.instances.share.confirm")
-        }
-    ], [], (info) => {
-        let nonContentSpecific = info.files.filter(e => !contentSpecific.includes(e));
-        let yesContentSpecific = info.files.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]);
-        yesContentSpecific = yesContentSpecific.filter(e => {
-            if (e.source != "player_install") return true;
-            let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-            let content_file = content_folder + "/" + e.file_name;
-            nonContentSpecific.push(content_file);
-            return false;
-        });
-        if (info.out == "elpack") {
-            createElPack(instanceInfo, yesContentSpecific, nonContentSpecific, info.version);
-        } else if (info.out == "mrpack") {
-            yesContentSpecific = yesContentSpecific.filter(e => {
-                if (e.source == "modrinth") return true;
-                let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-                let content_file = content_folder + "/" + e.file_name;
-                nonContentSpecific.push(content_file);
-                return false;
-            });
-            createMrPack(instanceInfo, yesContentSpecific, nonContentSpecific, info.version);
-        } else if (info.out == "cf_zip") {
-            yesContentSpecific = yesContentSpecific.filter(e => {
-                if (e.source == "curseforge") return true;
-                let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
-                let content_file = content_folder + "/" + e.file_name;
-                nonContentSpecific.push(content_file);
-                return false;
-            });
-            createCfZip(instanceInfo, yesContentSpecific, nonContentSpecific, info.version);
-        }
-    });
-}
 
 const overlay = document.getElementById('drop-overlay');
 document.getElementById('drop-overlay-inner').innerHTML = translate("app.import.drop");

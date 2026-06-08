@@ -1986,7 +1986,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
     let globalWrapper = getDefault("global_wrapper");
     let globalPostExit = getDefault("global_post_exit_hook");
     try {
-        await fixProfile(player_info, player_id);
+        await fixProfile(player_info, player_info.id);
         if (!settings.quickPlay && instance_info.source_server) {
             settings.quickPlay = { "type": "multiplayer", "info": instance_info.source_server };
         }
@@ -2824,11 +2824,11 @@ async function deleteInstanceFiles(instance_id) {
     }
 }
 
-ipcMain.handle('duplicate-instance-files', async (_, old_instance_id, new_instance_id) => {
-    return await duplicateInstanceFiles(old_instance_id, new_instance_id);
+ipcMain.handle('duplicate-instance', async (_, old_instance_id, new_instance_id, name, icon) => {
+    return await duplicateInstance(old_instance_id, new_instance_id, name, icon);
 });
 
-async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
+async function duplicateInstance(old_instance_id, new_instance_id, name, icon) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
@@ -2862,11 +2862,50 @@ async function duplicateInstanceFiles(old_instance_id, new_instance_id) {
             signal.throwIfAborted();
         }
         win.webContents.send('progress-update', translate("app.instance.duplicating"), 100, translate("app.done"), processId, "done", cancelId);
-        return true;
     } catch (err) {
         win.webContents.send('progress-update', translate("app.instance.duplicating"), 100, err, processId, "error", cancelId);
-        throw err;
+        return false;
     }
+    let oldInstance = getInstance(old_instance_id);
+    let newInstance = addInstance(
+        name,
+        new Date(),
+        new Date(),
+        "",
+        oldInstance.loader,
+        oldInstance.vanilla_version,
+        oldInstance.loader_version,
+        oldInstance.locked,
+        oldInstance.downloaded,
+        oldInstance.group_id,
+        icon,
+        new_instance_id,
+        0,
+        oldInstance.install_source,
+        oldInstance.install_id,
+        false,
+        true
+    );
+    batchUpdateInstance({
+        "java_args": oldInstance.java_args,
+        "provided_java_args": oldInstance.provided_java_args,
+        "uses_custom_java_args": oldInstance.uses_custom_java_args,
+        "uses_custom_java_installation": oldInstance.uses_custom_java_installation,
+        "java_path": oldInstance.java_path,
+        "java_version": oldInstance.java_version,
+        "allocated_ram": oldInstance.allocated_ram,
+        "env_vars": oldInstance.env_vars,
+        "post_exit_hook": oldInstance.post_exit_hook,
+        "pre_launch_hook": oldInstance.pre_launch_hook,
+        "post_launch_hook": oldInstance.post_launch_hook,
+        "wrapper": oldInstance.wrapper,
+        "window_height": oldInstance.window_height,
+        "window_width": oldInstance.window_width,
+        "installed_version": oldInstance.installed_version,
+        "source_server": oldInstance.source_server
+    }, new_instance_id);
+    db.prepare("INSERT INTO content (name, author, image, file_name, source, type, version, instance, source_info, disabled, version_id) SELECT name, author, image, file_name, source, type, version, ?, source_info, disabled, version_id FROM content WHERE instance = ?").run(new_instance_id, old_instance_id);
+    return newInstance;
 }
 
 ipcMain.handle('change-folder', async (_, old_path, new_path) => {
@@ -4617,6 +4656,21 @@ function updateInstance(key, value, instance_id) {
     if (win && win.webContents) win.webContents.send('instance-updated', key, value, instance_id);
     return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
 }
+function batchUpdateInstance(info, instance_id) {
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server"];
+    for (let key in info) {
+        if (info[key] instanceof Date) info[key] = info[key].toISOString();
+        if (typeof info[key] === "boolean") info[key] = Number(info[key]);
+        if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
+    }
+    for (let key in info) {
+        if (win && win.webContents) win.webContents.send('instance-updated', key, info[key], instance_id);
+    }
+    let keys = Object.keys(info);
+    let setClause = keys.map(key => `${key} = ?`).join(", ");
+    let values = keys.map(key => info[key]);
+    return db.prepare(`UPDATE instances SET ${setClause} WHERE id = ?`).run(...values, instance_id);
+}
 function deleteInstance(instance_id) {
     db.prepare("DELETE FROM content WHERE instance = ?").run(instance_id);
     db.prepare("DELETE FROM last_played_servers WHERE instance_id = ?").run(instance_id);
@@ -5450,10 +5504,8 @@ ipcMain.handle('friend-action', async (_, player_id, action, friend) => {
             body: JSON.stringify({ name, profileId, updateType: action })
         }
     );
-    console.log(res);
     let j = await res.json();
     j.status = res.status;
-    console.log(j);
     return j;
 });
 

@@ -173,8 +173,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteInstanceFiles: async (instance_id) => {
         return await ipcRenderer.invoke('delete-instance-files', instance_id);
     },
-    duplicateInstanceFiles: async (old_instance_id, new_instance_id) => {
-        return await ipcRenderer.invoke('duplicate-instance-files', old_instance_id, new_instance_id);
+    duplicateInstance: async (old_instance_id, new_instance_id, name, icon) => {
+        return await ipcRenderer.invoke('duplicate-instance', old_instance_id, new_instance_id, name, icon);
     },
     updateOptionsTXT: async (instance_id, key, value) => {
         return await ipcRenderer.invoke('update-options-txt', instance_id, key, value);
