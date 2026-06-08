@@ -185,8 +185,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getLangFile: () => {
         return ipcRenderer.sendSync('get-lang');
     },
-    playMinecraft: async (instance_id, player_id, quickPlay) => {
-        return await ipcRenderer.invoke('play-minecraft', instance_id, player_id, quickPlay);
+    playMinecraft: async (instance_id, settings) => {
+        return await ipcRenderer.invoke('play-minecraft', instance_id, settings);
     },
     getJavaInstallation: async (v) => {
         return await ipcRenderer.invoke('get-java-installation', v);

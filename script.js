@@ -492,6 +492,31 @@ class Instance {
     display(default_tab, make_button_loading) {
         this.instanceScreen.display(false, default_tab, make_button_loading);
     }
+
+    async play(settings) {
+        try {
+            await window.enderlynx.playMinecraft(this.instance_id, settings);
+            await live.findLive();
+        } catch (e) {
+            displayError(e);
+        }
+    }
+
+    async playSingleplayerWorld(world_id) {
+        await this.play({ quickPlay: { "type": "singleplayer", "info": world_id } });
+    }
+
+    async playMultiplayerWorld(world_id) {
+        await this.play({ quickPlay: { "type": "multiplayer", "info": world_id } });
+    }
+
+    async playDemo() {
+        await this.play({ demo: true })
+    }
+
+    async stop() {
+        return await window.enderlynx.stopInstance(this.instance_id);
+    }
 }
 
 async function getInstances() {
@@ -907,7 +932,7 @@ class LiveMinecraft {
         this.nameElement.textContent = instanceInfo.name;
         this.element.classList.add("minecraft-live");
         this.stopButton.onclick = () => {
-            stopInstance(instanceInfo);
+            await instanceInfo.stop();
             this.findLive();
         }
         this.logButton.onclick = () => {
@@ -932,7 +957,7 @@ class LiveMinecraft {
                 "title": translate("app.live.context.stop"),
                 "icon": '<i class="fa-regular fa-circle-stop"></i>',
                 "func": () => {
-                    stopInstance(instanceInfo);
+                    await instanceInfo.stop();
                     this.findLive();
                 }
             }
@@ -2757,11 +2782,11 @@ class InstanceScreen extends Screen {
     }
 
     async play() {
-        return await playInstance(this.instance);
+        return await this.instance.play();
     }
 
     async stop() {
-        return await stopInstance(this.instance);
+        return await this.instance.stop();
     }
 
     async analyzeLogs() {
@@ -3482,7 +3507,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.worlds.play"),
                                 "icon": '<i class="fa-solid fa-play"></i>',
                                 "func": async () => {
-                                    await playSingleplayerWorld(this.instance, worlds[i].id);
+                                    this.instance.playSingleplayerWorld(worlds[i].id);
                                 }
                             } : null,
                             {
@@ -3595,7 +3620,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.worlds.play"),
                                 "icon": '<i class="fa-solid fa-play"></i>',
                                 "func": async () => {
-                                    await playMultiplayerWorld(this.instance, worldsMultiplayer[i].ip);
+                                    this.instance.playMultiplayerWorld(worldsMultiplayer[i].ip);
                                 }
                             } : null,
                             {
@@ -4946,8 +4971,12 @@ class HomeScreen extends Screen {
             playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
             playButton.onclick = async () => {
                 playButton.className = "home-loading-button";
-                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
+                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading");
+                if (e.type == "singleplayer") {
+                    await instanceInfo.playSingleplayerWorld(e.id);
+                } else {
+                    await instanceInfo.playMultiplayerWorld(e.ip);
+                }
                 instanceInfo.display();
             }
             let morebutton = document.createElement("button");
@@ -4960,7 +4989,11 @@ class HomeScreen extends Screen {
                     "func": async () => {
                         playButton.className = "home-loading-button";
                         playButton.innerHTML = '<i class="spinner"></i>' + translate("app.loading");
-                        e.type == "singleplayer" ? await playSingleplayerWorld(instanceInfo, e.id) : await playMultiplayerWorld(instanceInfo, e.ip);
+                        if (e.type == "singleplayer") {
+                            await instanceInfo.playSingleplayerWorld(e.id);
+                        } else {
+                            await instanceInfo.playMultiplayerWorld(e.ip);
+                        }
                         instanceInfo.display();
                     }
                 } : null,
@@ -5160,12 +5193,12 @@ class HomeScreen extends Screen {
                 playButton.onclick = isRunning ? async () => {
                     playButton.classList.add("home-loading-button");
                     playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
-                    await stopInstance(instanceInfo);
+                    await instanceInfo.stop();
                     formatPlayButton(false);
                 } : async () => {
                     playButton.className = "home-loading-button";
                     playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                    await playInstance(instanceInfo);
+                    await instanceInfo.play();
                     instanceInfo.display();
                 }
                 if (more) more.refreshButtons();
@@ -5180,12 +5213,12 @@ class HomeScreen extends Screen {
                     "title": () => running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
                     "func": async (e) => {
                         if (running) {
-                            await stopInstance(instanceInfo);
+                            await instanceInfo.stop();
                             formatPlayButton(false);
                         } else {
                             playButton.className = "home-loading-button";
                             playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                            await playInstance(instanceInfo);
+                            await instanceInfo.play();
                             instanceInfo.display();
                         }
                     }
@@ -5674,10 +5707,10 @@ class InstancesScreen extends Screen {
                     "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
                     "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
                     "func": running ? async (e) => {
-                        await stopInstance(instances[i]);
+                        instances[i].stop();
                     } : async (e) => {
                         instances[i].display(undefined, true);
-                        await playInstance(instances[i]);
+                        instances[i].play();
                     }
                 },
                 instances[i].locked ? null : {
@@ -9325,27 +9358,6 @@ function displaySuccess(success) {
         hideToast(element);
     }
     setTimeout(() => { hideToast(element) }, 3000);
-}
-
-async function playInstance(instInfo, quickPlay = null) {
-    try {
-        let profile = await getDefaultProfile();
-        await window.enderlynx.playMinecraft(instInfo.instance_id, profile.id, quickPlay);
-        await live.findLive();
-    } catch (e) {
-        displayError(e);
-    }
-}
-
-async function playSingleplayerWorld(instInfo, world_id) {
-    await playInstance(instInfo, { "type": "singleplayer", "info": world_id });
-}
-async function playMultiplayerWorld(instInfo, world_id) {
-    await playInstance(instInfo, { "type": "multiplayer", "info": world_id });
-}
-
-async function stopInstance(instInfo) {
-    return await window.enderlynx.stopInstance(instInfo.instance_id);
 }
 
 function formatTime(secs) {
@@ -13499,7 +13511,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             ], [], () => { }, () => { });
                             e.getDependencies((v) => {
                                 element.innerHTML = "";
-                                v.sort((a,b) => {
+                                v.sort((a, b) => {
                                     return (a?.project?.name || a.file_name).localeCompare(b?.project?.name || b.file_name);
                                 });
                                 for (let i = 0; i < v.length; i++) {

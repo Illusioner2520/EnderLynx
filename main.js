@@ -196,9 +196,9 @@ async function launchGameFromArgs(instance_id_to_launch, world_type_to_launch, w
         }
         let profile_id = profile.id;
         if (world_type_to_launch) {
-            await playMinecraft(instance_id_to_launch, profile_id, { "type": world_type_to_launch, "info": world_id_to_launch });
+            await playMinecraft(instance_id_to_launch, { profile_id, quickPlay: { "type": world_type_to_launch, "info": world_id_to_launch } });
         } else {
-            await playMinecraft(instance_id_to_launch, profile_id, {});
+            await playMinecraft(instance_id_to_launch, { profile_id });
         }
         if (dont_launch) app.quit();
     } catch (e) {
@@ -1953,18 +1953,18 @@ async function processMMCZip(instance_id, info, title = ".zip file") {
     }
 }
 
-ipcMain.handle('play-minecraft', async (_, instance_id, player_id, quickPlay) => {
-    return await playMinecraft(instance_id, player_id, quickPlay);
+ipcMain.handle('play-minecraft', async (_, instance_id, settings) => {
+    return await playMinecraft(instance_id, settings);
 });
 
-async function playMinecraft(instance_id, player_id, quickPlay) {
-    let player_info = getProfileFromId(player_id);
+async function playMinecraft(instance_id, settings = { player_id: null, quickPlay: {}, demo: false }) {
+    let player_info = settings.player_id ? getProfileFromId(settings.player_id) : getDefaultProfile();
     let instance_info = getInstance(instance_id);
     if (!instance_info) {
         throw new Error(translate("app.launch.unable_to_find_instance"));
     }
     updateInstance("last_played", new Date(), instance_id);
-    if (!player_id) throw new Error(translate("app.launch.sign_in"));
+    if (!player_info?.id) throw new Error(translate("app.launch.sign_in"));
 
     if (new Date(player_info.expires) < new Date()) {
         try {
@@ -1981,13 +1981,13 @@ async function playMinecraft(instance_id, player_id, quickPlay) {
     let globalPostExit = getDefault("global_post_exit_hook");
     try {
         await fixProfile(player_info, player_id);
-        if (!quickPlay && instance_info.source_server) {
-            quickPlay = { "type": "multiplayer", "info": instance_info.source_server };
+        if (!settings.quickPlay && instance_info.source_server) {
+            settings.quickPlay = { "type": "multiplayer", "info": instance_info.source_server };
         }
         let minecraft = await mc.launchGame(instance_info.loader, instance_info.vanilla_version, instance_info.loader_version, player_info.name, player_info.uuid, {
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid
-        }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, quickPlay, false, instance_info.allocated_ram || 4096, instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version), parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+        }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480 }, settings.quickPlay, settings.demo, instance_info.allocated_ram || 4096, instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version), parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
         return { minecraft, player_info }
@@ -2113,7 +2113,7 @@ async function getNewAccessToken(player_id) {
     const authManager = new Auth("select_account");
     const xboxManager = await authManager.refresh(player_info.refresh_token);
     const token = await xboxManager.getMinecraft();
-    let info =  {
+    let info = {
         "access_token": token.mcToken,
         "uuid": token.profile.id,
         "refresh_token": token.parent.msToken.refresh_token,
