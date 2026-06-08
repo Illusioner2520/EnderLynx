@@ -892,7 +892,10 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                                 else if (iconPath.endsWith('.gif')) mime = 'image/gif';
                                 let resizedBuffer = iconBuffer;
                                 try {
-                                    resizedBuffer = sharp(iconBuffer).resize({ width: 40, height: 40, fit: "inside" }).toBufferSync();
+                                    let image = nativeImage.createFromBuffer(iconBuffer);
+                                    let size = image.getSize();
+                                    let scale = Math.min(40 / size.height, 40 / size.width);
+                                    resizedBuffer = scale >= 1 ? iconBuffer : image.resize({ width: Math.round(size.width * scale), height: Math.round(size.height * scale) }).toPNG();
                                 } catch (e) {
                                     resizedBuffer = iconBuffer;
                                 }
@@ -931,7 +934,10 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                                 else if (iconPath.endsWith('.gif')) mime = 'image/gif';
                                 let resizedBuffer = iconBuffer;
                                 try {
-                                    resizedBuffer = sharp(iconBuffer).resize({ width: 40, height: 40, fit: "inside" }).toBufferSync();
+                                    let image = nativeImage.createFromBuffer(iconBuffer);
+                                    let size = image.getSize();
+                                    let scale = Math.min(40 / size.height, 40 / size.width);
+                                    resizedBuffer = scale >= 1 ? iconBuffer : image.resize({ width: Math.round(size.width * scale), height: Math.round(size.height * scale) }).toPNG();
                                 } catch (e) {
                                     resizedBuffer = iconBuffer;
                                 }
@@ -3259,22 +3265,6 @@ ipcMain.handle('get-world-files', async (_, instance_id, world_id) => {
     return await getAllFilesRecursive(dirPath, undefined, true);
 });
 
-ipcMain.handle('set-world-dat', async (_, instance_id, world_id, datInfo) => {
-    let files = Object.keys(datInfo);
-    const worldPath = path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id);
-    try {
-        for (let i = 0; i < files.length; i++) {
-            let filePath = path.resolve(worldPath, files[i]);
-            const newBuffer = nbt.writeUncompressed(datInfo[files[i]]);
-            const newerBuffer = zlib.gzipSync(newBuffer);
-            await fsPromises.writeFile(filePath, newerBuffer);
-        }
-        return true;
-    } catch (e) {
-        return false;
-    }
-})
-
 function readElPack(info) {
     try {
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
@@ -3588,8 +3578,7 @@ ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
             const response = await fetch(file_path);
             if (!response.ok) return false;
             const arrayBuffer = await response.arrayBuffer();
-            let buffer = await sharp(arrayBuffer).png().toBuffer();
-            image = nativeImage.createFromBuffer(buffer);
+            image = nativeImage.createFromBuffer(Buffer.from(arrayBuffer));
         } else {
             file_path = path.resolve(file_path);
             image = nativeImage.createFromPath(file_path);
@@ -3792,8 +3781,8 @@ ipcMain.handle('import-skin', async (_, dataurl) => {
     const base64Data = dataurl.split(',')[1];
     if (!base64Data) throw new Error("Invalid data URL");
     const buffer = Buffer.from(base64Data, "base64");
-    await fsPromises.writeFile(path.resolve(user_path, `minecraft/skins/${hash.hash}.png`), buffer);
-    return hash.hash;
+    await fsPromises.writeFile(path.resolve(user_path, `minecraft/skins/${hash}.png`), buffer);
+    return hash;
 });
 
 async function hashImageFromDataUrl(dataUrl) {
@@ -3808,7 +3797,7 @@ async function hashImageFromDataUrl(dataUrl) {
         .toBuffer({ resolveWithObject: true });
 
     const hash = crypto.createHash('sha256').update(data).digest('hex');
-    return { "hash": hash, "buffer": data };
+    return hash;
 }
 
 ipcMain.handle('test-java-installation', async (_, file_path) => {
@@ -3944,7 +3933,7 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
                 comment: translate("app.desktop_shortcut.description", "%n", instance_name),
                 icon: iconPath,
                 arguments: args,
-                VBScriptPath: path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
+                VBScriptPath: isDev ? path.join(__dirname, "node_modules", "create-desktop-shortcuts", "src", "windows.vbs") : path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "create-desktop-shortcuts", "src", "windows.vbs")
             },
             linux: {
                 filePath: target,
@@ -4660,7 +4649,7 @@ function getInstanceContentDatabase(instance_id) {
 function updateContent(key, value, content_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["name", "author", "disabled", "image", "file_name", "source", "type", "version", "version_id", "instance", "source_info TEXT"];
+    let allowedKeys = ["name", "author", "disabled", "image", "file_name", "source", "type", "version", "version_id", "instance", "source_info"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit that value");
     if (win && win.webContents) win.webContents.send('content-updated', key, value, content_id);
     return db.prepare(`UPDATE content SET ${key} = ? WHERE id = ?`).run(value, content_id);

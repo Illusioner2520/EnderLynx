@@ -28,6 +28,7 @@
     "electron": "^41.5.1"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
     "ace-builds": "^1.43.6",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^12.6.2",

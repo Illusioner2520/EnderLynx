@@ -3725,16 +3725,6 @@ dialog[open]::backdrop {
     cursor: pointer;
 }
 
-.nbt-button {
-    width: 20px;
-    height: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    font-size: 1rem;
-}
-
 .multiple-select-top {
     display: grid;
     grid-template-columns: subgrid;
@@ -3788,29 +3778,6 @@ dialog[open]::backdrop {
 .multiple-file-select-title {
     font-weight: bold;
     font-size: 1rem;
-}
-
-.nbt-key,
-.nbt-value {
-    font-weight: bold;
-    font-size: 1rem;
-    background-color: var(--color-1t);
-    border: 0;
-    padding: 5px;
-    border-radius: 5px;
-    width: fit-content;
-    min-width: 60px;
-    field-sizing: content;
-}
-
-.nbt-dropdown {
-    width: 150px;
-    background-color: var(--color-1t);
-}
-
-.nbt-dropdown .dropdown-button {
-    padding: 5px;
-    border-radius: 5px;
 }
 
 .multiple-select-item:nth-child(2n) {
@@ -5078,8 +5045,7 @@ dialog {
     font-size: 1.3rem;
 }
 
-.details.open>*>.details-top-chevron
-.wardrobe-default-skin-details>*>.details-top-chevron {
+.details.open>*>.details-top-chevron {
     rotate: 180deg;
 }
 
@@ -6485,4 +6451,8 @@ body.april_fools *::before {
 .wardrobe-default-skin-details:has(.my-account-option-list-skin:empty) {
     display: none;
     transition: none;
+}
+
+.my-account-option-list-skin:empty {
+    display: none;
 }
