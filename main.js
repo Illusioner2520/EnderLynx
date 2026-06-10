@@ -1330,8 +1330,10 @@ async function processCfZip(instance_id, info, title = ".zip file") {
 
         signal.throwIfAborted();
         win.webContents.send('progress-update', translate("app.installing", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
+        let split = manifest_json.minecraft.modLoaders[0].id.split("-");
+        let loader_version = split[split.length - 1];
         return ({
-            "loader_version": manifest_json.minecraft.modLoaders[0].id.split("-")[1],
+            "loader_version": loader_version,
             "content": cfData.length ? content : [],
             "loader": manifest_json.minecraft.modLoaders[0].id.split("-")[0],
             "vanilla_version": manifest_json.minecraft.version,

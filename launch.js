@@ -477,6 +477,7 @@ class Minecraft {
         }
     }
     async installNeoForge(mcversion, neoforgeversion, isRepair) {
+        if (neoforgeversion == "47.1.82") neoforgeversion = "47.1.83";
         let processId = generateNewProcessId();
         let cancelId = generateNewCancelId();
         let abortController = new AbortController();
@@ -484,7 +485,10 @@ class Minecraft {
         let signal = abortController.signal;
         try {
             this.win.webContents.send('progress-update', this.translate("app.downloading.neoforge"), 0, this.translate("app.downloading.neoforge.installer"), processId, "good", cancelId, true);
-            const neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeversion}/neoforge-${neoforgeversion}-installer.jar`;
+            let neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${neoforgeversion}/neoforge-${neoforgeversion}-installer.jar`;
+            if (mcversion == "1.20.1") {
+                neoForgeInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-${neoforgeversion}/forge-1.20.1-${neoforgeversion}-installer.jar`
+            }
             const neoForgeMetaDir = path.resolve(this.userPath, `minecraft/meta/neoforge/${mcversion}/${neoforgeversion}`);
             const neoForgeLibDir = path.resolve(this.userPath, `minecraft/meta/libraries`);
             fs.mkdirSync(neoForgeMetaDir, { recursive: true });
@@ -781,6 +785,7 @@ class Minecraft {
                 }
             }
         } else if (loader == "neoforge") {
+            if (loaderVersion == "47.1.82") loaderVersion = "47.1.83";
             if (!fs.existsSync(path.resolve(this.userPath, `minecraft/meta/neoforge/${version}/${loaderVersion}/neoforge-${version}-${loaderVersion}.json`))) {
                 await this.installNeoForge(version, loaderVersion);
             } else {
@@ -1726,10 +1731,23 @@ class NeoForge {
             }
         }
 
+        versions.push("1.20.1");
+
         return versions.reverse();
     }
 
     static async getVersions(mcVersion) {
+        if (mcVersion == "1.20.1") {
+            const res = await fetch("https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge");
+            const data = (await res.json()).versions;
+            let list = [];
+            for (let i = 0; i < data.length; i++) {
+                let split = data[i].split("-");
+                if (split.length <= 1) continue;
+                list.push(split[1]);
+            }
+            return list.reverse();
+        }
         let start = "";
         let end = "";
         let split2 = mcVersion.split("-");
