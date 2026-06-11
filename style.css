@@ -2413,16 +2413,18 @@ dialog[open]::backdrop {
 }
 
 .logs-display:not(.word-wrap) .log-entry {
-    white-space: nowrap;
+    white-space: pre;
 }
 
 .logs-display.word-wrap .log-entry {
     overflow-wrap: anywhere;
+    white-space: pre-wrap;
 }
 
 .log-entry {
     height: 15px;
     padding-right: 10px;
+    tab-size: 4;
 }
 
 .discover-list {

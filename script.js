@@ -4526,7 +4526,7 @@ class InstanceScreen extends Screen {
                         lineElement.classList.add("log-info");
                     } else if (e.includes("WARN")) {
                         lineElement.classList.add("log-warn");
-                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("\tat ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                         lineElement.classList.add("log-error");
                     }
                     logs.push({ "element": lineElement, "content": e });
@@ -4548,7 +4548,7 @@ class InstanceScreen extends Screen {
                             lineElement.classList.add("log-info");
                         } else if (e.includes("WARN")) {
                             lineElement.classList.add("log-warn");
-                        } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                        } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("\tat ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                             lineElement.classList.add("log-error");
                         }
                         logs.push({ "element": lineElement, "content": e });
@@ -4584,7 +4584,7 @@ class InstanceScreen extends Screen {
                         lineElement.classList.add("log-info");
                     } else if (e.includes("WARN")) {
                         lineElement.classList.add("log-warn");
-                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("at ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
+                    } else if (e.includes("ERROR") || e.includes("FATAL") || e.includes("\tat ") || e.includes("Error:") || e.includes("Caused by:") || e.includes("Exception")) {
                         lineElement.classList.add("log-error");
                     }
                     logs.push({ "element": lineElement, "content": e });
