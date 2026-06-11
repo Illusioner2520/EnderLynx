@@ -1694,7 +1694,32 @@ class Quilt {
     static async getVersions(mcVersion) {
         const res = await fetch(`https://meta.quiltmc.org/v3/versions/loader/${mcVersion}`);
         const data = await res.json();
-        return data.map(e => e.loader.version);
+        let versions = data.map(e => e.loader.version);
+        function parse(v) {
+            const parts = v.split('-');
+            const base = parts[0];
+            const beta = parts[1] && parts[1].startsWith('beta.') ? Number(parts[1].split('.').slice(1).join('.')) : (parts[1] && parts[1].startsWith('beta') ? Number(parts[1].split(/beta\.?/)[1]) : null);
+            const nums = base.split('.').map(n => Number(n));
+            return { nums, beta };
+        }
+        function cmp(a, b) {
+            const A = parse(a);
+            const B = parse(b);
+            const len = Math.max(A.nums.length, B.nums.length);
+            for (let i = 0; i < len; i++) {
+                const na = A.nums[i] || 0;
+                const nb = B.nums[i] || 0;
+                if (na !== nb) return na > nb ? -1 : 1;
+            }
+            if (A.beta == null && B.beta == null) return 0;
+            if (A.beta == null) return -1;
+            if (B.beta == null) return 1;
+            if ((A.beta || 0) !== (B.beta || 0)) return (A.beta || 0) > (B.beta || 0) ? -1 : 1;
+            return 0;
+        }
+
+        versions.sort(cmp);
+        return versions;
     }
 }
 
