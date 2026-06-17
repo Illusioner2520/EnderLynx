@@ -572,7 +572,7 @@ class Instance {
         });
     }
 
-    async repair() {
+    async repair(whatToRepair) {
         await this.setMcInstalled(false);
         await this.setFailed(false);
         let r = await window.enderlynx.repairMinecraft(this.instance_id, this.loader, this.vanilla_version, this.loader_version, whatToRepair);
