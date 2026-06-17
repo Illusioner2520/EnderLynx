@@ -287,6 +287,7 @@ window.enderlynx.onCapeUpdated(async (key, value, cape_id) => {
 
 class Instance {
     static instances = new Map();
+    static DEFAULT_FILE_EXCLUSIONS = ["exclude", "logs", "*.log", ".fabric", "crash-reports", "debug", "downloads", "*.json", "backups", "temp", "saves", "screenshots", "simplebackups", "*.zip", "*.html", "libraries", "versions", ".mixin.out", ".cache", "*.elpack", "*.mrpack"];
 
     constructor(content) {
         if (!content) throw new Error("Instance not found");
@@ -482,6 +483,10 @@ class Instance {
 
     async delete() {
         Instance.instances.delete(this.instance_id);
+        let content = await this.getContent();
+        content.forEach((e) => {
+            e.delete();
+        });
         await window.enderlynx.deleteInstance(this.instance_id);
     }
 
@@ -1096,7 +1101,7 @@ class Instance {
                 "name": translate("app.instances.share.files"),
                 "id": "files",
                 "options": options,
-                "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts"],
+                "default": Instance.DEFAULT_FILE_EXCLUSIONS,
                 "onchange": (v) => {
                     overrides = v;
                     updateDistributionInfo(out, v, packVersion, name);
@@ -1157,7 +1162,7 @@ class Instance {
             let content_file = content_folder + "/" + e.file_name;
             let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
             contentSpecific.push(replace);
-            contentMap[replace] = e;
+            contentMap[replace] = { content_id: e.id, path: content_file };
             let index = options.indexOf(content_file);
             if (index < 0) return;
             options[index] = replace;
@@ -1191,11 +1196,7 @@ class Instance {
                 "name": translate("app.instances.duplicate.files"),
                 "id": "files",
                 "options": options,
-                "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts"],
-                "onchange": (v) => {
-                    overrides = v;
-                    updateDistributionInfo(out, v, packVersion, name);
-                }
+                "default": Instance.DEFAULT_FILE_EXCLUSIONS
             }
         ], [
             {
@@ -1207,9 +1208,15 @@ class Instance {
                 "content": translate("app.instances.duplicate.confirm")
             }
         ], [], async (info) => {
+            let nonContentSpecific = info.files.filter(e => !contentSpecific.includes(e));
+            let yesContentSpecific = info.files.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]);
+
             let new_instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-            let success = await window.enderlynx.duplicateInstance(this.instance_id, new_instance_id, info.name, info.icon);
-            if (!success) displayError(translate("app.instances.duplicate.fail"));
+            let success = await window.enderlynx.duplicateInstance(this.instance_id, new_instance_id, info.name, info.icon, nonContentSpecific, yesContentSpecific);
+            if (!success) {
+                displayError(translate("app.instances.duplicate.fail"));
+                return;
+            }
             let newInstance = Instance.getInstance(new_instance_id);
             newInstance.display();
         })
@@ -10235,6 +10242,22 @@ class MultipleFileSelect {
 
     setSelected(selected) {
         this.selected = new Set();
+        if (selected[0] == "exclude") {
+            let not_selected = selected.slice(1);
+            this.selectAll("", this.getNode(""));
+            not_selected.forEach(e => {
+                if (e[0] == "*") {
+                    this.deselectRootByExtension(e);
+                    return;
+                }
+                let node = this.getNode(e);
+                if (!node) return;
+                this.deselectAll(e, node);
+            });
+            this.updateCheckboxStates();
+            if (this.onchange) this.onchange(this.getValue());
+            return;
+        }
         selected.forEach(e => {
             let node = this.getNode(e);
             if (!node) return;
@@ -10244,7 +10267,6 @@ class MultipleFileSelect {
         if (this.onchange) this.onchange(this.getValue());
     }
 
-    /** Build a hierarchical tree object */
     buildTree(paths) {
         const root = {};
         for (const path of paths) {
@@ -10261,7 +10283,6 @@ class MultipleFileSelect {
         return root;
     }
 
-    /** Recursive render — only called once */
     renderTree(node, container, parentPath = "") {
         for (const key of Object.keys(node)) {
             const fullPath = parentPath ? parentPath + "/" + key : key;
@@ -10351,9 +10372,9 @@ class MultipleFileSelect {
     }
 
     selectAll(path, node) {
-        this.selected.add(path);
+        if (path) this.selected.add(path);
         for (const key of Object.keys(node.children)) {
-            this.selectAll(path + "/" + key, node.children[key]);
+            this.selectAll(path == "" ? key : path + "/" + key, node.children[key]);
         }
     }
 
@@ -10364,7 +10385,18 @@ class MultipleFileSelect {
         }
     }
 
-    /** Efficiently update checkboxes and indeterminate states */
+    deselectRootByExtension(ext) {
+        let extension = ext.substring(2);
+        for (const key of Object.keys(this.tree)) {
+            let split = key.split(".");
+            if (split[split.length - 1] == extension) {
+                let node = this.getNode(key);
+                if (!node) continue;
+                this.deselectAll(key, node);
+            }
+        }
+    }
+
     updateCheckboxStates() {
         const allCheckboxes = this.itemList.querySelectorAll(".multiple-file-select-checkbox");
         for (const checkbox of allCheckboxes) {
@@ -10381,8 +10413,8 @@ class MultipleFileSelect {
         });
     }
 
-    /** Find a node by path */
     getNode(path) {
+        if (path == "") return { children: this.tree };
         const parts = path.split("/");
         let node = { children: this.tree };
         for (const part of parts) {
@@ -10393,7 +10425,6 @@ class MultipleFileSelect {
         return node;
     }
 
-    /** Compute selection state recursively */
     getNodeSelectionState(path, node) {
         if (!node || !Object.keys(node.children).length) {
             return {

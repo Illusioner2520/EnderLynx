@@ -2841,36 +2841,36 @@ async function deleteInstanceFiles(instance_id) {
     }
 }
 
-ipcMain.handle('duplicate-instance', async (_, old_instance_id, new_instance_id, name, icon) => {
-    return await duplicateInstance(old_instance_id, new_instance_id, name, icon);
+ipcMain.handle('duplicate-instance', async (_, old_instance_id, new_instance_id, name, icon, nonContentSpecific, yesContentSpecific) => {
+    return await duplicateInstance(old_instance_id, new_instance_id, name, icon, nonContentSpecific, yesContentSpecific);
 });
 
-async function duplicateInstance(old_instance_id, new_instance_id, name, icon) {
+async function duplicateInstance(old_instance_id, new_instance_id, name, icon, nonContentSpecific, yesContentSpecific) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     let signal = abortController.signal;
+    let contentIdList = yesContentSpecific.map(e => e.content_id);
     try {
+        let fullOverrideList = nonContentSpecific.concat(yesContentSpecific.map(e => e.path));
         win.webContents.send('progress-update', translate("app.instance.duplicating"), 0, translate("app.instance.duplicating.beginning"), processId, "good", cancelId);
         const src = path.resolve(user_path, `minecraft/instances/${old_instance_id}`);
         const dest = path.resolve(user_path, `minecraft/instances/${new_instance_id}`);
         if (!fs.existsSync(src)) return false;
         await fsPromises.mkdir(dest, { recursive: true });
-        const entries = await fsPromises.readdir(src, { withFileTypes: true });
-        const total = entries.length;
         let completed = 0;
 
-        for (const entry of entries) {
-            const percent = Math.round(((completed + 1) / total) * 100);
-            win.webContents.send('progress-update', translate("app.instance.duplicating"), percent, translate("app.instance.duplicating.progress", "%f", entry.name, "%a", completed, "%b", total), processId, "good", cancelId);
-            if (entry.name == "logs") continue;
+        for (const override of fullOverrideList) {
+            const percent = Math.round(((completed + 1) / fullOverrideList.length) * 100);
+            win.webContents.send('progress-update', translate("app.instance.duplicating"), percent, translate("app.instance.duplicating.progress", "%f", path.basename(override), "%a", completed, "%b", fullOverrideList.length), processId, "good", cancelId);
             signal.throwIfAborted();
-            const srcPath = path.join(src, entry.name);
-            const destPath = path.join(dest, entry.name);
-
-            if (entry.isDirectory()) {
-                await fsPromises.cp(srcPath, destPath, { recursive: true, errorOnExist: false, force: true });
+            const srcPath = path.join(src, override);
+            const destPath = path.join(dest, override);
+            await fsPromises.mkdir(path.dirname(destPath), { recursive: true });
+            const srcStat = await fsPromises.stat(srcPath);
+            if (srcStat.isDirectory()) {
+                await fsPromises.cp(srcPath, destPath, { recursive: true });
             } else {
                 await fsPromises.copyFile(srcPath, destPath);
             }
@@ -2921,7 +2921,9 @@ async function duplicateInstance(old_instance_id, new_instance_id, name, icon) {
         "installed_version": oldInstance.installed_version,
         "source_server": oldInstance.source_server
     }, new_instance_id);
-    db.prepare("INSERT INTO content (name, author, image, file_name, source, type, version, instance, source_info, disabled, version_id) SELECT name, author, image, file_name, source, type, version, ?, source_info, disabled, version_id FROM content WHERE instance = ?").run(new_instance_id, old_instance_id);
+    if (contentIdList.length == 0) return newInstance;
+    let idPlaceholders = contentIdList.map(() => '?').join(',');
+    db.prepare(`INSERT INTO content (name, author, image, file_name, source, type, version, instance, source_info, disabled, version_id) SELECT name, author, image, file_name, source, type, version, ?, source_info, disabled, version_id FROM content WHERE id in (${idPlaceholders})`).run(new_instance_id, ...contentIdList);
     return newInstance;
 }
 
