@@ -568,26 +568,8 @@ class Instance {
             if (info.java) whatToRepair.push("java");
             if (info.assets) whatToRepair.push("assets");
             if (info.mod_loader) whatToRepair.push("mod_loader");
-            this.repair(whatToRepair);
+            await window.enderlynx.repairMinecraft(this.instance_id, this.loader, this.vanilla_version, this.loader_version, whatToRepair);
         });
-    }
-
-    async repair(whatToRepair) {
-        await this.setMcInstalled(false);
-        await this.setFailed(false);
-        let r = await window.enderlynx.repairMinecraft(this.instance_id, this.loader, this.vanilla_version, this.loader_version, whatToRepair);
-        if (r.error) {
-            await this.setFailed(true);
-        } else {
-            if (whatToRepair.includes("java")) {
-                await this.setJavaVersion(r.java_version);
-            }
-            await this.setMcInstalled(true);
-        }
-        await this.setProvidedJavaArgs(r.java_args);
-        if (!this.uses_custom_java_args) {
-            await this.setJavaArgs(r.java_args);
-        }
     }
 
     async showSettingsDialog() {

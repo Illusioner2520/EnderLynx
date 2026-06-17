@@ -2095,6 +2095,8 @@ async function downloadMinecraft(instance_id, loader, vanilla_version, loader_ve
 
 async function repairMinecraft(instance_id, loader, vanilla_version, loader_version, whatToRepair) {
     try {
+        updateInstance("mc_installed", false, instance_id);
+        updateInstance("failed", false, instance_id);
         let mc = new Minecraft(instance_id, undefined, db, user_path, win, translate);
         let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
         if (whatToRepair.includes("mod_loader")) {
@@ -2108,9 +2110,22 @@ async function repairMinecraft(instance_id, loader, vanilla_version, loader_vers
                 await mc.installQuilt(vanilla_version, loader_version, true);
             }
         }
-        return { "java_installation": r.java_installation ? r.java_installation.replaceAll("\\", "/") : r.java_installation, "java_version": r.java_version, "java_args": r.java_args };
+        let instance = getInstance(instance_id);
+        if (whatToRepair.includes("java")) {
+            updateInstance("java_version", r.java_version, instance_id);
+            if (!instance.uses_custom_java_installation) {
+                updateInstance("java_path", r.java_installation);
+            }
+        }
+        updateInstance("mc_installed", true, instance_id);
+        updateInstance("provided_java_args", r.java_args, instance_id);
+        if (!instance.uses_custom_java_args) {
+            updateInstance("java_args", r.java_args, instance_id);
+        }
+        return true;
     } catch (err) {
-        return { "error": true }
+        updateInstance("failed", true, instance_id);
+        return false;
     }
 }
 
