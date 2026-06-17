@@ -1146,6 +1146,22 @@ class Instance {
     }
 
     async showDuplicateDialog() {
+        document.body.classList.add("loading");
+        let options = await window.enderlynx.getInstanceFiles(this.instance_id);
+        document.body.classList.remove("loading");
+        let content = await this.getContent();
+        let contentSpecific = [];
+        let contentMap = {};
+        content.forEach(e => {
+            let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+            let content_file = content_folder + "/" + e.file_name;
+            let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
+            contentSpecific.push(replace);
+            contentMap[replace] = e;
+            let index = options.indexOf(content_file);
+            if (index < 0) return;
+            options[index] = replace;
+        });
         let dialog = new Dialog();
         if (!this.mc_installed || this.installing) {
             dialog.showDialog(translate("app.instances.duplicate.title", "%i", this.name), "notice", translate("app.instances.duplicate.installing.notice"), [
@@ -1171,8 +1187,15 @@ class Instance {
                 "maxlength": 50
             },
             {
-                "type": "notice",
-                "content": translate("app.instances.duplicate.notice")
+                "type": "files",
+                "name": translate("app.instances.duplicate.files"),
+                "id": "files",
+                "options": options,
+                "default": ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "defaultconfigs", "kubejs", "scripts"],
+                "onchange": (v) => {
+                    overrides = v;
+                    updateDistributionInfo(out, v, packVersion, name);
+                }
             }
         ], [
             {
