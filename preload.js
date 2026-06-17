@@ -703,7 +703,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         if (code === undefined) {
             strokeColor = `#777`;
         }
-        let data = svgData.replaceAll("__ACCENT__", strokeColor);
+        let data = svgData.replaceAll("currentColor", strokeColor);
         return data;
     },
     openWorldFolder: (instance_id, world_id) => {
