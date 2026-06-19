@@ -6205,7 +6205,7 @@ class HomeScreen extends Screen {
     }
 
     async getMCNews() {
-        this.mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/jcr:content.articles.json")).json();
+        this.mc_news = await (await fetch("https://www.minecraft.net/content/minecraftnet/language-masters/en-us/_jcr_content.articles.page-1.json")).json();
         this.updateMCNews();
     }
 }
