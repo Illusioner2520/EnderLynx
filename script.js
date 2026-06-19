@@ -13321,76 +13321,42 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
     });
 }
 
-document.addEventListener("mouseover", function (e) {
+function showTooltip(target) {
     let tooltip = document.getElementById("tooltip");
     if (!tooltip) return;
-    let target = e.target;
     while (target && target !== document.body) {
         if (target.hasAttribute && target.hasAttribute("title")) {
             let title = target.getAttribute("title");
-            if (title) {
-                tooltip.textContent = title;
-                tooltip.showPopover();
-                const rect = target.getBoundingClientRect();
-                let x = rect.left + (rect.width / 2);
-                let y = rect.top - 7;
-                tooltip.style.setProperty("--left", x + "px");
-                tooltip.style.setProperty("--top", y + "px");
-            }
-            return;
-        }
-        target = target.parentElement;
-    }
-    tooltip.hidePopover();
-});
-
-document.addEventListener("mouseout", function (e) {
-    let tooltip = document.getElementById("tooltip");
-    if (!tooltip) return;
-    tooltip.hidePopover();
-});
-
-document.addEventListener("focusin", function (e) {
-    let tooltip = document.getElementById("tooltip");
-    if (!tooltip) return;
-    let target = e.target;
-    while (target && target !== document.body) {
-        if (target.hasAttribute && target.hasAttribute("title")) {
-            let title = target.getAttribute("title");
-            if (title) {
-                tooltip.textContent = title;
-                tooltip.showPopover();
-                const rect = target.getBoundingClientRect();
-                let x = rect.left + (rect.width / 2);
-                let y = rect.top - 7;
-                tooltip.style.setProperty("--left", x + "px");
-                tooltip.style.setProperty("--top", y + "px");
-            }
-            return;
-        }
-        target = target.parentElement;
-    }
-    tooltip.hidePopover();
-});
-
-document.addEventListener("focusout", function (e) {
-    let tooltip = document.getElementById("tooltip");
-    if (!tooltip) return;
-    tooltip.hidePopover();
-});
-
-document.addEventListener("mouseover", function (e) {
-    let target = e.target;
-    while (target && target !== document.body) {
-        if (target.hasAttribute && target.hasAttribute("title")) {
             target.setAttribute("data-tooltip-title", target.getAttribute("title"));
             target.removeAttribute("title");
+            if (title) {
+                tooltip.textContent = title;
+                tooltip.showPopover();
+                const rect = target.getBoundingClientRect();
+                let x = rect.left + (rect.width / 2);
+                let y = rect.top - 7;
+                tooltip.style.setProperty("--left", x + "px");
+                tooltip.style.setProperty("--top", y + "px");
+            }
+            return;
         }
         target = target.parentElement;
     }
+    tooltip.hidePopover();
+}
+
+function hideTooltip() {
+    let tooltip = document.getElementById("tooltip");
+    if (!tooltip) return;
+    tooltip.hidePopover();
+}
+
+document.addEventListener("mouseover", function (e) {
+    showTooltip(e.target);
 });
 
 document.addEventListener("mouseout", function (e) {
+    hideTooltip();
     let target = e.target;
     while (target && target !== document.body) {
         if (target.hasAttribute && target.hasAttribute("data-tooltip-title")) {
@@ -13401,10 +13367,16 @@ document.addEventListener("mouseout", function (e) {
     }
 });
 
+document.addEventListener("focusin", function (e) {
+    showTooltip(e.target);
+});
+
+document.addEventListener("focusout", function (e) {
+    hideTooltip();
+});
+
 document.addEventListener("scroll", function (e) {
-    let tooltip = document.getElementById("tooltip");
-    if (!tooltip) return;
-    tooltip.hidePopover();
+    hideTooltip();
     contextmenu.hideContextMenu();
 }, true);
 
