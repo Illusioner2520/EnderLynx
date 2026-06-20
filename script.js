@@ -12032,7 +12032,7 @@ function sanitize(input) {
         .replace(/'/g, "&#39;");
 }
 
-const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href"] });
+const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href", "align"] });
 
 async function applyCape(profile_id, cape) {
     try {
