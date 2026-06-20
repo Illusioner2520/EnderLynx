@@ -970,7 +970,7 @@ class Instance {
         content.forEach(e => {
             let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
             let content_file = content_folder + "/" + e.file_name;
-            let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
+            let replace = content_folder + "/" + parseMinecraftFormatting(e.name).replaceAll("\\", "\\\\").replaceAll("/", "\\/");
             contentSpecific.push(replace);
             contentMap[replace] = e;
             let index = options.indexOf(content_file);
@@ -1160,7 +1160,7 @@ class Instance {
         content.forEach(e => {
             let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
             let content_file = content_folder + "/" + e.file_name;
-            let replace = content_folder + "/" + parseMinecraftFormatting(e.name);
+            let replace = content_folder + "/" + parseMinecraftFormatting(e.name).replaceAll("\\", "\\\\").replaceAll("/", "\\/");
             contentSpecific.push(replace);
             contentMap[replace] = { content_id: e.id, path: content_file };
             let index = options.indexOf(content_file);
@@ -10270,7 +10270,7 @@ class MultipleFileSelect {
     buildTree(paths) {
         const root = {};
         for (const path of paths) {
-            const parts = path.split(/\/\/|\/|\\/);
+            const parts = path.split(/(?<!\\)(?:\/\/|\/)/);
             let node = root;
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
@@ -10337,7 +10337,7 @@ class MultipleFileSelect {
             label.className = isFile
                 ? "multiple-file-select-title file"
                 : "multiple-file-select-title folder";
-            label.innerHTML = key;
+            label.innerHTML = key.replaceAll("\\/", "/").replaceAll("\\\\", "\\");
             item.appendChild(label);
 
             container.appendChild(item);
@@ -10415,7 +10415,7 @@ class MultipleFileSelect {
 
     getNode(path) {
         if (path == "") return { children: this.tree };
-        const parts = path.split("/");
+        const parts = path.split(/(?<!\\)(?:\/)/);
         let node = { children: this.tree };
         for (const part of parts) {
             if (!node.children) return null;
