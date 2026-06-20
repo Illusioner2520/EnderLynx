@@ -2892,7 +2892,7 @@ async function duplicateInstance(old_instance_id, new_instance_id, name, icon, n
         oldInstance.loader,
         oldInstance.vanilla_version,
         oldInstance.loader_version,
-        oldInstance.locked,
+        false,
         oldInstance.downloaded,
         oldInstance.group_id,
         icon,
