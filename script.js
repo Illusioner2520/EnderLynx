@@ -12549,20 +12549,20 @@ async function displayContentInfo(content_source, content, content_id, instance_
     tabsElement.style.marginInline = "auto";
     let refreshVersionsList;
     let setVersionIdAndIndex;
+    let descriptionElement = document.createElement("div");
+    descriptionElement.className = "markdown-body";
+    descriptionElement.style.maxWidth = "800px";
+    descriptionElement.style.marginInline = "auto";;
+    descriptionElement.setHTMLUnsafe(content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description, { sanitizer: superSanitizer });
+    descriptionElement.innerHTML = descriptionElement.innerHTML; // TODO: Remove when Chromium fixes Sanitizer bug with <details>
+    afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked, content_list_to_update, states);
     let tabs = new TabContent(tabsElement, [
         {
             "name": translate("app.discover.tabs.description"),
             "value": "description",
             "func": () => {
                 tabContent.innerHTML = "";
-                let element = document.createElement("div");
-                element.className = "markdown-body";
-                element.style.maxWidth = "800px";
-                element.style.marginInline = "auto";
-                tabContent.appendChild(element);
-                element.setHTMLUnsafe(content.uses_markdown_description ? parseModrinthMarkdown(content.description) : content.description, { sanitizer: superSanitizer });
-                element.innerHTML = element.innerHTML; // TODO: Remove when Chromium fixes Sanitizer bug with <details>
-                afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked, content_list_to_update, states);
+                tabContent.appendChild(descriptionElement);
             }
         },
         content.versions?.length ? {
