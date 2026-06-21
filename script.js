@@ -9012,8 +9012,6 @@ class SkinEntry {
             skinImg.classList.add("dinnerbone");
         }
         this.element = skinEle;
-        console.log(e);
-        console.log(e.active_uuid);
         if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
             skinEle.classList.add("selected");
         }
@@ -12032,7 +12030,7 @@ function sanitize(input) {
         .replace(/'/g, "&#39;");
 }
 
-const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href", "align"] });
+const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href", "align", "class"], "comments": false });
 
 async function applyCape(profile_id, cape) {
     try {
@@ -13167,6 +13165,20 @@ function parseModrinthMarkdown(md) {
 }
 
 function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextMenu, locked, content_list_to_update, states) {
+    document.querySelectorAll('.markdown-body *[class]').forEach((el) => {
+        if (el.classList.contains("spoiler")) {
+            let newElement = createElement("details");
+            let summaryElement = createElement("summary");
+            summaryElement.textContent = translate("app.discover.show_spoiler");
+            newElement.appendChild(summaryElement);
+            for (let child of Array.from(el.children)) {
+                newElement.appendChild(child);
+            }
+            el.replaceWith(newElement);
+            return;
+        }
+        el.className = "";
+    });
     document.querySelectorAll('.markdown-body img').forEach((el) => {
         let src = el.getAttribute('src');
         if (!src) return;

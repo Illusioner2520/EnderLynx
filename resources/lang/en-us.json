@@ -716,6 +716,7 @@
     "app.worlds.pin.success": "World pinned",
     "app.worlds.unpin.success": "World unpinned",
     "app.discover.last_updated": "Last Updated",
+    "app.discover.show_spoiler": "Show Spoiler",
     "app.discover.view.source": "View Source",
     "app.discover.view.wiki": "View Wiki",
     "app.discover.view.issues": "View Issues",
