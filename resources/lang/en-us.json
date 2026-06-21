@@ -739,6 +739,7 @@
     "app.discover.donate.github": "GitHub",
     "app.discover.donate.ko-fi": "Ko-fi",
     "app.discover.donate.bmac": "Buy Me a Coffee",
+    "app.discover.donate.paypal": "PayPal",
     "app.discover.open_in_browser": "Open in Browser",
     "app.discover.copy": "Copy Link Address",
     "app.discover.copy.success": "Link address copied to clipboard",
