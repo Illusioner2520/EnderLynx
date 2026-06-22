@@ -4757,11 +4757,17 @@ button.dependency:active {
 .version-file-title {
     font-weight: bold;
     font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .version-file-desc {
     font-size: .8rem;
     color: var(--subtle-text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .settings-chip {

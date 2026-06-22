@@ -12225,7 +12225,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
         } else {
             await content.getInfoFromId(content_id, content_source);
         }
-        await content.getAllVersions();
         await content.getAuthors();
     } catch (e) {
         loading.errorOut(e, () => {
@@ -12290,7 +12289,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
         if (instance_id) currentlyInstalling = true;
         installButtonClick(content, null, instance_id, installButton, contentInfo, (id) => {
             if (tabs.selected == "files" && refreshVersionsList) {
-                setVersionIdAndIndex(id);
+                setVersionId(id);
                 refreshVersionsList();
             }
             if (instance_id) currentlyInstalling = false;
@@ -12548,7 +12547,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     contentInfo.showModal();
     tabsElement.style.marginInline = "auto";
     let refreshVersionsList;
-    let setVersionIdAndIndex;
+    let setVersionId;
     let descriptionElement = document.createElement("div");
     descriptionElement.className = "markdown-body";
     descriptionElement.style.maxWidth = "800px";
@@ -12569,33 +12568,28 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 }
             }
         },
-        content.versions?.length ? {
+        {
             "name": translate("app.discover.tabs.files"),
             "value": "files",
             "func": async () => {
-                let installedVersion = "";
-                if (instance_id) instance_content = await (Instance.getInstance(instance_id)).getContent();
-                content_ids = instance_content.map(e => e.source_info);
-                if (content_ids.includes(content.id)) {
-                    installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
-                }
-                if ((content.project_type == "modpack" || content.project_type == "server") && instance_id) {
-                    installedVersion = (Instance.getInstance(instance_id)).installed_version;
-                }
-
                 tabContent.innerHTML = "";
-                let topFilters = document.createElement("div");
-                topFilters.className = "version-file-filters";
-                let mcVersionFilter = document.createElement("div");
-                let allGameVersions = Array.from(
-                    new Set(
-                        content.versions.flatMap(v => v.game_versions)
-                    )
-                );
+                let installedVersion = "";
+                if (instance_id) {
+                    instance_content = await Instance.getInstance(instance_id).getContent();
+                    content_ids = instance_content.map(e => e.source_info);
+                    if (content_ids.includes(content.id)) {
+                        installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
+                    }
+                    if (content.project_type == "modpack" || content.project_type == "server") {
+                        installedVersion = Instance.getInstance(instance_id).installed_version;
+                    }
+                }
+                let topFilters = createElement("div", "version-file-filters");
+                let mcVersionFilter = createElement("div");
+                let allGameVersions = Array.from(new Set(content.game_versions));
                 if (Array.isArray(minecraftVersions) && minecraftVersions.length > 0) {
                     sortByVersion(allGameVersions, true);
                 }
-
                 let versionDropdown = new SearchDropdown(
                     translate("app.discover.game_version"),
                     [{ "name": translate("app.discover.game_version.all"), "value": "all" }].concat(
@@ -12604,63 +12598,31 @@ async function displayContentInfo(content_source, content, content_id, instance_
                     mcVersionFilter,
                     vanilla_version ? vanilla_version : "all",
                     (v) => {
-                        filterVersions(v, loaderDropdown.value, channelDropdown.value, 1);
+                        filterVersions(v, loaderDropdown.value, 1);
                     }
                 );
-                let mcLoaderFilter = document.createElement("div");
-                let allLoaders = Array.from(
-                    new Set(
-                        content.versions.flatMap(v => v.loaders)
-                    )
-                );
-                let loaderDropdown = new Dropdown(translate("app.discover.loader"),
+                let mcLoaderFilter = createElement("div");
+                let allLoaders = Array.from(new Set(content.loaders));
+                let loaderDropdown = new Dropdown(
+                    translate("app.discover.loader"),
                     [{
                         "name": translate("app.discover.loader.all"),
                         "value": "all"
                     }].concat(allLoaders.map(e => ({ "name": translate("app.loader." + e), "value": e }))),
                     mcLoaderFilter, loader ? loader : "all", (v) => {
-                        filterVersions(versionDropdown.value, v, channelDropdown.value, 1);
-                    })
-                let channelFilter = document.createElement("div");
-                let channelDropdown = new Dropdown(translate("app.discover.channel"), [
-                    {
-                        "name": translate("app.discover.channel.all"),
-                        "value": "all"
-                    },
-                    {
-                        "name": translate("app.discover.channel.release"),
-                        "value": "release"
-                    },
-                    {
-                        "name": translate("app.discover.channel.beta"),
-                        "value": "beta"
-                    },
-                    {
-                        "name": translate("app.discover.channel.alpha"),
-                        "value": "alpha"
-                    }
-                ], channelFilter, "all", (v) => {
-                    filterVersions(versionDropdown.value, loaderDropdown.value, v, 1);
+                        filterVersions(versionDropdown.value, v, 1);
+                    });
+
+                let pagination = new Pagination(1, 0, (new_page) => {
+                    filterVersions(versionDropdown.value, loaderDropdown.value, new_page);
                 });
-
-                let pages = Math.ceil(content.versions.length / 25);
-
-                let pagination = new Pagination(1, pages, (new_page) => {
-                    filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value, new_page);
-                });
-
                 topFilters.appendChild(mcVersionFilter);
                 if (["modpack", "mod", "server"].includes(content.project_type)) topFilters.appendChild(mcLoaderFilter);
-                topFilters.appendChild(channelFilter);
-
                 pagination.element.style.gridColumn = "-1";
-
                 topFilters.appendChild(pagination.element);
                 tabContent.appendChild(topFilters);
-                let wrapper = document.createElement("div");
-                wrapper.className = "version-files-wrapper";
-                let topBar = document.createElement("div");
-                topBar.className = "version-file-top";
+                let wrapper = createElement("div", "version-files-wrapper");
+                let topBar = createElement("div", "version-file-top");
                 let noLoaderProjectTypes = ["resource_pack", "world", "resourcepack"];
                 let removeLoaders = noLoaderProjectTypes.includes(content.project_type);
                 let names = ["", translate("app.discover.files.name"), translate("app.discover.files.versions"), translate("app.discover.files.loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""];
@@ -12677,52 +12639,42 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 let notfound = new NoResultsFound();
                 notfound.element.style.gridColumn = "span 8";
                 notfound.element.style.display = "none";
-                notfound.element.style.backgroundColor = "var(--color-1)"
+                notfound.element.style.backgroundColor = "var(--color-1)";
 
-                let versionInfo = [];
+                let versions = [];
 
-                let filterVersions = (version, loader_, channel, new_page) => {
+                let filterVersions = async (version, loader_, new_page) => {
+                    let loading = new LoadingContainer();
+                    loading.element.style.gridColumn = "span 8";
+                    loading.element.style.backgroundColor = "var(--color-1)";
+                    wrapper.innerHTML = "";
+                    wrapper.appendChild(loading.element);
                     pagination.setPage(new_page);
-                    let count = 0;
-                    versionInfo.forEach(e => {
-                        if (!e.game_versions.includes(version) && version && version != "all") {
-                            e.element.remove();
-                            return;
+                    try {
+                        let info = await content.getVersions(loader_, version, content.project_type, new_page, content.id, content.source);
+                        versions = info.versions;
+                        showVersions();
+                        pagination.setTotalPages(Math.ceil(info.total / 25));
+                        if (info.total == 0) {
+                            notfound.element.style.display = "";
+                            topBar.style.display = "none";
+                        } else {
+                            notfound.element.style.display = "none";
+                            topBar.style.display = "grid";
                         }
-                        if (loader_ && !e.loaders.includes(loader_) && (content.project_type == "mod" || content.project_type == "modpack" || content.project_type == "server") && loader_ != "all") {
-                            e.element.remove();
-                            return;
-                        }
-                        if (channel && e.channel != channel && channel != "all") {
-                            e.element.remove();
-                            return;
-                        }
-                        count++;
-                        if (count <= (new_page * 25 - 25) || count > new_page * 25) {
-                            e.element.remove();
-                            return;
-                        }
-                        wrapper.appendChild(e.element);
-                    });
-                    pagination.setTotalPages(Math.ceil(count / 25));
-                    if (count == 0) {
-                        notfound.element.style.display = "";
-                        topBar.style.display = "none";
-                    } else {
-                        notfound.element.style.display = "none";
-                        topBar.style.display = "grid";
+                    } catch (err) {
+                        loading.errorOut(err, () => {
+                            filterVersions(version, loader_, new_page);
+                        });
                     }
                 }
 
-                let installedVersionIndex = content.versions.findIndex(v => v.version_id == installedVersion);
-
                 let showVersions = () => {
                     currentlyInstalling = false;
-                    versionInfo = [];
                     wrapper.innerHTML = "";
                     wrapper.appendChild(topBar);
                     wrapper.appendChild(notfound.element);
-                    content.versions.forEach((e, i) => {
+                    versions.forEach((e, i) => {
                         let versionEle = document.createElement("div");
                         versionEle.className = "version-file";
 
@@ -12746,8 +12698,8 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         nameName.className = "version-file-title";
                         let nameDesc = document.createElement("div");
                         nameDesc.className = "version-file-desc";
-                        nameName.innerHTML = e.version_number;
-                        nameDesc.innerHTML = e.name;
+                        nameName.innerHTML = e.display_name;
+                        nameDesc.innerHTML = e.sub_name;
                         nameInfo.appendChild(nameName);
                         nameInfo.appendChild(nameDesc);
                         versionEle.appendChild(nameInfo);
@@ -12897,18 +12849,13 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             if (content_list_to_update?.updateSecondaryColumn) content_list_to_update.updateSecondaryColumn();
                             if (instance_id) {
                                 installedVersion = e.version_id;
-                                installedVersionIndex = i;
                                 showVersions();
                             }
                             global_discover_content_states[content.id] = global_discover_content_states[content.id].filter(e => e != installButton);
                         }
-                        if (installedVersion && installedVersionIndex > i) {
-                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.update");
-                            installButton.setAttribute("title", translate("app.discover.update.tooltip"));
-                            installButton.onclick = updateToSpecificVersion;
-                        } else if (installedVersion && installedVersionIndex < i) {
-                            installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.downgrade");
-                            installButton.setAttribute("title", translate("app.discover.downgrade.tooltip"));
+                        if (installedVersion) {
+                            installButton.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left"></i>' + translate("app.discover.change_version");
+                            installButton.setAttribute("title", translate("app.discover.change_version.tooltip"));
                             installButton.onclick = updateToSpecificVersion;
                         } else {
                             installButton.onclick = () => {
@@ -12922,7 +12869,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
                                     if (content.project_type != "modpack" && e.project_type != "datapack") installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                                     if (instance_id) {
                                         installedVersion = e.version_id;
-                                        installedVersionIndex = i;
                                         showVersions();
                                     }
                                     global_discover_content_states[content.id] = global_discover_content_states[content.id].filter(e => e != installButton);
@@ -13033,24 +12979,20 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         versionEle.appendChild(dependencyButton);
 
                         wrapper.appendChild(versionEle);
-
-                        versionInfo.push({ "element": versionEle, "loaders": e.loaders, "game_versions": e.game_versions.map(e => e.toLowerCase()), "channel": e.channel })
                     });
-                    filterVersions(versionDropdown.value, loaderDropdown.value, channelDropdown.value, 1);
                 }
 
-                setVersionIdAndIndex = (id) => {
+                filterVersions(versionDropdown.value, loaderDropdown.value, 1);
+
+                setVersionId = (id) => {
                     installedVersion = id;
-                    installedVersionIndex = content.versions.findIndex(v => v.id === installedVersion);
                 }
 
                 refreshVersionsList = showVersions;
 
-                showVersions();
-
                 tabContent.appendChild(wrapper);
             }
-        } : null,
+        },
         content.authors.length ? {
             "name": content.authors.length == 1 ? translate("app.discover.tabs.author") : translate("app.discover.tabs.authors"),
             "value": "authors",

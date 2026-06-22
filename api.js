@@ -60,7 +60,7 @@ class Project {
         this.links.donations = urlInfo.link_urls ? Object.entries(urlInfo.link_urls).map(e => e[1]).filter(e => e.donation) : [];
         this.links.browser = `https://modrinth.com/project/${this.id}`;
         this.gallery = urlInfo.gallery.map(e => new GalleryImage(e, "modrinth"));
-        this.loaders = [...new Set((urlInfo.mrpack_loaders || []).concat(urlInfo.loaders || []).concat(urlInfo.project_loader_fields?.mrpack_loaders || []))];
+        this.loaders = [...new Set((urlInfo.mrpack_loaders || []).concat(urlInfo.loaders || []).concat(urlInfo.project_loader_fields?.mrpack_loaders || []))].filter(e => e != "mrpack");
         this.game_versions = urlInfo.minecraft_java_server?.content?.kind == "vanilla" ? urlInfo.minecraft_java_server.content.supported_game_versions : urlInfo.project_loader_fields ? urlInfo.project_loader_fields.game_versions : urlInfo.game_versions;
         this.online_players = urlInfo.minecraft_java_server?.ping?.data?.players_online ?? null;
         this.max_players = urlInfo.minecraft_java_server?.ping?.data?.players_max ?? null;
@@ -111,7 +111,7 @@ class Project {
         this.icon = urlInfo.logo?.thumbnailUrl || urlInfo.logo?.url || "";
         this.published = new Date(urlInfo.dateCreated);
         this.updated = new Date(urlInfo.dateModified);
-        this.loaders = [...new Set(urlInfo.latestFilesIndexes.map(e => Project.curseforge_mod_loader_conversion[e.modLoader]))];
+        this.loaders = [...new Set(urlInfo.latestFilesIndexes.map(e => Project.curseforge_mod_loader_conversion[e.modLoader]).filter(e => e))];
         this.game_versions = [...new Set(urlInfo.latestFilesIndexes.map(e => e.gameVersion))];
     }
     setDescription(description) {
@@ -174,12 +174,12 @@ class Project {
         } else if (this.source == "curseforge") {
             let url = `https://api.curse.tools/v1/mods/${this.id}/files?pageSize=50&index=0`;
             let urlInfo = await (await fetch(url)).json();
-            this.versions = urlInfo.data.map(e => new ProjectVersion(e, "curseforge"));
+            this.versions = urlInfo.data.map(e => new ProjectVersion(e, "curseforge", this.project_type));
             let pages = Math.ceil(urlInfo.pagination.totalCount / 50);
             for (let i = 1; i <= pages; i++) {
                 let url = `https://api.curse.tools/v1/mods/${this.id}/files?pageSize=50&index=${50 * i}`;
                 let urlInfo = await (await fetch(url)).json();
-                this.versions = this.versions.concat(urlInfo.data.map(e => new ProjectVersion(e, "curseforge")));
+                this.versions = this.versions.concat(urlInfo.data.map(e => new ProjectVersion(e, "curseforge", this.project_type)));
             }
         }
     }
@@ -197,8 +197,7 @@ class Project {
             await this.getAllVersions(id, source);
         }
         if (this.versions) {
-            for (let i = 0; i < this.versions.length; i++) {
-                let version = this.versions[i];
+            for (let version of this.versions) {
                 if (version.game_versions.includes(game_version) && (!loaderRequired || version.loaders.includes(loader))) {
                     return version;
                 }
@@ -208,7 +207,31 @@ class Project {
         if (source == "curseforge") {
             let url = `https://api.curse.tools/v1/mods/${id}/files?pageSize=50&index=0&gameVersion=${game_version}${loaderRequired ? "&modLoaderType=" + Project.curseforge_mod_loader_conversion_vice_versa[loader] : ""}`;
             let urlInfo = await (await fetch(url)).json();
-            return new ProjectVersion(urlInfo.data[0], "curseforge");
+            return new ProjectVersion(urlInfo.data[0], "curseforge", this.project_type);
+        }
+    }
+    async getVersions(loader = "all", game_version = "all", project_type, page = 1, id, source) {
+        let page_size = 25;
+        if (!project_type && this.project_type) project_type = this.project_type;
+        let num = Number(id);
+        if (!isNaN(num)) id = num;
+        let useLoader = project_type == "mod" || project_type == "modpack";
+        if (source == "modrinth" && !this.versions) {
+            await this.getAllVersions(this.id, source);
+        }
+        if (this.versions) {
+            let matchedVersions = [];
+            for (let version of this.versions) {
+                if ((game_version == "all" || version.game_versions.includes(game_version)) && (!useLoader || loader == "all" || version.loaders.includes(loader))) {
+                    matchedVersions.push(version);
+                }
+            }
+            return { versions: matchedVersions.slice(page_size * --page, page_size * ++page), total: matchedVersions.length };
+        }
+        if (source == "curseforge") {
+            let url = `https://api.curse.tools/v1/mods/${id}/files?pageSize=${page_size}&index=${page_size * --page}${game_version != "all" ? "&gameVersion=" + game_version : ""}${(useLoader && loader != "all") ? "&modLoaderType=" + Project.curseforge_mod_loader_conversion_vice_versa[loader] : ""}`;
+            let urlInfo = await (await fetch(url)).json();
+            return { versions: urlInfo.data.map(e => new ProjectVersion(e, "curseforge", this.project_type)), total: urlInfo.pagination.totalCount };
         }
     }
     async getAuthors() {
@@ -329,13 +352,15 @@ class ProjectVersionList {
 }
 
 class ProjectVersion {
-    constructor(info, source) {
+    constructor(info, source, project_type) {
         this.source = source;
         if (source == "modrinth") {
             this.version_id = info.id;
             this.project_id = info.project_id;
             this.name = info.name;
+            this.sub_name = info.name;
             this.version_number = info.version_number;
+            this.display_name = info.version_number;
             this.published = new Date(info.date_published);
             this.downloads = info.downloads;
             this.channel = info.version_type;
@@ -355,14 +380,29 @@ class ProjectVersion {
             this.version_id = info.id.toString();
             this.project_id = info.modId.toString();
             this.name = info.displayName || info.id;
+            this.display_name = info.displayName || info.id;
+            this.sub_name = info.fileName;
             this.version_number = "";
             this.filename = info.fileName;
             this.channel = Project.curseforge_release_type_conversion[info.releaseType];
             this.published = new Date(info.fileDate);
             this.downloads = info.downloadCount;
             this.download_url = info.downloadUrl;
-            this.game_versions = info.sortableGameVersions.map(e => e.gameVersion).filter(e => e);
+            this.game_versions = [...new Set(info.sortableGameVersions.map(e => e.gameVersion).filter(e => e))];
             this.loaders = info.sortableGameVersions.filter(e => !e.gameVersion).map(e => e.gameVersionName.toLowerCase()).filter(e => e != "client" && e != "server");
+            if (this.loaders.length == 0) {
+                this.loaders = this.filename.endsWith(".zip") ? ["optifine", "iris"] : ["forge"];
+                if (project_type == "mod" || project_type == "modpack") {
+                    this.loaders = ["forge"];
+                } else if (project_type == "shader") {
+                    this.loaders = ["optifine", "iris"];
+                } else if (project_type == "datapack") {
+                    this.loaders = ["datapack"]
+                }
+                if (!project_type) {
+                    this.loaders = ["forge"];
+                }
+            }
             this.required_dependencies = info.dependencies.filter(e => e.relationType == 3).map(e => ({ project_id: e.modId.toString() }));
             this.dependencies = info.dependencies.map(e => ({ project_id: e.modId.toString(), type: Project.curseforge_dependency_type_conversion[e.relationType] }));
         }
@@ -519,6 +559,7 @@ class Modrinth {
 
 class CurseForge {
     static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") {
+        if (pageSize > 50) pageSize = 50;
         let sort = 1;
         if (sortBy == "downloads") sort = 6;
         if (sortBy == "newest") sort = 11;
