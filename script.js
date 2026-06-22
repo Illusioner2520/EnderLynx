@@ -13312,10 +13312,12 @@ function showTooltip(target) {
     let tooltip = document.getElementById("tooltip");
     if (!tooltip) return;
     while (target && target !== document.body) {
-        if (target.hasAttribute && target.hasAttribute("title")) {
-            let title = target.getAttribute("title");
-            target.setAttribute("data-tooltip-title", target.getAttribute("title"));
-            target.removeAttribute("title");
+        if (target.hasAttribute && (target.hasAttribute("title") || target.hasAttribute("data-tooltip-title"))) {
+            let title = target.getAttribute("title") || target.getAttribute("data-tooltip-title");
+            if (target.hasAttribute("title")) {
+                target.setAttribute("data-tooltip-title", title);
+                target.removeAttribute("title");
+            }
             if (title) {
                 tooltip.textContent = title;
                 tooltip.showPopover();
@@ -13332,19 +13334,10 @@ function showTooltip(target) {
     tooltip.hidePopover();
 }
 
-function hideTooltip() {
+function hideTooltip(target) {
     let tooltip = document.getElementById("tooltip");
     if (!tooltip) return;
     tooltip.hidePopover();
-}
-
-document.addEventListener("mouseover", function (e) {
-    showTooltip(e.target);
-});
-
-document.addEventListener("mouseout", function (e) {
-    hideTooltip();
-    let target = e.target;
     while (target && target !== document.body) {
         if (target.hasAttribute && target.hasAttribute("data-tooltip-title")) {
             target.setAttribute("title", target.getAttribute("data-tooltip-title"));
@@ -13352,6 +13345,14 @@ document.addEventListener("mouseout", function (e) {
         }
         target = target.parentElement;
     }
+}
+
+document.addEventListener("mouseover", function (e) {
+    showTooltip(e.target);
+});
+
+document.addEventListener("mouseout", function (e) {
+    hideTooltip(e.target);
 });
 
 document.addEventListener("focusin", function (e) {
@@ -13359,7 +13360,7 @@ document.addEventListener("focusin", function (e) {
 });
 
 document.addEventListener("focusout", function (e) {
-    hideTooltip();
+    hideTooltip(e.target);
 });
 
 document.addEventListener("scroll", function (e) {
