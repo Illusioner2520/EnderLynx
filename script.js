@@ -13140,9 +13140,7 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
             let summaryElement = createElement("summary");
             summaryElement.textContent = translate("app.discover.show_spoiler");
             newElement.appendChild(summaryElement);
-            for (let child of Array.from(el.children)) {
-                newElement.appendChild(child);
-            }
+            newElement.innerHTML += el.innerHTML;
             el.replaceWith(newElement);
             return;
         }
