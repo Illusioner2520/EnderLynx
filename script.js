@@ -1996,6 +1996,10 @@ class SearchBar {
     setOnEnter(onenter) {
         this.onenter = onenter;
     }
+    setValue(value) {
+        this.value = value;
+        this.input.value = value;
+    }
     disable(m) {
         this.element.style.cursor = "not-allowed";
         this.element.style.opacity = ".5";
@@ -2094,7 +2098,7 @@ class Dropdown {
                 break;
             }
         }
-        this.selectedElement.textContent = name || initial;
+        this.selectedElement.textContent = name;
         for (let i = 0; i < this.optEles.length; i++) {
             if (this.optEles[i].dataset.value == option) {
                 this.optEles[i].classList.add("selected");
@@ -6574,6 +6578,12 @@ class DiscoverScreen extends Screen {
 
     calculateContent(instance, vanilla_version, loader, default_tab) {
         this.contentElement.innerHTML = "";
+        this.content_source = "default";
+        this.sort_by = "relevance";
+        this.view = 20;
+        this.game_version = vanilla_version || "all";
+        this.loader_dropdown = loader || "all";
+        this.query = "";
         this.instance = instance;
         this.vanilla_version = vanilla_version;
         this.loader = loader;
@@ -6698,12 +6708,18 @@ class DiscoverScreen extends Screen {
         searchElement.style.flexGrow = 2;
         this.searchBar = new SearchBar(searchElement, () => { }, (v) => {
             this.getContent();
+            this.query = v;
         });
+        this.searchBar.setValue(this.query);
         let dropdownElement = document.createElement("div");
         dropdownElement.style.minWidth = "200px";
-        this.sourceDropdown = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, () => {
+        this.sourceDropdown = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, (v) => {
             this.getContent();
+            this.content_source = v;
         });
+        if (this.content_source != "default" && sources.map(e => e.value).includes(this.content_source)) {
+            this.sourceDropdown.selectOption(this.content_source);
+        }
         this.getContent();
         searchAndFilter.appendChild(dropdownElement);
         searchAndFilter.appendChild(searchElement);
@@ -6711,37 +6727,38 @@ class DiscoverScreen extends Screen {
         this.tabElement.appendChild(this.discoverList);
     }
 
-    async getContent(vanilla_version = this.vanilla_version, loader = this.loader, page = 1, pageSize = 20, sortBy = "relevance") {
+    async getContent(page = 1) {
         let source = this.sourceDropdown.value;
         let query = this.searchBar.value;
-        if (loader == "all") loader = null;
-        if (vanilla_version == "all") vanilla_version = null;
         let instance_content = [];
         if (this.instance) instance_content = await this.instance.getContent();
-        if (["fabric", "forge", "neoforge", "quilt"].includes(loader) && this.currentTab == "server") loader = null;
+        if (["fabric", "forge", "neoforge", "quilt"].includes(this.loader_dropdown) && this.currentTab == "server") this.loader_dropdown = "all";
+        if (this.currentTab != "server") {
+            if (this.loader_dropdown == "vanilla" || this.loader_dropdown == "modpack") this.loader_dropdown = "all";
+        }
         let content_ids = instance_content.map(e => e.source_info);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
         this.discoverList.appendChild(loading.element);
         this.requestFrame();
         if (source == "vanilla_tweaks") {
-            new VanillaTweaksSelector(this.currentTab, vanilla_version, this.instance?.instance_id, undefined, this.discoverList, query);
+            new VanillaTweaksSelector(this.currentTab, this.game_version, this.instance?.instance_id, undefined, this.discoverList, query);
             return;
         }
         let results = [];
         try {
-            if (source == "modrinth") results = await Modrinth.search(query, loader, this.currentTab, vanilla_version, page, pageSize, sortBy);
-            else if (source == "curseforge") results = await CurseForge.search(query, loader, this.currentTab, vanilla_version, page, pageSize, sortBy);
+            if (source == "modrinth") results = await Modrinth.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by);
+            else if (source == "curseforge") results = await CurseForge.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by);
             this.discoverList.innerHTML = "";
         } catch (err) {
             loading.errorOut(err, () => {
-                this.getContent(vanilla_version, loader, page, pageSize, sortBy);
+                this.getContent(page);
             });
             return;
         }
-        this.totalPages = Math.ceil(results.total_hits / pageSize);
+        this.totalPages = Math.ceil(results.total_hits / this.view);
         let paginationTop = new Pagination(page, this.totalPages, (new_page) => {
-            this.getContent(vanilla_version, loader, new_page, pageSize, sortBy);
+            this.getContent(new_page);
         });
         let sortByDropdownElement = createElement("div");
         sortByDropdownElement.style.width = "150px";
@@ -6768,8 +6785,9 @@ class DiscoverScreen extends Screen {
                 "name": translate("app.discover.sort.updated"),
                 "value": "updated"
             }
-        ], sortByDropdownElement, sortBy, (new_sort) => {
-            this.getContent(vanilla_version, loader, 1, pageSize, new_sort)
+        ], sortByDropdownElement, this.sort_by, (new_sort) => {
+            this.sort_by = new_sort;
+            this.getContent();
         });
         let viewDropdown = new Dropdown(translate("app.discover.view"), [
             {
@@ -6796,13 +6814,15 @@ class DiscoverScreen extends Screen {
                 "name": translate("app.discover.view.100"),
                 "value": "100"
             }
-        ], viewDropdownElement, pageSize, (new_page_size) => {
-            this.getContent(vanilla_version, loader, 1, Number(new_page_size), sortBy)
+        ], viewDropdownElement, this.view, (new_page_size) => {
+            this.view = new_page_size;
+            this.getContent();
         });
         let gameVersionDropdown = new SearchDropdown(translate("app.discover.game_version"), [
             { "name": translate("app.discover.game_version.all"), "value": "all" }
-        ].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), gameVersionDropdownElement, vanilla_version || "all", (new_game_version) => {
-            this.getContent(new_game_version, loader, 1, pageSize, sortBy)
+        ].concat(minecraftVersions.toReversed().map(e => ({ "name": e, "value": e }))), gameVersionDropdownElement, this.game_version, (new_game_version) => {
+            this.game_version = new_game_version;
+            this.getContent();
         });
         let loaderDropdown = new Dropdown(translate("app.discover.loader"), this.currentTab == "server" ? [
             {
@@ -6838,11 +6858,12 @@ class DiscoverScreen extends Screen {
                 "name": translate("app.loader.quilt"),
                 "value": "quilt"
             }
-        ], loaderDropdownElement, this.currentTab == "server" ? (!loader ? "all" : (loader == "vanilla" ? "vanilla" : "all")) : (loader || "all"), (new_loader) => {
-            this.getContent(vanilla_version, new_loader, 1, pageSize, sortBy);
+        ], loaderDropdownElement, this.loader_dropdown, (new_loader) => {
+            this.loader_dropdown = new_loader;
+            this.getContent();
         });
         let paginationBottom = new Pagination(page, this.totalPages, (new_page) => {
-            this.getContent(vanilla_version, loader, new_page, pageSize, sortBy);
+            this.getContent(new_page);
         });
         let discoverListTop = createElement("div", "discover-list-top");
         this.discoverList.appendChild(discoverListTop);
@@ -6860,7 +6881,7 @@ class DiscoverScreen extends Screen {
             let content = results.projects[i];
             let entry = new ContentSearchEntry(content, '<i class="fa-solid fa-download"></i>' + translate("app.discover.install"), (button) => {
                 installButtonClick(content, undefined, this.instance?.instance_id, button, undefined, undefined, this.discover_content_states)
-            }, this.instance?.instance_id, vanilla_version, this.currentTab == "server" ? null : loader, content_ids.includes(content.id), false, this.currentTab, undefined, this.discover_content_states);
+            }, this.instance?.instance_id, this.game_version == "all" ? null : this.game_version, this.currentTab == "server" ? null : this.loader_dropdown == "all" ? null : this.loader_dropdown, content_ids.includes(content.id), false, this.currentTab, undefined, this.discover_content_states);
             this.discoverList.appendChild(entry.element);
         }
         this.discoverList.appendChild(paginationBottom.element);
@@ -11396,6 +11417,7 @@ function displayVanillaTweaksEditor(instance_id, version, packs, file_name, cont
 
 class VanillaTweaksSelector {
     constructor(type, version, instance_id, vt_version, element, query, hide_install_button) {
+        if (version == "all") version = null;
         this.type = type;
         this.version = version;
         this.instance_id = instance_id
@@ -11680,7 +11702,7 @@ class VanillaTweaksSelector {
                             await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
                         }
                         await instance.setInstalling(false);
-                        await window.enderlynx.installMinecraft(instance_id, loader, game_version);
+                        await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
                     });
                 }
 

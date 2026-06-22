@@ -538,6 +538,8 @@ class Author {
 
 class Modrinth {
     static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") {
+        if (loader == "all") loader = null;
+        if (version == "all") version = null;
         if (project_type == "server") project_type = "minecraft_java_server";
         let sort = sortBy;
         let facets = [];
@@ -559,6 +561,8 @@ class Modrinth {
 
 class CurseForge {
     static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") {
+        if (loader == "all") loader = null;
+        if (version == "all") version = null;
         if (pageSize > 50) pageSize = 50;
         let sort = 1;
         if (sortBy == "downloads") sort = 6;
