@@ -13205,6 +13205,8 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
 
                 if (dialogContextMenu && (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com")) {
                     let pathParts = url_obj.pathname.split('/').filter(Boolean);
+                    let customVersion = url_obj.searchParams.getAll("g").length > 1 ? null : url_obj.searchParams.get("g");
+                    let customLoader = url_obj.searchParams.getAll("l").length > 1 ? null : url_obj.searchParams.get("l");
                     if (pathParts.length >= 2) {
                         let pageType = pathParts[0];
                         let pageId = pathParts[1];
@@ -13212,12 +13214,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                             el.setAttribute('title', url);
                             el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("modrinth", undefined, pageId, instance_id, vanilla_version, pageType == "datapack" ? "datapack" : (loader == "datapack" ? "" : loader), locked, false, content_list_to_update, states);
+                                displayContentInfo("modrinth", undefined, pageId, instance_id, customVersion ?? vanilla_version, pageType == "datapack" ? "datapack" : customLoader ?? (loader == "datapack" ? "" : loader), locked, false, content_list_to_update, states, pathParts[2] == "versions" ? "files" : undefined);
                             });
                             el.addEventListener('keydown', (e) => {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
-                                    displayContentInfo("modrinth", undefined, pageId, instance_id, vanilla_version, pageType == "datapack" ? "datapack" : (loader == "datapack" ? "" : loader), locked, false, content_list_to_update, states);
+                                    displayContentInfo("modrinth", undefined, pageId, instance_id, customVersion ?? vanilla_version, pageType == "datapack" ? "datapack" : customLoader ?? (loader == "datapack" ? "" : loader), locked, false, content_list_to_update, states, pathParts[2] == "versions" ? "files" : undefined);
                                 }
                             });
                             el.oncontextmenu = (e) => {
@@ -13228,6 +13230,9 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                     }
                 } else if (dialogContextMenu && (url_obj.hostname == "curseforge.com" || url_obj.hostname == "www.curseforge.com" || url_obj.hostname == "legacy.curseforge.com")) {
                     let pathParts = url_obj.pathname.split('/').filter(Boolean);
+                    let customVersion = url_obj.searchParams.get("version");
+                    let customLoaderId = url_obj.searchParams.get("gameVersionTypeId");
+                    let customLoader = Project.curseforge_mod_loader_conversion[customLoaderId] || null;
                     if (pathParts.length >= 2 && pathParts[0] == "minecraft") {
                         let pageType = pathParts[1];
                         let pageId = pathParts[2];
@@ -13243,12 +13248,12 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
                             el.setAttribute('title', url);
                             el.addEventListener('click', (e) => {
                                 e.preventDefault();
-                                displayContentInfo("curseforge", undefined, pageId + ":" + map[pageType], instance_id, vanilla_version, loader == "datapack" ? "" : loader, locked, false, content_list_to_update, states);
+                                displayContentInfo("curseforge", undefined, pageId + ":" + map[pageType], instance_id, customVersion ?? vanilla_version, customLoader ?? (loader == "datapack" ? "" : loader), locked, false, content_list_to_update, states, pathParts[3] == "files" ? "files" : undefined);
                             });
                             el.addEventListener('keydown', (e) => {
                                 if (e.key == "Enter" || e.key == " ") {
                                     e.preventDefault();
-                                    displayContentInfo("curseforge", undefined, pageId + ":" + map[pageType], instance_id, vanilla_version, loader == "datapack" ? "" : loader, locked, false, content_list_to_update, states);
+                                    displayContentInfo("curseforge", undefined, pageId + ":" + map[pageType], instance_id, customVersion ?? vanilla_version, customLoader ?? (loader == "datapack" ? "" : loader), locked, false, content_list_to_update, states, pathParts[3] == "files" ? "files" : undefined);
                                 }
                             });
                             el.oncontextmenu = (e) => {
