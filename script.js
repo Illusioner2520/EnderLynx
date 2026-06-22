@@ -13588,6 +13588,7 @@ async function updateContent(source, content, project, version, instance) {
         await window.enderlynx.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instance.vanilla_version, instance.instance_id, content.file_name);
         return;
     }
+    if (source == "player_install") return;
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, content.type, content.source_info, content.source);
     if (!version) {
         let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
