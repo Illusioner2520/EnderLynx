@@ -3729,17 +3729,18 @@ class InstanceScreen extends Screen {
                                     window.enderlynx.showContentInFolder(this.instance.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
                                 }
                             },
-                            e.source == "modrinth" ? {
+                            e.source == "modrinth" || e.source == "curseforge" ? {
                                 "title": translate("app.content.view"),
                                 "icon": '<i class="fa-solid fa-circle-info"></i>',
                                 "func": async () => {
                                     displayContentInfo(e.source, undefined, e.source_info, this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList, {});
                                 }
-                            } : e.source == "curseforge" ? {
-                                "title": translate("app.content.view"),
-                                "icon": '<i class="fa-solid fa-circle-info"></i>',
+                            } : null,
+                            !this.instance.locked && (e.source == "modrinth" || e.source == "curseforge") ? {
+                                "title": translate("app.content.change_version"),
+                                "icon": '<i class="fa-solid fa-arrow-right-arrow-left"></i>',
                                 "func": async () => {
-                                    displayContentInfo(e.source, undefined, e.source_info, this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList, {});
+                                    displayContentInfo(e.source, undefined, e.source_info, this.instance.instance_id, this.instance.vanilla_version, this.instance.loader, this.instance.locked, false, contentList, {}, "files");
                                 }
                             } : null,
                             e.source == "vanilla_tweaks" && !this.instance.locked ? {
@@ -12150,7 +12151,7 @@ let contentInfoHistory = [];
 let contentInfoIndex = 0;
 let dialogContextMenu = new ContextMenu();
 
-async function displayContentInfo(content_source, content, content_id, instance_id, vanilla_version, loader, locked, disableAddToHistory = false, content_list_to_update, states) {
+async function displayContentInfo(content_source, content, content_id, instance_id, vanilla_version, loader, locked, disableAddToHistory = false, content_list_to_update, states, tab = "description") {
     if (!content_source) return;
     if (!content) content = new Project();
     let contentInfo = document.getElementById("contentInfo");
@@ -13100,7 +13101,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
             }
         } : null
     ].filter(e => e))
-    tabs.selectOption("description");
+    tabs.selectOption(tab);
 
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();

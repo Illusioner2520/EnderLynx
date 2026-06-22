@@ -543,6 +543,7 @@
     "app.content.delete.success": "Deleted %c",
     "app.content.delete.fail": "Unable to delete %c",
     "app.content.view": "View Content",
+    "app.content.change_version": "Change Version",
     "app.content.edit_packs": "Edit Packs",
     "app.content.edit_packs.confirm": "Install Selected Packs",
     "app.content.edit_packs.cancel": "Cancel",
