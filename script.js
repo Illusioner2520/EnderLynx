@@ -12178,12 +12178,15 @@ async function displayContentInfo(content_source, content, content_id, instance_
     if (!content) content = new Project();
     let contentInfo = document.getElementById("contentInfo");
     if (!disableAddToHistory) {
+        let displayFunction = () => {
+            displayContentInfo(content_source, content, content_id, instance_id, vanilla_version, loader, locked, true, content_list_to_update, states, tab);
+        };
         if (contentInfo.open) {
             contentInfoHistory = contentInfoHistory.slice(0, contentInfoIndex + 1);
-            contentInfoHistory.push({ "content_source": content_source, "content": content, "content_id": content_id, "loader": loader });
+            contentInfoHistory.push(displayFunction);
             contentInfoIndex++;
         } else {
-            contentInfoHistory = [{ "content_source": content_source, "content": content, "content_id": content_id, "loader": loader }];
+            contentInfoHistory = [displayFunction];
             contentInfoIndex = 0;
         }
     }
@@ -12210,7 +12213,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     } else {
         buttonBack.onclick = () => {
             contentInfoIndex--;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, contentInfoHistory[contentInfoIndex].loader, locked, true, content_list_to_update, states);
+            contentInfoHistory[contentInfoIndex]();
         }
     }
     contentNav.appendChild(buttonBack);
@@ -12222,7 +12225,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     } else {
         buttonForward.onclick = () => {
             contentInfoIndex++;
-            displayContentInfo(contentInfoHistory[contentInfoIndex].content_source, contentInfoHistory[contentInfoIndex].content, contentInfoHistory[contentInfoIndex].content_id, instance_id, vanilla_version, contentInfoHistory[contentInfoIndex].loader, locked, true, content_list_to_update, states);
+            contentInfoHistory[contentInfoIndex]();
         }
     }
     contentNav.appendChild(buttonForward);
@@ -12251,7 +12254,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
         await content.getAuthors();
     } catch (e) {
         loading.errorOut(e, () => {
-            displayContentInfo(content_source, content, content_id, instance_id, vanilla_version, loader, locked, true, content_list_to_update, states);
+            displayContentInfo(content_source, content, content_id, instance_id, vanilla_version, loader, locked, true, content_list_to_update, states, tab);
         });
         return;
     }
