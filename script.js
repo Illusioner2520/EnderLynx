@@ -12888,9 +12888,9 @@ async function displayContentInfo(content_source, content, content_id, instance_
                                 if (currentlyInstalling) return;
                                 global_discover_content_states[content.id].push(installButton);
                                 if (instance_id && content.project_type != "world" && e.project_type != "datapack") currentlyInstalling = true;
-                                if (content.project_type != "modpack" && e.project_type != "datapack") installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-                                if (content.project_type != "modpack" && e.project_type != "datapack") installButton.classList.add("disabled");
-                                if (content.project_type != "modpack" && instance_id && e.project_type != "datapack") installButton.onclick = () => { };
+                                if (content.project_type != "modpack" && content.project_type != "server" && e.project_type != "datapack") installButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+                                if (content.project_type != "modpack" && content.project_type != "server" && e.project_type != "datapack") installButton.classList.add("disabled");
+                                if (content.project_type != "modpack" && content.project_type != "server" && instance_id && e.project_type != "datapack") installButton.onclick = () => { };
                                 installButtonClick(content, e, instance_id, installButton, contentInfo, () => {
                                     if (content.project_type != "modpack" && e.project_type != "datapack") installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                                     if (instance_id) {
