@@ -4585,7 +4585,7 @@ button.dependency:active {
         }
 
         tr:not(:last-of-type) td,
-        th {
+        &:has(tbody) th {
             border-bottom: 2px solid var(--color-2);
         }
     }
