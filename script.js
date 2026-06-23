@@ -3450,6 +3450,7 @@ class InstanceScreen extends Screen {
         this.running = checkForProcess(this.instance.pid);
         if (make_loading) {
             this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+            this.playButton.removeAttribute("title");
             this.playButton.className = "instance-top-loading-button";
             this.playButton.onclick = () => { };
         } else if (this.instance.failed) {
@@ -3459,12 +3460,12 @@ class InstanceScreen extends Screen {
             this.playButton.onclick = () => { };
         } else if (!this.instance.mc_installed) {
             this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-            this.playButton.title = "";
+            this.playButton.removeAttribute("title");
             this.playButton.className = "instance-top-loading-button";
             this.playButton.onclick = () => { };
         } else if (!this.running) {
             this.playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            this.playButton.title = "";
+            this.playButton.removeAttribute("title");
             this.playButton.className = "instance-top-play-button";
             this.playButton.onclick = async () => {
                 this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
@@ -3478,7 +3479,7 @@ class InstanceScreen extends Screen {
             }
         } else {
             this.playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-            this.playButton.title = "";
+            this.playButton.removeAttribute("title");
             this.playButton.className = "instance-top-stop-button";
             this.playButton.onclick = async () => {
                 this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
