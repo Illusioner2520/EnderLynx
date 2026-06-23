@@ -470,6 +470,7 @@ class ProjectVersion {
             for (let key in info) {
                 dependencies.push(info[key]);
             }
+            dependencies = dependencies.filter(e => e?.project?.name || e.file_name);
             this.dependencies_cache = dependencies;
             callback(dependencies);
             return dependencies;
