@@ -940,7 +940,7 @@ class Instance {
                                 "status": "error",
                                 "cancel": () => { }
                             }]);
-                            this.instanceScreen.showContent();
+                            this.instanceScreen.tabs.selectOption("content");
                             return;
                         }
                     }
@@ -953,7 +953,7 @@ class Instance {
                         "cancel": () => { }
                     }]);
                     displaySuccess(translate("app.instances.updated_all").replace("%i", this.name));
-                    this.instanceScreen.showContent();
+                    this.instanceScreen.tabs.selectOption("content");
                 }
                 await this.setMcInstalled(true);
             }
