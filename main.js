@@ -992,18 +992,21 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
             const admZip = new AdmZip(zip);
             const entry = admZip.getEntry('pack.mcmeta');
             if (entry) {
-                packMcMeta = JSON.parse(entry.getData().toString('utf-8'));
+                try {
+                    packMcMeta = JSON.parse(entry.getData().toString('utf-8'));
+                } catch (e) { }
             }
             const iconEntry = admZip.getEntry("pack.png");
             if (iconEntry) {
                 const iconBuffer = iconEntry.getData();
                 let mime = 'image/png';
+                if (!packMcMeta) packMcMeta = {};
                 packMcMeta.icon = `data:${mime};base64,${iconBuffer.toString('base64')}`;
             }
         } catch (e) { }
         let name = file.replace(".zip.disabled", ".zip");
         if (packMcMeta?.pack?.description) name = packMcMeta.pack.description;
-        if (packMcMeta?.pack?.description.fallback) name = packMcMeta.pack.description.fallback;
+        if (packMcMeta?.pack?.description?.fallback) name = packMcMeta.pack.description.fallback;
         if (typeof name !== "string") name = file.replace(".zip.disabled", ".zip");
         return {
             type: 'resource_pack',
