@@ -13228,8 +13228,8 @@ function afterMarkdownParse(instance_id, vanilla_version, loader, dialogContextM
 
                 if (dialogContextMenu && (url_obj.hostname == "modrinth.com" || url_obj.hostname == "www.modrinth.com")) {
                     let pathParts = url_obj.pathname.split('/').filter(Boolean);
-                    let customVersion = url_obj.searchParams.getAll("g").length > 1 ? null : url_obj.searchParams.get("g");
-                    let customLoader = url_obj.searchParams.getAll("l").length > 1 ? null : url_obj.searchParams.get("l");
+                    let customVersion = url_obj.searchParams.getAll("g").length > 1 ? "all" : url_obj.searchParams.get("g");
+                    let customLoader = url_obj.searchParams.getAll("l").length > 1 ? "all" : url_obj.searchParams.get("l");
                     if (pathParts.length >= 2) {
                         let pageType = pathParts[0];
                         let pageId = pathParts[1];
