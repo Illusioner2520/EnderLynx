@@ -4325,7 +4325,7 @@ class InstanceScreen extends Screen {
                     },
                     "more": {
                         "actionsList": [
-                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
+                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("13w16a") && this.instance.vanilla_version != "1.5.2" || !minecraftVersions ? {
                                 "title": translate("app.worlds.play"),
                                 "icon": '<i class="fa-solid fa-play"></i>',
                                 "func": async () => {
@@ -4347,7 +4347,7 @@ class InstanceScreen extends Screen {
                             //     "icon": '<i class="fa-solid fa-share"></i>',
                             //     "func": () => { }
                             // },
-                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("1.3") || !minecraftVersions ? {
+                           minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("13w16a") && this.instance.vanilla_version != "1.5.2" || !minecraftVersions ? {
                                 "icon": '<i class="fa-solid fa-desktop"></i>',
                                 "title": translate("app.worlds.desktop_shortcut"),
                                 "func": (e) => {
@@ -5675,7 +5675,7 @@ class HomeScreen extends Screen {
             item.appendChild(itemInfo);
             let instanceInfo = Instance.getInstance(e.instance_id);
             let playButton = document.createElement("button");
-            playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
+            playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("13w16a") && instanceInfo.vanilla_version != "1.5.2" && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
             playButton.className = "home-play-button";
             playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
             playButton.onclick = async () => {
@@ -5692,7 +5692,7 @@ class HomeScreen extends Screen {
             morebutton.className = "home-list-more";
             morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
             let buttons = new ContextMenuButtons([
-                ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions) ? {
+                ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("13w16a") && instanceInfo.vanilla_version != "1.5.2" && e.type == "multiplayer") || !minecraftVersions) ? {
                     "title": translate("app.worlds.play"),
                     "icon": '<i class="fa-solid fa-play"></i>',
                     "func": async () => {
@@ -5742,7 +5742,7 @@ class HomeScreen extends Screen {
                 //     "icon": '<i class="fa-solid fa-share"></i>',
                 //     "func": () => { }
                 // },
-                (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("1.3") && e.type == "multiplayer") || !minecraftVersions ? {
+                (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("13w16a") && instanceInfo.vanilla_version != "1.5.2" && e.type == "multiplayer") || !minecraftVersions ? {
                     "icon": '<i class="fa-solid fa-desktop"></i>',
                     "title": translate("app.worlds.desktop_shortcut"),
                     "func": () => {
