@@ -524,7 +524,9 @@ class Instance {
     }
 
     async stop() {
-        return await window.enderlynx.stopInstance(this.instance_id);
+        let success = await window.enderlynx.stopInstance(this.instance_id);
+        if (!success) displayError(translate("app.instance.stop.failed"));
+        return success;
     }
 
     showRepairDialog() {
@@ -3499,7 +3501,7 @@ class InstanceScreen extends Screen {
                 this.playButton.classList.add("instance-top-loading-button");
                 this.playButton.onclick = () => { };
                 let success = await this.stop();
-                if (!success) this.calculatePlayButtonState();
+                this.calculatePlayButtonState();
             }
             window.enderlynx.clearProcessWatches();
             window.enderlynx.watchProcessForExit(this.instance.pid, () => {
@@ -5901,10 +5903,9 @@ class HomeScreen extends Screen {
                 playButton.className = isRunning ? "home-stop-button" : "home-play-button";
                 playButton.innerHTML = isRunning ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
                 playButton.onclick = isRunning ? async () => {
-                    playButton.classList.add("home-loading-button");
                     playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
                     await instanceInfo.stop();
-                    formatPlayButton(false);
+                    formatPlayButton(checkForProcess(instanceInfo.pid));
                 } : async () => {
                     playButton.className = "home-loading-button";
                     playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
@@ -5924,7 +5925,7 @@ class HomeScreen extends Screen {
                     "func": async (e) => {
                         if (running) {
                             await instanceInfo.stop();
-                            formatPlayButton(false);
+                            formatPlayButton(checkForProcess(instanceInfo.pid));
                         } else {
                             playButton.className = "home-loading-button";
                             playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")

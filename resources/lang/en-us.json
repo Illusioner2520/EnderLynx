@@ -1282,5 +1282,6 @@
     "app.discover.dependency.incompatible.version": "Version %v is incompatible",
     "app.discover.dependency.tool": "Tool",
     "app.discover.dependency.tool.version": "Version %v is a tool",
-    "app.discover.dependency.no_dependencies": "No Dependencies"
+    "app.discover.dependency.no_dependencies": "No Dependencies",
+    "app.instance.stop.failed": "Failed to stop instance"
 }

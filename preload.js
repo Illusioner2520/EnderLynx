@@ -447,21 +447,16 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     watchProcessForExit: (pid, callback) => {
         if (processWatches[pid]) {
-            processWatches[pid]['callback'] = callback;
+            processWatches[pid].callback = callback;
         } else {
             processWatches[pid] = {};
-            processWatches[pid]['callback'] = callback;
+            processWatches[pid].callback = callback;
             const timer = setInterval(() => {
-                try {
-                    process.kill(pid, 0);
-                } catch (err) {
-                    if (err.code === 'ESRCH') {
-                        clearInterval(timer);
-                        processWatches[pid]['callback']();
-                        delete processWatches[pid];
-                    } else {
-                        processWatches[pid]['callback']();
-                    }
+                let check = checkForProcess(pid);
+                if (!check) {
+                    clearInterval(timer);
+                    processWatches[pid].callback();
+                    delete processWatches[pid];
                 }
             }, 1000);
             processWatches[pid]['interval'] = timer;

@@ -3550,7 +3550,7 @@ ipcMain.handle('stop-instance', async (_, instance_id) => {
                     clearInterval(interval);
                     exec(os.platform() == 'win32' ? `taskkill /PID ${pid} /T /F` : `kill -KILL -${pid}`, (forceError) => {
                         if (forceError) {
-                            reject("failed to kill process");
+                            resolve(false);
                             return;
                         }
                         const stillAlive = checkForProcess(pid);
