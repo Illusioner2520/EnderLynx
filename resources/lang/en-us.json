@@ -684,6 +684,8 @@
     "app.discover.loader.all": "All",
     "app.discover.install": "Install",
     "app.discover.error_creating_modpack": "Error: Could not find version of '%t' that is version %v and uses loader %l",
+    "app.discover.error_downloading_modpack": "Failed to download modpack",
+    "app.discover.error_adding_content_to_modpack": "Failed to add %f to modpack",
     "app.discover.installing": "Installing...",
     "app.discover.loading": "Loading...",
     "app.discover.failed": "Failed",

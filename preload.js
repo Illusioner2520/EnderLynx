@@ -465,8 +465,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteContent: async (instance_id, project_type, filename) => {
         return await ipcRenderer.invoke('delete-content', instance_id, project_type, filename);
     },
-    addContent: async (instance_id, project_type, project_url, filename, data_pack_world, content_id) => {
-        return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, filename, data_pack_world, content_id);
+    addContent: async (instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
+        return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     },
     processPackFile: async (file_path, instance_id, title) => {
         return await ipcRenderer.invoke('process-pack-file', file_path, instance_id, title);
@@ -722,8 +722,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
         let full_path = path.join(userPath, "minecraft/instances", instance_id, file_path);
         showFileInFolder(full_path);
     },
-    installModpack: async (info, type, instance_id, name) => {
-        return await ipcRenderer.invoke('install-modpack', info, type, instance_id, name);
+    installModpack: async (info, type, instance_id, name, sha1) => {
+        return await ipcRenderer.invoke('install-modpack', info, type, instance_id, name, sha1);
     },
     installMinecraft: async (instance_id, loader, game_version, loader_version) => {
         return await ipcRenderer.invoke('install-minecraft', instance_id, loader, game_version, loader_version);

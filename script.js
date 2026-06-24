@@ -9368,7 +9368,7 @@ async function showCreateInstanceDialog() {
             let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
             instance.display();
             try {
-                await window.enderlynx.installModpack(info.file, "file", instance_id, info.name_f);
+                await window.enderlynx.installModpack(info.file, "file", instance_id, info.name_f, null);
             } catch (e) {
                 await instance.setFailed(true);
                 await instance.setInstalling(false);
@@ -9379,7 +9379,7 @@ async function showCreateInstanceDialog() {
             let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
             instance.display();
             try {
-                await window.enderlynx.installModpack(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, "cf_url", instance_id, info.name_c);
+                await window.enderlynx.installModpack(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, "cf_url", instance_id, info.name_c, null);
             } catch (e) {
                 displayError(translate("app.cf.code.error"));
                 await instance.delete();
@@ -11961,7 +11961,7 @@ class Details {
 
 async function installContent(source, project, version, instance, data_pack_world) {
     if (project.server_modpack?.kind == "vanilla") {
-        await addContent(instance.instance_id, "server", project.ip_address, project.name, project.icon);
+        await addContent(instance.instance_id, "server", project.ip_address, null, project.name, project.icon);
         return { id: true };
     }
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, project.project_type, project.id, source);
@@ -11969,7 +11969,12 @@ async function installContent(source, project, version, instance, data_pack_worl
         displayError(translate("app.discover.error"));
         return;
     }
-    await installSpecificVersion(version, source, instance, version.project_type || project.project_type, project.name, project.author, project.icon, project.id, false, data_pack_world);
+    try {
+        await installSpecificVersion(version, source, instance, version.project_type || project.project_type, project.name, project.author, project.icon, project.id, false, data_pack_world);
+    } catch (e) {
+        displayError(e.message);
+        return;
+    }
     return { id: version.version_id };
 }
 
@@ -11978,7 +11983,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let content = await instance.getContent();
     let modrinth_ids = content.filter(e => e.source == "modrinth").map(e => e.source_info);
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => e.source_info);
-    let initialContent = await addContent(instance_id, project_type, version.download_url, version.filename, data_pack_world, project_id);
+    let initialContent = await addContent(instance_id, project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
     if (isUpdate) return initialContent;
     let version_number = version.version_number || "";
     let version_id = version.version_id;
@@ -12005,8 +12010,8 @@ async function installSpecificVersion(version, source, instance, project_type, t
     return initialContent;
 }
 
-async function addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id) {
-    return await window.enderlynx.addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id);
+async function addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
+    return await window.enderlynx.addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
 }
 
 class LoadingContainer {
@@ -13851,10 +13856,17 @@ async function installButtonClick(content, version, instance_id, button, dialog_
             let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
             await instance.setInstalledVersion(version.version_id);
             instance.display();
-            await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instance_id, title);
+            try {
+                await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instance_id, title, version.sha1_hash);
+            } catch (e) {
+                displayError(translate("app.discover.error_downloading_modpack"));
+                await instance.setFailed(true);
+                await instance.setMcInstalled(true);
+                return;
+            }
             if (project_type == "server") {
                 if (info.link_to_server) await instance.setSourceServer(ip_address);
-                await addContent(instance.instance_id, "server", ip_address, server_name, server_icon);
+                await addContent(instance.instance_id, "server", ip_address, null, server_name, server_icon);
             }
         })
     } else if (instance_id) {
@@ -14100,7 +14112,14 @@ async function runModpackUpdate(instanceInfo, source, version) {
     await window.enderlynx.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
     await instanceInfo.clearContent();
     await instanceInfo.setInstalledVersion(version.version_id);
-    await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instanceInfo.instance_id, instanceInfo.name);
+    try {
+        await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instanceInfo.instance_id, instanceInfo.name, version.sha1_hash);
+    } catch (e) {
+        displayError(translate("app.discover.error_downloading_modpack"));
+        await instanceInfo.setFailed(true);
+        await instanceInfo.setMcInstalled(true);
+        return;
+    }
 }
 
 function closeAllDialogs() {
@@ -14305,7 +14324,7 @@ let importInstance = (info, file_path) => {
         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
         let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
         instance.display();
-        await window.enderlynx.installModpack(file_path, "file", instance_id, info.name);
+        await window.enderlynx.installModpack(file_path, "file", instance_id, info.name, null);
     });
 }
 

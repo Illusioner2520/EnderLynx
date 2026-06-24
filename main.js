@@ -1422,21 +1422,27 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
 
         const downloadPromises = modrinth_index_json.files.map((file, i) =>
             limit(async () => {
-                signal.throwIfAborted();
-                await urlToFile(file.downloads[0], path.resolve(destDir, file.path), { signal });
-                version_hashes.push(file.hashes.sha512);
-                content.push({
-                    "disabled": false,
-                    "file_name": path.basename(file.path),
-                    "version_hash": file.hashes.sha512
-                });
-                signal.throwIfAborted();
-                if (count == modrinth_index_json.files.length - 1) {
-                    win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
-                } else {
-                    win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / modrinth_index_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", count + 1, "%b", modrinth_index_json.files.length), processId, "good", cancelId);
+                try {
+                    signal.throwIfAborted();
+                    let install_path = path.resolve(destDir, file.path);
+                    await urlToFile(file.downloads[0], install_path, { signal });
+                    await validateSha1(file.hashes.sha1, install_path);
+                    version_hashes.push(file.hashes.sha512);
+                    content.push({
+                        "disabled": false,
+                        "file_name": path.basename(file.path),
+                        "version_hash": file.hashes.sha512
+                    });
+                    signal.throwIfAborted();
+                    if (count == modrinth_index_json.files.length - 1) {
+                        win.webContents.send('progress-update', translate("app.installing", "%t", title), 95, translate("app.installing.metadata"), processId, "good", cancelId);
+                    } else {
+                        win.webContents.send('progress-update', translate("app.installing", "%t", title), ((count + 2) / modrinth_index_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", count + 1, "%b", modrinth_index_json.files.length), processId, "good", cancelId);
+                    }
+                    count++;
+                } catch (e) {
+                    win.webContents.send('display-error', translate("app.discover.error_adding_content_to_modpack", "%f", path.basename(file.path)));
                 }
-                count++;
             })
         );
 
@@ -2176,42 +2182,46 @@ function parseEnvString(input) {
     return env;
 }
 
-async function downloadModrinthPack(instance_id, url, title) {
+async function downloadModrinthPack(instance_id, url, title, sha1) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     let signal = abortController.signal;
     win.webContents.send('progress-update', translate("app.downloading", "%t", title), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
+    let install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`);
     try {
-        await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`), {
+        await urlToFile(url, install_path, {
             signal, onProgress: (v) => {
                 win.webContents.send('progress-update', translate("app.downloading", "%t", title), v, translate("app.downloading.downloading"), processId, "good", cancelId);
             }
         });
+        await validateSha1(sha1, install_path);
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
-        return path.resolve(user_path, `minecraft/instances/${instance_id}/pack.mrpack`);
+        return install_path;
     } catch (err) {
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, err, processId, "error", cancelId);
         throw err;
     }
 }
 
-async function downloadCurseForgePack(instance_id, url, title) {
+async function downloadCurseForgePack(instance_id, url, title, sha1) {
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
     cancelFunctions[cancelId] = abortController;
     let signal = abortController.signal;
     win.webContents.send('progress-update', translate("app.downloading", "%t", title), 0, translate("app.downloading.beginning"), processId, "good", cancelId);
+    let install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`);
     try {
-        await urlToFile(url, path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`), {
+        await urlToFile(url, install_path, {
             signal, onProgress: (v) => {
                 win.webContents.send('progress-update', translate("app.downloading", "%t", title), v, translate("app.downloading.downloading"), processId, "good", cancelId);
             }
         });
+        await validateSha1(sha1, install_path);
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, translate("app.done"), processId, "done", cancelId);
-        return path.resolve(user_path, `minecraft/instances/${instance_id}/pack.zip`);
+        return install_path;
     } catch (err) {
         win.webContents.send('progress-update', translate("app.downloading", "%t", title), 100, err, processId, "error", cancelId);
         throw err;
@@ -2535,8 +2545,8 @@ async function downloadVanillaTweaksResourcePacks(packs, version, instance_id, f
     }
 }
 
-ipcMain.handle('add-content', async (_, instance_id, project_type, project_url, filename, data_pack_world, content_id) => {
-    return await addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id);
+ipcMain.handle('add-content', async (_, instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
+    return await addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
 });
 
 ipcMain.handle('add-server', async (_, instance_id, ip, name) => {
@@ -2554,7 +2564,7 @@ async function getServerImage(ip) {
     return info.favicon;
 }
 
-async function addContent(instance_id, project_type, project_url, filename, data_pack_world, content_id) {
+async function addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
     if (project_type == "server") {
         let v = await addServer(instance_id, project_url, filename, data_pack_world);
         return v;
@@ -2586,6 +2596,8 @@ async function addContent(instance_id, project_type, project_url, filename, data
             win.webContents.send('content-install-update', content_id, p);
         }
     });
+
+    await validateSha1(sha1, install_path);
 
     win.webContents.send('content-install-update', content_id, 100);
 
@@ -5386,20 +5398,20 @@ ipcMain.handle('copy-text', async (_, text) => {
     }
 });
 
-ipcMain.handle('install-modpack', async (_, info, type, instance_id, name) => {
-    return await installModpack(info, type, instance_id, name);
+ipcMain.handle('install-modpack', async (_, info, type, instance_id, name, sha1) => {
+    return await installModpack(info, type, instance_id, name, sha1);
 });
 
 ipcMain.handle('install-minecraft', async (_, instance_id, loader, game_version, loader_version) => {
     return await installMinecraft(instance_id, loader, game_version, loader_version);
 });
 
-async function installModpack(info, type, instance_id, name) {
+async function installModpack(info, type, instance_id, name, sha1) {
     try {
         if (type == "cf_url") {
-            info = await downloadCurseForgePack(instance_id, info, name);
+            info = await downloadCurseForgePack(instance_id, info, name, sha1);
         } else if (type == "mr_url") {
-            info = await downloadModrinthPack(instance_id, info, name);
+            info = await downloadModrinthPack(instance_id, info, name, sha1);
         }
     } catch (e) {
         updateInstance("failed", true, instance_id);
@@ -5531,6 +5543,29 @@ ipcMain.handle('friend-action', async (_, player_id, action, friend) => {
     j.status = res.status;
     return j;
 });
+
+async function validateSha1(sha1, install_path) {
+    if (!sha1) return;
+    let file_sha1 = null;
+    try {
+        file_sha1 = await new Promise((resolve, reject) => {
+            const hash = crypto.createHash('sha1');
+            const stream = fs.createReadStream(install_path);
+            stream.on('data', chunk => hash.update(chunk));
+            stream.on('end', () => resolve(hash.digest('hex')));
+            stream.on('error', reject);
+        });
+    } catch (e) {
+        console.error('Failed to compute SHA1 for installed content:', e);
+    }
+
+    if (Math.random() < 0.1) file_sha1 += "dsfasdf";
+
+    if (file_sha1 != sha1) {
+        await fsPromises.rm(install_path);
+        throw new Error("Failed to verify download.");
+    }
+}
 
 // update
 try {

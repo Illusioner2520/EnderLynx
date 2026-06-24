@@ -369,6 +369,7 @@ class ProjectVersion {
             this.required_dependencies = info.dependencies.filter(e => e.dependency_type == "required").map(e => ({ version_id: e.version_id, project_id: e.project_id }));
             this.download_url = info.files[0]?.url;
             this.filename = info.files[0]?.filename;
+            this.sha1_hash = info.files[0]?.hashes?.sha1;
             this.uses_markdown_description = true;
             if (info.project_types.includes("datapack")) {
                 this.project_type = "datapack";
@@ -384,6 +385,7 @@ class ProjectVersion {
             this.sub_name = info.fileName;
             this.version_number = "";
             this.filename = info.fileName;
+            this.sha1_hash = info.hashes[0].value;
             this.channel = Project.curseforge_release_type_conversion[info.releaseType];
             this.published = new Date(info.fileDate);
             this.downloads = info.downloadCount;
