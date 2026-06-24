@@ -5156,7 +5156,7 @@ dialog {
 body.potato *:not(.ace_text-layer),
 body.potato *::backdrop,
 body.potato *::before,
-body.potato *::after {
+body.potato *:not(.mc-news-title)::after {
     transition-duration: 0s !important;
     animation-duration: 0s !important;
     box-shadow: none !important;
