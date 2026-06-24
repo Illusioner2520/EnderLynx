@@ -8585,7 +8585,7 @@ settingsButtonEle.onclick = async () => {
     ], async (info) => {
         await setDefault("default_width", info.default_width);
         await setDefault("default_height", info.default_height);
-        await setDefault("default_fullscreen", info.default_fullscreen);
+        await setDefault("default_fullscreen", (info.default_fullscreen).toString());
         await setDefault("default_ram", info.default_ram);
         await setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
         await setDefault("default_page", info.default_page);
