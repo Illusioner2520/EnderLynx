@@ -314,6 +314,7 @@ class Instance {
         this.mc_installed = Boolean(content.mc_installed);
         this.window_width = content.window_width;
         this.window_height = content.window_height;
+        this.fullscreen = Boolean(content.fullscreen);
         this.allocated_ram = content.allocated_ram;
         this.java_version = content.java_version;
         this.java_path = content.java_path;
@@ -379,6 +380,9 @@ class Instance {
     }
     async setWindowHeight(window_height) {
         await window.enderlynx.updateInstance("window_height", window_height, this.instance_id);
+    }
+    async setFullscreen(fullscreen) {
+        await window.enderlynx.updateInstance("fullscreen", fullscreen, this.instance_id);
     }
     async setAllocatedRam(allocated_ram) {
         await window.enderlynx.updateInstance("allocated_ram", allocated_ram, this.instance_id);
@@ -707,6 +711,14 @@ class Instance {
                 "desc": translate("app.instances.settings.height.description")
             },
             {
+                "type": "toggle",
+                "name": translate("app.instances.settings.fullscreen"),
+                "id": "fullscreen",
+                "default": this.fullscreen ?? false,
+                "tab": "window",
+                "desc": translate("app.instances.settings.fullscreen.description")
+            },
+            {
                 "type": "slider",
                 "name": translate("app.instances.settings.ram"),
                 "id": "allocated_ram",
@@ -863,6 +875,7 @@ class Instance {
             await this.setGroup(info.group);
             await this.setWindowWidth(info.width);
             await this.setWindowHeight(info.height);
+            await this.setFullscreen(info.fullscreen);
             await this.setAllocatedRam(info.allocated_ram);
             await this.setSourceServer(info.source_server);
             if (resettingJavaInstallation && info.java_path == default_java_installation) {
@@ -8468,6 +8481,14 @@ settingsButtonEle.onclick = async () => {
             "default": Number(await getDefault("default_height"))
         },
         {
+            "type": "toggle",
+            "name": translate("app.settings.defaults.fullscreen"),
+            "desc": translate("app.settings.defaults.fullscreen.description"),
+            "tab": "defaults",
+            "id": "default_fullscreen",
+            "default": Number(await getDefault("default_fullscreen"))
+        },
+        {
             "type": "text",
             "name": translate("app.settings.globals.custom_env_vars"),
             "tab": "globals",
@@ -8563,6 +8584,7 @@ settingsButtonEle.onclick = async () => {
     ], async (info) => {
         await setDefault("default_width", info.default_width);
         await setDefault("default_height", info.default_height);
+        await setDefault("default_fullscreen", info.default_fullscreen);
         await setDefault("default_ram", info.default_ram);
         await setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
         await setDefault("default_page", info.default_page);

@@ -882,6 +882,9 @@ class Minecraft {
         let args = [];
         if (this.args.game) {
             let extraArgs = [];
+            if (customResolution.fullscreen) {
+                extraArgs.push("--fullscreen");
+            }
             let quickPlayHandled = false;
             // ~1.13+
             if (this.modded_args_game) this.args.game = this.args.game.concat(this.modded_args_game);
@@ -1029,6 +1032,9 @@ class Minecraft {
                 let server = split[0];
                 let port = split[1] ?? "25565";
                 args = args.concat(["--server", server, "--port", port])
+            }
+            if (customResolution.fullscreen) {
+                extraArgs.push("--fullscreen");
             }
         }
         console.log("Launching game.");
