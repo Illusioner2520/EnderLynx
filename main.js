@@ -5559,8 +5559,6 @@ async function validateSha1(sha1, install_path) {
         console.error('Failed to compute SHA1 for installed content:', e);
     }
 
-    if (Math.random() < 0.1) file_sha1 += "dsfasdf";
-
     if (file_sha1 != sha1) {
         await fsPromises.rm(install_path);
         throw new Error("Failed to verify download.");
