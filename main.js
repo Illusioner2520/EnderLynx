@@ -5565,6 +5565,22 @@ async function validateSha1(sha1, install_path) {
     }
 }
 
+function hasColumn(table, column) {
+    return db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
+}
+
+function addColumnIfMissing(table, column, type) {
+    if (!hasColumn(table, column)) {
+        db.prepare(`ALTER TABLE ${table} ADD ${column} ${type}`).run();
+    }
+}
+
+function dropColumnIfExists(table, column) {
+    if (hasColumn(table, column)) {
+        db.prepare(`ALTER TABLE ${table} DROP COLUMN ${column}`).run();
+    }
+}
+
 // update
 try {
     switch (getDefault("saved_version")) {
@@ -5576,14 +5592,13 @@ try {
         case "0.0.6":
         case "0.0.7":
             if (getDefault("default_page") == "my_account") setDefault("default_page", "wardrobe");
-            db.prepare("ALTER TABLE skins DROP COLUMN file_name;").run();
-            db.prepare("ALTER TABLE skins DROP COLUMN last_used;").run();
-            db.prepare("ALTER TABLE capes DROP COLUMN last_used;").run();
+            dropColumnIfExists("skins", "file_name");
+            dropColumnIfExists("capes", "last_used");
         case "0.0.8":
         case "0.0.9":
         case "0.1.0":
         case "0.1.1":
-            db.prepare("ALTER TABLE instances ADD failed INTEGER").run();
+            addColumnIfMissing("instances", "failed", "INTEGER");
         case "0.2.0":
         case "0.3.0":
         case "0.4.0":
@@ -5592,33 +5607,36 @@ try {
         case "0.4.3":
         case "0.4.4":
         case "0.5.0":
-            db.prepare("ALTER TABLE skins ADD favorited INTEGER").run();
-            db.prepare("ALTER TABLE skins ADD last_used TEXT").run();
-            db.prepare("ALTER TABLE skins ADD preview TEXT").run();
-            db.prepare("ALTER TABLE skins ADD preview_model TEXT").run();
-            db.prepare("ALTER TABLE skins ADD head TEXT").run();
+            addColumnIfMissing("skins", "favorited", "INTEGER");
+            addColumnIfMissing("skins", "last_used", "TEXT");
+            addColumnIfMissing("skins", "preview", "TEXT");
+            addColumnIfMissing("skins", "preview_model", "TEXT");
+            addColumnIfMissing("skins", "head", "TEXT");
         case "0.6.0":
         case "0.6.1":
         case "0.6.2":
         case "0.6.3":
         case "0.6.4":
         case "0.6.5":
-            db.prepare("ALTER TABLE instances ADD post_launch_hook TEXT").run();
-            db.prepare("ALTER TABLE instances ADD uses_custom_java_args INTEGER").run();
-            db.prepare("ALTER TABLE instances ADD provided_java_args TEXT").run();
+            addColumnIfMissing("instances", "post_launch_hook", "TEXT");
+            addColumnIfMissing("instances", "uses_custom_java_args", "INTEGER");
+            addColumnIfMissing("instances", "provided_java_args", "TEXT");
         case "0.6.6":
         case "0.6.7":
             let java = new Java(db, user_path, win, translate);
             java.upgradeLegacy();
         case "0.7.0":
         case "0.7.1":
-            db.prepare("ALTER TABLE instances ADD source_server TEXT").run();
-            db.prepare("ALTER TABLE java_versions ADD package_uuid TEXT").run();
-            db.prepare("ALTER TABLE instances ADD uses_custom_java_installation INTEGER").run();
-            db.prepare("UPDATE instances SET uses_custom_java_installation = ?").run(1);
+            addColumnIfMissing("instances", "source_server", "TEXT");
+            addColumnIfMissing("java_versions", "package_uuid", "TEXT");
+            let hasUsesCustomJavaInstallationColumn = hasColumn("instances", "uses_custom_java_installation");
+            if (!hasUsesCustomJavaInstallationColumn) {
+                addColumnIfMissing("instances", "uses_custom_java_installation", "INTEGER");
+                db.prepare("UPDATE instances SET uses_custom_java_installation = ?").run(1);
+            }
         case "0.8.0":
         case "0.8.1":
-            db.prepare("ALTER TABLE profiles DROP COLUMN client_id;").run();
+            dropColumnIfExists("profiles", "client_id");
         case "0.9.0":
         case "0.9.1":
         case "0.10.0":
@@ -5629,12 +5647,13 @@ try {
             db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
             db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
         case "0.10.2":
-            db.prepare("ALTER TABLE skins ADD tag TEXT").run();
+            addColumnIfMissing("skins", "tag", "TEXT");
         case "0.10.3":
         case "0.10.4":
         case "0.10.5":
-            db.prepare("ALTER TABLE instances ADD fullscreen INTEGER").run();
+            addColumnIfMissing("instances", "fullscreen", "INTEGER");
     }
-} catch (e) { }
-
-setDefault("saved_version", version);
+    setDefault("saved_version", version);
+} catch (e) {
+    if (win) win.webContents.send('display-error', e.message);
+}
