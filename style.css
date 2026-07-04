@@ -158,7 +158,7 @@ body.sidebar-right .sidebar {
 }
 
 body.compact .sidebar {
-    width: 76px;
+    width: 68px;
 }
 
 .player-switch {
@@ -599,30 +599,30 @@ body.sidebar-right #offline-notice {
 }
 
 body.compact .content {
-    left: 77px;
-    width: calc(100% - 77px);
+    left: 69px;
+    width: calc(100% - 69px);
 }
 
 body.compact {
-    --floating-offset: 38.5px;
+    --floating-offset: 34.5px;
 }
 
 body.compact #offline-notice {
-    left: 77px;
-    width: calc(100% - 77px);
+    left: 69px;
+    width: calc(100% - 69px);
 }
 
 body.compact.sidebar-right .content {
-    right: 77px;
+    right: 69px;
     left: unset;
 }
 
 body.compact.sidebar-right {
-    --floating-offset: -38.5px;
+    --floating-offset: -34.5px;
 }
 
 body.compact.sidebar-right #offline-notice {
-    right: 77px;
+    right: 69px;
     left: unset;
 }
 

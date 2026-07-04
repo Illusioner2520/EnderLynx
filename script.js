@@ -8334,7 +8334,7 @@ settingsButtonEle.onclick = async () => {
             "onchange": (v) => {
                 if (v == "compact") {
                     document.body.classList.add("compact");
-                } else {
+                } else if (window.innerWidth >= 1000) {
                     document.body.classList.remove("compact");
                 }
             }
@@ -8622,11 +8622,7 @@ settingsButtonEle.onclick = async () => {
             document.body.classList.remove(e);
         });
         document.body.classList.add(info.default_accent_color);
-        if (info.default_sidebar == "compact") {
-            document.body.classList.add("compact");
-        } else {
-            document.body.classList.remove("compact");
-        }
+        updateSidebarSize();
         if (info.default_sidebar_side == "right") {
             document.body.classList.add("sidebar-right");
         } else {
@@ -8670,11 +8666,7 @@ settingsButtonEle.onclick = async () => {
             document.body.classList.remove(e);
         });
         document.body.classList.add(accent_color);
-        if (sidebar_mode == "compact") {
-            document.body.classList.add("compact");
-        } else {
-            document.body.classList.remove("compact");
-        }
+        updateSidebarSize();
         if (sidebar_side == "right") {
             document.body.classList.add("sidebar-right");
         } else {
@@ -8703,9 +8695,7 @@ async function applyDefaults() {
         document.body.classList.add("light");
     }
     document.body.classList.add(await getDefault("default_accent_color"));
-    if (await getDefault("default_sidebar") == "compact") {
-        document.body.classList.add("compact");
-    }
+    updateSidebarSize();
     if (await getDefault("default_sidebar_side") == "right") {
         document.body.classList.add("sidebar-right");
     }
@@ -14496,10 +14486,20 @@ function sortByVersion(list, reverse) {
 let logResizeFunction;
 let aceResizeFunction;
 
-window.addEventListener('resize', () => {
+window.addEventListener('resize', async () => {
     if (logResizeFunction) logResizeFunction();
     if (aceResizeFunction) aceResizeFunction();
+    updateSidebarSize();
 });
+
+async function updateSidebarSize() {
+    let preference = await getDefault("default_sidebar");
+    if (window.innerWidth < 1000 || preference == "compact") {
+        document.body.classList.add("compact");
+        return;
+    }
+    document.body.classList.remove("compact");
+}
 
 function createElement(tag, className, props = {}) {
     let ele = document.createElement(tag);
