@@ -6736,6 +6736,8 @@ class DiscoverScreen extends Screen {
     }
 
     async getContent(page = 1) {
+        let pageId = Math.random();
+        this.pageId = pageId;
         let source = this.sourceDropdown.value;
         let query = this.searchBar.value;
         let instance_content = [];
@@ -6757,6 +6759,7 @@ class DiscoverScreen extends Screen {
         try {
             if (source == "modrinth") results = await Modrinth.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by);
             else if (source == "curseforge") results = await CurseForge.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by);
+            if (this.pageId != pageId) return;
             this.discoverList.innerHTML = "";
         } catch (err) {
             loading.errorOut(err, () => {

@@ -1879,6 +1879,12 @@ body.compact .live-stop {
 
 body.compact .download-log-wrapper {
     scale: .8;
+    width: 280px;
+    position: fixed;
+    left: calc(anchor(left) - 5px);
+    box-shadow: 0 0 10px black;
+    bottom: calc(anchor(top) + 10px);
+    position-visibility: anchors-visible;
 }
 
 .download-log-wrapper:popover-open {
@@ -1889,14 +1895,6 @@ body.compact .download-log-wrapper {
         opacity: 0;
         scale: .8 !important;
     }
-}
-
-body.compact .download-log-wrapper {
-    width: 280px;
-    position: fixed;
-    left: calc(anchor(left) - 5px);
-    box-shadow: 0 0 10px black;
-    bottom: calc(anchor(top) + 10px);
 }
 
 body.compact.sidebar-right .download-log-wrapper {
