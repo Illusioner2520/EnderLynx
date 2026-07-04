@@ -684,11 +684,12 @@ class Minecraft {
         javaArgs = ["-Xms" + initial_heap_size + "M", "-Xmx" + allocatedRam + "M", "-Dlog4j.configurationFile=" + pathToFileURL(path.resolve(this.userPath, "log_config.xml")).href].concat(javaArgs);
         this.libs = "";
         this.libNames = [];
+        let moddedVersionJsonPath = path.resolve(this.userPath, `minecraft/meta/${loader}/${version}/${loaderVersion}/${loader}-${version}-${loaderVersion}.json`);
         if (loader == "fabric") {
-            if (!fs.existsSync(path.resolve(this.userPath, `minecraft/meta/fabric/${version}/${loaderVersion}/fabric-${version}-${loaderVersion}.json`))) {
+            if (!fs.existsSync(moddedVersionJsonPath)) {
                 await this.installFabric(version, loaderVersion);
             } else {
-                let fabric_json = fs.readFileSync(path.resolve(this.userPath, `minecraft/meta/fabric/${version}/${loaderVersion}/fabric-${version}-${loaderVersion}.json`));
+                let fabric_json = fs.readFileSync(moddedVersionJsonPath);
                 fabric_json = JSON.parse(fabric_json);
                 this.main_class = fabric_json.mainClass;
                 this.modded_args_game = fabric_json.arguments.game;
@@ -701,10 +702,10 @@ class Minecraft {
                 }
             }
         } else if (loader == "quilt") {
-            if (!fs.existsSync(path.resolve(this.userPath, `minecraft/meta/quilt/${version}/${loaderVersion}/quilt-${version}-${loaderVersion}.json`))) {
+            if (!fs.existsSync(moddedVersionJsonPath)) {
                 await this.installQuilt(version, loaderVersion);
             } else {
-                let quilt_json = fs.readFileSync(path.resolve(this.userPath, `minecraft/meta/quilt/${version}/${loaderVersion}/quilt-${version}-${loaderVersion}.json`));
+                let quilt_json = fs.readFileSync(moddedVersionJsonPath);
                 quilt_json = JSON.parse(quilt_json);
                 this.main_class = quilt_json.mainClass;
                 if (quilt_json.arguments?.game) this.modded_args_game = quilt_json.arguments.game;
@@ -717,7 +718,7 @@ class Minecraft {
                 }
             }
         } else if (loader == "forge") {
-            if (!fs.existsSync(path.resolve(this.userPath, `minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`))) {
+            if (!fs.existsSync(moddedVersionJsonPath)) {
                 await this.installForge(version, loaderVersion);
             } else {
                 const lowerBound = "7.8.0.684";
@@ -758,7 +759,7 @@ class Minecraft {
                     this.modded_args_game = [];
                     this.modded_args_jvm = [];
                 } else if (compareVersions(loaderVersion, upperBound) > 0) {
-                    let forge_version_info = fs.readFileSync(path.resolve(this.userPath, `minecraft/meta/forge/${version}/${loaderVersion}/forge-${version}-${loaderVersion}.json`))
+                    let forge_version_info = fs.readFileSync(moddedVersionJsonPath)
                     forge_version_info = JSON.parse(forge_version_info);
                     let libraries = forge_version_info.libraries;
                     let lib_paths = libraries.map(e => path.resolve(this.userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
@@ -786,10 +787,10 @@ class Minecraft {
             }
         } else if (loader == "neoforge") {
             if (loaderVersion == "47.1.82") loaderVersion = "47.1.83";
-            if (!fs.existsSync(path.resolve(this.userPath, `minecraft/meta/neoforge/${version}/${loaderVersion}/neoforge-${version}-${loaderVersion}.json`))) {
+            if (!fs.existsSync(moddedVersionJsonPath)) {
                 await this.installNeoForge(version, loaderVersion);
             } else {
-                let neo_forge_version_info = fs.readFileSync(path.resolve(this.userPath, `minecraft/meta/neoforge/${version}/${loaderVersion}/neoforge-${version}-${loaderVersion}.json`))
+                let neo_forge_version_info = fs.readFileSync(moddedVersionJsonPath)
                 neo_forge_version_info = JSON.parse(neo_forge_version_info);
                 let libraries = neo_forge_version_info.libraries;
                 let lib_paths = libraries.map(e => path.resolve(this.userPath, `minecraft/meta/libraries`, e.downloads.artifact.path));
@@ -930,7 +931,6 @@ class Minecraft {
                 e = e.replace("${auth_session}", auth.accessToken);
                 return e;
             });
-            if (this.modded_args_jvm_top) args = args.concat(this.modded_args_jvm_top);
             args.push("-Dlog4j2.formatMsgNoLookups=true");
             args: for (let i = 0; i < this.args.jvm.length; i++) {
                 let e = this.args.jvm[i];
