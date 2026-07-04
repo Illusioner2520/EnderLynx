@@ -3342,13 +3342,6 @@ class InstanceScreen extends Screen {
         });
         let threeDots = createElement("button", "instance-top-more", { innerHTML: '<i class="fa-solid fa-ellipsis-vertical"></i>' });
         let buttons = new ContextMenuButtons([
-            this.instance.locked ? null : {
-                "icon": '<i class="fa-solid fa-plus"></i>',
-                "title": translate("app.button.content.add"),
-                "func": (e) => {
-                    discoverScreen.display(false, this.instance, this.instance.vanilla_version, this.instance.loader);
-                }
-            },
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": translate("app.button.instances.duplicate"),
