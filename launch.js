@@ -872,13 +872,6 @@ class Minecraft {
             this.modded_args_game = [];
             this.modded_args_jvm = [];
         }
-        let player_info;
-        try {
-            const obtainUsername = await fetch(`https://api.minecraftservices.com/minecraft/profile/lookup/${uuid}`);
-            player_info = await obtainUsername.json();
-        } catch (err) {
-            player_info = { "name": username };
-        }
         let args = [];
         if (this.args.game) {
             let extraArgs = [];
@@ -921,7 +914,7 @@ class Minecraft {
             }
             this.args.game = this.args.game.filter((e) => e);
             this.args.game = this.args.game.map((e) => {
-                e = e.replace("${auth_player_name}", player_info.name);
+                e = e.replace("${auth_player_name}", username);
                 e = e.replace("${version_name}", version);
                 e = e.replace("${game_directory}", path.resolve(this.userPath, `minecraft/instances/${this.instance_id}`));
                 e = e.replace("${assets_root}", this.asset_dir);
@@ -1010,7 +1003,7 @@ class Minecraft {
             args = args.concat(javaArgs);
             args.push(this.main_class);
             this.args = this.args.map((e) => {
-                e = e.replace("${auth_player_name}", player_info.name);
+                e = e.replace("${auth_player_name}", username);
                 e = e.replace("${version_name}", version);
                 e = e.replace("${game_directory}", path.resolve(this.userPath, `minecraft/instances/${this.instance_id}`));
                 e = e.replace("${assets_root}", this.asset_dir);
