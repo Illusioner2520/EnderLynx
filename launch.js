@@ -1255,7 +1255,19 @@ class Minecraft {
                         this.win.webContents.send('progress-update', this.translate("app.downloading.minecraft"), v * (3 / 20) + 40, this.translate("app.downloading.minecraft.version_jar"), processId, "good", cancelId, true);
                     }
                 });
-                this.jarfile = jarFilePath;
+            }
+            this.jarfile = jarFilePath;
+            let databaseDataVersion = this.db.prepare("SELECT * FROM mc_versions_cache WHERE name = ?").get(version);
+            if (!databaseDataVersion.data_version) {
+                const jar = new AdmZip(jarFilePath);
+                const entry = jar.getEntry('version.json');
+                if (entry) {
+                    try {
+                        let jarInfo = JSON.parse(entry.getData().toString('utf-8'));
+                        if (!jarInfo.world_version) throw new Error();
+                        this.db.prepare("UPDATE mc_versions_cache SET data_version = ? WHERE name = ?").run(jarInfo.world_version, version);
+                    } catch (e) { }
+                }
             }
             let java = new Java(this.db, this.userPath, this.win, this.translate);
             let paths = "";

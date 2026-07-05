@@ -62,15 +62,15 @@ if (!fs.existsSync(user_path)) {
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, attempted_options_txt_version INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT, model TEXT, active_uuid TEXT, skin_id TEXT, skin_url TEXT, default_skin INTEGER, texture_key TEXT, favorited INTEGER, last_used TEXT, preview TEXT, preview_model TEXT, head TEXT, tag TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT, version TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT, data_version INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, version INTEGER UNIQUE, file_path TEXT, package_uuid TEXT)').run();
 
@@ -2087,6 +2087,7 @@ async function downloadMinecraft(instance_id, loader, vanilla_version, loader_ve
     try {
         let mc = new Minecraft(instance_id, undefined, db, user_path, win, translate);
         let r = await mc.downloadGame(loader, vanilla_version);
+        setOptionsTXT(instance_id, true, true);
         if (loader == "fabric") {
             await mc.installFabric(vanilla_version, loader_version);
         } else if (loader == "forge") {
@@ -3480,20 +3481,20 @@ ipcMain.handle('read-zip', async (_, info) => {
     return readZip(info);
 });
 
-ipcMain.handle('set-options-txt', async (_, instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
-    return await setOptionsTXT(instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
+ipcMain.handle('set-options-txt', async (_, instance_id, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
+    return await setOptionsTXT(instance_id, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
 });
 
-async function setOptionsTXT(instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists, callback) {
+async function setOptionsTXT(instance_id, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) {
     const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
     let alreadyExists = fs.existsSync(optionsPath);
+    let instance = getInstance(instance_id);
+    let content = getDefaultOptionsTXT(instance.vanilla_version);
     if (dont_complete_if_already_exists && alreadyExists) {
-        if (callback) callback(content.version);
         return content.version;
     }
     if (!alreadyExists) {
         await fsPromises.writeFile(optionsPath, content.content, "utf-8");
-        if (callback) callback(content.version);
         return content.version;
     } else {
         let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
@@ -3517,7 +3518,6 @@ async function setOptionsTXT(instance_id, content, dont_complete_if_already_exis
             }
         }
         await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
-        if (callback) callback(version);
         return version;
     }
 }
@@ -3966,31 +3966,31 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
         if (worldType) args += ` --worldType=${worldType} "--worldId=${worldId}"`
     }
 
-    if (!iconSource) {
-        iconSource = "resources/icons/icon." + iconExt;
-    }
-
     let base_path_name = instance_id;
     let current_count = 1;
 
-    let iconPath = path.resolve(user_path, "icons", instance_id + '.' + iconExt);
+    let iconPath = null;
 
-    while (fs.existsSync(iconPath)) {
-        iconPath = path.resolve(user_path, "icons", base_path_name + "_" + current_count + "." + iconExt);
-        current_count++;
-    }
-
-    try {
-        if (os.platform() == 'win32') {
-            await convertToType(iconSource, iconPath, "ico");
-        } else {
-            await convertToType(iconSource, iconPath, "png");
+    if (iconSource) {
+        iconPath = path.resolve(user_path, "icons", instance_id + '.' + iconExt);
+    
+        while (fs.existsSync(iconPath)) {
+            iconPath = path.resolve(user_path, "icons", base_path_name + "_" + current_count + "." + iconExt);
+            current_count++;
         }
-    } catch (e) {
-        console.error(e);
+    
+        try {
+            if (os.platform() == 'win32') {
+                await convertToType(iconSource, iconPath, "ico");
+            } else {
+                await convertToType(iconSource, iconPath, "png");
+            }
+        } catch (e) {
+            console.error(e);
+        }
     }
 
-    if (!fs.existsSync(iconPath)) {
+    if (!iconPath || !fs.existsSync(iconPath)) {
         let enderlynxiconpath = path.resolve(user_path, "icons", "enderlynx." + iconExt);
         if (!fs.existsSync(enderlynxiconpath)) {
             await fsPromises.copyFile(path.resolve(__dirname, "resources", "icons", "icon." + iconExt), enderlynxiconpath);
@@ -4686,13 +4686,13 @@ function getInstances() {
 function updateInstance(key, value, instance_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
     if (win && win.webContents) win.webContents.send('instance-updated', key, value, instance_id);
     return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
 }
 function batchUpdateInstance(info, instance_id) {
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "attempted_options_txt_version", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen"];
     for (let key in info) {
         if (info[key] instanceof Date) info[key] = info[key].toISOString();
         if (typeof info[key] === "boolean") info[key] = Number(info[key]);
@@ -4714,9 +4714,6 @@ function deleteInstance(instance_id) {
 }
 function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
     db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram, fullscreen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(getDefault("default_width")), Number(getDefault("default_height")), Number(getDefault("default_ram")), Number(getDefault("default_fullscreen")));
-    setOptionsTXT(instance_id, getDefaultOptionsTXT(vanilla_version), true, false, (v) => {
-        updateInstance("attempted_options_txt_version", v, instance_id);
-    });
     return getInstance(instance_id);
 }
 
@@ -4912,21 +4909,11 @@ function removeCapeActive(cape_id) {
 }
 
 // default options management
-function getDefaultOptionsVersions() {
-    return db.prepare("SELECT * FROM options_defaults WHERE key = ?").all("version").map(e => e.version).filter(e => e);
-}
 function getDefaultOption(key) {
     return db.prepare("SELECT * FROM options_defaults WHERE key = ?").get(key)?.value;
 }
-function setDefaultOption(key, value, version) {
-    if (key == "version") {
-        let findVersion = db.prepare("SELECT * FROM options_defaults WHERE version = ?").get(version);
-        if (findVersion) {
-            return db.prepare("UPDATE options_defaults SET value = ? WHERE key = ? AND version = ?").run(value, key, version);
-        } else {
-            return db.prepare("INSERT INTO options_defaults (key, value, version) VALUES (?, ?, ?)").run(key, value, version);
-        }
-    }
+function setDefaultOption(key, value) {
+    if (key == "version") return;
     if (!getDefaultOption(key)) {
         return db.prepare("INSERT INTO options_defaults (key, value) VALUES (?, ?)").run(key, value);
     }
@@ -5078,47 +5065,39 @@ let keyToNum = {
     "key.mouse.19": -79,
     "key.mouse.20": -78
 };
-function getDefaultOptionsTXT(version, data_version) {
-    let v;
-    if (!data_version) {
-        let thisIndex = minecraftVersions.indexOf(version);
-        let versions = getDefaultOptionsVersions();
-        let min_distance = 10000;
-        let version_to_use = "something_not_null";
-        if (versions.includes(this.version)) {
-            version_to_use = this.version;
-        } else {
-            versions.forEach(e => {
-                let vIndex = minecraftVersions.indexOf(e);
-                if (vIndex > thisIndex) return;
-                if (thisIndex - vIndex < min_distance) {
-                    min_distance = thisIndex - vIndex;
-                    version_to_use = e;
-                }
-            });
+function getVersionsWithDataVersions() {
+    return db.prepare("SELECT * FROM mc_versions_cache WHERE data_version IS NOT NULL").all();
+}
+function getDefaultOptionsTXT(version) {
+    let data_version = 100;
+    let thisIndex = minecraftVersions.indexOf(version);
+    let versions = getVersionsWithDataVersions();
+    let min_distance = 10000;
+    versions.forEach(e => {
+        let vIndex = minecraftVersions.indexOf(e.name);
+        if (vIndex > thisIndex) return;
+        if (thisIndex - vIndex < min_distance) {
+            min_distance = thisIndex - vIndex;
+            data_version = e.data_version;
         }
-        v = db.prepare("SELECT * FROM options_defaults WHERE key = ? AND version = ?").get("version", version_to_use);
-    }
-    let r = db.prepare("SELECT * FROM options_defaults WHERE NOT key = ?").all("version");
+    });
+    let options = db.prepare("SELECT * FROM options_defaults").all();
     let content = "";
-    if (!data_version) data_version = v?.value;
-    if (!data_version) data_version = 100;
     content = "version:" + data_version + "\n";
-    data_version = Number(data_version);
-    r.forEach(e => {
-        if (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && minecraftVersions.indexOf(this.version) != -1 && keyToNum[e.value]) {
+    options.forEach(e => {
+        if (data_version <= 1343 && keyToNum[e.value]) {
             content += e.key + ":" + keyToNum[e.value] + "\n"
         } else {
             content += e.key + ":" + e.value + "\n"
         }
     });
-    return { "content": content, "version": data_version, "keys": r.map(e => e.key), "values": r.map(e => e.value).map(e => (minecraftVersions.indexOf(this.version) <= minecraftVersions.indexOf("1.12.2") && minecraftVersions.indexOf(this.version) != -1 && keyToNum[e]) ? keyToNum[e] : e) };
+    return { "content": content, "version": data_version, "keys": options.map(e => e.key), "values": options.map(e => e.value).map(e => (data_version <= 1343 && keyToNum[e]) ? keyToNum[e] : e) };
 }
 function getDefaultOptions() {
-    return db.prepare("SELECT * FROM options_defaults WHERE key != ?").all("version");
+    return db.prepare("SELECT * FROM options_defaults").all();
 }
 function deleteDefaultOptions() {
-    return db.prepare("DELETE FROM options_defaults WHERE key != ?").all("version");
+    return db.prepare("DELETE FROM options_defaults").all();
 }
 
 // mc versions management
@@ -5259,8 +5238,6 @@ ipcMain.handle('get-active-cape', (_, ...params) => getActiveCape(...params));
 ipcMain.handle('add-cape', (_, ...params) => addCape(...params));
 ipcMain.handle('set-cape-active', (_, ...params) => setCapeActive(...params));
 ipcMain.handle('remove-cape-active', (_, ...params) => removeCapeActive(...params));
-ipcMain.handle('get-default-options-versions', (_, ...params) => getDefaultOptionsVersions(...params));
-ipcMain.handle('get-default-options-txt', (_, ...params) => getDefaultOptionsTXT(...params));
 ipcMain.handle('get-default-options', (_, ...params) => getDefaultOptions(...params));
 ipcMain.handle('delete-default-options', (_, ...params) => deleteDefaultOptions(...params));
 ipcMain.handle('get-default-option', (_, ...params) => getDefaultOption(...params));
@@ -5419,9 +5396,6 @@ async function installModpack(info, type, instance_id, name, sha1) {
         return;
     }
     let packInfo = await processPackFile(info, instance_id, name);
-    setOptionsTXT(instance_id, getDefaultOptionsTXT(packInfo.vanilla_version), false, true, (v) => {
-        updateInstance("attempted_options_txt_version", v, instance_id);
-    });
     if (packInfo.error) {
         updateInstance("failed", true, instance_id);
         updateInstance("installing", false, instance_id);
@@ -5466,6 +5440,7 @@ async function installMinecraft(instance_id, loader, game_version, loader_versio
         updateInstance("loader_version", loader_version, instance_id);
     }
     let r = await downloadMinecraft(instance_id, loader, game_version, loader_version);
+    setOptionsTXT(instance_id, false, false);
     if (r.error) {
         updateInstance("failed", true, instance_id);
     } else {
@@ -5641,7 +5616,6 @@ try {
         case "0.9.1":
         case "0.10.0":
         case "0.10.1":
-            db.prepare("DELETE FROM options_defaults WHERE key = ? AND (version = ? OR version IS NULL)").run("version", "");
             db.prepare("UPDATE content SET source_info = substr(source_info, 1, length(source_info) - 2) WHERE source_info LIKE '%.0';").run();
             db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
             db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
@@ -5652,6 +5626,11 @@ try {
         case "0.10.4":
         case "0.10.5":
             addColumnIfMissing("instances", "fullscreen", "INTEGER");
+        case "0.10.6":
+            dropColumnIfExists("instances", "attempted_options_txt_version");
+            addColumnIfMissing("mc_versions_cache", "data_version", "INTEGER");
+            dropColumnIfExists("options_defaults", "version");
+            db.prepare("DELETE FROM options_defaults WHERE key = ?").run("version");
     }
     setDefault("saved_version", version);
 } catch (e) {

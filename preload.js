@@ -160,9 +160,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getRecentlyPlayedWorlds: async (instance_ids) => {
         return await ipcRenderer.invoke('get-recently-played-worlds', instance_ids);
     },
-    setOptionsTXT: async (instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists, callback) => {
-        let result = await ipcRenderer.invoke('set-options-txt', instance_id, content, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
-        if (callback) callback(result);
+    setOptionsTXT: async (instance_id, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
+        let result = await ipcRenderer.invoke('set-options-txt', instance_id, dont_complete_if_already_exists, dont_add_to_end_if_already_exists);
         return result;
     },
     deleteWorld: async (instance_id, world_id, callback) => {
@@ -770,8 +769,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     addCape: async (...params) => ipcRenderer.invoke('add-cape', ...params),
     setCapeActive: async (...params) => ipcRenderer.invoke('set-cape-active', ...params),
     removeCapeActive: async (...params) => ipcRenderer.invoke('remove-cape-active', ...params),
-    getDefaultOptionsVersions: async (...params) => ipcRenderer.invoke('get-default-options-versions', ...params),
-    getDefaultOptionsTXT: async (...params) => ipcRenderer.invoke('get-default-options-txt', ...params),
     getDefaultOptions: async (...params) => ipcRenderer.invoke('get-default-options', ...params),
     deleteDefaultOptions: async (...params) => ipcRenderer.invoke('delete-default-options', ...params),
     getDefaultOption: async (...params) => ipcRenderer.invoke('get-default-option', ...params),

@@ -23,24 +23,16 @@ document.body.onmousedown = (e) => {
 }
 
 class DefaultOptions {
-    constructor(v) {
-        this.version = v;
-    }
-
-    async getDefault(key) {
+    static async getDefault(key) {
         return await window.enderlynx.getDefaultOption(key);
     }
 
-    async setDefault(key, value) {
+    static async setDefault(key, value) {
         await window.enderlynx.setDefaultOption(key, value, this.version);
     }
 
-    async deleteDefault(key) {
+    static async deleteDefault(key) {
         await window.enderlynx.deleteDefaultOption(key);
-    }
-
-    async getOptionsTXT(dataVersion) {
-        return await window.enderlynx.getDefaultOptionsTXT(this.version, dataVersion);
     }
 }
 
@@ -318,7 +310,6 @@ class Instance {
         this.allocated_ram = content.allocated_ram;
         this.java_version = content.java_version;
         this.java_path = content.java_path;
-        this.attempted_options_txt_version = content.attempted_options_txt_version;
         this.java_args = content.java_args;
         this.env_vars = content.env_vars;
         this.pre_launch_hook = content.pre_launch_hook;
@@ -402,16 +393,8 @@ class Instance {
     async setLoader(loader) {
         await window.enderlynx.updateInstance("loader", loader, this.instance_id);
     }
-    async setVanillaVersion(vanilla_version, do_not_set_options_txt) {
+    async setVanillaVersion(vanilla_version) {
         await window.enderlynx.updateInstance("vanilla_version", vanilla_version, this.instance_id);
-        if (do_not_set_options_txt) return;
-        let default_options = new DefaultOptions(vanilla_version);
-        window.enderlynx.setOptionsTXT(this.instance_id, await default_options.getOptionsTXT(), false, false, (v) => {
-            this.setAttemptedOptionsTxtVersion(v);
-        });
-    }
-    async setAttemptedOptionsTxtVersion(attempted_options_txt_version) {
-        await window.enderlynx.updateInstance("attempted_options_txt_version", attempted_options_txt_version, this.instance_id);
     }
     async setLoaderVersion(loader_version) {
         await window.enderlynx.updateInstance("loader_version", loader_version, this.instance_id);
@@ -912,7 +895,7 @@ class Instance {
             }
             if (!info.loader || !info.game_version) return;
             await this.setLoader(info.loader);
-            await this.setVanillaVersion(info.game_version, true);
+            await this.setVanillaVersion(info.game_version);
             await this.setLoaderVersion(info.loader_version);
             await this.setMcInstalled(false);
             await this.setFailed(false);
@@ -4790,10 +4773,8 @@ class InstanceScreen extends Screen {
                     "content": translate("app.instances.options.apply.confirm")
                 }
             ], [], async () => {
-                let default_options = new DefaultOptions(this.instance.vanilla_version);
                 try {
-                    let v = await window.enderlynx.setOptionsTXT(this.instance.instance_id, await default_options.getOptionsTXT(), false, true);
-                    await this.instance.setAttemptedOptionsTxtVersion(v);
+                    let v = await window.enderlynx.setOptionsTXT(this.instance.instance_id, false, true);
                     displaySuccess(translate("app.instances.options.apply.done"));
                 } catch (e) {
                     console.error(e);
@@ -4892,7 +4873,6 @@ class InstanceScreen extends Screen {
         document.body.addEventListener("keydown", previousKeyDownEventListener);
         document.body.addEventListener("mousedown", previousMouseDownEventListener);
 
-        let defaultOptions = new DefaultOptions(this.instance.vanilla_version);
         for (let i = 0; i < values.length; i++) {
             let e = values[i];
             let item = createElement("div", "option-item");
@@ -4904,7 +4884,7 @@ class InstanceScreen extends Screen {
 
             let onChange = async (v) => {
                 values[i].value = (type == "text" ? '"' + v + '"' : v);
-                if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
+                if (await DefaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
                     setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                     item.classList.add("default");
                     setDefaultButton.onclick = onRemove;
@@ -5028,7 +5008,7 @@ class InstanceScreen extends Screen {
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
 
             let onSet = async () => {
-                await defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
+                await DefaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 item.classList.add("default");
                 setDefaultButton.onclick = onRemove;
@@ -5038,14 +5018,14 @@ class InstanceScreen extends Screen {
             setDefaultButton.onclick = onSet;
 
             let onRemove = async () => {
-                await defaultOptions.deleteDefault(e.key);
+                await DefaultOptions.deleteDefault(e.key);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
                 item.classList.remove("default");
                 setDefaultButton.onclick = onSet;
                 displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
             }
 
-            if (await defaultOptions.getDefault(e.key) == e.value) {
+            if (await DefaultOptions.getDefault(e.key) == e.value) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 item.classList.add("default");
                 setDefaultButton.onclick = onRemove;
@@ -5059,10 +5039,6 @@ class InstanceScreen extends Screen {
                 inputElement.style.opacity = ".5";
                 inputElement.style.cursor = "not-allowed";
                 inputElement.disabled = true;
-            }
-
-            if (e.key == "version" && Number(e.value) != this.instance.attempted_options_txt_version) {
-                defaultOptions.setDefault(e.key, e.value);
             }
 
             optionList.appendChild(item);
@@ -7747,7 +7723,7 @@ settingsButtonEle.onclick = async () => {
             selectedKeySelect.classList.remove("selected");
             let key = selectedKeySelect.getAttribute("data-key")
             selectedKeySelect = null;
-            defaultOptions.setDefault(key, keyCode ? keyCode : "key.keyboard.unknown");
+            DefaultOptions.setDefault(key, keyCode ? keyCode : "key.keyboard.unknown");
             displaySuccess(translate("app.options.updated_default"));
             if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
         }
@@ -7767,7 +7743,7 @@ settingsButtonEle.onclick = async () => {
             selectedKeySelect.value = mouseKey;
             let key = selectedKeySelect.getAttribute("data-key")
             selectedKeySelect = null;
-            defaultOptions.setDefault(key, mouseKey ? mouseKey : "key.keyboard.unknown");
+            DefaultOptions.setDefault(key, mouseKey ? mouseKey : "key.keyboard.unknown");
             displaySuccess(translate("app.options.updated_default"));
             if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
         }
@@ -7776,7 +7752,6 @@ settingsButtonEle.onclick = async () => {
     document.body.addEventListener("keydown", previousKeyDownEventListener);
     document.body.addEventListener("mousedown", previousMouseDownEventListener);
 
-    let defaultOptions = new DefaultOptions();
     let values = await window.enderlynx.getDefaultOptions();
     let def_opts = document.createElement("div");
     def_opts.className = "option-list";
@@ -7795,7 +7770,7 @@ settingsButtonEle.onclick = async () => {
 
             let onChange = async (v) => {
                 values[i].value = (type == "text" ? '"' + v + '"' : v);
-                if (await defaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
+                if (await DefaultOptions.getDefault(e.key) == (type == "text" ? '"' + v + '"' : v)) {
                     setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                     setDefaultButton.onclick = onRemove;
                 } else {
@@ -7824,7 +7799,7 @@ settingsButtonEle.onclick = async () => {
                 inputElement.className = "option-input";
                 inputElement.value = e.value.slice(1, -1);
                 inputElement.onchange = () => {
-                    defaultOptions.setDefault(e.key, '"' + inputElement.value + '"');
+                    DefaultOptions.setDefault(e.key, '"' + inputElement.value + '"');
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = '"' + inputElement.value + '"';
                     oldvalue = inputElement.value;
@@ -7837,7 +7812,7 @@ settingsButtonEle.onclick = async () => {
                 inputElement.value = e.value;
                 inputElement.type = "number";
                 inputElement.onchange = () => {
-                    defaultOptions.setDefault(e.key, inputElement.value);
+                    DefaultOptions.setDefault(e.key, inputElement.value);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = inputElement.value;
                     oldvalue = inputElement.value;
@@ -7848,7 +7823,7 @@ settingsButtonEle.onclick = async () => {
                 let inputElement1 = document.createElement("div");
                 inputElement1.className = "option-input";
                 inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
-                    defaultOptions.setDefault(e.key, v);
+                    DefaultOptions.setDefault(e.key, v);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = v;
                     oldvalue = v;
@@ -7860,7 +7835,7 @@ settingsButtonEle.onclick = async () => {
                 inputElement.className = "option-input";
                 inputElement.value = e.value;
                 inputElement.onchange = () => {
-                    defaultOptions.setDefault(e.key, inputElement.value);
+                    DefaultOptions.setDefault(e.key, inputElement.value);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = inputElement.value;
                     oldvalue = inputElement.value;
@@ -7891,7 +7866,7 @@ settingsButtonEle.onclick = async () => {
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
 
             let onSet = () => {
-                defaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
+                DefaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 setDefaultButton.onclick = onRemove;
                 displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
@@ -7900,13 +7875,13 @@ settingsButtonEle.onclick = async () => {
             setDefaultButton.onclick = onSet;
 
             let onRemove = () => {
-                defaultOptions.deleteDefault(e.key);
+                DefaultOptions.deleteDefault(e.key);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
                 setDefaultButton.onclick = onSet;
                 displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
             }
 
-            if (await defaultOptions.getDefault(e.key) == e.value) {
+            if (await DefaultOptions.getDefault(e.key) == e.value) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 setDefaultButton.onclick = onRemove;
             }
@@ -7957,11 +7932,10 @@ settingsButtonEle.onclick = async () => {
         ], [], async (info) => {
             let options = await window.enderlynx.getOptions(info.options_txt_location);
             await window.enderlynx.deleteDefaultOptions();
-            let defaultOptions = new DefaultOptions();
             for (let i = 0; i < options.length; i++) {
                 let e = options[i];
                 if (e.key == "version") return;
-                await defaultOptions.setDefault(e.key, e.value);
+                await DefaultOptions.setDefault(e.key, e.value);
             }
             generateUIForOptions(options);
         })
@@ -8004,9 +7978,8 @@ settingsButtonEle.onclick = async () => {
                 "content": translate("app.settings.def_opts.add.confirm")
             }
         ], [], async (info) => {
-            let defaultOptions = new DefaultOptions();
             if (info.key != "version") {
-                await defaultOptions.setDefault(info.key, info.value);
+                await DefaultOptions.setDefault(info.key, info.value);
             }
             generateUIForOptions(await window.enderlynx.getDefaultOptions());
         })
@@ -8032,9 +8005,7 @@ settingsButtonEle.onclick = async () => {
             for (let i = 0; i < instances.length; i++) {
                 let instanceInfo = instances[i];
                 try {
-                    let default_options = new DefaultOptions(instanceInfo.vanilla_version);
-                    let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, await default_options.getOptionsTXT(), false, true);
-                    instanceInfo.setAttemptedOptionsTxtVersion(v);
+                    let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, false, true);
                 } catch (e) {
                     displayError(translate("app.settings.options.apply.fail", "%i", instanceInfo.name));
                 }
