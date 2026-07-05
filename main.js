@@ -3532,14 +3532,14 @@ async function applyResourcePack(instance_id, file_name) {
         let instance = getInstance(instance_id);
         let content = getDefaultOptionsTXT(instance.vanilla_version);
         if (!alreadyExists) {
-            await fsPromises.writeFile(optionsPath, `version:${content.version}\nresourcePacks:["file/${file_name}"]`, "utf-8");
+            await fsPromises.writeFile(optionsPath, `version:${content.version}\nresourcePacks:["${file_name}"]`, "utf-8");
             return true;
         }
         let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].trim().startsWith("resourcePacks:")) {
                 let value = JSON.parse(lines[i].trim().split(":").slice(1).join(":"));
-                value.push(`file/${file_name}`);
+                value.push(`${file_name}`);
                 lines[i] = "resourcePacks:" + JSON.stringify(value);
                 found = true;
                 break;
