@@ -337,6 +337,8 @@
     "app.settings.hide_ips.description": "Hides IP Addresses in world lists. (Click to reveal them)",
     "app.settings.modrinth_link": "Link Player Installed Content to Modrinth",
     "app.settings.modrinth_link.description": "Searches Modrinth for a file with the same hash and then will link the content with Modrinth, allowing it to be updated and viewed.",
+    "app.settings.auto_apply_resource_packs": "Automatically Apply Compatible Resource Packs",
+    "app.settings.auto_apply_resource_packs.description": "Automatically applies any compatible resource packs you download to your game when it is able to. Note: If Minecraft doesn't consider it compatible, it won't be automatically applied.",
     "app.settings.defaults.notice": "Note: These defaults will only apply to new instances you create and will not be retroactively applied. For previously created instances, you can edit these settings in that instance's settings.",
     "app.settings.defaults.width": "Default Width",
     "app.settings.defaults.width.description": "The width of the game when launched.",

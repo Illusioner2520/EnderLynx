@@ -4774,7 +4774,7 @@ class InstanceScreen extends Screen {
                 }
             ], [], async () => {
                 try {
-                    let v = await window.enderlynx.setOptionsTXT(this.instance.instance_id, false, true);
+                    await window.enderlynx.setOptionsTXT(this.instance.instance_id, false, true);
                     displaySuccess(translate("app.instances.options.apply.done"));
                 } catch (e) {
                     console.error(e);
@@ -8005,7 +8005,7 @@ settingsButtonEle.onclick = async () => {
             for (let i = 0; i < instances.length; i++) {
                 let instanceInfo = instances[i];
                 try {
-                    let v = await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, false, true);
+                    await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, false, true);
                 } catch (e) {
                     displayError(translate("app.settings.options.apply.fail", "%i", instanceInfo.name));
                 }
@@ -8386,6 +8386,14 @@ settingsButtonEle.onclick = async () => {
             "default": await getDefault("link_with_modrinth") == "true"
         },
         {
+            "type": "toggle",
+            "name": translate("app.settings.auto_apply_resource_packs"),
+            "tab": "appearance",
+            "id": "auto_apply_resource_packs",
+            "desc": translate("app.settings.auto_apply_resource_packs.description"),
+            "default": await getDefault("auto_apply_resource_packs") == "true"
+        },
+        {
             "type": "slider",
             "name": translate("app.settings.resources.downloads"),
             "desc": translate("app.settings.resources.downloads.description"),
@@ -8560,6 +8568,7 @@ settingsButtonEle.onclick = async () => {
         await setDefault("potato_mode", (info.potato_mode).toString());
         await setDefault("hide_ip", (info.hide_ip).toString());
         await setDefault("link_with_modrinth", (info.modrinth_link).toString());
+        await setDefault("auto_apply_resource_packs", (info.auto_apply_resource_packs).toString());
         await setDefault("global_pre_launch_hook", info.global_pre_launch_hook);
         await setDefault("global_post_launch_hook", info.global_post_launch_hook);
         await setDefault("global_wrapper", info.global_wrapper);

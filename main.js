@@ -76,7 +76,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, ve
 
 db.pragma('journal_mode = WAL');
 
-let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "pinned", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false", "default_fullscreen": "false" };
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "pinned", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false", "default_fullscreen": "false", "auto_apply_resource_packs": "false" };
 
 let minecraftVersions = [];
 
@@ -2540,6 +2540,10 @@ async function downloadVanillaTweaksResourcePacks(packs, version, instance_id, f
         }
         await urlToFile(link, filePath);
 
+        if (getDefault("auto_apply_resource_packs") == "true") {
+            applyResourcePack(instance_id, baseName);
+        }
+
         return baseName;
     } else {
         return false;
@@ -2659,6 +2663,10 @@ async function addContent(instance_id, project_type, project_url, sha1, filename
         "datapack": "data_pack",
         "resource_pack": "resource_pack",
         "data_pack": "data_pack"
+    }
+
+    if (getDefault("auto_apply_resource_packs") == "true" && (project_type == "resourcepack" || project_type == "resource_pack")) {
+        applyResourcePack(instance_id, filename);
     }
 
     return {
@@ -3491,23 +3499,19 @@ async function setOptionsTXT(instance_id, dont_complete_if_already_exists, dont_
     let instance = getInstance(instance_id);
     let content = getDefaultOptionsTXT(instance.vanilla_version);
     if (dont_complete_if_already_exists && alreadyExists) {
-        return content.version;
+        return;
     }
     if (!alreadyExists) {
         await fsPromises.writeFile(optionsPath, content.content, "utf-8");
-        return content.version;
+        return;
     } else {
         let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
-        let version = content.version;
         for (let j = 0; j < content.keys.length; j++) {
             let key = content.keys[j];
             let value = content.values[j];
             let found = false;
             inner: for (let i = 0; i < lines.length; i++) {
                 if (lines[i].trim().startsWith(key + ":")) {
-                    if (key == "version") {
-                        version = Number(lines[i].trim().split(":").slice(1).join(":").trim());
-                    }
                     lines[i] = `${key}:${value}`;
                     found = true;
                     break inner;
@@ -3518,8 +3522,31 @@ async function setOptionsTXT(instance_id, dont_complete_if_already_exists, dont_
             }
         }
         await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
-        return version;
     }
+}
+
+async function applyResourcePack(instance_id, file_name) {
+    try {
+        const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
+        let alreadyExists = fs.existsSync(optionsPath);
+        let instance = getInstance(instance_id);
+        let content = getDefaultOptionsTXT(instance.vanilla_version);
+        if (!alreadyExists) {
+            await fsPromises.writeFile(optionsPath, `version:${content.version}\nresourcePacks:["file/${file_name}"]`, "utf-8");
+            return true;
+        }
+        let lines = (await fsPromises.readFile(optionsPath, "utf-8")).split(/\r?\n/);
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].trim().startsWith("resourcePacks:")) {
+                let value = JSON.parse(lines[i].trim().split(":").slice(1).join(":"));
+                value.push(`file/${file_name}`);
+                lines[i] = "resourcePacks:" + JSON.stringify(value);
+                found = true;
+                break;
+            }
+        }
+        await fsPromises.writeFile(optionsPath, lines.filter(Boolean).join("\n"), "utf-8");
+    } catch (e) { }
 }
 
 ipcMain.handle('update-options-txt', async (_, instance_id, key, value) => {
@@ -3973,12 +4000,12 @@ ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, 
 
     if (iconSource) {
         iconPath = path.resolve(user_path, "icons", instance_id + '.' + iconExt);
-    
+
         while (fs.existsSync(iconPath)) {
             iconPath = path.resolve(user_path, "icons", base_path_name + "_" + current_count + "." + iconExt);
             current_count++;
         }
-    
+
         try {
             if (os.platform() == 'win32') {
                 await convertToType(iconSource, iconPath, "ico");
