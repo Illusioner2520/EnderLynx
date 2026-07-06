@@ -645,12 +645,12 @@ async function getMultiplayerWorlds(instance_id) {
 
         let i = 0;
         for (const server of servers) {
+            if (server.hidden?.value) continue;
             worlds.push({
                 name: server.name?.value || "Unknown",
                 ip: server.ip?.value || "",
                 icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
                 acceptTextures: server.acceptTextures?.value ?? false,
-                hideAddress: server.hideAddress?.value ?? false,
                 last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null,
                 index: i
             });
