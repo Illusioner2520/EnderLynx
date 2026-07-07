@@ -1647,20 +1647,25 @@ class LiveMinecraft {
         innerName.textContent = translate("app.instances.no_running");
         name.appendChild(innerName);
         this.nameElement = innerName;
+        let buttons = createElement("div", "live-buttons");
+        let viewButton = document.createElement("div");
+        viewButton.className = "live-view";
+        viewButton.innerHTML = '<i class="fa-regular fa-eye"></i>';
         let stopButton = document.createElement("div");
         stopButton.className = "live-stop";
-        stopButton.setAttribute("title", translate("app.live.stop"));
         stopButton.innerHTML = '<i class="fa-regular fa-circle-stop"></i>';
         let logButton = document.createElement("div");
         logButton.className = "live-log";
-        logButton.setAttribute("title", translate("app.live.logs"));
         logButton.innerHTML = '<i class="fa-solid fa-terminal"></i>';
         this.stopButton = stopButton;
         this.logButton = logButton;
+        this.viewButton = viewButton;
+        buttons.appendChild(stopButton);
+        buttons.appendChild(viewButton);
+        buttons.appendChild(logButton);
         element.appendChild(indicator);
         element.appendChild(name);
-        element.appendChild(stopButton);
-        element.appendChild(logButton);
+        element.appendChild(buttons);
     }
     setLive(instanceInfo) {
         this.nameElement.textContent = instanceInfo.name;
@@ -1672,32 +1677,8 @@ class LiveMinecraft {
         this.logButton.onclick = () => {
             instanceInfo.display("logs");
         }
-        let buttons = new ContextMenuButtons([
-            {
-                "title": translate("app.live.context.view"),
-                "icon": '<i class="fa-solid fa-eye"></i>',
-                "func": () => {
-                    instanceInfo.display();
-                }
-            },
-            {
-                "title": translate("app.live.context.logs"),
-                "icon": '<i class="fa-solid fa-terminal"></i>',
-                "func": () => {
-                    instanceInfo.display("logs");
-                }
-            },
-            {
-                "title": translate("app.live.context.stop"),
-                "icon": '<i class="fa-regular fa-circle-stop"></i>',
-                "func": async () => {
-                    await instanceInfo.stop();
-                    this.findLive();
-                }
-            }
-        ])
-        this.element.oncontextmenu = (e) => {
-            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        this.viewButton.onclick = () => {
+            instanceInfo.display();
         }
         window.enderlynx.setActivity({
             "details": translate("app.discord_rpc.playing").replace("%i", instanceInfo.name),
@@ -1715,6 +1696,7 @@ class LiveMinecraft {
         this.element.oncontextmenu = () => { };
         this.stopButton.onclick = () => { };
         this.logButton.onclick = () => { };
+        this.viewButton.onclick = () => { };
         resetDiscordStatus(true);
         rpcLocked = false;
     }
@@ -3212,6 +3194,7 @@ class Screen {
             }]);
             Display.pageIndex++;
         }
+        titleBar.updateTitleBarButtons();
         for (let i = 0; i < navButtons.length; i++) {
             navButtons[i].removeSelected();
         }
@@ -3963,109 +3946,33 @@ class InstanceScreen extends Screen {
         importWorlds.classList.add("add-content-button");
         importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.import")
         importWorlds.onclick = async () => {
+
             let dialog = new Dialog();
             dialog.showDialog(translate("app.worlds.import.title"), "form", [
                 {
-                    "type": "dropdown",
-                    "id": "launcher",
-                    "name": translate("app.worlds.import.launcher"),
-                    "options": [
-                        {
-                            "name": translate("app.name"),
-                            "value": "current"
-                        },
-                        {
-                            "name": translate("app.launcher.vanilla"),
-                            "value": "vanilla"
-                        },
-                        {
-                            "name": translate("app.launcher.modrinth"),
-                            "value": "modrinth"
-                        },
-                        {
-                            "name": translate("app.launcher.curseforge"),
-                            "value": "curseforge"
-                        },
-                        {
-                            "name": translate("app.launcher.multimc"),
-                            "value": "multimc"
-                        },
-                        {
-                            "name": translate("app.launcher.prism"),
-                            "value": "prism"
-                        },
-                        {
-                            "name": translate("app.launcher.atlauncher"),
-                            "value": "atlauncher"
-                        },
-                        {
-                            "name": translate("app.launcher.gdlauncher"),
-                            "value": "gdlauncher"
-                        }
-                    ]
-                },
-                {
                     "type": "text",
-                    "id": "folder_path",
-                    "name": translate("app.worlds.import.folder_path"),
-                    "default": window.enderlynx.getInstanceFolderPath(),
-                    "input_source": "launcher",
-                    "source": async (l) => await window.enderlynx.getLauncherInstancePath(l),
+                    "id": "file_path",
+                    "name": translate("app.worlds.import.file_path"),
                     "buttons": [
                         {
-                            "name": translate("app.worlds.import.folder_path.browse"),
+                            "name": translate("app.worlds.import.file_path.browse.folder"),
                             "icon": '<i class="fa-solid fa-folder"></i>',
                             "func": async (v, b, i) => {
-                                let newValue = await window.enderlynx.triggerFileImportBrowse(v, 1);
+                                let newValue = await window.enderlynx.triggerFolderBrowse(v);
+                                if (newValue) i.value = newValue;
+                                if (i.onchange) i.onchange();
+                            }
+                        },
+                        {
+                            "name": translate("app.worlds.import.file_path.browse.file"),
+                            "icon": '<i class="fa-solid fa-folder"></i>',
+                            "func": async (v, b, i) => {
+                                let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["zip"], translate("app.worlds.import.file_path.browse.types"));
                                 if (newValue) i.value = newValue;
                                 if (i.onchange) i.onchange();
                             }
                         }
                     ]
-                },
-                {
-                    "type": "dropdown",
-                    "name": translate("app.worlds.import.instance"),
-                    "input_source": "folder_path",
-                    "id": "instance",
-                    "source": window.enderlynx.getLauncherInstances,
-                    "options": [],
-                    "onchange": async (a, b, c) => {
-                        let launcher = "";
-                        let filePath = "";
-                        for (let i = 0; i < b.length; i++) {
-                            if (b[i].id == "launcher") {
-                                launcher = b[i].element.value;
-                                if (launcher == "vanilla") {
-                                    c.style.display = "none";
-                                } else {
-                                    c.style.display = "grid";
-                                }
-                            }
-                            if (b[i].id == "folder_path") {
-                                filePath = b[i].element.value;
-                            }
-                            if (b[i].id == "world") {
-                                if (launcher == "vanilla") {
-                                    b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(filePath)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
-                                } else {
-                                    b[i].element.setOptions((await window.enderlynx.getWorldsFromOtherLauncher(a)).map(e => ({ "name": parseMinecraftFormatting(e.name), "value": e.value })));
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "type": "checkboxes",
-                    "name": translate("app.worlds.import.worlds"),
-                    "options": (await getInstanceWorlds(this.instance)).map(e => ({ "name": e.name, "value": e.id })),
-                    "id": "world"
-                },
-                {
-                    "type": "toggle",
-                    "name": translate("app.worlds.import.remove"),
-                    "id": "remove",
-                    "default": false
                 }
             ], [
                 {
@@ -4077,17 +3984,16 @@ class InstanceScreen extends Screen {
                     "content": translate("app.worlds.import.confirm")
                 }
             ], [], async (info) => {
-                for (let i = 0; i < info.world.length; i++) {
-                    let world = info.world[i];
-                    try {
-                        await window.enderlynx.transferWorld(world, this.instance.instance_id, info.remove);
-                    } catch (e) {
-                        displayError(translate("app.worlds.import.error", "%m", e.message));
-                    }
+                document.body.classList.add("loading");
+                let success = await window.enderlynx.importWorld(info.file_path, this.instance.instance_id);
+                document.body.classList.remove("loading");
+                if (success) {
+                    displaySuccess(translate("app.worlds.import.complete"));
+                } else {
+                    displayError(translate("app.worlds.import.failed"));
                 }
-                displaySuccess(translate("app.worlds.import.complete"));
-                this.showWorlds();
-            })
+                if (this.currentTab == "worlds") this.showWorlds();
+            });
         }
         let addContent = document.createElement("button");
         addContent.classList.add("add-content-button");
@@ -4339,7 +4245,7 @@ class InstanceScreen extends Screen {
                             //     "icon": '<i class="fa-solid fa-share"></i>',
                             //     "func": () => { }
                             // },
-                           minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("13w16a") && this.instance.vanilla_version != "1.5.2" || !minecraftVersions ? {
+                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("13w16a") && this.instance.vanilla_version != "1.5.2" || !minecraftVersions ? {
                                 "icon": '<i class="fa-solid fa-desktop"></i>',
                                 "title": translate("app.worlds.desktop_shortcut"),
                                 "func": (e) => {
@@ -7575,7 +7481,6 @@ class FriendsScreen extends Screen {
         }
         this.lastRefreshed[this.profile.uuid] = new Date();
         this.friends[this.profile.uuid] = friends;
-        console.log(friends);
         for (let presence of friends?.presence?.presence || []) {
             friends.presence[presence.profileId.replaceAll("-", "")] = presence;
         }
@@ -7662,7 +7567,6 @@ class FriendsScreen extends Screen {
                             displayError(translate("app.friends.error.cancel"));
                             return;
                         }
-                        console.log(action);
                         this.friends[this.profile.uuid] = action;
                         this.showFriendsList();
                     }
@@ -8257,6 +8161,7 @@ settingsButtonEle.onclick = async () => {
                 } else {
                     document.body.classList.remove("light");
                 }
+                updateWindowButtonColors();
             }
         },
         {
@@ -8286,6 +8191,7 @@ settingsButtonEle.onclick = async () => {
                     document.body.classList.remove(e);
                 });
                 document.body.classList.add(v);
+                updateWindowButtonColors();
             }
         },
         {
@@ -8598,6 +8504,7 @@ settingsButtonEle.onclick = async () => {
             document.body.classList.remove(e);
         });
         document.body.classList.add(info.default_accent_color);
+        updateWindowButtonColors();
         updateSidebarSize();
         if (info.default_sidebar_side == "right") {
             document.body.classList.add("sidebar-right");
@@ -8642,6 +8549,7 @@ settingsButtonEle.onclick = async () => {
             document.body.classList.remove(e);
         });
         document.body.classList.add(accent_color);
+        updateWindowButtonColors();
         updateSidebarSize();
         if (sidebar_side == "right") {
             document.body.classList.add("sidebar-right");
@@ -8671,6 +8579,7 @@ async function applyDefaults() {
         document.body.classList.add("light");
     }
     document.body.classList.add(await getDefault("default_accent_color"));
+    updateWindowButtonColors();
     updateSidebarSize();
     if (await getDefault("default_sidebar_side") == "right") {
         document.body.classList.add("sidebar-right");
@@ -9359,7 +9268,7 @@ async function showCreateInstanceDialog() {
 class Display {
     static currentScreen;
     static pageLog = [];
-    static pageIndex = 0;
+    static pageIndex = -1;
 
     static pageForward() {
         if (!this.pageLog[this.pageIndex + 1]) return;
@@ -9545,7 +9454,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
     screenshotWrapper.appendChild(screenshotInfo);
     screenshotPreview.appendChild(screenshotWrapper);
     changeDisplay(name, file, desc);
-    screenshotPreview.showModal();
+    screenshotPreview.show();
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
 }
@@ -9798,8 +9707,6 @@ function parseMinecraftFormatting(text) {
 
     return result;
 }
-
-let live = new LiveMinecraft(liveMinecraft);
 
 class NoResultsFound {
     constructor(message = translate("app.no_results_found")) {
@@ -10466,136 +10373,18 @@ class MultipleFileSelect {
     }
 }
 
-class MultipleSelect {
-    constructor(element, options) {
-        element.className = "multiple-select-wrapper";
-        let topElement = document.createElement("div");
-        topElement.className = "multiple-select-top";
-        let topCheckbox = document.createElement("input");
-        topCheckbox.className = "multiple-select-checkbox";
-        topCheckbox.type = "checkbox";
-        topCheckbox.onchange = (e) => {
-            if (topCheckbox.checked) {
-                this.checkCheckboxes();
-            } else {
-                this.uncheckCheckboxes();
-            }
-        }
-        this.checkBox = topCheckbox;
-        let topSearch = document.createElement("div");
-        let searchBar = new SearchBar(topSearch, (v) => {
-            this.items.forEach(e => {
-                if (e.value.toLowerCase().includes(v.toLowerCase().trim())) {
-                    e.element.style.display = "grid";
-                } else {
-                    e.element.style.display = "none";
-                }
-            });
-            this.figureOutMainCheckedState();
-        }, () => { });
-        topElement.appendChild(topCheckbox);
-        topElement.appendChild(topSearch);
-        element.appendChild(topElement);
-
-        let itemList = document.createElement("div");
-        itemList.className = "multiple-select";
-        element.appendChild(itemList);
-
-        this.itemList = itemList;
-
-        this.setOptions(options);
-    }
-    get value() {
-        let vals = [];
-        this.items.forEach(e => {
-            if (e.checkbox.checked) {
-                vals.push(e.val);
-            }
-        });
-        return vals;
-    }
-    setSelected(selected) {
-        this.items.forEach(e => {
-            if (selected.includes(e.val)) {
-                e.checkbox.checked = true;
-            } else {
-                e.checkbox.checked = false;
-            }
-            this.figureOutMainCheckedState();
-        });
-    }
-    setOptions(options) {
-        this.itemList.innerHTML = "";
-        this.checkBoxes = [];
-        this.items = [];
-
-        options.forEach(e => {
-            let itemElement = document.createElement("div");
-            itemElement.className = "multiple-select-item";
-            this.itemList.appendChild(itemElement);
-            let itemCheckbox = document.createElement("input");
-            itemCheckbox.className = "multiple-select-checkbox";
-            itemCheckbox.type = "checkbox";
-            itemCheckbox.onchange = () => {
-                this.figureOutMainCheckedState();
-            }
-            this.items.push({ "element": itemElement, "value": e.name, "checkbox": itemCheckbox, "val": e.value });
-            itemElement.appendChild(itemCheckbox);
-            let itemTitle = document.createElement("div");
-            itemTitle.innerHTML = e.name;
-            itemTitle.className = "multiple-select-title";
-            itemElement.appendChild(itemTitle);
-            this.checkBoxes.push(itemCheckbox);
-        });
-    }
-    figureOutMainCheckedState() {
-        let total = 0;
-        let checked = 0;
-        for (let i = 0; i < this.checkBoxes.length; i++) {
-            if (this.checkBoxes[i].checked && isNotDisplayNone(this.checkBoxes[i])) {
-                checked++;
-            }
-            if (isNotDisplayNone(this.checkBoxes[i])) {
-                total++;
-            }
-        }
-        if (total == checked && total != 0) {
-            this.checkBox.checked = true;
-            this.checkBox.indeterminate = false;
-        } else if (checked > 0) {
-            this.checkBox.checked = false;
-            this.checkBox.indeterminate = true;
-        } else {
-            this.checkBox.checked = false;
-            this.checkBox.indeterminate = false;
-        }
-    }
-    checkCheckboxes() {
-        this.checkBoxes.forEach((e) => {
-            if (isNotDisplayNone(e)) e.checked = true;
-        });
-    }
-    uncheckCheckboxes() {
-        this.checkBoxes.forEach((e) => {
-            if (isNotDisplayNone(e)) e.checked = false;
-        });
-    }
-}
-
 class Dialog {
     constructor() { }
     closeDialog() {
         this.element.close();
-        setTimeout(() => {
-            this.element.remove();
-        }, 1000);
     }
     showDialog(title, type, info, buttons, tabs, onsubmit, onclose, full_screen, dont_maintain_height, wide) {
         this.onsubmit = onsubmit;
+        this.useOnClose = true;
         let element = document.createElement("dialog");
         element.className = "dialog";
-        element.oncancel = (e) => {
-            if (onclose) onclose();
+        element.onclose = (e) => {
+            if (onclose && this.useOnClose) onclose();
             setTimeout(() => {
                 this.element.remove();
             }, 1000);
@@ -10612,10 +10401,6 @@ class Dialog {
         dialogX.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         dialogX.onclick = (e) => {
             this.element.close();
-            if (onclose) onclose();
-            setTimeout(() => {
-                this.element.remove();
-            }, 1000);
         }
         dialogTop.appendChild(dialogTitle);
         dialogTop.appendChild(dialogX);
@@ -10627,7 +10412,7 @@ class Dialog {
         let contents = {};
         element.appendChild(realDialogContent);
         document.body.appendChild(element);
-        element.showModal();
+        element.show();
         let tabElement = document.createElement("div");
         this.values = [];
         this.selectedTab = tabs ? tabs[0]?.value ?? "" : "";
@@ -10880,19 +10665,6 @@ class Dialog {
                         info[i].onchange(multiSelect.value);
                     });
                     this.values.push({ "id": info[i].id, "element": multiSelect });
-                } else if (info[i].type == "checkboxes") {
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    let label = document.createElement("div");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    wrapper.appendChild(label);
-                    let element = document.createElement("div");
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    let multiSelect = new MultipleSelect(element, info[i].options);
-                    if (info[i].default) multiSelect.setSelected(info[i].default);
-                    this.values.push({ "id": info[i].id, "element": multiSelect });
                 } else if (info[i].type == "files") {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";
@@ -11085,10 +10857,6 @@ class Dialog {
                     buttonElement.onclick = () => {
                         if (info[i].close_dialog) {
                             this.element.close();
-                            if (onclose) onclose();
-                            setTimeout(() => {
-                                this.element.remove();
-                            }, 1000);
                         }
                         info[i].func();
                     }
@@ -11110,10 +10878,6 @@ class Dialog {
             if (buttons[i].type == "cancel") {
                 buttonElement.onclick = (e) => {
                     this.element.close();
-                    if (onclose) onclose();
-                    setTimeout(() => {
-                        this.element.remove();
-                    }, 1000);
                 }
             } else if (buttons[i].type == "confirm") {
                 buttonElement.classList.add("confirm");
@@ -11139,10 +10903,8 @@ class Dialog {
             info2[e.id] = e.value;
         });
         this.onsubmit(info2, this.buttonElement);
+        this.useOnClose = false;
         this.element.close();
-        setTimeout(() => {
-            this.element.remove();
-        }, 1000);
     }
 }
 
@@ -12190,7 +11952,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let currentlyInstalling = false;
 
     contentInfo.innerHTML = "";
-    contentInfo.showModal();
+    contentInfo.show();
     contentInfo.onscroll = () => {
         dialogContextMenu.hideContextMenu();
     }
@@ -12565,7 +12327,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     tabContent.style.padding = "10px";
     tabContent.style.paddingTop = "0px";
     contentWrapper.appendChild(tabContent);
-    contentInfo.showModal();
+    contentInfo.show();
     tabsElement.style.marginInline = "auto";
     let refreshVersionsList;
     let setVersionId;
@@ -14482,3 +14244,87 @@ function createElement(tag, className, props = {}) {
     if (className) ele.className = className;
     return Object.assign(ele, props);
 }
+
+function colorToHex(color) {
+    const match1 = color.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+    const match2 = color.match(/rgb\(([\d.]+),\s+([\d.]+),\s+([\d.]+)\)/);
+
+    if (match1) {
+        const [r, g, b] = match1.slice(1).map(v => Math.round(parseFloat(v) * 255));
+        return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+    }
+    if (match2) {
+        const [r, g, b] = match2.slice(1).map(v => Number(v));
+        return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+    }
+    return null;
+}
+
+async function updateWindowButtonColors() {
+    let computedStyle = getComputedStyle(document.getElementsByClassName("sidebar")[0]);
+    let hexCode = colorToHex(computedStyle.backgroundColor);
+    let textColorHexCode = colorToHex(computedStyle.color);
+    return await window.enderlynx.updateWindowButtonColors(hexCode, textColorHexCode);
+}
+
+class TitleBar {
+    constructor() {
+        let titleBar = document.getElementsByClassName("title-bar")[0];
+        let logo = createElement("img", "enderlynx-logo", {
+            alt: translate("app.logo"),
+            src: "resources/icons/icon.png"
+        });
+        let title = createElement("div", "enderlynx-title", {
+            textContent: translate("app.name")
+        });
+        titleBar.appendChild(logo);
+        titleBar.appendChild(title);
+        let backButton = createElement("button", "title-bar-button", {
+            onclick: () => {
+                Display.pageBackward()
+            },
+            innerHTML: '<i class="fa-solid fa-arrow-left"></i>'
+        });
+        let forwardButton = createElement("button", "title-bar-button", {
+            onclick: () => {
+                Display.pageForward()
+            },
+            innerHTML: '<i class="fa-solid fa-arrow-right"></i>'
+        });
+        titleBar.appendChild(backButton);
+        titleBar.appendChild(forwardButton);
+        let liveMinecraft = createElement("div", "live");
+        live = new LiveMinecraft(liveMinecraft);
+        titleBar.appendChild(liveMinecraft);
+        this.backButton = backButton;
+        this.forwardButton = forwardButton;
+        this.titleBar = titleBar;
+        this.updateTitleBarButtons();
+    }
+    updateTitleBarButtons() {
+        if (Display.pageIndex <= 0) {
+            this.backButton.classList.add("disabled");
+        } else {
+            this.backButton.classList.remove("disabled");
+        }
+        if (Display.pageIndex >= Display.pageLog.length - 1) {
+            this.forwardButton.classList.add("disabled");
+        } else {
+            this.forwardButton.classList.remove("disabled");
+        }
+    }
+}
+
+let live;
+let titleBar = new TitleBar();
+
+document.addEventListener("keydown", (e) => {
+    if (e.key == "Escape") {
+        let openDialogs = Array.from(document.querySelectorAll("dialog[open]"));
+        if (!openDialogs.length) return;
+        let latestDialog = openDialogs[openDialogs.length - 1];
+        latestDialog.close();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+});

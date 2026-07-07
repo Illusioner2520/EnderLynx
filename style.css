@@ -82,9 +82,20 @@ body {
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
     --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
-    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), transparent);
+    --sidebar: color-mix(in srgb, 7.8% var(--accent-color), var(--background-color));
+    --title-bar-height: env(titlebar-area-height, 30px);
+    --title-bar-height-plus-border: calc(var(--title-bar-height) + 1px);
+    --offline-notice-height: 0px;
+    --sidebar-width: 300px;
+    --sidebar-width-plus-border: 301px;
+    --floating-offset: 150.5px;
     color-scheme: dark;
     overflow: hidden;
+    background: var(--background-color);
+    display: flex;
+    margin: 0;
+    font-family: "Arial Rounded", Arial, Helvetica, sans-serif;
+    color: var(--text-color);
 }
 
 body.light {
@@ -104,7 +115,7 @@ body.light {
     --color-2: color-mix(in srgb, 15.6% var(--text-color), var(--background-color));
     --color-1t: color-mix(in srgb, 7.8% var(--text-color), transparent);
     --color-2t: color-mix(in srgb, 15.6% var(--text-color), transparent);
-    --sidebar: color-mix(in srgb, 15.6% var(--accent-color), transparent);
+    --sidebar: color-mix(in srgb, 15.6% var(--accent-color), var(--background-color));
     color-scheme: light;
 }
 
@@ -112,13 +123,22 @@ body.light.potato {
     --dialog-background: #fffe;
 }
 
-body {
-    background: var(--background-color);
-    display: flex;
-    margin: 0;
-    font-family: "Arial Rounded", Arial, Helvetica, sans-serif;
-    color: var(--text-color);
-    --floating-offset: 150.5px;
+body.compact {
+    --sidebar-width: 68px;
+    --sidebar-width-plus-border: 69px;
+    --floating-offset: 34.5px;
+}
+
+body.sidebar-right {
+    --floating-offset: -150.5px;
+}
+
+body.compact.sidebar-right {
+    --floating-offset: -34.5px;
+}
+
+body.offline {
+    --offline-notice-height: 30px;
 }
 
 button {
@@ -136,18 +156,72 @@ button {
     flex-direction: column;
     padding: 10px;
     gap: 10px;
-    width: 300px;
+    width: var(--sidebar-width-plus-border);
     background-color: var(--sidebar);
-    height: 100%;
+    height: calc(100% - var(--title-bar-height));
     position: fixed;
-    top: 0;
+    top: var(--title-bar-height);
     left: 0;
     border-right-style: solid;
     border-color: var(--color-2);
     border-width: 1px;
     z-index: 4;
-    backdrop-filter: blur(15px);
     overflow-y: auto;
+    padding-top: 0;
+    color: var(--text-color);
+}
+
+.round-sidebar-title-bar {
+    position: fixed;
+    top: var(--title-bar-height);
+    left: var(--sidebar-width);
+    width: 16px;
+    height: 16px;
+    background: transparent;
+    border-radius: 16px 0 0 0;
+    border-style: solid none none solid;
+    border-color: var(--color-2);
+    border-width: 1px;
+    z-index: 4;
+    box-shadow: -8px -8px 0 8px var(--sidebar);
+    clip-path: inset(0);
+}
+
+body.sidebar-right .round-sidebar-title-bar {
+    border-radius: 0 16px 0 0;
+    border-style: solid solid none none;
+    left: unset;
+    right: var(--sidebar-width);
+    box-shadow: 8px -8px 0 8px var(--sidebar);
+}
+
+.title-bar {
+    display: flex;
+    padding: 10px;
+    gap: 10px;
+    background-color: var(--sidebar);
+    position: fixed;
+    inset: unset;
+    top: 0;
+    left: 0;
+    border-style: none none solid none;
+    border-color: var(--color-2);
+    border-width: 1px;
+    z-index: 3;
+    -webkit-app-region: drag;
+    padding-left: calc(env(titlebar-area-x, 0) + 10px);
+    padding-right: calc(100% - env(titlebar-area-width, 100%) - env(titlebar-area-x, 0) + 10px);
+    width: 100%;
+    height: var(--title-bar-height-plus-border);
+    align-items: center;
+}
+
+body:has(dialog[open]) .title-bar {
+    z-index: 1001;
+}
+
+body:has(dialog[open]) .title-bar-button {
+    -webkit-app-region: drag;
 }
 
 body.sidebar-right .sidebar {
@@ -155,10 +229,6 @@ body.sidebar-right .sidebar {
     right: 0;
     border-right-style: none;
     border-left-style: solid;
-}
-
-body.compact .sidebar {
-    width: 68px;
 }
 
 .player-switch {
@@ -526,7 +596,7 @@ body.sidebar-right #player-dropdown {
     outline-style: solid;
     outline-color: var(--secondary-accent-color);
     outline-width: 3.5px;
-    z-index: 100000;
+    z-index: 500;
     animation-name: outline-bounce;
     animation-timing-function: ease;
     animation-duration: .1s;
@@ -572,57 +642,20 @@ body.compact #playerSwitch .player-chevron {
 
 .content {
     position: absolute;
-    top: 0;
-    left: 301px;
-    width: calc(100% - 301px);
-    height: 100%;
+    top: calc(var(--title-bar-height-plus-border) + var(--offline-notice-height));
+    left: var(--sidebar-width-plus-border);
+    width: calc(100% - var(--sidebar-width-plus-border));
+    height: calc(100% - var(--title-bar-height-plus-border) - var(--offline-notice-height));
     transition: top .25s, height .25s;
 }
 
-body.offline .content {
-    top: 30px;
-    height: calc(100% - 30px);
-}
-
 body.sidebar-right .content {
-    right: 301px;
+    right: var(--sidebar-width-plus-border);
     left: unset;
-}
-
-body.sidebar-right {
-    --floating-offset: -150.5px;
 }
 
 body.sidebar-right #offline-notice {
-    right: 301px;
-    left: unset;
-}
-
-body.compact .content {
-    left: 69px;
-    width: calc(100% - 69px);
-}
-
-body.compact {
-    --floating-offset: 34.5px;
-}
-
-body.compact #offline-notice {
-    left: 69px;
-    width: calc(100% - 69px);
-}
-
-body.compact.sidebar-right .content {
-    right: 69px;
-    left: unset;
-}
-
-body.compact.sidebar-right {
-    --floating-offset: -34.5px;
-}
-
-body.compact.sidebar-right #offline-notice {
-    right: 69px;
+    right: var(--sidebar-width-plus-border);
     left: unset;
 }
 
@@ -1767,15 +1800,27 @@ i {
     border-width: 1px;
     border-color: var(--color-1t);
     align-items: center;
-    height: 40px;
     border-radius: 8px;
+    padding: 8px;
+    gap: 8px;
+    height: 32px;
+    overflow: hidden;
+    margin-left: auto;
+}
+
+.live.minecraft-live {
+    padding-right: 0;
 }
 
 .live-name {
     flex-grow: 1;
     font-size: 1rem;
-    color: var(--text-color);
+    color: var(--subtle-text-color);
     overflow: hidden;
+}
+
+.live.minecraft-live .live-name {
+    color: var(--text-color);
 }
 
 .live-name>div {
@@ -1783,6 +1828,24 @@ i {
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+}
+
+.live-view {
+    display: grid;
+    height: 30px;
+    width: 30px;
+    cursor: pointer;
+    place-items: center;
+    transition: background-color .25s;
+    color: var(--text-color);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-right: 0;
+    -webkit-app-region: no-drag;
+}
+
+.live-view:hover {
+    background-color: var(--color-1t);
 }
 
 .live-stop {
@@ -1795,8 +1858,8 @@ i {
     color: var(--danger-color);
     border-radius: 4px;
     flex-shrink: 0;
-    margin: 4px;
     margin-right: 0;
+    -webkit-app-region: no-drag;
 }
 
 .live-stop:hover {
@@ -1812,19 +1875,19 @@ i {
     transition: background-color .25s;
     border-radius: 4px;
     flex-shrink: 0;
-    margin: 4px;
     margin-left: 0;
+    -webkit-app-region: no-drag;
 }
 
 .live-log:hover {
     background-color: var(--color-1t);
 }
 
-.live:not(.minecraft-live) .live-stop {
-    display: none;
+.live-buttons {
+    display: flex;
 }
 
-.live:not(.minecraft-live) .live-log {
+.live:not(.minecraft-live) .live-buttons {
     display: none;
 }
 
@@ -1833,20 +1896,8 @@ i {
     height: 10px;
     background-color: var(--subtle-text-color);
     border-radius: 50%;
-    margin-inline: 10px;
-    margin-block: 15px;
     transition: color .25s;
     flex-shrink: 0;
-}
-
-body.compact .live-indicator {
-    margin-inline: auto;
-}
-
-body.compact .live-name,
-body.compact .live-log,
-body.compact .live-stop {
-    display: none;
 }
 
 .live.minecraft-live .live-indicator {
@@ -2153,6 +2204,14 @@ dialog {
     opacity: 0;
     translate: 0 25vh;
     transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, translate .5s;
+    overscroll-behavior: contain;
+    max-height: calc(100% - var(--title-bar-height-plus-border) - 2em - 6px);
+    max-width: calc(100% - 2em - 6px);
+    z-index: 1000;
+    margin: auto;
+    bottom: 0;
+    top: var(--title-bar-height-plus-border);
+    overflow: auto;
 }
 
 dialog[open] {
@@ -4183,9 +4242,9 @@ dialog[open]::backdrop {
 
 .dialog-full {
     width: 100%;
-    height: 100%;
+    height: calc(100% - var(--title-bar-height-plus-border));
     max-width: calc(100% - 2em - 6px);
-    max-height: calc(100% - 2em - 6px);
+    max-height: calc(100% - var(--title-bar-height-plus-border) - 2em - 6px);
 }
 
 .content-wrapper {
@@ -4962,10 +5021,6 @@ button.dependency:active {
     margin-bottom: 10px;
 }
 
-dialog {
-    overscroll-behavior: contain;
-}
-
 #tooltip {
     position: fixed;
     background-color: var(--text-color);
@@ -5151,7 +5206,7 @@ dialog {
     color: var(--accent-color);
 }
 
-body.potato *:not(.ace_text-layer),
+body.potato *:not(.ace_text-layer):not(.round-sidebar-title-bar),
 body.potato *::backdrop,
 body.potato *::before,
 body.potato *:not(.mc-news-title)::after {
@@ -5426,10 +5481,10 @@ body.hide_ip .hidden-text.shown::after {
     align-items: center;
     text-align: center;
     height: 30px;
-    left: 301px;
-    width: calc(100% - 301px);
+    left: var(--sidebar-width-plus-border);
+    width: calc(100% - var(--sidebar-width-plus-border));
     position: absolute;
-    top: 0;
+    top: var(--title-bar-height-plus-border);
     scale: .8;
     opacity: 0;
     transition: display .25s allow-discrete, scale .25s, opacity .25s;
@@ -5556,10 +5611,10 @@ div:has(> .dialog-wrapper-hidden.shown) {
     justify-content: center;
     align-items: center;
     position: fixed;
-    top: 0;
+    top: var(--title-bar-height-plus-border);
     left: 0;
     width: 100%;
-    height: 100%;
+    height: calc(100% - var(--title-bar-height-plus-border));
     padding: 20px;
     background-color: var(--dialog-backdrop);
     backdrop-filter: blur(5px);
@@ -6464,4 +6519,72 @@ body.april_fools *::before {
 
 .my-account-option-list-skin:empty {
     display: none;
+}
+
+.enderlynx-logo {
+    height: 100%;
+    aspect-ratio: 1 / 1;
+}
+
+.enderlynx-title {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--text-color);
+    text-shadow: 0 0 10px var(--accent-color);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.title-bar-button {
+    font-size: .8rem;
+    color: var(--text-color);
+    background-color: var(--color-1t);
+    height: 100%;
+    aspect-ratio: 1;
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color .25s, scale .1s;
+    -webkit-app-region: no-drag;
+}
+
+.title-bar-button:active {
+    scale: .9;
+}
+
+.title-bar-button:hover {
+    background-color: var(--color-2t);
+}
+
+.title-bar-button.disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.title-bar-button:first-of-type {
+    margin-left: 8px;
+}
+
+#dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--dialog-backdrop);
+    z-index: 999;
+    top: var(--title-bar-height-plus-border);
+    transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, backdrop-filter .5s;
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    display: none;
+}
+
+body:has(dialog[open]) #dialog-backdrop {
+    opacity: 1;
+    backdrop-filter: blur(5px);
+    display: block;
+
+    @starting-style {
+        opacity: 0;
+        backdrop-filter: blur(0px);
+    }
 }

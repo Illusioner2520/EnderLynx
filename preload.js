@@ -733,6 +733,9 @@ contextBridge.exposeInMainWorld('enderlynx', {
     friendAction: async (player_id, action, friend) => {
         return await ipcRenderer.invoke('friend-action', player_id, action, friend);
     },
+    updateWindowButtonColors: async (hexCode, textColorHexCode) => {
+        return await ipcRenderer.invoke('update-window-button-colors', hexCode, textColorHexCode);
+    },
     getInstance: (...params) => ipcRenderer.sendSync('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
     updateInstance: async (...params) => ipcRenderer.invoke('update-instance', ...params),

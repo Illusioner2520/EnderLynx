@@ -254,6 +254,14 @@ const createWindow = (sendToWindow = {}) => {
             spellcheck: false,
             additionalArguments: additionalArguments
         },
+        titleBarStyle: 'hidden',
+        ...(process.platform !== 'darwin' ? {
+            titleBarOverlay: {
+                color: '#0a0a0a',
+                symbolColor: '#ffffff',
+                height: 48
+            }
+        } : {}),
         backgroundColor: "#0a0a0a",
         icon: path.join(__dirname, 'resources/icons/icon.' + iconExt)
     });
@@ -285,9 +293,6 @@ const createWindow = (sendToWindow = {}) => {
     });
 
     state.manage(win);
-    if (!enableDev) {
-        Menu.setApplicationMenu(null);
-    }
     win.webContents.send('arg-info', sendToWindow);
 }
 
@@ -3012,6 +3017,7 @@ ipcMain.handle('import-world', async (_, info, instance_id, worldName) => {
 });
 
 async function importWorld(info, instance_id, worldName) {
+    if (!worldName && !info.has_buffer) worldName = path.basename(info);
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
@@ -5544,6 +5550,16 @@ ipcMain.handle('friend-action', async (_, player_id, action, friend) => {
     let j = await res.json();
     j.status = res.status;
     return j;
+});
+
+ipcMain.handle('update-window-button-colors', async (_, hexCode, textColorHexCode) => {
+    if (win && process.platform !== "darwin") {
+        win.setTitleBarOverlay({
+            color: hexCode,
+            symbolColor: textColorHexCode,
+            height: 48
+        });
+    }
 });
 
 async function validateSha1(sha1, install_path) {
