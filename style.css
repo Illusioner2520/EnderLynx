@@ -6588,3 +6588,78 @@ body.april_fools *::before {
         backdrop-filter: blur(0px);
     }
 }
+
+.file-upload-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.file-uploads {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.file-upload-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.file-upload-x {
+    cursor: pointer;
+    transition: color .25s;
+    color: var(--subtle-text-color);
+    font-size: .8rem;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.file-upload-x:hover {
+    color: var(--text-color);
+}
+
+.file-upload-chip {
+    display: flex;
+    border-radius: 8px;
+    padding-inline: 8px;
+    background-color: var(--color-1t);
+    width: max-content;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    border-style: solid;
+    border-color: var(--color-2t);
+    border-width: 1px;
+    height: 32px;
+}
+
+.file-upload-button {
+    display: flex;
+    border-radius: 8px;
+    padding: 8px;
+    background-color: var(--color-1t);
+    width: max-content;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.file-upload-button:active {
+    scale: .95;
+}
+
+.file-upload-button:hover {
+    background-color: var(--color-2t);
+}
+
+.file-upload-button.danger:hover {
+    background-color: var(--danger-color);
+}

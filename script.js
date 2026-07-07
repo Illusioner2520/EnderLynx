@@ -3519,20 +3519,14 @@ class InstanceScreen extends Screen {
             let dialog = new Dialog();
             dialog.showDialog(translate("app.content.import.title"), "form", [
                 {
-                    "type": "text",
-                    "id": "file_path",
-                    "name": translate("app.content.import.file_path"),
-                    "buttons": [
-                        {
-                            "name": translate("app.content.import.file_path.browse"),
-                            "icon": '<i class="fa-solid fa-folder"></i>',
-                            "func": async (v, b, i) => {
-                                let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["zip", "jar", "disabled"], translate("app.content.import.file_path.browse.types"));
-                                if (newValue) i.value = newValue;
-                                if (i.onchange) i.onchange();
-                            }
-                        }
-                    ]
+                    "type": "file-upload",
+                    "id": "files",
+                    "name": translate("app.content.import.files"),
+                    "files_allowed": true,
+                    "folders_allowed": false,
+                    "file_types_allowed": ["zip", "jar"],
+                    "file_types_name": translate("app.content.import.files.types"),
+                    "max_amount_allowed": -1
                 },
                 {
                     "type": "dropdown",
@@ -3569,13 +3563,14 @@ class InstanceScreen extends Screen {
                 }
             ], [], async (info) => {
                 document.body.classList.add("loading");
-                let success = await window.enderlynx.importContent(info.file_path, info.content_type, this.instance.instance_id);
-                document.body.classList.remove("loading");
-                if (success) {
-                    displaySuccess(translate("app.content.import.complete"));
-                } else {
-                    displayError(translate("app.content.import.failed"));
+                for (let file of info.files) {
+                    let success = await window.enderlynx.importContent(file.path, info.content_type, this.instance.instance_id);
+                    if (!success) {
+                        displayError(translate("app.content.import.failed", "%f", file.basename));
+                    }
                 }
+                document.body.classList.remove("loading");
+                displaySuccess(translate("app.content.import.done"));
                 if (this.currentTab == "content") this.showContent();
             })
         }
@@ -3946,33 +3941,17 @@ class InstanceScreen extends Screen {
         importWorlds.classList.add("add-content-button");
         importWorlds.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.worlds.import")
         importWorlds.onclick = async () => {
-
             let dialog = new Dialog();
             dialog.showDialog(translate("app.worlds.import.title"), "form", [
                 {
-                    "type": "text",
-                    "id": "file_path",
-                    "name": translate("app.worlds.import.file_path"),
-                    "buttons": [
-                        {
-                            "name": translate("app.worlds.import.file_path.browse.folder"),
-                            "icon": '<i class="fa-solid fa-folder"></i>',
-                            "func": async (v, b, i) => {
-                                let newValue = await window.enderlynx.triggerFolderBrowse(v);
-                                if (newValue) i.value = newValue;
-                                if (i.onchange) i.onchange();
-                            }
-                        },
-                        {
-                            "name": translate("app.worlds.import.file_path.browse.file"),
-                            "icon": '<i class="fa-solid fa-folder"></i>',
-                            "func": async (v, b, i) => {
-                                let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["zip"], translate("app.worlds.import.file_path.browse.types"));
-                                if (newValue) i.value = newValue;
-                                if (i.onchange) i.onchange();
-                            }
-                        }
-                    ]
+                    "type": "file-upload",
+                    "id": "files",
+                    "name": translate("app.worlds.import.files"),
+                    "files_allowed": true,
+                    "folders_allowed": true,
+                    "file_types_allowed": ["zip"],
+                    "file_types_name": translate("app.worlds.import.files.types"),
+                    "max_amount_allowed": -1
                 }
             ], [
                 {
@@ -3985,13 +3964,14 @@ class InstanceScreen extends Screen {
                 }
             ], [], async (info) => {
                 document.body.classList.add("loading");
-                let success = await window.enderlynx.importWorld(info.file_path, this.instance.instance_id);
-                document.body.classList.remove("loading");
-                if (success) {
-                    displaySuccess(translate("app.worlds.import.complete"));
-                } else {
-                    displayError(translate("app.worlds.import.failed"));
+                for (let file of info.files) {
+                    let success = await window.enderlynx.importWorld(file.path, this.instance.instance_id);
+                    if (!success) {
+                        displayError(translate("app.worlds.import.failed", "%f", file.basename));
+                    }
                 }
+                document.body.classList.remove("loading");
+                displaySuccess(translate("app.worlds.import.done"));
                 if (this.currentTab == "worlds") this.showWorlds();
             });
         }
@@ -7810,19 +7790,14 @@ settingsButtonEle.onclick = async () => {
                 "content": translate("app.settings.def_opts.import.description")
             },
             {
-                "type": "text",
+                "type": "file-upload",
+                "id": "files",
                 "name": translate("app.settings.def_opts.import.location"),
-                "id": "options_txt_location",
-                "buttons": [
-                    {
-                        "name": translate("app.settings.def_opts.import.browse"),
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.enderlynx.triggerFileImportBrowseWithOptions(v, 0, ["txt"], "options.txt");
-                            if (newValue) i.value = newValue;
-                        }
-                    }
-                ]
+                "files_allowed": true,
+                "folders_allowed": false,
+                "file_types_allowed": ["txt"],
+                "file_types_name": translate("app.settings.def_opts.import.location.types"),
+                "max_amount_allowed": 1
             }
         ], [
             {
@@ -7834,7 +7809,7 @@ settingsButtonEle.onclick = async () => {
                 "content": translate("app.settings.def_opts.import.confirm")
             }
         ], [], async (info) => {
-            let options = await window.enderlynx.getOptions(info.options_txt_location);
+            let options = await window.enderlynx.getOptions(info.files[0].path);
             await window.enderlynx.deleteDefaultOptions();
             for (let i = 0; i < options.length; i++) {
                 let e = options[i];
@@ -8323,8 +8298,8 @@ settingsButtonEle.onclick = async () => {
                     "name": translate("app.settings.folder_location.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "func": async (v, b, i) => {
-                        let newValue = await window.enderlynx.triggerFolderBrowse(v);
-                        if (newValue) i.value = newValue;
+                        let newValue = await window.enderlynx.triggerBrowse(v, "folder", [], "", translate("app.settings.folder_location.select"), false);
+                        if (newValue[0]?.path) i.value = newValue[0].path;
                     }
                 }
             ]
@@ -9190,22 +9165,16 @@ async function showCreateInstanceDialog() {
             "maxlength": 50
         },
         {
-            "type": "text",
-            "id": "file",
-            "tab": "file",
+            "type": "file-upload",
+            "id": "files",
             "name": translate("app.instances.file"),
             "desc": translate("app.instances.file.description"),
-            "default": "",
-            "buttons": [
-                {
-                    "name": translate("app.instances.file.browse"),
-                    "icon": '<i class="fa-solid fa-file"></i>',
-                    "func": async (v, b, i) => {
-                        let newValue = await window.enderlynx.triggerFileImportBrowse(v, 0);
-                        if (newValue) i.value = newValue;
-                    }
-                }
-            ]
+            "files_allowed": true,
+            "folders_allowed": false,
+            "file_types_allowed": ["elpack", "mrpack", "zip"],
+            "file_types_name": translate("app.instances.file.types"),
+            "max_amount_allowed": 1,
+            "tab": "file"
         }
     ], [
         { "content": translate("app.instances.cancel"), "type": "cancel" },
@@ -9243,7 +9212,7 @@ async function showCreateInstanceDialog() {
             let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
             instance.display();
             try {
-                await window.enderlynx.installModpack(info.file, "file", instance_id, info.name_f, null);
+                await window.enderlynx.installModpack(info.files[0].path, "file", instance_id, info.name_f, null);
             } catch (e) {
                 await instance.setFailed(true);
                 await instance.setInstalling(false);
@@ -10137,6 +10106,97 @@ class ImageUpload {
     }
 }
 
+class FileUpload {
+    constructor(element, filesAllowed = true, foldersAllowed = false, fileTypesAllowed = ["*"], fileTypesName = "", maxAmountAllowed = -1, value = []) {
+        element.className = "file-upload-wrapper";
+        this.foldersAllowed = foldersAllowed;
+        this.filesAllowed = filesAllowed;
+        this.fileTypesAllowed = fileTypesAllowed;
+        this.maxAmountAllowed = maxAmountAllowed;
+        this.fileTypesName = fileTypesName;
+        this.value = [];
+        let uploadsElement = createElement("div", "file-uploads");
+        this.uploadsElement = uploadsElement;
+        let buttonsElement = createElement("div", "file-upload-buttons");
+        this.buttonsElement = buttonsElement;
+        element.appendChild(uploadsElement);
+        element.appendChild(buttonsElement);
+        if (filesAllowed) {
+            let fileButton = createElement("button", "file-upload-button", {
+                innerHTML: '<i class="fa-solid fa-file"></i>' + translate("app.import.browse.file")
+            });
+            fileButton.onclick = async () => {
+                let value = await window.enderlynx.triggerBrowse("", "file", fileTypesAllowed, fileTypesName, translate("app.import.select.file"), this.maxAmountAllowed != 1);
+                this.addValues(value);
+            }
+            buttonsElement.appendChild(fileButton);
+        }
+        if (foldersAllowed) {
+            let folderButton = createElement("button", "file-upload-button", {
+                innerHTML: '<i class="fa-solid fa-folder"></i>' + translate("app.import.browse.folder")
+            });
+            folderButton.onclick = async () => {
+                let value = await window.enderlynx.triggerBrowse("", "folder", [], "", translate("app.import.select.folder"), this.maxAmountAllowed != 1);
+                this.addValues(value);
+            }
+            buttonsElement.appendChild(folderButton);
+        }
+        let removeAllButton = createElement("button", "file-upload-button danger");
+        this.removeAllButton = removeAllButton;
+        removeAllButton.onclick = () => {
+            this.value = [];
+            this.uploadsElement.innerHTML = "";
+            this.updateState();
+        }
+        let nothingElement = createElement("div", "file-no-selected", {
+            textContent: translate("app.import.no_files_selected")
+        });
+        this.nothingElement = nothingElement;
+        this.addValues(value);
+    }
+    addValues(values) {
+        for (let v of values) {
+            if (this.maxAmountAllowed == 1) {
+                this.value = [];
+                this.uploadsElement.innerHTML = "";
+            } else if (this.maxAmountAllowed >= 0 && this.value.length >= this.maxAmountAllowed) {
+                continue;
+            }
+            this.value.push(v);
+            let element = createElement("div", "file-upload-chip");
+            element.title = v.path;
+            let text = createElement("span");
+            text.textContent = v.basename;
+            let removeButton = createElement("button", "file-upload-x", {
+                innerHTML: '<i class="fa-solid fa-xmark"></i>'
+            });
+            removeButton.onclick = () => {
+                element.remove();
+                for (let i = this.value.length - 1; i >= 0; i--) {
+                    if (this.value[i].path == v.path) {
+                        this.value.splice(i, 1);
+                    }
+                }
+                this.updateState();
+            }
+            element.appendChild(text);
+            element.appendChild(removeButton);
+            this.uploadsElement.appendChild(element);
+        }
+        this.updateState();
+    }
+    updateState() {
+        if (this.value.length == 0) {
+            this.removeAllButton.remove();
+            this.uploadsElement.appendChild(this.nothingElement);
+        } else {
+            this.buttonsElement.appendChild(this.removeAllButton);
+            this.nothingElement.remove();
+        }
+        this.removeAllButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>' + (this.value.length == 1 ? translate("app.import.delete") : translate("app.import.delete.all"));
+    }
+}
+
 class MultipleFileSelect {
     constructor(element, options) {
         element.className = "multiple-file-select-wrapper";
@@ -10689,6 +10749,17 @@ class Dialog {
                     if (info[i].onchange) multiSelect.addOnChange(info[i].onchange);
                     if (info[i].default) multiSelect.setSelected(info[i].default);
                     this.values.push({ "id": info[i].id, "element": multiSelect });
+                } else if (info[i].type == "file-upload") {
+                    let wrapper = createElement("div", "dialog-text-label-wrapper");
+                    let label = createElement("div", "dialog-label", {
+                        textContent: info[i].name
+                    });
+                    wrapper.appendChild(label);
+                    let element = createElement("div");
+                    wrapper.appendChild(element);
+                    contents[tab].appendChild(wrapper);
+                    let fileUpload = new FileUpload(element, info[i].files_allowed, info[i].folders_allowed, info[i].file_types_allowed, info[i].file_types_name, info[i].max_amount_allowed, info[i].default);
+                    this.values.push({ id: info[i].id, element: fileUpload });
                 } else if (info[i].type == "dropdown") {
                     let wrapper = document.createElement("div");
                     wrapper.className = "dialog-text-label-wrapper";

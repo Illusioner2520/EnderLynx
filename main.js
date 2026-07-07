@@ -374,7 +374,12 @@ ipcMain.handle('show-open-dialog', async (event, options) => {
         }
     }
     const result = await dialog.showOpenDialog(win, options);
-    return result;
+    if (result.canceled) return [];
+    if (!result.filePaths) return [];
+    return result.filePaths.map(e => ({
+        path: e,
+        basename: path.basename(e)
+    }));
 });
 
 ipcMain.handle('show-save-dialog', async (event, options, file_path) => {

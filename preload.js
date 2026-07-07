@@ -516,43 +516,26 @@ contextBridge.exposeInMainWorld('enderlynx', {
     testJavaInstallation: async (file_path) => {
         return await ipcRenderer.invoke('test-java-installation', file_path);
     },
-    triggerFileImportBrowse: async (file_path, type) => {
-        let startDir = file_path;
-        const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: await translate(type ? "app.import.select.folder" : "app.import.select.file"),
-            defaultPath: startDir,
-            properties: [type ? 'openDirectory' : 'openFile'],
-            filters: [{ name: await translate("app.import.select.pack_files"), extensions: ['mrpack', 'elpack', 'zip'] }]
-        });
-        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-            return null;
+    triggerBrowse: async (initial_file_path, type, extensions, extensionName, title, allowMultiple = false) => {
+        let settings = {
+            title: title,
+            defaultPath: initial_file_path,
+            properties: [type == 'folder' ? 'openDirectory' : 'openFile']
+        };
+        if (allowMultiple) {
+            settings.properties.push("multiSelections");
         }
-        return result.filePaths[0];
-    },
-    triggerFolderBrowse: async (file_path) => {
-        let startDir = file_path;
-        const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: await translate("app.select.folder"),
-            defaultPath: startDir,
-            properties: ['openDirectory']
-        });
-        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-            return null;
+        if (extensions && extensions.length > 0) {
+            settings.filters = [
+                {
+                    name: extensionName,
+                    extensions: extensions
+                },
+                { name: "All Files", extensions: ["*"] }
+            ]
         }
-        return result.filePaths[0];
-    },
-    triggerFileImportBrowseWithOptions: async (file_path, type, extensions, extName) => {
-        let startDir = file_path;
-        const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: await translate(type ? "app.import.select.folder" : "app.import.select.file"),
-            defaultPath: startDir,
-            properties: [type ? 'openDirectory' : 'openFile'],
-            filters: [{ name: extName, extensions: extensions }]
-        });
-        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-            return null;
-        }
-        return result.filePaths[0];
+        const result = await ipcRenderer.invoke('show-open-dialog', settings);
+        return result;
     },
     getInstanceFolderPath: () => {
         return path.resolve(userPath, "minecraft/instances");
