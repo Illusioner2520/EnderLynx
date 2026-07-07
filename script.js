@@ -9455,6 +9455,10 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
     screenshotPreview.appendChild(screenshotWrapper);
     changeDisplay(name, file, desc);
     screenshotPreview.show();
+    screenshotPreviewBackdrop.classList.add("shown");
+    screenshotPreview.onclose = () => {
+        screenshotPreviewBackdrop.classList.remove("shown");
+    }
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
 }
@@ -10385,8 +10389,10 @@ class Dialog {
         element.className = "dialog";
         element.onclose = (e) => {
             if (onclose && this.useOnClose) onclose();
+            this.backdrop.classList.remove("shown");
             setTimeout(() => {
                 this.element.remove();
+                this.backdrop.remove();
             }, 1000);
         }
         this.element = element;
@@ -10411,8 +10417,12 @@ class Dialog {
         if (wide) element.classList.add("wide");
         let contents = {};
         element.appendChild(realDialogContent);
+        let backdrop = createElement("div", "dialog-backdrop");
+        document.body.appendChild(backdrop);
+        this.backdrop = backdrop;
         document.body.appendChild(element);
         element.show();
+        backdrop.classList.add("shown");
         let tabElement = document.createElement("div");
         this.values = [];
         this.selectedTab = tabs ? tabs[0]?.value ?? "" : "";
@@ -11953,6 +11963,10 @@ async function displayContentInfo(content_source, content, content_id, instance_
 
     contentInfo.innerHTML = "";
     contentInfo.show();
+    contentInfoBackdrop.classList.add("shown");
+    contentInfo.onclose = () => {
+        contentInfoBackdrop.classList.remove("shown");
+    }
     contentInfo.onscroll = () => {
         dialogContextMenu.hideContextMenu();
     }

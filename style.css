@@ -6566,11 +6566,11 @@ body.april_fools *::before {
     margin-left: 8px;
 }
 
-#dialog-backdrop {
+.dialog-backdrop {
     position: fixed;
     inset: 0;
     background: var(--dialog-backdrop);
-    z-index: 999;
+    z-index: 1000;
     top: var(--title-bar-height-plus-border);
     transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, backdrop-filter .5s;
     opacity: 0;
@@ -6578,7 +6578,7 @@ body.april_fools *::before {
     display: none;
 }
 
-body:has(dialog[open]) #dialog-backdrop {
+.dialog-backdrop.shown {
     opacity: 1;
     backdrop-filter: blur(5px);
     display: block;
