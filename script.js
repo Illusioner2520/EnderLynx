@@ -14128,36 +14128,46 @@ document.body.ondrop = async (e) => {
     [...document.getElementsByClassName("drop-overlay")].forEach(e => e.classList.remove("shown"));
     let overlay = activeOverlay;
     const files = e.dataTransfer.files;
-    for (let i = 0; i < files.length; i++) {
-        await processFileDrop(overlay, files[i]);
-    }
+    await processFileDrop(overlay, files);
 }
 
-async function processFileDrop(overlay, file) {
-    let path = window.enderlynx.readPathFromDrop(file);
-    let usePath = false;
-    let info = {};
-    try {
-        let buffer = await file.arrayBuffer();
-        info = {
-            has_buffer: true,
-            name: file.name,
-            buffer
-        }
-    } catch (e) {
-        usePath = true;
-        if (overlay.dataset.action != "world-import" && overlay.dataset.action != "file-import") {
-            return;
+async function processFileDrop(overlay, files) {
+    let fileInfo = [];
+    for (let file of files) {
+        try {
+            let buffer = await file.arrayBuffer();
+            let info = {
+                has_buffer: true,
+                name: file.name,
+                buffer
+            }
+            fileInfo.push({
+                info: info,
+                name: file.name
+            });
+        } catch (e) {
+            if (overlay.dataset.action != "world-import" && overlay.dataset.action != "file-import") {
+                continue;
+            }
+            fileInfo.push({
+                info: window.enderlynx.readPathFromDrop(file),
+                name: file.name
+            });
         }
     }
-    if (overlay.dataset.action == "instance-import" || await window.enderlynx.isInstanceFile(info)) {
-        let instanceInfo = await window.enderlynx.readPackFile(info);
-        if (!info || !(await window.enderlynx.isInstanceFile(info))) {
-            displayError(translate("app.import.instance.fail", "%f", file.name));
-            return;
+    for (let i = fileInfo.length - 1; i >= 0; i--) {
+        let info = fileInfo[i].info;
+        if (overlay.dataset.action == "instance-import" || await window.enderlynx.isInstanceFile(info)) {
+            let instanceInfo = await window.enderlynx.readPackFile(info);
+            if (!info || !(await window.enderlynx.isInstanceFile(info))) {
+                displayError(translate("app.import.instance.fail", "%f", info.name));
+                continue;
+            }
+            importInstance(instanceInfo, info);
+            fileInfo.splice(i, 1);
         }
-        importInstance(instanceInfo, info);
-    } else if (overlay.dataset.action == "content-import") {
+    }
+    if (overlay.dataset.action == "content-import") {
         document.body.classList.add("loading")
         let instance = Instance.getInstance(overlay.dataset.instanceId);
         if (instance.locked) {
@@ -14165,40 +14175,46 @@ async function processFileDrop(overlay, file) {
             document.body.classList.remove("loading");
             return;
         }
-        let success = await window.enderlynx.importContent(info, "auto", overlay.dataset.instanceId);
-        if (!success) {
-            displayError(translate("app.import.content.fail", "%f", file.name));
-            document.body.classList.remove("loading");
-            return;
+        for (let info of fileInfo) {
+            let success = await window.enderlynx.importContent(info.info, "auto", overlay.dataset.instanceId);
+            if (!success) {
+                displayError(translate("app.import.content.fail", "%f", info.name));
+            }
         }
         if (document.body.contains(overlay)) instance.instanceScreen.showContent();
         document.body.classList.remove("loading");
     } else if (overlay.dataset.action == "world-import") {
+        document.body.classList.add("loading")
         let instance = Instance.getInstance(overlay.dataset.instanceId);
-        let success = await window.enderlynx.importWorld(usePath ? path : info, overlay.dataset.instanceId, file.name);
-        if (!success) {
-            displayError(translate("app.import.worlds.fail", "%f", file.name));
-            return;
+        for (let info of fileInfo) {
+            let success = await window.enderlynx.importWorld(info.info, overlay.dataset.instanceId, info.name);
+            if (!success) {
+                displayError(translate("app.import.worlds.fail", "%f", info.name));
+            }
         }
         if (document.body.contains(overlay)) instance.instanceScreen.showWorlds();
+        document.body.classList.remove("loading");
     } else if (overlay.dataset.action == "file-import") {
         let instance = Instance.getInstance(overlay.dataset.instanceId);
         let paths = overlay.dataset.paths;
-        let success = await window.enderlynx.importFile(usePath ? path : info, overlay.dataset.instanceId, file.name, overlay.dataset.paths);
-        if (!success) {
-            displayError(translate("app.import.files.fail", "%f", file.name));
-            return;
+        for (let info of fileInfo) {
+            let success = await window.enderlynx.importFile(info.info, overlay.dataset.instanceId, info.name, overlay.dataset.paths);
+            if (!success) {
+                displayError(translate("app.import.files.fail", "%f", info.name));
+            }
         }
         if (document.body.contains(overlay)) instance.instanceScreen.setFilesPath(paths);
     } else if (overlay.dataset.action == "skin-import") {
-        let dataUrl = await window.enderlynx.pathToDataUrl(info);
-        importSkin({
-            "skin": dataUrl,
-            "name": translate("app.wardrobe.unnamed"),
-            "model": "auto"
-        }, () => {
-            if (document.body.contains(overlay)) wardrobeScreen.display();
-        });
+        for (let info of fileInfo) {
+            let dataUrl = await window.enderlynx.pathToDataUrl(info.info);
+            importSkin({
+                "skin": dataUrl,
+                "name": translate("app.wardrobe.unnamed"),
+                "model": "auto"
+            }, () => {
+                if (document.body.contains(overlay)) wardrobeScreen.display();
+            });
+        }
     }
 }
 
