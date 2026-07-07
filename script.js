@@ -10755,6 +10755,12 @@ class Dialog {
                         textContent: info[i].name
                     });
                     wrapper.appendChild(label);
+                    if (info[i].desc) {
+                        let labelDesc = document.createElement("label");
+                        labelDesc.textContent = info[i].desc;
+                        labelDesc.className = "dialog-label-desc";
+                        wrapper.appendChild(labelDesc);
+                    }
                     let element = createElement("div");
                     wrapper.appendChild(element);
                     contents[tab].appendChild(wrapper);

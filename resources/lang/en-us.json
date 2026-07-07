@@ -442,7 +442,6 @@
     "app.instances.file": "File",
     "app.instances.file.description": "Select a .mrpack file, .elpack file, CurseForge .zip file or a MultiMC/Prism .zip file",
     "app.instances.file.types": "Instance File",
-    "app.instances.file.browse": "Browse Files",
     "app.instances.launcher": "Launcher",
     "app.launcher.modrinth": "Modrinth App",
     "app.launcher.curseforge": "CurseForge App",
