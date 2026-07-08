@@ -6273,7 +6273,7 @@ class InstancesScreen extends Screen {
                     "icon": '<i class="fa-solid fa-copy"></i>',
                     "title": translate("app.button.instances.duplicate"),
                     "func": (e) => {
-                        this.instance.showDuplicateDialog();
+                        instances[i].showDuplicateDialog();
                     }
                 },
                 {
