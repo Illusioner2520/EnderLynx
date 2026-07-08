@@ -335,7 +335,6 @@
     "app.settings.modrinth_link.description": "Searches Modrinth for a file with the same hash and then will link the content with Modrinth, allowing it to be updated and viewed.",
     "app.settings.auto_apply_resource_packs": "Automatically Apply Compatible Resource Packs",
     "app.settings.auto_apply_resource_packs.description": "Automatically applies any compatible resource packs you download to your game when it is able to. Note: If Minecraft doesn't consider it compatible, it won't be automatically applied.",
-    "app.settings.defaults.notice": "Note: These defaults will only apply to new instances you create and will not be retroactively applied. For previously created instances, you can edit these settings in that instance's settings.",
     "app.settings.defaults.width": "Default Width",
     "app.settings.defaults.width.description": "The width of the game when launched.",
     "app.settings.defaults.height": "Default Height",
@@ -644,8 +643,8 @@
     "app.dialog.remove_image": "Remove Image",
     "app.failed_to_load": "Failed to load info: %m",
     "app.dialog.loading": "Loading...",
-    "app.failed_to_load_list": "Failed to load list: %m",
-    "app.dialog.unable_to_load": "Unable to Load",
+    "app.dialog.unable_to_load.no_name": "Unable to Load",
+    "app.dialog.unable_to_load": "Unable to Load %n",
     "app.discover.back_to_instance": "Back to Instance",
     "app.discover.add_content": "Add Content",
     "app.discover.title": "Discover",
@@ -1285,5 +1284,9 @@
     "app.discover.dependency.tool": "Tool",
     "app.discover.dependency.tool.version": "Version %v is a tool",
     "app.discover.dependency.no_dependencies": "No Dependencies",
-    "app.instance.stop.failed": "Failed to stop instance"
+    "app.instance.stop.failed": "Failed to stop instance",
+    "app.instances.settings.custom.window": "Custom Window Settings",
+    "app.instances.settings.custom.java_args": "Custom Java Arguments",
+    "app.instances.settings.custom.java_installation": "Custom Java Installation",
+    "app.instances.settings.custom.allocated_ram": "Custom Allocated RAM"
 }

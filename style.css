@@ -1634,7 +1634,7 @@ i {
     padding: 4px;
     width: 44px;
     height: 26px;
-    background-color: var(--color-1t);
+    background-color: var(--color-1);
     position: relative;
     cursor: pointer;
     border-radius: 1000px;
@@ -6665,4 +6665,55 @@ body.april_fools *::before {
 
 .file-upload-button.danger:hover {
     background-color: var(--danger-color);
+}
+
+.override-default-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    gap: 16px;
+    width: 100%;
+    flex-shrink: 1;
+    align-self: start;
+    padding: 16px;
+    border-radius: 16px;
+    background-color: var(--sidebar);
+}
+
+.override-default-inner-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: start;
+    gap: 16px;
+}
+
+.override-default-inner-box.disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.override-default-inner-box.disabled * {
+    cursor: not-allowed;
+}
+
+.override-checkbox-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.override-checkbox {
+    border-radius: 2.5px;
+    height: 20px;
+    width: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-color);
+    margin: 0;
+}
+
+.override-checkbox-name {
+    color: var(--text-color);
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
 }

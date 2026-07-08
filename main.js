@@ -62,7 +62,7 @@ if (!fs.existsSync(user_path)) {
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -2006,15 +2006,27 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
     let globalPostLaunch = getDefault("global_post_launch_hook");
     let globalWrapper = getDefault("global_wrapper");
     let globalPostExit = getDefault("global_post_exit_hook");
+    // TODO: update for not using custom window / allocated ram / java args
     try {
         await fixProfile(player_info, player_info.id);
         if (!settings.quickPlay && instance_info.source_server) {
             settings.quickPlay = { "type": "multiplayer", "info": instance_info.source_server };
         }
+        let width = instance_info.uses_custom_window ? instance_info.window_width : Number(getDefault("default_width"));
+        let height = instance_info.uses_custom_window ? instance_info.window_height : Number(getDefault("default_height"));
+        let fullscreen = instance_info.uses_custom_window ? instance_info.fullscreen : getDefault("default_fullscreen") == "true";
+        let allocated_ram = instance_info.uses_custom_allocated_ram ? instance_info.allocated_ram : Number(getDefault("default_ram"));
+        let java_installation = instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version);
+        let java_args = instance_info.uses_custom_java_args ? instance_info.java_args : instance_info.provided_java_args;
         let minecraft = await mc.launchGame(instance_info.loader, instance_info.vanilla_version, instance_info.loader_version, player_info.name, player_info.uuid, {
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid
-        }, { "width": instance_info.window_width || 854, "height": instance_info.window_height || 480, "fullscreen": Boolean(instance_info.fullscreen || false) }, settings.quickPlay, settings.demo, instance_info.allocated_ram || 4096, instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version), parseJavaArgs(instance_info.java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+        }, {
+            "width": width || 854,
+            "height": instance_info.window_height || 480,
+            "fullscreen": Boolean(fullscreen || false)
+        },
+        settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
         return { minecraft, player_info }
@@ -2942,6 +2954,8 @@ async function duplicateInstance(old_instance_id, new_instance_id, name, icon, n
         "provided_java_args": oldInstance.provided_java_args,
         "uses_custom_java_args": oldInstance.uses_custom_java_args,
         "uses_custom_java_installation": oldInstance.uses_custom_java_installation,
+        "uses_custom_window": oldInstance.uses_custom_window,
+        "uses_custom_allocated_ram": oldInstance.uses_custom_allocated_ram,
         "java_path": oldInstance.java_path,
         "java_version": oldInstance.java_version,
         "allocated_ram": oldInstance.allocated_ram,
@@ -4724,13 +4738,13 @@ function getInstances() {
 function updateInstance(key, value, instance_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen", "uses_custom_window", "uses_custom_allocated_ram"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
     if (win && win.webContents) win.webContents.send('instance-updated', key, value, instance_id);
     return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
 }
 function batchUpdateInstance(info, instance_id) {
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen", "uses_custom_window", "uses_custom_allocated_ram"];
     for (let key in info) {
         if (info[key] instanceof Date) info[key] = info[key].toISOString();
         if (typeof info[key] === "boolean") info[key] = Number(info[key]);
@@ -5675,6 +5689,14 @@ try {
         case "0.10.5":
             addColumnIfMissing("instances", "fullscreen", "INTEGER");
         case "0.10.6":
+            let default_width = Number(getDefault("default_width"));
+            let default_height = Number(getDefault("default_height"));
+            let default_fullscreen = getDefault("default_fullscreen") == "true" ? 1 : 0;
+            let default_allocated_ram = Number(getDefault("default_ram"));
+            addColumnIfMissing("instances", "uses_custom_window", "INTEGER");
+            addColumnIfMissing("instances", "uses_custom_allocated_ram", "INTEGER");
+            db.prepare("UPDATE instances SET uses_custom_allocated_ram = ? WHERE allocated_ram != ?").run(Number(true), default_allocated_ram);
+            db.prepare("UPDATE instances SET uses_custom_window = ? WHERE window_width != ? OR window_height != ? OR fullscreen != ?").run(Number(true), default_width, default_height, default_fullscreen);
             dropColumnIfExists("instances", "attempted_options_txt_version");
             addColumnIfMissing("mc_versions_cache", "data_version", "INTEGER");
             dropColumnIfExists("options_defaults", "version");

@@ -323,6 +323,8 @@ class Instance {
         this.provided_java_args = content.provided_java_args;
         this.uses_custom_java_installation = Boolean(content.uses_custom_java_installation);
         this.source_server = content.source_server;
+        this.uses_custom_window = Boolean(content.uses_custom_window);
+        this.uses_custom_allocated_ram = Boolean(content.uses_custom_allocated_ram);
         this.instanceScreen = new InstanceScreen(this);
     }
 
@@ -446,6 +448,12 @@ class Instance {
     }
     async setSourceServer(source_server) {
         await window.enderlynx.updateInstance("source_server", source_server, this.instance_id);
+    }
+    async setUsesCustomWindow(uses_custom_window) {
+        await window.enderlynx.updateInstance("uses_custom_window", uses_custom_window, this.instance_id);
+    }
+    async setUsesCustomAllocatedRam(uses_custom_allocated_ram) {
+        await window.enderlynx.updateInstance("uses_custom_allocated_ram", uses_custom_allocated_ram, this.instance_id);
     }
 
     async addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
@@ -680,130 +688,151 @@ class Instance {
                 "desc": translate("app.instances.settings.linked_server.description")
             },
             {
-                "type": "number",
-                "name": translate("app.instances.settings.width"),
-                "id": "width",
-                "default": this.window_width ?? 854,
+                "type": "override-default",
+                "id": "uses_custom_window",
+                "name": translate("app.instances.settings.custom.window"),
                 "tab": "window",
-                "desc": translate("app.instances.settings.width.description")
-            },
-            {
-                "type": "number",
-                "name": translate("app.instances.settings.height"),
-                "id": "height",
-                "default": this.window_height ?? 480,
-                "tab": "window",
-                "desc": translate("app.instances.settings.height.description")
-            },
-            {
-                "type": "toggle",
-                "name": translate("app.instances.settings.fullscreen"),
-                "id": "fullscreen",
-                "default": this.fullscreen ?? false,
-                "tab": "window",
-                "desc": translate("app.instances.settings.fullscreen.description")
-            },
-            {
-                "type": "slider",
-                "name": translate("app.instances.settings.ram"),
-                "id": "allocated_ram",
-                "default": this.allocated_ram ?? 4096,
-                "tab": "java",
-                "min": 512,
-                "max": window.enderlynx.getTotalRAM(),
-                "increment": 64,
-                "unit": translate("app.instances.settings.ram.unit"),
-                "desc": translate("app.instances.settings.ram.description")
-            },
-            {
-                "type": "text",
-                "name": translate("app.instances.settings.java_installation"),
-                "id": "java_path",
-                "default": this.uses_custom_java_installation ? this.java_path : default_java_installation,
-                "tab": "java",
-                "desc": translate("app.instances.settings.java_installation.description." + window.enderlynx.ostype()).replace("%v", this.java_version),
-                "buttons": [
+                "enabled": this.uses_custom_window,
+                "children": [
                     {
-                        "name": translate("app.instances.settings.java_installation.detect"),
-                        "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
-                        "func": async (v, b, i) => {
-                            b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.detect.searching");
-                            let dialog = new Dialog();
-                            let results = await window.enderlynx.detectJavaInstallations(this.java_version);
-                            dialog.showDialog(translate("app.instances.settings.java_installation.detect.title"), "form", [
-                                {
-                                    "type": "dropdown",
-                                    "id": "java_path",
-                                    "name": translate("app.instances.settings.java_installation.detect.java_path"),
-                                    "options": results.map(e => ({ "name": e.path, "value": e.path }))
-                                }
-                            ], [
-                                { "type": "cancel", "content": translate("app.instances.settings.java_installation.detect.cancel") },
-                                { "type": "confirm", "content": translate("app.instances.settings.java_installation.detect.confirm") }
-                            ], [], (info) => {
-                                i.value = info.java_path;
-                            });
-                            b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>' + translate("app.instances.settings.java_installation.detect");
-                        }
+                        "type": "number",
+                        "name": translate("app.instances.settings.width"),
+                        "id": "width",
+                        "desc": translate("app.instances.settings.width.description"),
+                        "default": this.window_width ?? 854,
+                        "custom_value": this.window_width ?? 854,
+                        "default_value": Number(await getDefault("default_width"))
                     },
                     {
-                        "name": translate("app.instances.settings.java_installation.browse"),
-                        "icon": '<i class="fa-solid fa-folder"></i>',
-                        "func": async (v, b, i) => {
-                            let newValue = await window.enderlynx.triggerFileBrowse(v);
-                            if (newValue) i.value = newValue;
-                        }
+                        "type": "number",
+                        "name": translate("app.instances.settings.height"),
+                        "id": "height",
+                        "desc": translate("app.instances.settings.height.description"),
+                        "default": this.window_height ?? 480,
+                        "custom_value": this.window_height ?? 480,
+                        "default_value": Number(await getDefault("default_height"))
                     },
                     {
-                        "name": translate("app.instances.settings.java_installation.test"),
-                        "icon": '<i class="fa-solid fa-play"></i>',
-                        "func": async (v, b) => {
-                            let num = Math.floor(Math.random() * 10000);
-                            b.setAttribute("data-num", num);
-                            b.classList.remove("failed");
-                            b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
-                            let success = await window.enderlynx.testJavaInstallation(v);
-                            if (success) {
-                                b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
-                            } else {
-                                b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
-                                b.classList.add("failed");
-                            }
-                            setTimeout(() => {
-                                if (b.getAttribute("data-num") == num) {
-                                    b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
-                                    b.classList.remove("failed");
-                                }
-                            }, 3000);
-                        }
-                    },
-                    {
-                        "name": translate("app.instances.settings.java_installation.test.reset"),
-                        "icon": '<i class="fa-solid fa-rotate-left"></i>',
-                        "func": async (v, b, i) => {
-                            b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.reset.resetting");
-                            let java_path = default_java_installation;
-                            i.value = java_path;
-                            resettingJavaInstallation = true;
-                            b.innerHTML = '<i class="fa-solid fa-rotate-left"></i>' + translate("app.instances.settings.java_installation.test.reset")
-                        }
+                        "type": "toggle",
+                        "name": translate("app.instances.settings.fullscreen"),
+                        "id": "fullscreen",
+                        "desc": translate("app.instances.settings.fullscreen.description"),
+                        "default": this.fullscreen ?? false,
+                        "custom_value": this.fullscreen ?? false,
+                        "default_value": await getDefault("default_fullscreen") == "true"
                     }
                 ]
             },
             {
-                "type": "text",
-                "id": "java_args",
-                "name": translate("app.instances.settings.custom_args"),
-                "default": this.java_args,
+                "type": "override-default",
+                "id": "uses_custom_allocated_ram",
+                "name": translate("app.instances.settings.custom.allocated_ram"),
                 "tab": "java",
-                "buttons": [
+                "enabled": this.uses_custom_allocated_ram,
+                "children": [
                     {
-                        "name": translate("app.instances.settings.java_args.reset"),
-                        "icon": '<i class="fa-solid fa-rotate-left"></i>',
-                        "func": (v, b, i) => {
-                            i.value = this.provided_java_args;
-                            resettingJavaArgs = true;
-                        }
+                        "type": "slider",
+                        "name": translate("app.instances.settings.ram"),
+                        "id": "allocated_ram",
+                        "default": this.allocated_ram ?? 4096,
+                        "min": 512,
+                        "max": window.enderlynx.getTotalRAM(),
+                        "increment": 64,
+                        "unit": translate("app.instances.settings.ram.unit"),
+                        "desc": translate("app.instances.settings.ram.description"),
+                        "custom_value": this.allocated_ram ?? 4096,
+                        "default_value": Number(await getDefault("default_ram"))
+                    }
+                ]
+            },
+            {
+                "type": "override-default",
+                "id": "uses_custom_java_installation",
+                "name": translate("app.instances.settings.custom.java_installation"),
+                "tab": "java",
+                "enabled": this.uses_custom_java_installation,
+                "children": [
+                    {
+                        "type": "text",
+                        "name": translate("app.instances.settings.java_installation"),
+                        "id": "java_path",
+                        "default": this.java_path,
+                        "custom_value": this.java_path || default_java_installation,
+                        "default_value": default_java_installation,
+                        "desc": translate("app.instances.settings.java_installation.description." + window.enderlynx.ostype()).replace("%v", this.java_version),
+                        "buttons": [
+                            {
+                                "name": translate("app.instances.settings.java_installation.detect"),
+                                "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
+                                "func": async (value, button, setter) => {
+                                    button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.detect.searching");
+                                    let dialog = new Dialog();
+                                    let results = await window.enderlynx.detectJavaInstallations(this.java_version);
+                                    dialog.showDialog(translate("app.instances.settings.java_installation.detect.title"), "form", [
+                                        {
+                                            "type": "dropdown",
+                                            "id": "java_path",
+                                            "name": translate("app.instances.settings.java_installation.detect.java_path"),
+                                            "options": results.map(e => ({ "name": e.path, "value": e.path }))
+                                        }
+                                    ], [
+                                        { "type": "cancel", "content": translate("app.instances.settings.java_installation.detect.cancel") },
+                                        { "type": "confirm", "content": translate("app.instances.settings.java_installation.detect.confirm") }
+                                    ], [], (info) => {
+                                        setter(info.java_path);
+                                    });
+                                    button.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>' + translate("app.instances.settings.java_installation.detect");
+                                }
+                            },
+                            {
+                                "name": translate("app.instances.settings.java_installation.browse"),
+                                "icon": '<i class="fa-solid fa-folder"></i>',
+                                "func": async (v, b, i) => {
+                                    let newValue = await window.enderlynx.triggerFileBrowse(v);
+                                    if (newValue) i.value = newValue;
+                                }
+                            },
+                            {
+                                "name": translate("app.instances.settings.java_installation.test"),
+                                "icon": '<i class="fa-solid fa-play"></i>',
+                                "func": async (v, b) => {
+                                    let num = Math.floor(Math.random() * 10000);
+                                    b.setAttribute("data-num", num);
+                                    b.classList.remove("failed");
+                                    b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
+                                    let success = await window.enderlynx.testJavaInstallation(v);
+                                    if (success) {
+                                        b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
+                                    } else {
+                                        b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
+                                        b.classList.add("failed");
+                                    }
+                                    setTimeout(() => {
+                                        if (b.getAttribute("data-num") == num) {
+                                            b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
+                                            b.classList.remove("failed");
+                                        }
+                                    }, 3000);
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "type": "override-default",
+                "id": "uses_custom_java_args",
+                "name": translate("app.instances.settings.custom.java_args"),
+                "tab": "java",
+                "enabled": this.uses_custom_java_args,
+                "children": [
+                    {
+                        "type": "text",
+                        "id": "java_args",
+                        "name": translate("app.instances.settings.custom_args"),
+                        "default": this.java_args,
+                        "custom_value": this.java_args || this.provided_java_args,
+                        "default_value": this.provided_java_args
                     }
                 ]
             },
@@ -863,18 +892,11 @@ class Instance {
             await this.setFullscreen(info.fullscreen);
             await this.setAllocatedRam(info.allocated_ram);
             await this.setSourceServer(info.source_server);
-            if (resettingJavaInstallation && info.java_path == default_java_installation) {
-                await this.setUsesCustomJavaInstallation(false);
-                await this.setJavaPath(null);
-            } else if (info.java_path != this.java_path && info.java_path != default_java_installation) {
-                await this.setUsesCustomJavaInstallation(true);
-                await this.setJavaPath(info.java_path);
-            }
-            if (resettingJavaArgs && info.java_args == this.provided_java_args) {
-                await this.setUsesCustomJavaArgs(false);
-            } else if (info.java_args != this.java_args && info.java_args != this.provided_java_args) {
-                await this.setUsesCustomJavaArgs(true);
-            }
+            await this.setUsesCustomJavaInstallation(info.uses_custom_java_installation);
+            await this.setJavaPath(info.java_path);
+            await this.setUsesCustomJavaArgs(info.uses_custom_java_args);
+            await this.setUsesCustomWindow(info.uses_custom_window);
+            await this.setUsesCustomAllocatedRam(info.uses_custom_allocated_ram);
             await this.setJavaArgs(info.java_args);
             await this.setEnvVars(info.env_vars);
             await this.setPreLaunchHook(info.pre_launch_hook);
@@ -2159,16 +2181,18 @@ class SearchDropdown extends Dropdown {
 class Slider {
     constructor(element, min, max, initial, increment, unit) {
         element.classList.add("slider-wrapper");
-        let slider = document.createElement("div");
-        slider.className = "slider";
+        let slider = createElement("div", "slider");
+        this.slider = slider;
         let sliderInput = document.createElement("input");
         sliderInput.className = "slider-text-box";
         sliderInput.type = "number";
+        this.sliderInput = sliderInput;
         element.appendChild(slider);
         element.appendChild(sliderInput);
-        let initialPercentage = (initial - min) / (max - min) * 100;
-        slider.style.setProperty('--slider-percentage', initialPercentage + "%");
-        this.value = initial;
+        this.min = min;
+        this.max = max;
+        this.disabled = false;
+        this.setValue(initial);
 
         let lowerBound = document.createElement("div");
         lowerBound.className = "slider-label-left";
@@ -2186,46 +2210,37 @@ class Slider {
         slider.style.setProperty("--slider-transition", "width .1s, left .1s, scale .2s");
         sliderInput.oninput = () => {
             let rawValue = Number(sliderInput.value);
-            if (rawValue < min) rawValue = min;
-            if (rawValue > max) rawValue = max;
-            let percentage = (rawValue - min) / (max - min) * 100;
-            slider.style.setProperty('--slider-percentage', percentage + "%");
-            this.value = rawValue;
+            this.setValue(rawValue);
             if (this.onchange) this.onchange(this.value);
         }
         sliderInput.onchange = () => {
             let rawValue = Number(sliderInput.value);
-            if (rawValue < min) rawValue = min;
-            if (rawValue > max) rawValue = max;
-            sliderInput.value = rawValue;
-            let percentage = (rawValue - min) / (max - min) * 100;
-            slider.style.setProperty('--slider-percentage', percentage + "%");
-            this.value = rawValue;
+            this.setValue(rawValue);
             if (this.onchange) this.onchange(this.value);
         }
         slider.onclick = (event) => {
+            if (this.disabled) return;
             slider.style.setProperty("--slider-transition", "width .1s, left .1s, scale .2s");
             const rect = slider.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const percentage = Math.max(0, Math.min(1, x / rect.width));
             let value = min + percentage * (max - min);
             let snappedValue = Math.round(value / increment) * increment;
-            snappedValue = Math.max(min, Math.min(max, snappedValue));
-            sliderInput.value = snappedValue;
-            slider.style.setProperty('--slider-percentage', ((snappedValue - min) / (max - min) * 100) + "%");
-            this.value = snappedValue;
+            this.setValue(snappedValue);
             sliderInput.dispatchEvent(new Event('input'));
             if (this.onchange) this.onchange(this.value);
         };
         let isDragging = false;
 
         slider.onmousedown = (event) => {
+            if (this.disabled) return;
             isDragging = true;
             document.body.style.userSelect = "none";
             slider.style.setProperty("--slider-transition", "scale .2s");
         };
 
         document.addEventListener("mousemove", (event) => {
+            if (this.disabled) return;
             if (!isDragging) return;
             const rect = slider.getBoundingClientRect();
             let x = event.clientX - rect.left;
@@ -2233,15 +2248,13 @@ class Slider {
             const percentage = x / rect.width;
             let value = min + percentage * (max - min);
             let snappedValue = Math.round(value / increment) * increment;
-            snappedValue = Math.max(min, Math.min(max, snappedValue));
-            sliderInput.value = snappedValue;
-            slider.style.setProperty('--slider-percentage', ((snappedValue - min) / (max - min) * 100) + "%");
-            this.value = snappedValue;
+            this.setValue(snappedValue);
             sliderInput.dispatchEvent(new Event('input'));
             if (this.onchange) this.onchange(this.value);
         });
 
         document.addEventListener("mouseup", () => {
+            if (this.disabled) return;
             if (isDragging) {
                 isDragging = false;
                 document.body.style.userSelect = "";
@@ -2249,8 +2262,27 @@ class Slider {
         });
     }
 
+    setValue(value) {
+        if (value < this.min) value = this.min;
+        if (value > this.max) value = this.max;
+        let percentage = (value - this.min) / (this.max - this.min) * 100;
+        this.slider.style.setProperty('--slider-percentage', percentage + "%");
+        this.sliderInput.value = value;
+        this.value = value;
+    }
+
     addOnChange(onchange) {
         this.onchange = onchange;
+    }
+
+    disable() {
+        this.sliderInput.disabled = true;
+        this.disabled = true;
+    }
+
+    enable() {
+        this.sliderInput.disabled = false;
+        this.disabled = false;
     }
 }
 
@@ -2295,6 +2327,12 @@ class Toggle {
     }
     toggle() {
         this.processToggle();
+    }
+    disable() {
+        this.element.disabled = true;
+    }
+    enable() {
+        this.element.disabled = false;
     }
 }
 
@@ -7884,8 +7922,8 @@ settingsButtonEle.onclick = async () => {
                 {
                     "name": translate("app.settings.java.detect"),
                     "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
-                    "func": async (v, b, i) => {
-                        b.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.detect.searching");
+                    "func": async (value, button, setter) => {
+                        button.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.detect.searching");
                         let dialog = new Dialog();
                         let results = await window.enderlynx.detectJavaInstallations(e.version);
                         dialog.showDialog(translate("app.settings.java.select"), "form", [
@@ -7899,38 +7937,38 @@ settingsButtonEle.onclick = async () => {
                             { "type": "cancel", "content": translate("app.settings.java.cancel") },
                             { "type": "confirm", "content": translate("app.settings.java.confirm") }
                         ], [], (info) => {
-                            i.value = info.java_path;
+                            setter(info.java_path);
                         });
-                        b.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>Detect';
+                        button.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>Detect';
                     }
                 },
                 {
                     "name": translate("app.settings.java.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
-                    "func": async (v, b, i) => {
-                        let newValue = await window.enderlynx.triggerFileBrowse(v);
-                        if (newValue) i.value = newValue;
+                    "func": async (value, button, setter) => {
+                        let newValue = await window.enderlynx.triggerFileBrowse(value);
+                        if (newValue) setter(newValue);
                     }
                 },
                 {
                     "name": translate("app.settings.java.test"),
                     "icon": '<i class="fa-solid fa-play"></i>',
-                    "func": async (v, b) => {
+                    "func": async (value, button, setter) => {
                         let num = Math.floor(Math.random() * 10000);
-                        b.setAttribute("data-num", num);
-                        b.classList.remove("failed");
-                        b.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.test.testing");
-                        let success = await window.enderlynx.testJavaInstallation(v);
+                        button.setAttribute("data-num", num);
+                        button.classList.remove("failed");
+                        button.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.test.testing");
+                        let success = await window.enderlynx.testJavaInstallation(value);
                         if (success) {
-                            b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.settings.java.test.success");
+                            button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.settings.java.test.success");
                         } else {
-                            b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.settings.java.test.fail");
-                            b.classList.add("failed");
+                            button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.settings.java.test.fail");
+                            button.classList.add("failed");
                         }
                         setTimeout(() => {
-                            if (b.getAttribute("data-num") == num) {
-                                b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.settings.java.test");
-                                b.classList.remove("failed");
+                            if (button.getAttribute("data-num") == num) {
+                                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.settings.java.test");
+                                button.classList.remove("failed");
                             }
                         }, 3000);
                     }
@@ -7938,20 +7976,20 @@ settingsButtonEle.onclick = async () => {
                 {
                     "name": translate("app.settings.java.update"),
                     "icon": '<i class="fa-solid fa-download"></i>',
-                    "func": async (v, b, i) => {
-                        b.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.update.updating");
-                        b.onclick = () => { }
+                    "func": async (value, button, setter) => {
+                        button.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.update.updating");
+                        button.onclick = () => { }
                         let file_path = await window.enderlynx.downloadLatestJava(e.version);
                         if (file_path) {
-                            b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.settings.java.update.success");
+                            button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.settings.java.update.success");
                             if (typeof file_path == 'boolean') {
                                 displaySuccess(translate("app.settings.java.update.latest_installed"));
                                 return;
                             }
-                            i.value = file_path;
+                            setter(file_path);
                         } else {
-                            b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.settings.java.update.fail");
-                            b.classList.add("failed");
+                            button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.settings.java.update.fail");
+                            button.classList.add("failed");
                         }
                     }
                 }
@@ -8267,17 +8305,12 @@ settingsButtonEle.onclick = async () => {
                 {
                     "name": translate("app.settings.folder_location.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
-                    "func": async (v, b, i) => {
-                        let newValue = await window.enderlynx.triggerBrowse(v, "folder", [], "", translate("app.settings.folder_location.select"), false);
-                        if (newValue[0]?.path) i.value = newValue[0].path;
+                    "func": async (value, button, setter) => {
+                        let newValue = await window.enderlynx.triggerBrowse(value, "folder", [], "", translate("app.settings.folder_location.select"), false);
+                        if (newValue[0]?.path) setter(newValue[0].path);
                     }
                 }
             ]
-        },
-        {
-            "type": "notice",
-            "content": translate("app.settings.defaults.notice"),
-            "tab": "defaults"
         },
         {
             "type": "slider",
@@ -8313,7 +8346,7 @@ settingsButtonEle.onclick = async () => {
             "desc": translate("app.settings.defaults.fullscreen.description"),
             "tab": "defaults",
             "id": "default_fullscreen",
-            "default": Number(await getDefault("default_fullscreen"))
+            "default": await getDefault("default_fullscreen") == "true"
         },
         {
             "type": "text",
@@ -10493,432 +10526,8 @@ class Dialog {
             }
         } else if (type == "form") {
             for (let i = 0; i < info.length; i++) {
-                let tab = info[i].tab ?? "default";
-                if (info[i].type == "notice") {
-                    let textElement = document.createElement("div");
-                    if (info[i].content instanceof Element) {
-                        textElement.appendChild(info[i].content);
-                    } else {
-                        textElement.innerHTML = (info[i].content);
-                        textElement.className = "dialog-label-desc";
-                    }
-                    if (info[i].width) textElement.style.width = info[i].width + "px";
-                    contents[tab].appendChild(textElement);
-                } else if (info[i].type == "info") {
-                    let infoElement = document.createElement("div");
-                    infoElement.className = "info";
-                    infoElement.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + info[i].content;
-                    if (info[i].width) infoElement.style.width = info[i].width + "px";
-                    contents[tab].appendChild(infoElement);
-                } else if (info[i].type == "text") {
-                    let id = createId();
-                    let label = document.createElement("label");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    label.setAttribute("for", id);
-                    let labelDesc = document.createElement("label");
-                    if (info[i].desc) {
-                        labelDesc.innerHTML = info[i].desc;
-                        labelDesc.className = "dialog-label-desc";
-                        labelDesc.setAttribute("for", id);
-                    }
-                    let textInput = document.createElement("input");
-                    textInput.type = "text";
-                    textInput.className = "dialog-text-input";
-                    textInput.setAttribute("placeholder", info[i].name);
-                    textInput.id = id;
-                    textInput.addOnChange = (onchange) => {
-                        textInput.onchange = () => {
-                            onchange(textInput.value);
-                        }
-                    }
-                    if (info[i].onchange) textInput.onchange = () => {
-                        info[i].onchange(textInput.value);
-                    }
-                    if (info[i].oninput) textInput.oninput = () => {
-                        info[i].oninput(textInput.value);
-                    }
-                    if (info[i].maxlength) textInput.maxLength = info[i].maxlength;
-                    if (info[i].default) textInput.value = info[i].maxlength ? info[i].default.substring(0, info[i].maxlength) : info[i].default;
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    contents[tab].appendChild(wrapper);
-                    wrapper.appendChild(label);
-                    if (info[i].desc) wrapper.appendChild(labelDesc);
-                    wrapper.appendChild(textInput);
-                    if (info[i].buttons) {
-                        let buttonWrapper = document.createElement("div");
-                        buttonWrapper.className = 'sub-button-container';
-                        for (let j = 0; j < info[i].buttons.length; j++) {
-                            let buttonEle = document.createElement("button");
-                            buttonEle.innerHTML = info[i].buttons[j].icon + info[i].buttons[j].name
-                            buttonEle.className = "sub-button";
-                            let buttonClick = async () => {
-                                buttonEle.onclick = () => { }
-                                await info[i].buttons[j].func(textInput.value, buttonEle, textInput);
-                                buttonEle.onclick = buttonClick;
-                            }
-                            buttonEle.onclick = buttonClick;
-                            buttonWrapper.appendChild(buttonEle);
-                        }
-                        wrapper.appendChild(buttonWrapper);
-                    }
-                    if (info[i].source) {
-                        for (let j = 0; j < this.values.length; j++) {
-                            if (this.values[j].id != info[i].input_source) continue;
-                            // Use a token to ensure only the latest async result is displayed
-                            let updateToken = 0;
-                            this.values[j].element.addOnChange(async () => {
-                                const currentToken = ++updateToken;
-                                let value = this.values[j].element.value;
-                                if (info[i].hide?.includes(value)) {
-                                    wrapper.style.display = "none";
-                                } else {
-                                    wrapper.style.display = "grid";
-                                }
-                                try {
-                                    let list = await info[i].source(value);
-                                    // Only update if this is the latest request
-                                    if (currentToken !== updateToken) return;
-                                    textInput.value = list;
-                                    if (textInput.onchange) textInput.onchange();
-                                } catch (err) {
-                                    if (currentToken !== updateToken) return;
-                                    displayError(translate("app.failed_to_load", "%m", (err && err.message ? err.message : err)));
-                                    if (textInput.onchange) textInput.onchange();
-                                    textInput.value = "";
-                                }
-                            });
-                        }
-                    }
-                    if (info[i].focus) {
-                        textInput.focus();
-                    }
-                    if (i == info.length - 1) {
-                        textInput.onkeydown = (e) => {
-                            if (e.key == "Enter") {
-                                this.submit();
-                                e.preventDefault();
-                            }
-                        }
-                    }
-                    this.values.push({ "id": info[i].id, "element": textInput });
-                } else if (info[i].type == "number") {
-                    let id = createId();
-                    let label = document.createElement("label");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    label.setAttribute("for", id);
-                    let labelDesc = document.createElement("label");
-                    if (info[i].desc) {
-                        labelDesc.textContent = info[i].desc;
-                        labelDesc.className = "dialog-label-desc";
-                        labelDesc.setAttribute("for", id);
-                    }
-                    let textInput = document.createElement("input");
-                    textInput.type = "number";
-                    textInput.className = "dialog-text-input";
-                    textInput.setAttribute("placeholder", info[i].name);
-                    textInput.id = id;
-                    if (info[i].onchange) textInput.onchange = () => {
-                        info[i].onchange(textInput.value);
-                    }
-                    if (info[i].default) textInput.value = info[i].default;
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    contents[tab].appendChild(wrapper);
-                    wrapper.appendChild(label);
-                    if (info[i].desc) wrapper.appendChild(labelDesc);
-                    wrapper.appendChild(textInput);
-                    this.values.push({ "id": info[i].id, "element": textInput });
-                } else if (info[i].type == "toggle") {
-                    let labelWrapper = document.createElement("div");
-                    labelWrapper.className = "label-wrapper";
-                    let label = document.createElement("label");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    let labelDesc = document.createElement("label");
-                    labelDesc.textContent = info[i].desc;
-                    labelDesc.className = "dialog-label-desc";
-                    let toggleEle = document.createElement("button");
-                    let toggle = new Toggle(toggleEle, () => { }, info[i].default ?? false);
-                    if (info[i].onchange) toggle.onchange = () => {
-                        info[i].onchange(toggle.toggled);
-                    }
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper-horizontal";
-                    contents[tab].appendChild(wrapper);
-                    wrapper.appendChild(toggleEle);
-                    wrapper.appendChild(labelWrapper);
-                    labelWrapper.appendChild(label);
-                    if (info[i].desc) labelWrapper.appendChild(labelDesc);
-                    this.values.push({ "id": info[i].id, "element": toggle });
-                } else if (info[i].type == "slider") {
-                    let id = createId();
-                    let label = document.createElement("label");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    label.setAttribute("for", id);
-                    let labelDesc = document.createElement("label");
-                    if (info[i].desc) {
-                        labelDesc.textContent = info[i].desc;
-                        labelDesc.className = "dialog-label-desc";
-                        labelDesc.setAttribute("for", id);
-                    }
-                    let sliderElement = document.createElement("div");
-                    let slider = new Slider(sliderElement, info[i].min, info[i].max, info[i].default ?? info[i].min, info[i].increment, info[i].unit);
-                    if (info[i].onchange) slider.addOnChange(() => {
-                        info[i].onchange(slider.value);
-                    });
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    contents[tab].appendChild(wrapper);
-                    wrapper.appendChild(label);
-                    if (info[i].desc) wrapper.appendChild(labelDesc);
-                    wrapper.appendChild(sliderElement);
-                    this.values.push({ "id": info[i].id, "element": slider });
-                } else if (info[i].type == "image-upload") {
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    let label = document.createElement("div");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    wrapper.appendChild(label);
-                    let element = document.createElement("div");
-                    let imageUpload = new ImageUpload(element, info[i].default, info[i].image_code);
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    this.values.push({ "id": info[i].id, "element": imageUpload });
-                } else if (info[i].type == "multi-select") {
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    let label = document.createElement("div");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    wrapper.appendChild(label);
-                    let element = document.createElement("div");
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    let multiSelect = new MultiSelect(element, info[i].options);
-                    if (info[i].default) multiSelect.selectOption(info[i].default);
-                    if (info[i].onchange) multiSelect.addOnChange(() => {
-                        info[i].onchange(multiSelect.value);
-                    });
-                    this.values.push({ "id": info[i].id, "element": multiSelect });
-                } else if (info[i].type == "files") {
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    let label = document.createElement("div");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    wrapper.appendChild(label);
-                    let element = document.createElement("div");
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    let multiSelect = new MultipleFileSelect(element, info[i].options);
-                    if (info[i].onchange) multiSelect.addOnChange(info[i].onchange);
-                    if (info[i].default) multiSelect.setSelected(info[i].default);
-                    this.values.push({ "id": info[i].id, "element": multiSelect });
-                } else if (info[i].type == "file-upload") {
-                    let wrapper = createElement("div", "dialog-text-label-wrapper");
-                    let label = createElement("div", "dialog-label", {
-                        textContent: info[i].name
-                    });
-                    wrapper.appendChild(label);
-                    if (info[i].desc) {
-                        let labelDesc = document.createElement("label");
-                        labelDesc.textContent = info[i].desc;
-                        labelDesc.className = "dialog-label-desc";
-                        wrapper.appendChild(labelDesc);
-                    }
-                    let element = createElement("div");
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    let fileUpload = new FileUpload(element, info[i].files_allowed, info[i].folders_allowed, info[i].file_types_allowed, info[i].file_types_name, info[i].max_amount_allowed, info[i].default);
-                    this.values.push({ id: info[i].id, element: fileUpload });
-                } else if (info[i].type == "dropdown") {
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    let label = document.createElement("div");
-                    label.textContent = info[i].name;
-                    label.className = "dialog-label";
-                    let labelDesc = document.createElement("label");
-                    if (info[i].desc) {
-                        labelDesc.innerHTML = info[i].desc;
-                        labelDesc.className = "dialog-label-desc";
-                    }
-                    wrapper.appendChild(label);
-                    if (info[i].desc) wrapper.appendChild(labelDesc);
-                    let element = document.createElement("div");
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    let multiSelect;
-                    if (info[i].options.length >= 10 || info[i].source) {
-                        multiSelect = new SearchDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
-                    } else {
-                        multiSelect = new Dropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value, () => { });
-                    }
-                    if (info[i].onchange) multiSelect.addOnChange(() => {
-                        info[i].onchange(multiSelect.value, this.values, wrapper);
-                    });
-                    if (info[i].source) {
-                        let found = false;
-                        for (let j = 0; j < this.values.length; j++) {
-                            if (this.values[j].id != info[i].input_source) continue;
-                            found = true;
-                            // Use a token to ensure only the latest async result is displayed
-                            let updateToken = 0;
-                            this.values[j].element.addOnChange(async () => {
-                                const currentToken = ++updateToken;
-                                let oldValue = multiSelect.value;
-                                let value = this.values[j].element.value;
-                                label.innerHTML = translate("app.dialog.loading");
-                                multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
-                                try {
-                                    let list = await info[i].source(value);
-                                    // Only update if this is the latest request
-                                    if (currentToken !== updateToken) return;
-                                    if (label.innerHTML != translate("app.dialog.loading")) return;
-                                    if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
-                                        multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
-                                    } else {
-                                        multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                    }
-                                    if (multiSelect.onchange) multiSelect.onchange();
-                                    label.textContent = info[i].name;
-                                } catch (err) {
-                                    if (currentToken !== updateToken) return;
-                                    displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    if (multiSelect.onchange) multiSelect.onchange();
-                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
-                                    multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
-                                }
-                            });
-                            let setInitialValues = async () => {
-                                const currentToken = ++updateToken;
-                                let oldValue = multiSelect.value;
-                                let value = this.values[j].element.value;
-                                label.innerHTML = translate("app.dialog.loading");
-                                multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
-                                try {
-                                    let list = await info[i].source(value);
-                                    if (currentToken !== updateToken) return;
-                                    if (label.innerHTML != translate("app.dialog.loading")) return;
-                                    if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
-                                        multiSelect.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
-                                    } else {
-                                        multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                    }
-                                    if (multiSelect.onchange) multiSelect.onchange();
-                                    label.textContent = info[i].name;
-                                } catch (err) {
-                                    if (currentToken !== updateToken) return;
-                                    displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    if (multiSelect.onchange) multiSelect.onchange();
-                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
-                                    multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
-                                }
-                            }
-                            setInitialValues();
-                        }
-                        if (!found) {
-                            let setInitialValues = async () => {
-                                label.innerHTML = translate("app.dialog.loading");
-                                multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
-                                try {
-                                    let list = await info[i].source();
-                                    if (label.innerHTML != translate("app.dialog.loading")) return;
-                                    if (list.length && typeof list[0] === "object" && list[0] !== null && "name" in list[0] && "value" in list[0]) {
-                                        multiSelect.setOptions(list, list.map(e => e.value).includes(info[i].default) ? info[i].default : list[0]?.value);
-                                    } else {
-                                        multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(info[i].default) ? info[i].default : list[0]);
-                                    }
-                                    label.textContent = info[i].name;
-                                } catch (err) {
-                                    displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    if (multiSelect.onchange) multiSelect.onchange();
-                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
-                                    multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
-                                }
-                            }
-                            setInitialValues();
-                        }
-                    }
-                    this.values.push({ "id": info[i].id, "element": multiSelect });
-                } else if (info[i].type == "loader-version-dropdown") {
-                    let wrapper = document.createElement("div");
-                    wrapper.className = "dialog-text-label-wrapper";
-                    let label = document.createElement("div");
-                    label.innerHTML = "Loading...";
-                    label.className = "dialog-label";
-                    wrapper.appendChild(label);
-                    let element = document.createElement("div");
-                    wrapper.appendChild(element);
-                    contents[tab].appendChild(wrapper);
-                    let loaderElement;
-                    let multiSelect = new SearchDropdown("", info[i].options, element, info[i].default ?? info[i].options[0]?.value);
-                    for (let j = 0; j < this.values.length; j++) {
-                        if (this.values[j].id == info[i].loader_source) {
-                            loaderElement = this.values[j].element;
-                        }
-                        if (this.values[j].id == info[i].game_version_source) {
-                            let updateToken = 0;
-                            this.values[j].element.addOnChange(async () => {
-                                const currentToken = ++updateToken;
-                                wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
-                                if (loaderElement.value == "vanilla") return;
-                                let oldValue = multiSelect.value;
-                                let value = this.values[j].element.value;
-                                label.innerHTML = translate("app.dialog.loading");
-                                multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
-                                try {
-                                    let list = await getVersions(loaderElement.value, value);
-                                    if (currentToken !== updateToken) return;
-                                    if (label.innerHTML != translate("app.dialog.loading")) return;
-                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                    label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loaderElement.value]);
-                                } catch (err) {
-                                    if (currentToken !== updateToken) return;
-                                    displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
-                                    multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
-                                }
-                            });
-                            let setInitialValues = async () => {
-                                wrapper.style.display = loaderElement.value == "vanilla" ? "none" : "";
-                                if (loaderElement.value == "vanilla") return;
-                                let oldValue = multiSelect.value;
-                                let value = this.values[j].element.value;
-                                if (value == "loading") return;
-                                label.innerHTML = translate("app.dialog.loading");
-                                multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
-                                try {
-                                    let list = await getVersions(loaderElement.value, value);
-                                    if (label.innerHTML != translate("app.dialog.loading")) return;
-                                    multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info[i].default) ? info[i].default : list[0]);
-                                    label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loaderElement.value]);
-                                } catch (err) {
-                                    displayError(translate("app.failed_to_load_list", "%m", (err && err.message ? err.message : err)));
-                                    label.textContent = translate("app.dialog.unable_to_load") + " " + info[i].name;
-                                    multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load"), "value": "loading" }], "loading");
-                                }
-                            }
-                            setInitialValues();
-                        }
-                    }
-                    this.values.push({ "id": info[i].id, "element": multiSelect });
-                } else if (info[i].type == "button") {
-                    let buttonElement = document.createElement("button");
-                    buttonElement.innerHTML = info[i].icon + info[i].name;
-                    buttonElement.className = "sub-button";
-                    buttonElement.onclick = () => {
-                        if (info[i].close_dialog) {
-                            this.element.close();
-                        }
-                        info[i].func();
-                    }
-                    contents[tab].appendChild(buttonElement);
-                }
+                let elementInfo = this.getElement(info[i], i == info.length - 1);
+                contents[elementInfo.tab].appendChild(elementInfo.element);
             }
         }
         let keys = Object.keys(contents);
@@ -10928,20 +10537,20 @@ class Dialog {
         contents[keys[0]].style.display = "flex";
         let dialogButtons = document.createElement("div");
         dialogButtons.className = "dialog-buttons";
-        for (let i = 0; i < buttons.length; i++) {
-            let buttonElement = document.createElement("button");
-            buttonElement.className = "dialog-button";
-            buttonElement.textContent = buttons[i].content;
-            if (buttons[i].type == "cancel") {
+        for (let button of buttons) {
+            let buttonElement = createElement("button", "dialog-button", {
+                textContent: button.content
+            });
+            if (button.type == "cancel") {
                 buttonElement.onclick = (e) => {
-                    this.element.close();
+                    this.closeDialog();
                 }
-            } else if (buttons[i].type == "confirm") {
+            } else if (button.type == "confirm") {
                 buttonElement.classList.add("confirm");
                 buttonElement.onclick = () => {
                     this.submit();
                 }
-                this.buttonelement = buttonElement;
+                this.buttonElement = buttonElement;
             }
             dialogButtons.appendChild(buttonElement);
         }
@@ -10951,8 +10560,388 @@ class Dialog {
         document.getElementsByClassName("toasts")[0].showPopover();
     }
 
+    getElement(info, isLast) {
+        let tab = info.tab || "default";
+        let wrapper = createElement("div", "dialog-text-label-wrapper");
+        let label = createElement("label", "dialog-label", {
+            textContent: info.name
+        });
+        let labelDesc = createElement("label", "dialog-label-desc", {
+            textContent: info.desc
+        });
+        let value = {
+            getter: () => { },
+            setter: (value) => { },
+            tab,
+            runOnChange: () => { },
+            setOnChange: (onchange) => { },
+            id: info.id,
+            element: wrapper,
+            defaultValue: info.default_value,
+            customValue: info.custom_value,
+            disable: () => { },
+            enable: () => { }
+        };
+        if (info.type == "notice") {
+            let textElement = createElement("div");
+            if (info.content instanceof Element) {
+                textElement.appendChild(info.content);
+            } else {
+                textElement.innerHTML = info.content;
+                textElement.className = "dialog-label-desc";
+            }
+            if (info.width) textElement.style.width = info.width + "px";
+            value.element = textElement;
+        } else if (info.type == "info") {
+            let infoElement = createElement("div", "info", {
+                innerHTML: '<i class="fa-solid fa-triangle-exclamation"></i>' + info.content
+            });
+            if (info.width) infoElement.style.width = info.width + "px";
+            value.element = infoElement;
+        } else if (info.type == "text" || info.type == "number") {
+            label.htmlFor = info.id;
+            labelDesc.htmlFor = info.id;
+            let textInput = createElement("input", "dialog-text-input", {
+                placeholder: info.name,
+                id: info.id,
+                type: info.type
+            });
+            if (info.oninput) textInput.oninput = () => {
+                info.oninput(textInput.value);
+            }
+            textInput.value = info.default || "";
+            if (info.maxlength) textInput.maxLength = info.maxlength;
+            wrapper.appendChild(label);
+            if (info.desc) wrapper.appendChild(labelDesc);
+            wrapper.appendChild(textInput);
+            if (info.focus) {
+                textInput.focus();
+            }
+            if (isLast) {
+                textInput.onkeydown = (e) => {
+                    if (e.key == "Enter") {
+                        this.submit();
+                        e.preventDefault();
+                    }
+                }
+            }
+            value.getter = () => textInput.value;
+            value.runOnChange = () => {
+                if (textInput.onchange) textInput.onchange();
+            }
+            value.setter = (val) => {
+                textInput.value = val;
+                value.runOnChange();
+            }
+            value.setOnChange = (onchange) => {
+                textInput.onchange = () => {
+                    onchange(value.getter());
+                }
+            }
+            value.disable = () => textInput.disabled = true;
+            value.enable = () => textInput.disabled = false;
+        } else if (info.type == "toggle") {
+            let labelWrapper = createElement("div", "label-wrapper");
+            let toggleEle = createElement("button");
+            let toggle = new Toggle(toggleEle, () => { }, info.default ?? false);
+            let wrapper = createElement("div", "dialog-text-label-wrapper-horizontal");
+            wrapper.appendChild(toggleEle);
+            wrapper.appendChild(labelWrapper);
+            labelWrapper.appendChild(label);
+            if (info.desc) labelWrapper.appendChild(labelDesc);
+            value.getter = () => toggle.value;
+            value.runOnChange = () => {
+                if (toggle.onchange) toggle.onchange();
+            }
+            value.setter = (val) => {
+                toggle.setValueWithoutTrigger(val);
+                value.runOnChange();
+            }
+            value.element = wrapper;
+            value.setOnChange = (onchange) => {
+                toggle.onchange = () => {
+                    onchange(value.getter());
+                }
+            }
+            value.disable = () => toggle.disable();
+            value.enable = () => toggle.enable();
+        } else if (info.type == "slider") {
+            label.htmlFor = info.id;
+            labelDesc.htmlFor = info.id;
+            let sliderElement = createElement("div");
+            let slider = new Slider(sliderElement, info.min, info.max, info.default ?? info.min, info.increment, info.unit);
+            let wrapper = createElement("div", "dialog-text-label-wrapper");
+            wrapper.appendChild(label);
+            if (info.desc) wrapper.appendChild(labelDesc);
+            wrapper.appendChild(sliderElement);
+            value.getter = () => slider.value
+            value.setter = (value) => slider.setValue(value);
+            value.setOnChange = (onchange) => {
+                slider.addOnChange(() => {
+                    onchange(value.getter());
+                });
+            }
+            value.element = wrapper;
+            value.disable = () => slider.disable();
+            value.enable = () => slider.enable();
+        } else if (info.type == "image-upload") {
+            wrapper.appendChild(label);
+            let element = createElement("div");
+            let imageUpload = new ImageUpload(element, info.default, info.image_code);
+            wrapper.appendChild(element);
+            value.getter = () => imageUpload.value;
+        } else if (info.type == "multi-select") {
+            wrapper.appendChild(label);
+            let element = createElement("div");
+            wrapper.appendChild(element);
+            let multiSelect = new MultiSelect(element, info.options);
+            if (info.default) multiSelect.selectOption(info.default);
+            value.getter = () => multiSelect.value;
+            value.setter = (val) => multiSelect.selectOption(val);
+            value.setOnChange = (onchange) => {
+                multiSelect.addOnChange(() => {
+                    onchange(value.getter());
+                });
+            }
+        } else if (info.type == "files") {
+            wrapper.appendChild(label);
+            let element = createElement("div");
+            wrapper.appendChild(element);
+            let multiSelect = new MultipleFileSelect(element, info.options);
+            if (info.default) multiSelect.setSelected(info.default);
+            value.getter = () => multiSelect.value;
+            value.setter = (val) => multiSelect.setSelected(val);
+            value.setOnChange = (onchange) => multiSelect.addOnChange(onchange);
+        } else if (info.type == "file-upload") {
+            wrapper.appendChild(label);
+            if (info.desc) wrapper.appendChild(labelDesc);
+            let element = createElement("div");
+            wrapper.appendChild(element);
+            let fileUpload = new FileUpload(element, info.files_allowed, info.folders_allowed, info.file_types_allowed, info.file_types_name, info.max_amount_allowed, info.default);
+            value.getter = () => fileUpload.value;
+        } else if (info.type == "dropdown") {
+            wrapper.appendChild(label);
+            if (info.desc) wrapper.appendChild(labelDesc);
+            let element = createElement("div");
+            wrapper.appendChild(element);
+            let dropdown;
+            if (info.options.length >= 10 || info.source) {
+                dropdown = new SearchDropdown("", info.options, element, info.default ?? info.options[0]?.value);
+            } else {
+                dropdown = new Dropdown("", info.options, element, info.default ?? info.options[0]?.value);
+            }
+            value.getter = () => dropdown.value;
+            value.runOnChange = () => {
+                if (dropdown.onchange) dropdown.onchange();
+            }
+            value.setter = (val) => dropdown.selectOption(val);
+            value.setOptions = (options, initial) => dropdown.setOptions(options, initial);
+            value.setOnChange = (onchange) => {
+                dropdown.addOnChange(() => {
+                    onchange(value.getter(), this.values, wrapper);
+                });
+            }
+            value.getPass = () => dropdown.getPass();
+        } else if (info.type == "loader-version-dropdown") {
+            wrapper.appendChild(label);
+            let element = createElement("div");
+            wrapper.appendChild(element);
+            let loaderElement;
+            let multiSelect = new SearchDropdown("", info.options, element, info.default ?? info.options[0]?.value);
+            for (let otherElement of this.values) {
+                if (otherElement.id == info.loader_source) {
+                    loaderElement = otherElement;
+                }
+                if (otherElement.id == info.game_version_source) {
+                    let updateToken = 0;
+                    let setValue = async () => {
+                        const currentToken = ++updateToken;
+                        let loader = loaderElement.getter();
+                        wrapper.style.display = loader == "vanilla" ? "none" : "";
+                        if (loader == "vanilla") return;
+                        let oldValue = multiSelect.value;
+                        let value = otherElement.getter();
+                        label.innerHTML = translate("app.dialog.loading");
+                        multiSelect.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
+                        try {
+                            let list = await getVersions(loader, value);
+                            if (currentToken !== updateToken) return;
+                            if (label.innerHTML != translate("app.dialog.loading")) return;
+                            multiSelect.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info.default) ? info.default : list[0]);
+                            label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loader]);
+                        } catch (err) {
+                            if (currentToken !== updateToken) return;
+                            displayError(translate("app.failed_to_load", "%m", (err && err.message ? err.message : err)));
+                            label.textContent = translate("app.dialog.unable_to_load", "%n", info.name);
+                            multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load.no_name"), "value": "loading" }], "loading");
+                        }
+                    }
+                    otherElement.setOnChange(setValue);
+                    setValue();
+                }
+            }
+            value.getter = () => multiSelect.value;
+            value.runOnChange = () => {
+                if (multiSelect.onchange) multiSelect.onchange();
+            }
+            value.setter = (val) => multiSelect.selectOption(val);
+            value.setOptions = (options, initial) => multiSelect.setOptions(options, initial);
+            value.setOnChange = (onchange) => {
+                multiSelect.addOnChange(() => {
+                    onchange(value.getter(), this.values, wrapper);
+                });
+            }
+            value.getPass = () => multiSelect.getPass();
+        } else if (info.type == "button") {
+            let buttonElement = createElement("button", "sub-button", {
+                innerHTML: info.icon + info.name
+            });
+            buttonElement.onclick = () => {
+                if (info.close_dialog) {
+                    this.closeDialog();
+                }
+                info.func();
+            }
+            value.element = buttonElement;
+        } else if (info.type == "override-default") {
+            let overrideWrapper = createElement("div", "override-default-box");
+            let innerList = createElement("div", "override-default-inner-box");
+            if (!info.enabled) innerList.classList.add("disabled");
+            let checkboxWrapper = createElement("div", "override-checkbox-wrapper");
+            let checkbox = createElement("input", "override-checkbox", {
+                type: "checkbox",
+                id: info.id
+            });
+            if (info.enabled) {
+                checkbox.checked = true;
+            }
+            checkbox.onchange = () => {
+                if (!checkbox.checked) {
+                    innerList.classList.add("disabled");
+                    infoList.forEach(e => {
+                        e.setter(e.defaultValue);
+                        e.disable();
+                    });
+                } else {
+                    innerList.classList.remove("disabled");
+                    infoList.forEach(e => {
+                        e.setter(e.customValue);
+                        e.enable();
+                    });
+                }
+            }
+            let checkboxText = createElement("label", "override-checkbox-name", {
+                htmlFor: info.id,
+                textContent: info.name
+            });
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(checkboxText);
+            overrideWrapper.appendChild(checkboxWrapper);
+            overrideWrapper.appendChild(innerList);
+            let infoList = [];
+            for (let child of info.children) {
+                let elementInfo = this.getElement(child, false);
+                innerList.appendChild(elementInfo.element);
+                elementInfo.setOnChange((val) => {
+                    if (!checkbox.checked) return;
+                    elementInfo.customValue = val;
+                });
+                if (!info.enabled) {
+                    elementInfo.disable();
+                    elementInfo.setter(elementInfo.defaultValue);
+                } else {
+                    elementInfo.setter(elementInfo.customValue);
+                }
+                infoList.push(elementInfo);
+            }
+            value.getter = () => checkbox.checked;
+            value.element = overrideWrapper;
+        }
+        if (info.buttons) {
+            let buttonWrapper = createElement("div", "sub-button-container");
+            let buttonElements = [];
+            for (let button of info.buttons) {
+                let buttonEle = createElement("button", "sub-button", {
+                    innerHTML: button.icon + button.name
+                });
+                let buttonClick = async () => {
+                    buttonEle.onclick = () => { }
+                    await button.func(value.getter(), buttonEle, value.setter);
+                    buttonEle.onclick = buttonClick;
+                }
+                buttonEle.onclick = buttonClick;
+                buttonElements.push(buttonEle);
+                buttonWrapper.appendChild(buttonEle);
+            }
+            let oldDisable = value.disable;
+            value.disable = () => {
+                oldDisable();
+                for (let buttonElement of buttonElements) {
+                    buttonElement.disabled = true;
+                }
+            }
+            let oldEnable = value.enable;
+            value.enable = () => {
+                oldEnable();
+                for (let buttonElement of buttonElements) {
+                    buttonElement.disabled = false;
+                }
+            }
+            wrapper.appendChild(buttonWrapper);
+        }
+        if (info.source) {
+            let updateToken = 0;
+            let getValueFromSource = async (val) => {
+                const currentToken = ++updateToken;
+                let oldValue = value.getter();
+                label.innerHTML = translate("app.dialog.loading");
+                if (value.setOptions) value.setOptions([{ "name": translate("app.dialog.loading"), "value": "loading" }], "loading");
+                try {
+                    let list = await info.source(val);
+                    if (currentToken !== updateToken) return;
+                    if (label.innerHTML != translate("app.dialog.loading")) return;
+                    if (Array.isArray(list) && value.setOptions) {
+                        if (list[0] != null && typeof list[0] == 'object' && "name" in list[0] && "value" in list[0]) {
+                            value.setOptions(list, list.map(e => e.value).includes(oldValue) ? oldValue : list.map(e => e.value).includes(info.default) ? info.default : list[0]?.value);
+                        } else {
+                            value.setOptions(list.map(e => ({ "name": e, "value": e })), list.includes(oldValue) ? oldValue : list.includes(info.default) ? info.default : list[0]);
+                        }
+                        value.runOnChange();
+                    } else {
+                        value.setter(list);
+                    }
+                    label.textContent = info.name;
+                } catch (err) {
+                    if (currentToken !== updateToken) return;
+                    displayError(translate("app.failed_to_load", "%m", (err && err.message ? err.message : err)));
+                    label.textContent = translate("app.dialog.unable_to_load", "%n", info.name);
+                    if (value.setOptions) {
+                        value.setOptions([{ "name": translate("app.dialog.unable_to_load.no_name"), "value": "loading" }], "loading");
+                    } else {
+                        value.setter("");
+                    }
+                }
+            }
+            let found = false;
+            for (let otherElement of this.values) {
+                if (otherElement.id != info.input_source) continue;
+                found = true;
+                otherElement.setOnChange(getValueFromSource);
+                getValueFromSource(otherElement.getter());
+            }
+            if (!found) {
+                getValueFromSource("");
+            }
+        }
+        if (info.onchange) {
+            value.setOnChange(info.onchange);
+        }
+        this.values.push(value);
+        return value;
+    }
+
     async submit() {
-        let info = this.values.map(e => ({ "id": e.id, "value": e.element.value, "pass": e.element.getPass ? e.element.getPass() : null }));
+        let info = this.values.map(e => ({ "id": e.id, "value": e.customValue || e.getter(), "pass": e.getPass ? e.getPass() : null }));
         info.push({ "id": "selected_tab", "value": this.selectedTab });
         let info2 = {};
         info.forEach(e => {
@@ -14400,6 +14389,9 @@ document.addEventListener("keydown", (e) => {
         let openDialogs = Array.from(document.querySelectorAll("dialog[open]"));
         if (!openDialogs.length) return;
         let latestDialog = openDialogs[openDialogs.length - 1];
+        if (document.activeElement === latestDialog) {
+            latestDialog.querySelector("button")?.focus();
+        }
         latestDialog.close();
         e.preventDefault();
         e.stopPropagation();
