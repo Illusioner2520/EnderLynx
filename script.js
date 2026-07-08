@@ -3309,10 +3309,10 @@ class InstanceScreen extends Screen {
         let threeDots = createElement("button", "instance-top-more", { innerHTML: '<i class="fa-solid fa-ellipsis-vertical"></i>' });
         let buttons = new ContextMenuButtons([
             {
-                "icon": '<i class="fa-solid fa-copy"></i>',
-                "title": translate("app.button.instances.duplicate"),
-                "func": (e) => {
-                    this.instance.showDuplicateDialog();
+                "icon": '<i class="fa-solid fa-gear"></i>',
+                "title": translate("app.button.instances.open_settings"),
+                "func": async (e) => {
+                    this.instance.showSettingsDialog();
                 }
             },
             {
@@ -3320,27 +3320,6 @@ class InstanceScreen extends Screen {
                 "title": translate("app.button.instances.open_folder"),
                 "func": (e) => {
                     window.enderlynx.openInstanceFolder(this.instance.instance_id);
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-share"></i>',
-                "title": translate("app.button.instances.share"),
-                "func": (e) => {
-                    this.instance.showShareDialog();
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-wrench"></i>',
-                "title": translate("app.button.instances.repair"),
-                "func": () => {
-                    this.instance.showRepairDialog();
-                }
-            },
-            {
-                "icon": '<i class="fa-solid fa-gear"></i>',
-                "title": translate("app.button.instances.open_settings"),
-                "func": async (e) => {
-                    this.instance.showSettingsDialog();
                 }
             },
             {
@@ -3357,6 +3336,27 @@ class InstanceScreen extends Screen {
                 "title": translate("app.instances.desktop_shortcut"),
                 "func": () => {
                     addDesktopShortcut(this.instance);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-share"></i>',
+                "title": translate("app.button.instances.share"),
+                "func": (e) => {
+                    this.instance.showShareDialog();
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "title": translate("app.button.instances.duplicate"),
+                "func": (e) => {
+                    this.instance.showDuplicateDialog();
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-wrench"></i>',
+                "title": translate("app.button.instances.repair"),
+                "func": () => {
+                    this.instance.showRepairDialog();
                 }
             },
             {
@@ -5795,31 +5795,17 @@ class HomeScreen extends Screen {
                     }
                 },
                 {
-                    "icon": '<i class="fa-solid fa-folder"></i>',
-                    "title": translate("app.button.instances.open_folder"),
-                    "func": (e) => {
-                        window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-share"></i>',
-                    "title": translate("app.button.instances.share"),
-                    "func": (e) => {
-                        instanceInfo.showShareDialog();
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-wrench"></i>',
-                    "title": translate("app.button.instances.repair"),
-                    "func": () => {
-                        instanceInfo.showRepairDialog();
-                    }
-                },
-                {
                     "icon": '<i class="fa-solid fa-gear"></i>',
                     "title": translate("app.button.instances.open_settings"),
                     "func": async (e) => {
                         instanceInfo.showSettingsDialog();
+                    }
+                },
+                {
+                    "icon": '<i class="fa-solid fa-folder"></i>',
+                    "title": translate("app.button.instances.open_folder"),
+                    "func": (e) => {
+                        window.enderlynx.openInstanceFolder(instanceInfo.instance_id);
                     }
                 },
                 {
@@ -5839,10 +5825,10 @@ class HomeScreen extends Screen {
                     }
                 },
                 {
-                    "icon": '<i class="fa-solid fa-desktop"></i>',
-                    "title": translate("app.instances.desktop_shortcut"),
+                    "icon": '<i class="fa-solid fa-copy"></i>',
+                    "title": translate("app.button.instances.duplicate"),
                     "func": (e) => {
-                        addDesktopShortcut(instanceInfo);
+                        instanceInfo.showDuplicateDialog();
                     }
                 },
                 {
@@ -6266,20 +6252,6 @@ class InstancesScreen extends Screen {
                     }
                 },
                 {
-                    "icon": '<i class="fa-solid fa-share"></i>',
-                    "title": translate("app.button.instances.share"),
-                    "func": (e) => {
-                        instances[i].showShareDialog();
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-wrench"></i>',
-                    "title": translate("app.button.instances.repair"),
-                    "func": () => {
-                        instances[i].showRepairDialog();
-                    }
-                },
-                {
                     "icon": '<i class="fa-solid fa-gear"></i>',
                     "title": translate("app.button.instances.open_settings"),
                     "func": async (e) => {
@@ -6298,10 +6270,10 @@ class InstancesScreen extends Screen {
                     }
                 },
                 {
-                    "icon": '<i class="fa-solid fa-desktop"></i>',
-                    "title": translate("app.instances.desktop_shortcut"),
+                    "icon": '<i class="fa-solid fa-copy"></i>',
+                    "title": translate("app.button.instances.duplicate"),
                     "func": (e) => {
-                        addDesktopShortcut(instances[i]);
+                        this.instance.showDuplicateDialog();
                     }
                 },
                 {

@@ -64,7 +64,7 @@
     "app.button.instances.duplicate": "Duplicate Instance",
     "app.button.instances.open_folder": "Open Folder",
     "app.button.instances.share": "Export Instance",
-    "app.button.instances.open_settings": "Open Instance Settings",
+    "app.button.instances.open_settings": "Instance Settings",
     "app.button.instances.repair": "Repair Instance",
     "app.button.instances.delete": "Delete Instance",
     "app.button.instances.play_short": "Play",
