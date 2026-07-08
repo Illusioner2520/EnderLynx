@@ -3216,6 +3216,64 @@ let codeToKey = {
     "PrintScreen": "key.keyboard.print.screen"
 }
 
+class LoadingContainer {
+    constructor() {
+        let element = document.createElement("div");
+        element.className = "loading-container";
+        let spinner = document.createElement("div");
+        spinner.className = "loading-container-spinner";
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        element.appendChild(spinner);
+        element.appendChild(text);
+        text.innerHTML = translate("app.loading");
+        this.element = element;
+        let index = 1;
+        let interval = setInterval(() => {
+            if (!document.body.contains(this.element)) {
+                clearInterval(this.interval);
+                return;
+            }
+            text.innerHTML = translate("app.loading") + ".".repeat(index);
+            index++;
+        }, 400)
+        this.interval = interval;
+    }
+    errorOut(e, refresh_func) {
+        let error = document.createElement("div");
+        error.className = "loading-container-error";
+        error.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        text.textContent = typeof e == 'string' ? e : e.message;
+        this.element.innerHTML = '';
+        this.element.appendChild(error);
+        this.element.appendChild(text);
+        let refresh = document.createElement("button");
+        refresh.className = "loading-container-refresh";
+        refresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>Try Again';
+        refresh.onclick = refresh_func;
+        this.element.appendChild(refresh);
+        clearInterval(this.interval);
+    }
+}
+
+class CurrentlyInstalling {
+    constructor() {
+        let element = document.createElement("div");
+        element.className = "loading-container";
+        element.style.marginTop = "10px";
+        let spinner = document.createElement("div");
+        spinner.className = "loading-container-spinner";
+        let text = document.createElement("div");
+        text.className = "loading-container-text";
+        element.appendChild(spinner);
+        element.appendChild(text);
+        text.innerHTML = translate("app.currently_installing");
+        this.element = element;
+    }
+}
+
 class Screen {
     constructor(tabName, navButton) {
         this.tabName = tabName;
@@ -11786,64 +11844,6 @@ async function installSpecificVersion(version, source, instance, project_type, t
 
 async function addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
     return await window.enderlynx.addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
-}
-
-class LoadingContainer {
-    constructor() {
-        let element = document.createElement("div");
-        element.className = "loading-container";
-        let spinner = document.createElement("div");
-        spinner.className = "loading-container-spinner";
-        let text = document.createElement("div");
-        text.className = "loading-container-text";
-        element.appendChild(spinner);
-        element.appendChild(text);
-        text.innerHTML = translate("app.loading");
-        this.element = element;
-        let index = 1;
-        let interval = setInterval(() => {
-            if (!document.body.contains(this.element)) {
-                clearInterval(this.interval);
-                return;
-            }
-            text.innerHTML = translate("app.loading") + ".".repeat(index);
-            index++;
-        }, 400)
-        this.interval = interval;
-    }
-    errorOut(e, refresh_func) {
-        let error = document.createElement("div");
-        error.className = "loading-container-error";
-        error.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-        let text = document.createElement("div");
-        text.className = "loading-container-text";
-        text.textContent = typeof e == 'string' ? e : e.message;
-        this.element.innerHTML = '';
-        this.element.appendChild(error);
-        this.element.appendChild(text);
-        let refresh = document.createElement("button");
-        refresh.className = "loading-container-refresh";
-        refresh.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i>Try Again';
-        refresh.onclick = refresh_func;
-        this.element.appendChild(refresh);
-        clearInterval(this.interval);
-    }
-}
-
-class CurrentlyInstalling {
-    constructor() {
-        let element = document.createElement("div");
-        element.className = "loading-container";
-        element.style.marginTop = "10px";
-        let spinner = document.createElement("div");
-        spinner.className = "loading-container-spinner";
-        let text = document.createElement("div");
-        text.className = "loading-container-text";
-        element.appendChild(spinner);
-        element.appendChild(text);
-        text.innerHTML = translate("app.currently_installing");
-        this.element = element;
-    }
 }
 
 function sanitize(input) {
