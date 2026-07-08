@@ -2006,7 +2006,6 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
     let globalPostLaunch = getDefault("global_post_launch_hook");
     let globalWrapper = getDefault("global_wrapper");
     let globalPostExit = getDefault("global_post_exit_hook");
-    // TODO: update for not using custom window / allocated ram / java args
     try {
         await fixProfile(player_info, player_info.id);
         if (!settings.quickPlay && instance_info.source_server) {
