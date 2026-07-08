@@ -86,9 +86,9 @@ body {
     --title-bar-height: env(titlebar-area-height, 30px);
     --title-bar-height-plus-border: calc(var(--title-bar-height) + 1px);
     --offline-notice-height: 0px;
-    --sidebar-width: 300px;
-    --sidebar-width-plus-border: 301px;
-    --floating-offset: 150.5px;
+    --sidebar-width: 275px;
+    --sidebar-width-plus-border: 276px;
+    --floating-offset: 138px;
     color-scheme: dark;
     overflow: hidden;
     background: var(--background-color);
@@ -130,7 +130,7 @@ body.compact {
 }
 
 body.sidebar-right {
-    --floating-offset: -150.5px;
+    --floating-offset: -138px;
 }
 
 body.compact.sidebar-right {
@@ -2071,6 +2071,9 @@ body:not(.compact) .download-log-wrapper:not(:empty) {
 
 .download-desc {
     font-size: 1rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 .download-progress {
