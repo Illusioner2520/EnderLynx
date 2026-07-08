@@ -3637,13 +3637,11 @@ class InstanceScreen extends Screen {
             let content = [];
             let instance_content = await this.instance.getContent();
             instance_content.sort((a, b) => {
-                if (a.name.toLowerCase() > b.name.toLowerCase()) {
-                    return 1;
-                }
-                if (a.name.toLowerCase() < b.name.toLowerCase()) {
-                    return -1;
-                }
-                return 0;
+                let aName = a.name.replace(/§./g, '');
+                let bName = b.name.replace(/§./g, '');
+                return aName.localeCompare(bName, undefined, {
+                    sensitivity: "base"
+                });
             });
             for (let i = 0; i < instance_content.length; i++) {
                 let e = instance_content[i];
