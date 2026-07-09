@@ -6701,8 +6701,6 @@ class DiscoverScreen extends Screen {
         });
         let sortByDropdownElement = createElement("div");
         sortByDropdownElement.style.width = "150px";
-        let viewDropdownElement = createElement("div");
-        viewDropdownElement.style.width = "75px";
         let gameVersionDropdownElement = createElement("div");
         gameVersionDropdownElement.style.width = "180px";
         let loaderDropdownElement = createElement("div");
@@ -6726,35 +6724,6 @@ class DiscoverScreen extends Screen {
             }
         ], sortByDropdownElement, this.sort_by, (new_sort) => {
             this.sort_by = new_sort;
-            this.getContent();
-        });
-        let viewDropdown = new Dropdown(translate("app.discover.view"), [
-            {
-                "name": translate("app.discover.view.5"),
-                "value": "5"
-            },
-            {
-                "name": translate("app.discover.view.10"),
-                "value": "10"
-            },
-            {
-                "name": translate("app.discover.view.15"),
-                "value": "15"
-            },
-            {
-                "name": translate("app.discover.view.20"),
-                "value": "20"
-            },
-            {
-                "name": translate("app.discover.view.50"),
-                "value": "50"
-            },
-            {
-                "name": translate("app.discover.view.100"),
-                "value": "100"
-            }
-        ], viewDropdownElement, this.view, (new_page_size) => {
-            this.view = new_page_size;
             this.getContent();
         });
         let gameVersionDropdown = new SearchDropdown(translate("app.discover.game_version"), [
@@ -6807,7 +6776,6 @@ class DiscoverScreen extends Screen {
         let discoverListTop = createElement("div", "discover-list-top");
         this.discoverList.appendChild(discoverListTop);
         discoverListTop.appendChild(sortByDropdownElement);
-        discoverListTop.appendChild(viewDropdownElement);
         discoverListTop.appendChild(gameVersionDropdownElement);
         if (!["resourcepack", "shader", "world", "datapack"].includes(this.currentTab)) discoverListTop.appendChild(loaderDropdownElement);
         discoverListTop.appendChild(paginationTop.element);
