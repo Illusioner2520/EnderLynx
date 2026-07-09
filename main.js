@@ -5617,6 +5617,8 @@ function dropColumnIfExists(table, column) {
     }
 }
 
+db.prepare("UPDATE instances SET failed = ?, mc_installed = ?, installing = ? WHERE mc_installed = ? OR installing = ?").run(1, 1, 0, 0, 1);
+
 // update
 try {
     switch (getDefault("saved_version")) {
