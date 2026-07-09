@@ -2210,7 +2210,7 @@ class Slider {
         slider.style.setProperty("--slider-transition", "width .1s, left .1s, scale .2s");
         sliderInput.oninput = () => {
             let rawValue = Number(sliderInput.value);
-            this.setValue(rawValue);
+            this.setValue(rawValue, true);
             if (this.onchange) this.onchange(this.value);
         }
         sliderInput.onchange = () => {
@@ -2262,12 +2262,12 @@ class Slider {
         });
     }
 
-    setValue(value) {
+    setValue(value, dont_update_input) {
         if (value < this.min) value = this.min;
         if (value > this.max) value = this.max;
         let percentage = (value - this.min) / (this.max - this.min) * 100;
         this.slider.style.setProperty('--slider-percentage', percentage + "%");
-        this.sliderInput.value = value;
+        if (!dont_update_input) this.sliderInput.value = value;
         this.value = value;
     }
 
