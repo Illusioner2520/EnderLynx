@@ -92,24 +92,6 @@ module.exports = {
             },
         },
         {
-            name: '@electron-forge/maker-flatpak',
-            config: {
-                options: {
-                    id: "me.illusioner.enderlynx",
-                    productName: "EnderLynx",
-                    genericName: "Minecraft Launcher",
-                    icon: "./resources/icons/icon.png",
-                    categories: ['Game'],
-                    mimeType: ['application/zip', 'application/x-zip-compressed'],
-                    runtimeVersion: '25.08',
-                    baseVersion: '25.08',
-                    runtime: "org.freedesktop.platform",
-                    base: "org.electronjs.Electron2.BaseApp",
-                    sdk: "org.freedesktop.Sdk"
-                }
-            },
-        },
-        {
             name: '@electron-forge/maker-zip',
             platforms: ['linux'],
         }] : []),
