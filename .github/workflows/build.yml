@@ -129,7 +129,10 @@ jobs:
 
       - name: Run build script Linux
         if: runner.os == 'Linux'
-        run: npm run build:linux
+        run: |
+          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.electronjs.Electron2.BaseApp//25.08 -y
+          npm run build:linux
 
       - name: Run build script MacOS
         if: runner.os == 'macOS'

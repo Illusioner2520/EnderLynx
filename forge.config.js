@@ -101,7 +101,11 @@ module.exports = {
                     icon: "./resources/icons/icon.png",
                     categories: ['Game'],
                     mimeType: ['application/zip', 'application/x-zip-compressed'],
-                    runtimeVersion: '24.08'
+                    runtimeVersion: '25.08',
+                    baseVersion: '25.08',
+                    runtime: "org.freedesktop.platform",
+                    base: "org.electronjs.Electron2.BaseApp",
+                    sdk: "org.freedesktop.Sdk"
                 }
             },
         },
