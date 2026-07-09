@@ -214,14 +214,11 @@ body.sidebar-right .round-sidebar-title-bar {
     width: 100%;
     height: var(--title-bar-height-plus-border);
     align-items: center;
+    overflow: hidden;
 }
 
 body:has(dialog[open]) .title-bar {
     z-index: 1001;
-}
-
-body:has(dialog[open]) .title-bar-button {
-    -webkit-app-region: drag;
 }
 
 body.sidebar-right .sidebar {
@@ -2237,6 +2234,7 @@ dialog::backdrop {
     transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, backdrop-filter .5s;
     opacity: 0;
     backdrop-filter: blur(0px);
+    top: var(--title-bar-height-plus-border);
 }
 
 dialog[open]::backdrop {
@@ -6569,27 +6567,10 @@ body.april_fools *::before {
     margin-left: 8px;
 }
 
-.dialog-backdrop {
-    position: fixed;
-    inset: 0;
-    background: var(--dialog-backdrop);
-    z-index: 1000;
-    top: var(--title-bar-height-plus-border);
-    transition: overlay .5s allow-discrete, display .5s allow-discrete, opacity .5s, backdrop-filter .5s;
-    opacity: 0;
-    backdrop-filter: blur(0px);
-    display: none;
-}
-
-.dialog-backdrop.shown {
-    opacity: 1;
-    backdrop-filter: blur(5px);
-    display: block;
-
-    @starting-style {
-        opacity: 0;
-        backdrop-filter: blur(0px);
-    }
+body:has(dialog[open]) .title-bar-button {
+    -webkit-app-region: drag;
+    opacity: .5;
+    cursor: not-allowed;
 }
 
 .file-upload-wrapper {

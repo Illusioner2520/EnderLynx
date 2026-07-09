@@ -9484,11 +9484,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
     screenshotWrapper.appendChild(screenshotInfo);
     screenshotPreview.appendChild(screenshotWrapper);
     changeDisplay(name, file, desc);
-    screenshotPreview.show();
-    screenshotPreviewBackdrop.classList.add("shown");
-    screenshotPreview.onclose = () => {
-        screenshotPreviewBackdrop.classList.remove("shown");
-    }
+    screenshotPreview.showModal();
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();
 }
@@ -10510,10 +10506,8 @@ class Dialog {
         element.className = "dialog";
         element.onclose = (e) => {
             if (onclose && this.useOnClose) onclose();
-            this.backdrop.classList.remove("shown");
             setTimeout(() => {
                 this.element.remove();
-                this.backdrop.remove();
             }, 1000);
         }
         this.element = element;
@@ -10538,12 +10532,8 @@ class Dialog {
         if (wide) element.classList.add("wide");
         let contents = {};
         element.appendChild(realDialogContent);
-        let backdrop = createElement("div", "dialog-backdrop");
-        document.body.appendChild(backdrop);
-        this.backdrop = backdrop;
         document.body.appendChild(element);
-        element.show();
-        backdrop.classList.add("shown");
+        element.showModal();
         let tabElement = document.createElement("div");
         this.values = [];
         this.selectedTab = tabs ? tabs[0]?.value ?? "" : "";
@@ -11998,11 +11988,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let currentlyInstalling = false;
 
     contentInfo.innerHTML = "";
-    contentInfo.show();
-    contentInfoBackdrop.classList.add("shown");
-    contentInfo.onclose = () => {
-        contentInfoBackdrop.classList.remove("shown");
-    }
+    contentInfo.showModal();
     contentInfo.onscroll = () => {
         dialogContextMenu.hideContextMenu();
     }
@@ -12377,7 +12363,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
     tabContent.style.padding = "10px";
     tabContent.style.paddingTop = "0px";
     contentWrapper.appendChild(tabContent);
-    contentInfo.show();
+    contentInfo.showModal();
     tabsElement.style.marginInline = "auto";
     let refreshVersionsList;
     let setVersionId;
@@ -14379,21 +14365,36 @@ class TitleBar {
             this.forwardButton.classList.remove("disabled");
         }
     }
+    hoist() {
+        this.titleBar.popover = "manual";
+        this.titleBar.showPopover();
+    }
+    unhoist() {
+        this.titleBar.hidePopover();
+        this.titleBar.popover = null;
+    }
 }
 
 let live;
 let titleBar = new TitleBar();
 
-document.addEventListener("keydown", (e) => {
-    if (e.key == "Escape") {
-        let openDialogs = Array.from(document.querySelectorAll("dialog[open]"));
-        if (!openDialogs.length) return;
-        let latestDialog = openDialogs[openDialogs.length - 1];
-        if (document.activeElement === latestDialog) {
-            latestDialog.querySelector("button")?.focus();
-        }
-        latestDialog.close();
-        e.preventDefault();
-        e.stopPropagation();
+const observer = new MutationObserver(() => {
+    const openDialogs = document.querySelectorAll("dialog[open]");
+
+    if (openDialogs.length > previousCount) {
+        titleBar.hoist();
     }
+    if (previousCount > 0 && openDialogs.length === 0) {
+        titleBar.unhoist();
+    }
+
+    previousCount = openDialogs.length;
+});
+
+let previousCount = document.querySelectorAll("dialog[open]").length;
+
+observer.observe(document.body, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["open"]
 });
