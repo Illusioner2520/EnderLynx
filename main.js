@@ -1990,7 +1990,8 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
     if (!instance_info) {
         throw new Error(translate("app.launch.unable_to_find_instance"));
     }
-    updateInstance("last_played", new Date(), instance_id);
+    let last_played = new Date();
+    updateInstance("last_played", last_played, instance_id);
     if (!player_info?.id) throw new Error(translate("app.launch.sign_in"));
 
     if (new Date(player_info.expires) < new Date()) {
@@ -2025,9 +2026,10 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "height": instance_info.window_height || 480,
             "fullscreen": Boolean(fullscreen || false)
         },
-        settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+            settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
+        watchProcessForExit(minecraft.pid, last_played, instance_id);
         return { minecraft, player_info }
     } catch (err) {
         console.error(err);
@@ -4722,16 +4724,10 @@ ipcMain.handle('stop-watching-file', (_, filepath) => {
 // Instance management
 function getInstance(instance_id) {
     let info = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
-    if (info.install_id?.endsWith(".0")) info.install_id = Number(info.install_id).toString();
-    if (info.installed_version?.endsWith(".0")) info.installed_version = Number(info.installed_version).toString();
     return info;
 }
 function getInstances() {
     let info = db.prepare("SELECT * FROM instances").all();
-    for (let i of info) {
-        if (i.install_id?.endsWith(".0")) i.install_id = Number(i.install_id).toString();
-        if (i.installed_version?.endsWith(".0")) i.installed_version = Number(i.installed_version).toString();
-    }
     return info;
 }
 function updateInstance(key, value, instance_id) {
@@ -4771,16 +4767,14 @@ function addInstance(name, date_created, date_modified, last_played, loader, van
 // Content management
 function getContent(content_id) {
     let info = db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(content_id);
-    if (info.source_info?.endsWith(".0")) info.source_info = Number(info.source_info).toString();
-    if (info.version_id?.endsWith(".0")) info.version_id = Number(info.version_id).toString();
+    return info;
+}
+function getContentFromFileAndInstance(file_name, instance_id) {
+    let info = db.prepare("SELECT * FROM content WHERE file_name = ? AND instance = ?").get(file_name, instance_id);
     return info;
 }
 function getInstanceContentDatabase(instance_id) {
     let info = db.prepare("SELECT * FROM content WHERE instance = ?").all(instance_id);
-    for (let i in info) {
-        if (i.source_info?.endsWith(".0")) i.source_info = Number(i.source_info).toString();
-        if (i.version_id?.endsWith(".0")) i.version_id = Number(i.version_id).toString();
-    }
     return info;
 }
 function updateContent(key, value, content_id) {
@@ -4800,10 +4794,6 @@ function deleteContentDatabase(content_id) {
 }
 function getContentBySourceInfo(source_info) {
     let info = db.prepare("SELECT * FROM content WHERE source_info = ? OR source_info = ?").all(source_info, source_info + ".0");
-    for (let i in info) {
-        if (i.source_info?.endsWith(".0")) i.source_info = Number(i.source_info).toString();
-        if (i.version_id?.endsWith(".0")) i.version_id = Number(i.version_id).toString();
-    }
     return info;
 }
 
@@ -5599,6 +5589,123 @@ async function validateSha1(sha1, install_path) {
         await fsPromises.rm(install_path);
         throw new Error("Failed to verify download.");
     }
+}
+
+function watchProcessForExit(pid, last_played, instance_id) {
+    let startTime = new Date(last_played);
+    const timer = setInterval(async () => {
+        let check = checkForProcess(pid);
+        if (!check) {
+            clearInterval(timer);
+            if (win) {
+                win.webContents.send('process-exited', pid);
+                let crash_reports = await lookForCrashReports(instance_id, startTime);
+                if (crash_reports.length > 0) {
+                    win.webContents.send('game-crashed', crash_reports[crash_reports.length - 1], instance_id);
+                }
+            }
+        }
+    }, 1000);
+}
+
+getInstances().forEach(instance => {
+    if (checkForProcess(instance.pid)) {
+        watchProcessForExit(instance.pid, instance.last_played, instance.instance_id);
+    }
+});
+
+async function lookForCrashReports(instance_id, startTime) {
+    let dir = path.resolve(user_path, "minecraft", "instances", instance_id, "crash-reports");
+    let dir2 = path.resolve(user_path, "minecraft", "instances", instance_id);
+
+    let info = [];
+
+    if (fs.existsSync(dir)) {
+        info = info.concat((await fsPromises.readdir(dir, { withFileTypes: true }))
+            .filter(entry => entry.isFile())
+            .map(entry => {
+                const fullPath = path.join(dir, entry.name);
+                const stats = fs.statSync(fullPath);
+
+                return {
+                    name: entry.name,
+                    path: fullPath,
+                    created: stats.birthtimeMs,
+                    modified: stats.mtimeMs,
+                    type: "minecraft_crash_report",
+                    relativePath: "/crash-reports/" + entry.name
+                };
+            })
+            .filter(file =>
+                file.created >= startTime ||
+                file.modified >= startTime
+            ));
+    }
+    if (fs.existsSync(dir2)) {
+        info = info.concat((await fsPromises.readdir(dir, { withFileTypes: true })).filter(file => file.name.startsWith("hs_err_pid"))
+            .filter(entry => entry.isFile())
+            .map(entry => {
+                const fullPath = path.join(dir, entry.name);
+                const stats = fs.statSync(fullPath);
+
+                return {
+                    name: entry.name,
+                    path: fullPath,
+                    created: stats.birthtimeMs,
+                    modified: stats.mtimeMs,
+                    type: "java_crash_report",
+                    relativePath: "/" + entry.name
+                };
+            })
+            .filter(file =>
+                file.created >= startTime ||
+                file.modified >= startTime
+            ));
+    }
+    return info;
+}
+
+ipcMain.handle('analyze-crash-report', async (_, crash_report_path, instance_id) => {
+    return await analyzeCrashReport(crash_report_path, instance_id);
+});
+
+async function analyzeCrashReport(crash_report_path, instance_id) {
+    let textContent = await fsPromises.readFile(crash_report_path, { encoding: 'utf8' });
+    let matches = [...textContent.matchAll(/(?<![A-Za-z0-9_])([a-z0-9_]+\.)+([A-Z][a-zA-Z0-9_]+)/g)].map(e => e[0]);
+    let ignoreIdentifierStarts = ["net.minecraft", "com.mojang", "net.fabricmc", "java.", "org.spongepowered", "net.neoforged", "org.quiltmc", "com.llamalad7.mixinextras", "net.minecraftforge", "jdk.", "cpw.mods", "org.lwjgl", "sun.", "io.netty"];
+    let modFolder = path.resolve(user_path, "minecraft", "instances", instance_id, "mods");
+
+    matches = [...new Set(matches)];
+
+    for (const start of ignoreIdentifierStarts) {
+        matches = matches.filter(e => !e.startsWith(start));
+    }
+
+    if (matches.length == 0) return null;
+
+    const jars = (await fsPromises.readdir(modFolder)).filter(file => file.endsWith(".jar"));
+
+    for (const jar of jars) {
+        const jarPath = path.join(modFolder, jar);
+
+        try {
+            const zip = new AdmZip(jarPath);
+
+            for (const match of matches) {
+                const classPath = convertClassIdentifierToPath(match);
+
+                if (zip.getEntry(classPath)) {
+                    return getContentFromFileAndInstance(path.basename(jarPath), instance_id);
+                }
+            }
+        } catch { }
+    }
+
+    return null;
+}
+
+function convertClassIdentifierToPath(id) {
+    return id.replaceAll(".", "/") + ".class";
 }
 
 function hasColumn(table, column) {

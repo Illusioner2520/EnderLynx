@@ -350,6 +350,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
             callback(message);
         });
     },
+    onGameCrash: (callback) => {
+        ipcRenderer.on('game-crashed', (_event, crash_report, instance_id) => {
+            callback(crash_report, instance_id);
+        });
+    },
     onInstanceUpdated: (callback) => {
         ipcRenderer.on('instance-updated', (_event, key, value, instance_id) => {
             callback(key, value, instance_id);
@@ -377,7 +382,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     onPage: async (callback) => {
         pageCallback = callback;
-        if (startingPage) callback (startingPage);
+        if (startingPage) callback(startingPage);
     },
     onLaunchInstance: async (callback) => {
         launchInstanceCallback = callback;
@@ -440,25 +445,12 @@ contextBridge.exposeInMainWorld('enderlynx', {
     clearProcessWatches: () => {
         let keys = Object.keys(processWatches);
         for (let i = 0; i < keys.length; i++) {
-            clearInterval(processWatches[keys[i]]['interval']);
             delete processWatches[keys[i]];
         }
     },
     watchProcessForExit: (pid, callback) => {
-        if (processWatches[pid]) {
-            processWatches[pid].callback = callback;
-        } else {
-            processWatches[pid] = {};
-            processWatches[pid].callback = callback;
-            const timer = setInterval(() => {
-                let check = checkForProcess(pid);
-                if (!check) {
-                    clearInterval(timer);
-                    processWatches[pid].callback();
-                    delete processWatches[pid];
-                }
-            }, 1000);
-            processWatches[pid]['interval'] = timer;
+        processWatches[pid] = {
+            callback
         }
     },
     deleteContent: async (instance_id, project_type, filename) => {
@@ -719,6 +711,9 @@ contextBridge.exposeInMainWorld('enderlynx', {
     updateWindowButtonColors: async (hexCode, textColorHexCode) => {
         return await ipcRenderer.invoke('update-window-button-colors', hexCode, textColorHexCode);
     },
+    analyzeCrashReport: async (crash_report_path, instance_id) => {
+        return await ipcRenderer.invoke('analyze-crash-report', crash_report_path, instance_id);
+    },
     getInstance: (...params) => ipcRenderer.sendSync('get-instance', ...params),
     getInstances: async (...params) => ipcRenderer.invoke('get-instances', ...params),
     updateInstance: async (...params) => ipcRenderer.invoke('update-instance', ...params),
@@ -960,3 +955,9 @@ async function getOptions(optionsPath) {
 async function translate(key, ...params) {
     return await ipcRenderer.invoke('translate', key, ...params);
 }
+
+ipcRenderer.on('process-exited', (_, pid) => {
+    if (!processWatches[pid]) return;
+    processWatches[pid].callback();
+    delete processWatches[pid];
+});

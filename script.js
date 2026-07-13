@@ -787,30 +787,30 @@ class Instance {
                             {
                                 "name": translate("app.instances.settings.java_installation.browse"),
                                 "icon": '<i class="fa-solid fa-folder"></i>',
-                                "func": async (v, b, i) => {
-                                    let newValue = await window.enderlynx.triggerFileBrowse(v);
-                                    if (newValue) i.value = newValue;
+                                "func": async (value, button, setter) => {
+                                    let newValue = await window.enderlynx.triggerFileBrowse(value);
+                                    if (newValue) setter(newValue);
                                 }
                             },
                             {
                                 "name": translate("app.instances.settings.java_installation.test"),
                                 "icon": '<i class="fa-solid fa-play"></i>',
-                                "func": async (v, b) => {
+                                "func": async (value, button, setter) => {
                                     let num = Math.floor(Math.random() * 10000);
-                                    b.setAttribute("data-num", num);
-                                    b.classList.remove("failed");
-                                    b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
-                                    let success = await window.enderlynx.testJavaInstallation(v);
+                                    button.setAttribute("data-num", num);
+                                    button.classList.remove("failed");
+                                    button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
+                                    let success = await window.enderlynx.testJavaInstallation(value);
                                     if (success) {
-                                        b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
+                                        button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
                                     } else {
-                                        b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
-                                        b.classList.add("failed");
+                                        button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
+                                        button.classList.add("failed");
                                     }
                                     setTimeout(() => {
-                                        if (b.getAttribute("data-num") == num) {
-                                            b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
-                                            b.classList.remove("failed");
+                                        if (button.getAttribute("data-num") == num) {
+                                            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
+                                            button.classList.remove("failed");
                                         }
                                     }, 3000);
                                 }
@@ -3319,7 +3319,7 @@ class InstanceScreen extends Screen {
         this.instance = instance;
     }
 
-    calculateContent(default_tab, make_button_loading) {
+    calculateContent(default_tab, make_button_loading, file_path) {
         this.contentElement.innerHTML = "";
         this.contentElement.className = "instance-content";
         let topBar = createElement("div", "instance-top");
@@ -3509,6 +3509,10 @@ class InstanceScreen extends Screen {
             }
         ]);
         this.tabs.selectOption(default_tab || "content");
+        if (file_path && default_tab == "files") {
+            console.log(file_path);
+            this.setFilesPath(file_path);
+        }
     }
 
     async display(dont_add_to_log, ...args) {
@@ -5033,7 +5037,7 @@ class InstanceScreen extends Screen {
         this.tabElement.appendChild(fragment);
     }
 
-    async showFiles() {
+    async showFiles(startingFilePath = "") {
         let searchAndFilter = createElement("div", "search-and-filter-v3");
         let filesBreadcrumb = createElement("div", "files-breadcrumb");
         let homeButton = createElement("button", "home-button");
@@ -5072,7 +5076,7 @@ class InstanceScreen extends Screen {
         this.filesSearch = searchAndFilter;
         this.filesBreadcrumb = filesBreadcrumb;
         MoreMenu.clearMenus();
-        await this.setFilesPath("");
+        await this.setFilesPath(startingFilePath);
     }
 
     async setFilesPath(paths) {
@@ -10607,13 +10611,15 @@ class Dialog {
                 textElement.className = "dialog-label-desc";
             }
             if (info.width) textElement.style.width = info.width + "px";
-            value.element = textElement;
+            wrapper.appendChild(textElement);
+            value.element = wrapper;
         } else if (info.type == "info") {
             let infoElement = createElement("div", "info", {
                 innerHTML: '<i class="fa-solid fa-triangle-exclamation"></i>' + info.content
             });
             if (info.width) infoElement.style.width = info.width + "px";
-            value.element = infoElement;
+            wrapper.appendChild(infoElement);
+            value.element = wrapper;
         } else if (info.type == "text" || info.type == "number") {
             label.htmlFor = info.id;
             labelDesc.htmlFor = info.id;
@@ -14365,4 +14371,80 @@ observer.observe(document.body, {
     subtree: true,
     attributes: true,
     attributeFilter: ["open"]
+});
+
+window.enderlynx.onGameCrash((crash_report, instance_id) => {
+    let instance = Instance.getInstance(instance_id);
+    let dialog = new Dialog();
+    dialog.showDialog(translate("app.instances.crashed", "%i", instance.name), "form", [
+        {
+            "type": "notice",
+            "content": translate("app.instances.crashed.desc", "%i", instance.name),
+            "buttons": [
+                crash_report.type == "minecraft_crash_report" ? {
+                    "name": translate("app.instances.crashed.find_culprit"),
+                    "icon": '<i class="fa-solid fa-magnifying-glass"></i>',
+                    "func": async (value, button, setter) => {
+                        let dialog = new Dialog();
+                        let element = createElement('div', "culprit-wrapper");
+                        let loader = new LoadingContainer();
+                        element.appendChild(loader.element);
+                        dialog.showDialog(translate("app.instances.crashed.find_culprit.title"), "notice", element, [
+                            {
+                                "type": "confirm",
+                                "content": translate("app.instances.crashed.close")
+                            }
+                        ], [], () => { });
+                        let analysis = await window.enderlynx.analyzeCrashReport(crash_report.path, instance_id);
+                        loader.element.remove();
+                        if (analysis) {
+                            element.appendChild(createElement("div", undefined, {
+                                textContent: translate("app.instances.crashed.find_culprit.found")
+                            }));
+                            let mod = createElement("div", "dependency");
+                            let image = createElement("img", "dependency-image", {
+                                src: fixPathForImage(analysis.image || getDefaultImage(analysis.name))
+                            });
+                            let info = createElement("div", "dependency-info");
+                            let title = createElement("div", "dependency-title", {
+                                textContent: analysis.name
+                            });
+                            let file_name = createElement("div", "dependency-sub", {
+                                textContent: analysis.file_name
+                            });
+                            info.appendChild(title);
+                            info.appendChild(file_name);
+                            mod.appendChild(image);
+                            mod.appendChild(info);
+                            element.appendChild(mod);
+                        } else {
+                            element.appendChild(createElement("div", undefined, {
+                                textContent: translate("app.instances.crashed.find_culprit.not_found", "%m", loaders[instance.loader])
+                            }));
+                        }
+                    }
+                } : null,
+                {
+                    "name": translate("app.instances.crashed.open_report"),
+                    "icon": '<i class="fa-solid fa-eye"></i>',
+                    "func": () => {
+                        instance.instanceScreen.display(false, "files", false, crash_report.relativePath);
+                        dialog.closeDialog();
+                    }
+                },
+                {
+                    "name": translate("app.instances.crashed.open_report_folder"),
+                    "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
+                    "func": () => {
+                        window.enderlynx.showFileInFolder(crash_report.path);
+                    }
+                }
+            ].filter(e => e)
+        }
+    ], [
+        {
+            "type": "confirm",
+            "content": translate("app.instances.crashed.close")
+        }
+    ], [], () => { });
 });

@@ -4441,7 +4441,7 @@ dialog[open]::backdrop {
     padding: 8px;
     gap: 8px;
     align-items: center;
-    transition: backgroun-color .25s, scale .1s;
+    transition: background-color .25s, scale .1s;
 }
 
 button.dependency {
@@ -4484,6 +4484,14 @@ button.dependency:active {
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+}
+
+.culprit-wrapper {
+    width: 100%;
+    align-self: start;
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
 }
 
 .markdown-body {

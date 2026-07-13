@@ -1281,5 +1281,14 @@
     "app.instances.settings.custom.window": "Custom Window Settings",
     "app.instances.settings.custom.java_args": "Custom Java Arguments",
     "app.instances.settings.custom.java_installation": "Custom Java Installation",
-    "app.instances.settings.custom.allocated_ram": "Custom Allocated RAM"
+    "app.instances.settings.custom.allocated_ram": "Custom Allocated RAM",
+    "app.instances.crashed": "Instance '%i' crashed!",
+    "app.instances.crashed.close": "Close",
+    "app.instances.crashed.desc": "Instance '%i' has crashed. You can attempt to find the mod that is the likely culprit or open the crash report.",
+    "app.instances.crashed.find_culprit": "Find Likely Culprit",
+    "app.instances.crashed.open_report": "Open Crash Report",
+    "app.instances.crashed.open_report_folder": "Open Crash Report in Folder",
+    "app.instances.crashed.find_culprit.not_found": "No Likely Culprit Found. It may be an issue with %m or vanilla Minecraft.",
+    "app.instances.crashed.find_culprit.found": "This mod is the likely culprit of the crash. You can try updating or disabling it.",
+    "app.instances.crashed.find_culprit.title": "Likely Culprit"
 }
