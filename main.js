@@ -2022,7 +2022,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "xuid": player_info.xuid
         }, {
             "width": width || 854,
-            "height": instance_info.window_height || 480,
+            "height": height || 480,
             "fullscreen": Boolean(fullscreen || false)
         },
         settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
