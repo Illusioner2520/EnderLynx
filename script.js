@@ -2147,18 +2147,26 @@ class SearchDropdown extends Dropdown {
         this.dropdownList.classList.remove("dropdown-list");
         this.dropdownList.classList.add('dropdown-list-dialog');
         this.dropdownList.popover = "manual";
+        let close = () => {
+            this.dropdownList.hidePopover();
+            let values = this.options.filter(e => e.value.toLowerCase() == dropdownSearchInput.value.trim().toLowerCase());
+            if (values.length > 0) {
+                this.selectOption(values[0].value);
+            }
+        }
         let closePointer = (e) => {
             if (!this.dropdownList.matches(':popover-open')) return;
             const t = e.target;
             if (this.dropdownList.contains(t)) return;
             if (t === dropdownSearchInput || dropdownSearchInput.contains(t)) return;
-            this.dropdownList.hidePopover();
+            close();
             document.body.removeEventListener('pointerup', closePointer);
             document.body.removeEventListener('keydown', closeEscape);
         }
         let closeEscape = (e) => {
             if (e.key == "Escape") {
-                this.dropdownList.hidePopover();
+                if (this.dropdownList.matches(":popover-open")) e.preventDefault();
+                close();
                 document.body.removeEventListener('pointerup', closePointer);
                 document.body.removeEventListener('keydown', closeEscape);
             }
@@ -2168,13 +2176,32 @@ class SearchDropdown extends Dropdown {
     }
     filter() {
         let value = this.dropdownSearchInput.value.toLowerCase().trim();
-        this.optEles.forEach(e => {
-            if (!e.innerHTML.toLowerCase().includes(value)) {
-                e.style.display = "none";
-            } else {
+        if (!value) {
+            this.optEles.forEach(e => {
                 e.style.display = "";
+                this.popover.appendChild(e);
+            });
+            return;
+        }
+        let exactMatches = [];
+        let startMatches = [];
+        let otherMatches = [];
+        this.optEles.forEach(e => {
+            let text = e.innerHTML.toLowerCase();
+            if (!text.includes(value)) {
+                e.style.display = "none";
+                return;
+            }
+            e.style.display = "";
+            if (text == value) {
+                exactMatches.push(e);
+            } else if (text.startsWith(value)) {
+                startMatches.push(e);
+            } else {
+                otherMatches.push(e);
             }
         });
+        exactMatches.concat(startMatches, otherMatches).forEach(e => this.popover.appendChild(e));
     }
 }
 
