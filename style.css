@@ -2458,6 +2458,10 @@ dialog[open]::backdrop {
     scale: .95;
 }
 
+.image-upload-button:hover {
+    background-color: var(--color-2);
+}
+
 .log-info {
     color: skyblue;
 }
