@@ -441,14 +441,6 @@
     "app.instances.file": "File",
     "app.instances.file.description": "Select a .mrpack file, .elpack file, CurseForge .zip file or a MultiMC/Prism .zip file",
     "app.instances.file.types": "Instance File",
-    "app.instances.launcher": "Launcher",
-    "app.launcher.modrinth": "Modrinth App",
-    "app.launcher.curseforge": "CurseForge App",
-    "app.launcher.multimc": "MultiMC",
-    "app.launcher.prism": "PrismLauncher",
-    "app.launcher.atlauncher": "ATLauncher",
-    "app.launcher.gdlauncher": "GDLauncher",
-    "app.launcher.vanilla": "Minecraft Launcher",
     "app.instances.no_game_version": "Could not create instance because you didn't specify a game version",
     "app.instances.no_name": "Could not create instance because you didn't specify a name",
     "app.instances.play_time": "Play Time",
@@ -1281,5 +1273,6 @@
     "app.instances.settings.custom.window": "Custom Window Settings",
     "app.instances.settings.custom.java_args": "Custom Java Arguments",
     "app.instances.settings.custom.java_installation": "Custom Java Installation",
-    "app.instances.settings.custom.allocated_ram": "Custom Allocated RAM"
+    "app.instances.settings.custom.allocated_ram": "Custom Allocated RAM",
+    "app.discover.failed_to_install": "Failed to install %n"
 }

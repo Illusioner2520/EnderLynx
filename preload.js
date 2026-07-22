@@ -336,8 +336,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
         });
     },
     onContentInstallUpdate: (callback) => {
-        ipcRenderer.on('content-install-update', (_, content_id, percent) => {
-            callback(content_id, percent);
+        ipcRenderer.on('content-install-update', (_, content_id, instance_id, percent) => {
+            callback(content_id, instance_id, percent);
         });
     },
     onOpenFileShare: (callback) => {

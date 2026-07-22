@@ -2619,13 +2619,13 @@ async function addContent(instance_id, project_type, project_url, sha1, filename
 
     await urlToFile(project_url, install_path, {
         onProgress: (p) => {
-            win.webContents.send('content-install-update', content_id, p);
+            win.webContents.send('content-install-update', content_id, instance_id, p);
         }
     });
 
     await validateSha1(sha1, install_path);
 
-    win.webContents.send('content-install-update', content_id, 100);
+    win.webContents.send('content-install-update', content_id, instance_id, 100);
 
     if (project_type === "world") {
         const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
@@ -4722,16 +4722,10 @@ ipcMain.handle('stop-watching-file', (_, filepath) => {
 // Instance management
 function getInstance(instance_id) {
     let info = db.prepare("SELECT * FROM instances WHERE instance_id = ? LIMIT 1").get(instance_id);
-    if (info.install_id?.endsWith(".0")) info.install_id = Number(info.install_id).toString();
-    if (info.installed_version?.endsWith(".0")) info.installed_version = Number(info.installed_version).toString();
     return info;
 }
 function getInstances() {
     let info = db.prepare("SELECT * FROM instances").all();
-    for (let i of info) {
-        if (i.install_id?.endsWith(".0")) i.install_id = Number(i.install_id).toString();
-        if (i.installed_version?.endsWith(".0")) i.installed_version = Number(i.installed_version).toString();
-    }
     return info;
 }
 function updateInstance(key, value, instance_id) {
