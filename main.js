@@ -1333,9 +1333,6 @@ async function processCfZip(instance_id, info, title = ".zip file") {
             content.forEach(item => {
                 if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
                     item.name = e.name;
-                    if (!e?.logo?.thumbnailUrl) {
-                        console.log(e);
-                    }
                     item.image = e.logo?.thumbnailUrl;
                     item.author = e.authors.map(e => e.name).join(", ");
                 }
