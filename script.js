@@ -13475,7 +13475,7 @@ async function installButtonClick(content, version, instance_id) {
                 {
                     "type": "multi-select",
                     "name": translate("app.instances.loader"),
-                    "options": content_loaders?.length && project_type == "mod" ? (content_loaders?.map(e => ({ name: loaders[e], value: e })) || "vanilla") : [
+                    "options": content_loaders?.length && project_type == "mod" ? (content_loaders?.filter(e => loaders[e]).map(e => ({ name: loaders[e], value: e })) || "vanilla") : [
                         project_type != "shader" ? { "name": loaders["vanilla"], "value": "vanilla" } : null,
                         { "name": loaders["fabric"], "value": "fabric" },
                         { "name": loaders["forge"], "value": "forge" },
