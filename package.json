@@ -29,7 +29,7 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",
     "ace-builds": "^1.43.6",
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.6.0",
     "better-sqlite3": "^12.6.2",
     "create-desktop-shortcuts": "^1.11.1",
     "discord-rpc": "^4.0.1",
