@@ -13401,7 +13401,7 @@ async function installButtonClick(content, version, instance_id, dialog_to_close
             { "content": translate("app.instances.cancel"), "type": "cancel" },
             { "content": translate("app.instances.submit"), "type": "confirm" }
         ], [], async (info) => {
-            if (dialog_to_close) dialog_to_close.close();
+            contentInfo.close();
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
             if (!version) version = await content.getVersion(info.loader, info.game_version, project_type, content.id, content.source);
             if (!version) {
