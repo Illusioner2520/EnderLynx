@@ -90,7 +90,6 @@ Run: `npm run build:linux`
 Note for Linux:
 - `.deb` needs `fakeroot` and `dpkg` installed
 - `.rpm` needs `rpm` installed
-- `.flatpak` needs `flatpak`, `flatpak-builder` and `elfutils` installed
 
 ### MacOS
 
