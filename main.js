@@ -1165,7 +1165,7 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                     content.forEach(item => {
                         if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
                             item.name = e.name;
-                            item.image = e.logo.thumbnailUrl;
+                            item.image = e.logo?.thumbnailUrl;
                             item.author = e.authors.map(e => e.name).join(", ");
                         }
                     });
@@ -1333,7 +1333,10 @@ async function processCfZip(instance_id, info, title = ".zip file") {
             content.forEach(item => {
                 if (item.source === "curseforge" && Number(item.source_id) == Number(e.id)) {
                     item.name = e.name;
-                    item.image = e.logo.thumbnailUrl;
+                    if (!e?.logo?.thumbnailUrl) {
+                        console.log(e);
+                    }
+                    item.image = e.logo?.thumbnailUrl;
                     item.author = e.authors.map(e => e.name).join(", ");
                 }
             });
@@ -1795,7 +1798,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                         content.forEach(item => {
                             if (item.source === "curseforge" && item.source_id == e.id + ".0") {
                                 item.name = e.name;
-                                item.image = e.logo.thumbnailUrl;
+                                item.image = e.logo?.thumbnailUrl;
                                 item.author = e.authors.map(e => e.name).join(", ");
                             }
                         });
