@@ -6677,6 +6677,7 @@ class DiscoverScreen extends Screen {
         dropdownElement.style.minWidth = "200px";
         this.sourceDropdown = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, (v) => {
             this.active_categories = [];
+            this.categoryFilters.clear();
             this.getContent();
             this.content_source = v;
         });
@@ -6768,6 +6769,7 @@ class DiscoverScreen extends Screen {
         });
         this.active_categories = [];
         this.categoryFilters = categoryFilters;
+        this.categoryFilters.clear();
         let paginationBottom = new Pagination(1, this.totalPages, (new_page) => {
             this.getContent(new_page);
         });
@@ -14479,6 +14481,7 @@ class CategoryFilter {
     clear() {
         this.activeCategories = [];
         this.setCategories(this.categories);
+        this.categoryActive.textContent = translate("app.categories.active", "%n", this.activeCategories.length);
     }
 }
 
