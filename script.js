@@ -13287,7 +13287,7 @@ function fixPathForImage(path) {
 }
 
 let plugin_loaders = ["folia", "spigot", "paper", "bungeecord", "purpur", "waterfall", "velocity", "bukkit", "sponge"];
-async function installButtonClick(content, version, instance_id, dialog_to_close) {
+async function installButtonClick(content, version, instance_id) {
     let count = 0;
     let project_type = version?.project_type || content.project_type;
     let source = content.source;
