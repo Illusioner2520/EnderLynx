@@ -4901,7 +4901,7 @@ button.dependency:active {
     gap: 4px;
     max-width: 100%;
     flex-wrap: wrap;
-    align-content: center;
+    align-self: start;
 }
 
 .version-file-changelog {
