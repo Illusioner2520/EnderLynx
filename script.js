@@ -14312,7 +14312,7 @@ class DiscoverStateManagement {
         }
     }
     static async updateButton(buttonInfo, info) {
-        if (info.state == DiscoverState.LOADING) {
+        if (info.state == DiscoverState.LOADING && buttonInfo.version_id == null) {
             this.applyInstallButtonState(InstallButtonState.LOADING, buttonInfo);
             return;
         }
