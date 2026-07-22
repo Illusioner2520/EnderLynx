@@ -1019,7 +1019,7 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
         if (packMcMeta?.pack?.description?.fallback) name = packMcMeta.pack.description.fallback;
         if (typeof name !== "string") name = file.replace(".zip.disabled", ".zip");
         return {
-            type: 'resource_pack',
+            type: 'resourcepack',
             name: name,
             file_name: file,
             version: "",
@@ -1106,7 +1106,7 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                     if (item.source_id == e.id) {
                         item.name = e.title;
                         item.image = e.icon_url;
-                        item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                        item.type = e.project_type === "resourcepack" ? "resourcepack" : e.project_type;
                         if (e.organization) {
                             organization_ids.push(e.organization);
                             if (!organization_to_project_ids[e.organization]) organization_to_project_ids[e.organization] = [e.id];
@@ -1275,14 +1275,14 @@ async function processCfZip(instance_id, info, title = ".zip file") {
                 } else if (file_name.endsWith(".zip")) {
                     const tempZip = new AdmZip(tempFilePath);
                     if (tempZip.getEntry("pack.mcmeta")) {
-                        project_type = "resource_pack";
+                        project_type = "resourcepack";
                         destFolder = "resourcepacks";
                     } else if (tempZip.getEntry("shaders/")) {
                         destFolder = "shaderpacks";
                         project_type = "shader";
                     } else {
                         destFolder = "resourcepacks";
-                        project_type = "resource_pack";
+                        project_type = "resourcepack";
                     }
                 }
             } catch (e) {
@@ -1494,7 +1494,7 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
                 if (item.source_id == e.id) {
                     item.name = e.title;
                     item.image = e.icon_url;
-                    item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                    item.type = e.project_type === "resourcepack" ? "resourcepack" : e.project_type;
                     if (e.organization) {
                         organization_ids.push(e.organization);
                         if (!organization_to_project_ids[e.organization]) organization_to_project_ids[e.organization] = [e.id];
@@ -1645,7 +1645,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                 signal.throwIfAborted();
                 let install_path = "";
                 if (file.type == "mod") install_path = "mods/";
-                if (file.type == "resource_pack") install_path = "resourcepacks/";
+                if (file.type == "resourcepack") install_path = "resourcepacks/";
                 if (file.type == "shader") install_path = "shaderpacks/";
                 install_path += file.file_name;
                 let url = "";
@@ -1708,7 +1708,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                         if (item.source === "modrinth" && item.source_id === e.id) {
                             item.name = e.title;
                             item.image = e.icon_url;
-                            item.type = e.project_type === "resourcepack" ? "resource_pack" : e.project_type;
+                            item.type = e.project_type === "resourcepack" ? "resourcepack" : e.project_type;
                             if (e.organization) {
                                 mr_organization_ids.push(e.organization);
                                 if (!mr_organization_to_project_ids[e.organization]) mr_organization_to_project_ids[e.organization] = [e.id];
@@ -2601,13 +2601,13 @@ async function addContent(instance_id, project_type, project_url, sha1, filename
     let install_path = "";
     if (project_type == "mod") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/mods`, filename);
-    } else if (project_type == "resourcepack" || project_type == "resource_pack") {
+    } else if (project_type == "resourcepack") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`, filename);
     } else if (project_type == "shader") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/shaderpacks`, filename);
     } else if (project_type == "world") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/temp_worlds`, filename);
-    } else if (project_type == "datapack" || project_type == "data_pack") {
+    } else if (project_type == "datapack") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/saves/${data_pack_world}/datapacks`, filename);
     }
 
@@ -2678,15 +2678,13 @@ async function addContent(instance_id, project_type, project_url, sha1, filename
 
     let type_convert = {
         "mod": "mod",
-        "resourcepack": "resource_pack",
+        "resourcepack": "resourcepack",
         "shader": "shader",
         "world": "world",
-        "datapack": "data_pack",
-        "resource_pack": "resource_pack",
-        "data_pack": "data_pack"
+        "datapack": "datapack"
     }
 
-    if (getDefault("auto_apply_resource_packs") == "true" && (project_type == "resourcepack" || project_type == "resource_pack")) {
+    if (getDefault("auto_apply_resource_packs") == "true" && (project_type == "resourcepack")) {
         applyResourcePack(instance_id, filename);
     }
 
@@ -4260,24 +4258,24 @@ ipcMain.handle('import-content', async (_, info, content_type, instance_id) => {
                 const tempZip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
                 if (tempZip.getEntry("pack.mcmeta")) {
                     destFolder = "resourcepacks";
-                    fileType = "resource_pack";
+                    fileType = "resourcepack";
                 } else if (tempZip.getEntry("shaders/")) {
                     destFolder = "shaderpacks";
                     fileType = "shader";
                 } else {
                     destFolder = "resourcepacks";
-                    fileType = "resource_pack";
+                    fileType = "resourcepack";
                 }
             } catch (e) {
                 destFolder = "resourcepacks";
-                fileType = "resource_pack";
+                fileType = "resourcepack";
             }
         } else {
             return null;
         }
     } else {
         if (content_type === "mod") destFolder = "mods";
-        else if (content_type === "resource_pack") destFolder = "resourcepacks";
+        else if (content_type === "resourcepack") destFolder = "resourcepacks";
         else if (content_type === "shader") destFolder = "shaderpacks";
         else destFolder = "mods";
     }
@@ -4504,7 +4502,7 @@ ipcMain.handle('delete-content', async (_, instance_id, project_type, filename) 
     let install_path = "";
     if (project_type == "mod") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/mods`, filename);
-    } else if (project_type == "resource_pack") {
+    } else if (project_type == "resourcepack") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`, filename);
     } else if (project_type == "shader") {
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/shaderpacks`, filename);
@@ -5696,6 +5694,9 @@ try {
             addColumnIfMissing("mc_versions_cache", "data_version", "INTEGER");
             dropColumnIfExists("options_defaults", "version");
             db.prepare("DELETE FROM options_defaults WHERE key = ?").run("version");
+        case "0.11.0":
+        case "0.11.1":
+            db.prepare("UPDATE content SET type = ? WHERE type = ?").run("resourcepack", "resource_pack");
     }
     setDefault("saved_version", version);
 } catch (e) {

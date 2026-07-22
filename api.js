@@ -1,6 +1,5 @@
 class Project {
     static modrinth_project_type_conversion = {
-        "resourcepack": "resource_pack",
         "minecraft_java_server": "server"
     }
     static curseforge_project_type_conversion = {
@@ -539,7 +538,24 @@ class Author {
     }
 }
 
+class Category {
+    constructor(info, source) {
+        if (source == "modrinth") {
+            this.id = info.name;
+            this.name = "app.category." + info.name;
+            this.header = info.header == "categories" ? null : "app.category.header." + info.header;
+            this.project_type = Project.modrinth_project_type_conversion[info.project_type] || info.project_type;
+        } else if (source == "curseforge") {
+            this.id = info.id.toString();
+            this.name = info.name;
+            this.header = null;
+            this.project_type = Project.curseforge_project_type_conversion[info.classId] || "not_something_we_support_i_guess";
+        }
+    }
+}
+
 class Modrinth {
+    static categories = [];
     static modrinthToMinecraftVersions = {
         "1.14.2-pre4": "1.14.2 Pre-Release 4",
         "1.14.2-pre3": "1.14.2 Pre-Release 3",
@@ -557,7 +573,7 @@ class Modrinth {
     static minecraftToModrinthVersions = Object.fromEntries(
         Object.entries(Modrinth.modrinthToMinecraftVersions).map(([key, value]) => [value, key])
     )
-    static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") {
+    static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance", activeCategories = []) {
         if (loader == "all") loader = null;
         if (version == "all") version = null;
         if (project_type == "server") project_type = "minecraft_java_server";
@@ -570,6 +586,9 @@ class Modrinth {
             facets.push("(game_versions IN [\"" + version + "\"] OR minecraft_java_server.content.supported_game_versions IN [\"" + version + "\"])");
         }
         facets.push("project_types = " + project_type);
+        for (let category of activeCategories) {
+            facets.push(`categories = \"${category}\"`);
+        }
         let url = `https://api.modrinth.com/v3/search?query=${query}&limit=${pageSize}&index=${sort}&new_filters=${facets.join("%20AND%20")}&offset=${(page - 1) * pageSize}`;
         let urlInfo = await (await fetch(url)).json();
         let projects = [];
@@ -592,10 +611,20 @@ class Modrinth {
         }
         return this.minecraftToModrinthVersions[v] || v;
     }
+    static async getCategories(project_type) {
+        if (project_type == "datapack") project_type = "mod";
+        if (Modrinth.categories.length == 0) {
+            let url = "https://api.modrinth.com/v3/tag/category";
+            let urlInfo = await (await fetch(url)).json();
+            this.categories = urlInfo.map(e => new Category(e, "modrinth"));
+        }
+        return this.categories.filter(e => e.project_type == project_type);
+    }
 }
 
 class CurseForge {
-    static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") {
+    static categories = [];
+    static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance", activeCategories = []) {
         if (loader == "all") loader = null;
         if (version == "all") version = null;
         if (pageSize > 50) pageSize = 50;
@@ -617,7 +646,9 @@ class CurseForge {
         if (project_type == "world") id = 17;
         if (project_type == "datapack") id = 6945;
         if (project_type) ci = "&classId=" + id;
-        let url = `https://api.curse.tools/v1/cf/mods/search?gameId=432&index=${(page - 1) * pageSize}&searchFilter=${query}${gv}&pageSize=${pageSize}&sortField=${sort}&sortOrder=${sortOrder}${gf}${ci}`;
+        let categories = "";
+        if (activeCategories.length > 0) categories = "&categoryIds=" + activeCategories.join(",");
+        let url = `https://api.curse.tools/v1/cf/mods/search?gameId=432&index=${(page - 1) * pageSize}&searchFilter=${query}${gv}&pageSize=${pageSize}&sortField=${sort}&sortOrder=${sortOrder}${gf}${ci}${categories}`;
         let res = await fetch(url);
         let urlInfo = await res.json();
         if (urlInfo.pagination.totalCount > 10000) urlInfo.pagination.totalCount = 10000;
@@ -628,6 +659,14 @@ class CurseForge {
             projects.push(project);
         }
         return { projects, total_hits: urlInfo.pagination.totalCount };
+    }
+    static async getCategories(project_type) {
+        if (CurseForge.categories.length == 0) {
+            let url = "https://api.curse.tools/v1/categories?gameId=432";
+            let urlInfo = await (await fetch(url)).json();
+            this.categories = urlInfo.data.map(e => new Category(e, "curseforge"));
+        }
+        return this.categories.filter(e => e.project_type == project_type);
     }
 }
 

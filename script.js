@@ -988,7 +988,7 @@ class Instance {
         let contentSpecific = [];
         let contentMap = {};
         content.forEach(e => {
-            let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+            let content_folder = e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks";
             let content_file = content_folder + "/" + e.file_name;
             let replace = content_folder + "/" + parseMinecraftFormatting(e.name).replaceAll("\\", "\\\\").replaceAll("/", "\\/");
             contentSpecific.push(replace);
@@ -1141,7 +1141,7 @@ class Instance {
             let yesContentSpecific = info.files.filter(e => contentSpecific.includes(e)).map(e => contentMap[e]);
             yesContentSpecific = yesContentSpecific.filter(e => {
                 if (e.source != "player_install") return true;
-                let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                let content_folder = e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks";
                 let content_file = content_folder + "/" + e.file_name;
                 nonContentSpecific.push(content_file);
                 return false;
@@ -1151,7 +1151,7 @@ class Instance {
             } else if (info.out == "mrpack") {
                 yesContentSpecific = yesContentSpecific.filter(e => {
                     if (e.source == "modrinth") return true;
-                    let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                    let content_folder = e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks";
                     let content_file = content_folder + "/" + e.file_name;
                     nonContentSpecific.push(content_file);
                     return false;
@@ -1160,7 +1160,7 @@ class Instance {
             } else if (info.out == "cf_zip") {
                 yesContentSpecific = yesContentSpecific.filter(e => {
                     if (e.source == "curseforge") return true;
-                    let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+                    let content_folder = e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks";
                     let content_file = content_folder + "/" + e.file_name;
                     nonContentSpecific.push(content_file);
                     return false;
@@ -1178,7 +1178,7 @@ class Instance {
         let contentSpecific = [];
         let contentMap = {};
         content.forEach(e => {
-            let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+            let content_folder = e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks";
             let content_file = content_folder + "/" + e.file_name;
             let replace = content_folder + "/" + parseMinecraftFormatting(e.name).replaceAll("\\", "\\\\").replaceAll("/", "\\/");
             contentSpecific.push(replace);
@@ -2939,7 +2939,7 @@ async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDro
         let e = content[i];
         if (e.file_name == await contentInfo.secondary_column.desc()) {
             if (e.disabled) {
-                let new_file_name = await window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                let new_file_name = await window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_enable"));
                     return;
@@ -2949,7 +2949,7 @@ async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDro
                 contentInfo.secondary_column.desc = () => new_file_name;
                 displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
             } else {
-                let new_file_name = await window.enderlynx.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                let new_file_name = await window.enderlynx.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks", e.file_name);
                 if (!new_file_name) {
                     displayError(translate("app.error.failure_to_disable"));
                     return;
@@ -3665,7 +3665,7 @@ class InstanceScreen extends Screen {
                         },
                         {
                             "name": translate("app.content.resource_pack"),
-                            "value": "resource_pack"
+                            "value": "resourcepack"
                         },
                         {
                             "name": translate("app.content.shader"),
@@ -3726,7 +3726,7 @@ class InstanceScreen extends Screen {
             },
             {
                 "name": translate("app.content.resource_packs"),
-                "value": "resource_pack"
+                "value": "resourcepack"
             },
             {
                 "name": translate("app.content.shaders"),
@@ -3821,7 +3821,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.content.open"),
                                 "icon": '<i class="fa-solid fa-up-right-from-square"></i>',
                                 "func": async () => {
-                                    window.enderlynx.showContentInFolder(this.instance.instance_id, e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks", e.file_name);
+                                    window.enderlynx.showContentInFolder(this.instance.instance_id, e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks", e.file_name);
                                 }
                             },
                             e.source == "modrinth" || e.source == "curseforge" ? {
@@ -6551,6 +6551,7 @@ class DiscoverScreen extends Screen {
         this.vanilla_version = vanilla_version;
         this.loader = loader;
         this.default_tab = default_tab;
+        this.active_categories = [];
         added_vt_packs = [];
         DiscoverStateManagement.setInstance(instance);
         let titleTop = createElement("div", "title-top");
@@ -6637,7 +6638,6 @@ class DiscoverScreen extends Screen {
     }
 
     contentTabSelect(tab) {
-        if (tab == "resource_pack") tab = "resourcepack";
         this.currentTab = tab;
         this.tabElement.innerHTML = '';
         let sources = [];
@@ -6676,55 +6676,20 @@ class DiscoverScreen extends Screen {
         let dropdownElement = document.createElement("div");
         dropdownElement.style.minWidth = "200px";
         this.sourceDropdown = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, (v) => {
+            this.active_categories = [];
             this.getContent();
             this.content_source = v;
         });
         if (this.content_source != "default" && sources.map(e => e.value).includes(this.content_source)) {
             this.sourceDropdown.selectOption(this.content_source);
         }
-        this.getContent();
         searchAndFilter.appendChild(dropdownElement);
         searchAndFilter.appendChild(searchElement);
         this.tabElement.appendChild(searchAndFilter);
-        this.tabElement.appendChild(this.discoverList);
-    }
-
-    async getContent(page = 1) {
-        let pageId = Math.random();
-        this.pageId = pageId;
-        let source = this.sourceDropdown.value;
-        let query = this.searchBar.value;
-        let instance_content = [];
-        if (this.instance) instance_content = await this.instance.getContent();
-        if (["fabric", "forge", "neoforge", "quilt"].includes(this.loader_dropdown) && this.currentTab == "server") this.loader_dropdown = "all";
-        if (this.currentTab != "server") {
-            if (this.loader_dropdown == "vanilla" || this.loader_dropdown == "modpack") this.loader_dropdown = "all";
-        }
-        let content_ids = instance_content.map(e => e.source_info);
-        this.discoverList.innerHTML = "";
-        let loading = new LoadingContainer();
-        this.discoverList.appendChild(loading.element);
-        this.requestFrame();
-        if (source == "vanilla_tweaks") {
-            new VanillaTweaksSelector(this.currentTab, this.game_version, this.instance?.instance_id, undefined, this.discoverList, query);
-            return;
-        }
-        let results = [];
-        try {
-            if (source == "modrinth") results = await Modrinth.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by);
-            else if (source == "curseforge") results = await CurseForge.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by);
-            if (this.pageId != pageId) return;
-            this.discoverList.innerHTML = "";
-        } catch (err) {
-            loading.errorOut(err, () => {
-                this.getContent(page);
-            });
-            return;
-        }
-        this.totalPages = Math.ceil(results.total_hits / this.view);
-        let paginationTop = new Pagination(page, this.totalPages, (new_page) => {
+        let paginationTop = new Pagination(1, this.totalPages, (new_page) => {
             this.getContent(new_page);
         });
+        this.paginationTop = paginationTop;
         let sortByDropdownElement = createElement("div");
         sortByDropdownElement.style.width = "150px";
         let gameVersionDropdownElement = createElement("div");
@@ -6796,15 +6761,74 @@ class DiscoverScreen extends Screen {
             this.loader_dropdown = new_loader;
             this.getContent();
         });
-        let paginationBottom = new Pagination(page, this.totalPages, (new_page) => {
+        let categoryWrapperElement = createElement("div");
+        let categoryFilters = new CategoryFilter(categoryWrapperElement, [], [], (active_categories) => {
+            this.active_categories = active_categories;
+            this.getContent();
+        });
+        this.active_categories = [];
+        this.categoryFilters = categoryFilters;
+        let paginationBottom = new Pagination(1, this.totalPages, (new_page) => {
             this.getContent(new_page);
         });
+        this.paginationBottom = paginationBottom;
         let discoverListTop = createElement("div", "discover-list-top");
-        this.discoverList.appendChild(discoverListTop);
         discoverListTop.appendChild(sortByDropdownElement);
         discoverListTop.appendChild(gameVersionDropdownElement);
         if (!["resourcepack", "shader", "world", "datapack"].includes(this.currentTab)) discoverListTop.appendChild(loaderDropdownElement);
+        discoverListTop.appendChild(categoryWrapperElement);
         discoverListTop.appendChild(paginationTop.element);
+        this.discoverListTop = discoverListTop;
+        this.tabElement.appendChild(discoverListTop);
+        this.tabElement.appendChild(this.discoverList);
+        this.getContent();
+    }
+
+    async getContent(page = 1) {
+        let pageId = Math.random();
+        this.pageId = pageId;
+        let source = this.sourceDropdown.value;
+        let query = this.searchBar.value;
+        this.paginationBottom.setPage(page);
+        this.paginationTop.setPage(page);
+        let instance_content = [];
+        if (this.instance) instance_content = await this.instance.getContent();
+        if (["fabric", "forge", "neoforge", "quilt"].includes(this.loader_dropdown) && this.currentTab == "server") this.loader_dropdown = "all";
+        if (this.currentTab != "server") {
+            if (this.loader_dropdown == "vanilla" || this.loader_dropdown == "modpack") this.loader_dropdown = "all";
+        }
+        let content_ids = instance_content.map(e => e.source_info);
+        this.discoverList.innerHTML = "";
+        let loading = new LoadingContainer();
+        this.discoverList.appendChild(loading.element);
+        this.requestFrame();
+        if (source == "vanilla_tweaks") {
+            this.discoverListTop.style.display = "none";
+            new VanillaTweaksSelector(this.currentTab, this.game_version, this.instance?.instance_id, undefined, this.discoverList, query);
+            return;
+        }
+        this.discoverListTop.style.display = "";
+        let results = [];
+        let categories = [];
+        try {
+            if (source == "modrinth") results = await Modrinth.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by, this.active_categories);
+            else if (source == "curseforge") results = await CurseForge.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by, this.active_categories);
+            if (this.pageId != pageId) return;
+            this.discoverList.innerHTML = "";
+        } catch (err) {
+            loading.errorOut(err, () => {
+                this.getContent(page);
+            });
+            return;
+        }
+        try {
+            if (source == "modrinth") categories = await Modrinth.getCategories(this.currentTab);
+            else if (source == "curseforge") categories = await CurseForge.getCategories(this.currentTab);
+        } catch (err) { }
+        this.categoryFilters.setCategories(categories);
+        this.totalPages = Math.ceil(results.total_hits / this.view);
+        this.paginationBottom.setTotalPages(this.totalPages);
+        this.paginationTop.setTotalPages(this.totalPages);
         if (!results.projects || !results.projects.length) {
             let noresults = new NoResultsFound();
             this.discoverList.appendChild(noresults.element);
@@ -6815,7 +6839,7 @@ class DiscoverScreen extends Screen {
             let entry = new ContentSearchEntry(content, this.instance, this.game_version == "all" ? null : this.game_version, this.currentTab == "server" ? null : this.loader_dropdown == "all" ? null : this.loader_dropdown, content_ids.includes(content.id), false, this.currentTab, undefined);
             this.discoverList.appendChild(entry.element);
         }
-        this.discoverList.appendChild(paginationBottom.element);
+        this.discoverList.appendChild(this.paginationBottom.element);
     }
 }
 
@@ -11438,7 +11462,7 @@ class VanillaTweaksSelector {
                     return;
                 }
                 let instance = Instance.getInstance(this.instance_id);
-                await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
+                await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resourcepack", "", JSON.stringify(added_vt_packs), false);
                 submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
             } else {
                 let dialog = new Dialog();
@@ -11508,7 +11532,7 @@ class VanillaTweaksSelector {
                         instance.display();
                         let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
                         if (file_name) {
-                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
+                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resourcepack", "", JSON.stringify(added_vt_packs), false);
                         }
                         await instance.setInstalling(false);
                         await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
@@ -11565,7 +11589,7 @@ class VanillaTweaksSelector {
                         }
                         if (success) {
                             let instance = instances[i];
-                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resource_pack", "", JSON.stringify(added_vt_packs), false);
+                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resourcepack", "", JSON.stringify(added_vt_packs), false);
                             installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
                         } else {
                             installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
@@ -12377,7 +12401,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 tabContent.appendChild(topFilters);
                 let wrapper = createElement("div", "version-files-wrapper");
                 let topBar = createElement("div", "version-file-top");
-                let noLoaderProjectTypes = ["resource_pack", "world", "resourcepack"];
+                let noLoaderProjectTypes = ["resourcepack", "world", "resourcepack"];
                 let removeLoaders = noLoaderProjectTypes.includes(content.project_type);
                 let names = ["", translate("app.discover.files.name"), translate("app.discover.files.versions"), translate("app.discover.files.loaders"), translate("app.discover.files.date_published"), translate("app.discover.files.download_count"), "", ""];
                 if (removeLoaders) {
@@ -13238,7 +13262,7 @@ async function updateContent(source, content, project, version, instance) {
     if (source == "player_install") return;
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, content.type, content.source_info, content.source);
     if (!version) {
-        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", content.file_name);
+        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resourcepack" ? "resourcepacks" : "shaderpacks", content.file_name);
         if (!new_file_name) {
             displayError(translate("app.error.failure_to_disable"));
             return false;
@@ -13258,7 +13282,7 @@ async function updateContent(source, content, project, version, instance) {
     await content.setVersionId(version.version_id);
 
     if (content.disabled) {
-        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resource_pack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
+        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resourcepack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
         if (!new_file_name) {
             displayError(translate("app.error.failure_to_disable"));
             await content.setDisabled(false);
@@ -13706,7 +13730,7 @@ async function createMrPack(instance, content_list, overrides, pack_version) {
         return;
     }
     let files_list = content_list.map(e => {
-        let content_folder = e.type == "mod" ? "mods" : e.type == "resource_pack" ? "resourcepacks" : "shaderpacks";
+        let content_folder = e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks";
         let content_file = content_folder + "/" + e.file_name;
         return {
             "path": content_file,
@@ -14349,6 +14373,117 @@ class DiscoverStateManagement {
     }
 }
 
+class CategoryFilter {
+    constructor(element, categories, defaultActiveCategories = [], onchange) {
+        this.onchange = onchange;
+        this.id = createId();
+        this.activeCategories = defaultActiveCategories;
+        element.className = "category-filter-wrapper";
+        let categoryListButton = createElement("button", "category-filter-button");
+        categoryListButton.setAttribute("popovertarget", this.id);
+        let categoryInfo = createElement("div", "category-info");
+        let categoryName = createElement("div", "category-name", {
+            textContent: translate("app.discover.filters")
+        });
+        let categoryActive = createElement("div", "category-active", {
+            textContent: translate("app.categories.active", "%n", this.activeCategories.length)
+        });
+        this.categoryActive = categoryActive;
+        categoryInfo.appendChild(categoryName);
+        categoryInfo.appendChild(categoryActive);
+        categoryListButton.appendChild(categoryInfo);
+        let slidersIcon = createElement("i", "fa-solid fa-sliders");
+        categoryListButton.appendChild(slidersIcon);
+        element.style.anchorName = "--" + this.id;
+        element.appendChild(categoryListButton);
+        let categoryListElement = createElement("div", "category-list");
+        categoryListElement.setAttribute("popover", "");
+        categoryListElement.style.positionAnchor = "--" + this.id;
+        categoryListElement.id = this.id;
+        element.appendChild(categoryListElement);
+        this.categoryListElement = categoryListElement;
+        this.setCategories(categories);
+    }
+    setCategories(categories) {
+        this.categoryListElement.innerHTML = "";
+        this.categories = categories;
+        if (categories.length == 0) {
+            let element = createElement("div", "category-wrapper", {
+                textContent: translate("app.categories.unable_to_load")
+            });
+            this.categoryListElement.appendChild(element);
+        }
+        let groupedCategories = new Map();
+        for (let category of categories) {
+            let header = category.header == null ? "" : category.header;
+            if (!groupedCategories.has(header)) {
+                groupedCategories.set(header, []);
+            }
+            groupedCategories.get(header).push(category);
+        }
+        let headers = Array.from(groupedCategories.keys());
+        headers.sort((a, b) => {
+            if (a === "" && b !== "") return -1;
+            if (b === "" && a !== "") return 1;
+            return a.localeCompare(b);
+        });
+        for (let header of headers) {
+            let categoriesForHeader = groupedCategories.get(header);
+            categoriesForHeader.sort((a, b) => {
+                let nameA = translate(a.name);
+                let nameB = translate(b.name);
+                let matchA = nameA.match(/^(\d+(?:\.\d+)?)/);
+                let matchB = nameB.match(/^(\d+(?:\.\d+)?)/);
+                let numA = matchA ? Number(matchA[1]) : null;
+                let numB = matchB ? Number(matchB[1]) : null;
+                if (numA !== null && numB !== null) {
+                    if (numA !== numB) return numA - numB;
+                    return nameA.localeCompare(nameB);
+                }
+                if (numA !== null) return -1;
+                if (numB !== null) return 1;
+                return nameA.localeCompare(nameB);
+            });
+            let headerElement = createElement("div", "category-header", {
+                textContent: header ? translate(header) : translate("app.category.header.categories")
+            });
+            this.categoryListElement.appendChild(headerElement);
+            for (let category of categoriesForHeader) {
+                let categoryWrapper = createElement("div", "category-wrapper");
+                let categoryCheckbox = createElement("input", "category-checkbox", {
+                    id: category.id,
+                    type: "checkbox"
+                });
+                let categoryAddButton = createElement("label", "category-button", {
+                    htmlFor: category.id
+                });
+                categoryAddButton.textContent = translate(category.name);
+                categoryCheckbox.onchange = () => {
+                    if (this.activeCategories.includes(category.id)) {
+                        if (categoryCheckbox.checked) return;
+                        this.activeCategories = this.activeCategories.filter(e => e != category.id);
+                    } else {
+                        if (!categoryCheckbox.checked) return;
+                        this.activeCategories.push(category.id);
+                    }
+                    this.categoryActive.textContent = translate("app.categories.active", "%n", this.activeCategories.length);
+                    if (this.onchange) this.onchange(this.activeCategories);
+                }
+                categoryCheckbox.checked = this.activeCategories.includes(category.id);
+                categoryWrapper.appendChild(categoryCheckbox);
+                categoryWrapper.appendChild(categoryAddButton);
+                this.categoryListElement.appendChild(categoryWrapper);
+            }
+        }
+    }
+    clear() {
+        this.activeCategories = [];
+        this.setCategories(this.categories);
+    }
+}
+
 window.debug = {
-    DiscoverStateManagement
+    DiscoverStateManagement,
+    Modrinth,
+    CurseForge
 }
