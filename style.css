@@ -4901,6 +4901,10 @@ button.dependency:active {
     gap: 4px;
     max-width: 100%;
     flex-wrap: wrap;
+    align-self: center;
+}
+
+.dialog .version-file-chip-wrapper {
     align-self: start;
 }
 
