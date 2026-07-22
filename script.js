@@ -14131,6 +14131,7 @@ class DiscoverStateManagement {
         this.loadStartingStates(this.instance);
     }
     static async loadStartingStates(instance) {
+        if (!instance) return;
         let content = await instance.getContent();
         for (let c of content) {
             this.states[c.source_info + "-" + instance.instance_id] = {

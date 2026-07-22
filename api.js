@@ -61,7 +61,7 @@ class Project {
         this.links.browser = `https://modrinth.com/project/${this.id}`;
         this.gallery = urlInfo.gallery.map(e => new GalleryImage(e, "modrinth"));
         this.loaders = [...new Set((urlInfo.mrpack_loaders || []).concat(urlInfo.loaders || []).concat(urlInfo.project_loader_fields?.mrpack_loaders || []))].filter(e => e != "mrpack");
-        this.game_versions = urlInfo.minecraft_java_server?.content?.kind == "vanilla" ? urlInfo.minecraft_java_server.content.supported_game_versions : urlInfo.project_loader_fields ? urlInfo.project_loader_fields.game_versions : urlInfo.game_versions;
+        this.game_versions = Modrinth.convertToMinecraftVersionName(urlInfo.minecraft_java_server?.content?.kind == "vanilla" ? urlInfo.minecraft_java_server.content.supported_game_versions : urlInfo.project_loader_fields ? urlInfo.project_loader_fields.game_versions : urlInfo.game_versions);
         this.online_players = urlInfo.minecraft_java_server?.ping?.data?.players_online ?? null;
         this.max_players = urlInfo.minecraft_java_server?.ping?.data?.players_max ?? null;
         this.ip_address = urlInfo.minecraft_java_server?.address || null;
@@ -365,7 +365,7 @@ class ProjectVersion {
             this.downloads = info.downloads;
             this.channel = info.version_type;
             this.loaders = info.mrpack_loaders || info.loaders;
-            this.game_versions = info.game_versions;
+            this.game_versions = Modrinth.convertToMinecraftVersionName(info.game_versions);
             this.required_dependencies = info.dependencies.filter(e => e.dependency_type == "required").map(e => ({ version_id: e.version_id, project_id: e.project_id }));
             this.download_url = info.files[0]?.url;
             this.filename = info.files[0]?.filename;
@@ -540,6 +540,23 @@ class Author {
 }
 
 class Modrinth {
+    static modrinthToMinecraftVersions = {
+        "1.14.2-pre4": "1.14.2 Pre-Release 4",
+        "1.14.2-pre3": "1.14.2 Pre-Release 3",
+        "1.14.2-pre2": "1.14.2 Pre-Release 2",
+        "1.14.2-pre1": "1.14.2 Pre-Release 1",
+        "1.14.1-pre2": "1.14.1 Pre-Release 2",
+        "1.14.1-pre1": "1.14.1 Pre-Release 1",
+        "1.14-pre5": "1.14 Pre-Release 5",
+        "1.14-pre4": "1.14 Pre-Release 4",
+        "1.14-pre3": "1.14 Pre-Release 3",
+        "1.14-pre2": "1.14 Pre-Release 2",
+        "1.14-pre1": "1.14 Pre-Release 1",
+        "3D-Shareware-v1.34": "3D Shareware v1.34"
+    }
+    static minecraftToModrinthVersions = Object.fromEntries(
+        Object.entries(Modrinth.modrinthToMinecraftVersions).map(([key, value]) => [value, key])
+    )
     static async search(query, loader, project_type, version, page = 1, pageSize = 20, sortBy = "relevance") {
         if (loader == "all") loader = null;
         if (version == "all") version = null;
@@ -548,7 +565,10 @@ class Modrinth {
         let facets = [];
         if (loader && ["modpack", "mod"].includes(project_type)) facets.push("categories IN [\"" + loader + "\"]");
         if (loader && ["minecraft_java_server"].includes(project_type)) facets.push("minecraft_java_server.content.kind IN [\"" + loader + "\"]");
-        if (version) facets.push("(game_versions IN [\"" + version + "\"] OR minecraft_java_server.content.supported_game_versions IN [\"" + version + "\"])");
+        if (version) {
+            version = Modrinth.convertToModrinthVersionName(version);
+            facets.push("(game_versions IN [\"" + version + "\"] OR minecraft_java_server.content.supported_game_versions IN [\"" + version + "\"])");
+        }
         facets.push("project_types = " + project_type);
         let url = `https://api.modrinth.com/v3/search?query=${query}&limit=${pageSize}&index=${sort}&new_filters=${facets.join("%20AND%20")}&offset=${(page - 1) * pageSize}`;
         let urlInfo = await (await fetch(url)).json();
@@ -559,6 +579,18 @@ class Modrinth {
             projects.push(project);
         }
         return { projects, total_hits: urlInfo.total_hits };
+    }
+    static convertToMinecraftVersionName(v) {
+        if (Array.isArray(v)) {
+            return v.map(e => Modrinth.convertToMinecraftVersionName(e));
+        }
+        return this.modrinthToMinecraftVersions[v] || v;
+    }
+    static convertToModrinthVersionName(v) {
+        if (Array.isArray(v)) {
+            return v.map(e => Modrinth.convertToModrinthVersionName(e));
+        }
+        return this.minecraftToModrinthVersions[v] || v;
     }
 }
 
