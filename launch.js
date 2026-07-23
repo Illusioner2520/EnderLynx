@@ -1210,7 +1210,7 @@ class Minecraft {
             }
             java_args = java_args.filter(e => !e.startsWith("-Xms") && !e.startsWith("-Xmx"));
             java_args = quoteArgs(java_args);
-            if (!java_args) java_args = "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M";
+            if (!java_args) java_args = "-XX:+UnlockExperimentalVMOptions\n-XX:+UseG1GC\n-XX:G1NewSizePercent=20\n-XX:G1ReservePercent=20\n-XX:MaxGCPauseMillis=50\n-XX:G1HeapRegionSize=32M";
             signal.throwIfAborted();
             if (!isRepair || whatToRepair.includes("minecraft")) {
                 fs.writeFileSync(path.resolve(this.userPath, `minecraft/meta/versions/${version}/${version}.json`), JSON.stringify(version_json));
@@ -1891,7 +1891,7 @@ function quoteArgs(args) {
             return arg;
         }
         return `"${arg.replace(/(["\\])/g, "\\$1")}"`;
-    }).join(" ");
+    }).join("\n");
 }
 
 module.exports = {

@@ -2388,6 +2388,12 @@ dialog[open]::backdrop {
     font-size: 1.1rem;
 }
 
+textarea.dialog-text-input {
+    field-sizing: content;
+    resize: none;
+    word-break: keep-all;
+}
+
 .dialog-label {
     font-weight: bold;
     font-size: 1.2rem;

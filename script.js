@@ -828,6 +828,7 @@ class Instance {
                 "children": [
                     {
                         "type": "text",
+                        "multiline": true,
                         "id": "java_args",
                         "name": translate("app.instances.settings.custom_args"),
                         "default": this.java_args,
@@ -10665,11 +10666,13 @@ class Dialog {
         } else if (info.type == "text" || info.type == "number") {
             label.htmlFor = info.id;
             labelDesc.htmlFor = info.id;
-            let textInput = createElement("input", "dialog-text-input", {
+            let textInput = createElement(info.multiline ? "textarea" : "input", "dialog-text-input", {
                 placeholder: info.name,
-                id: info.id,
-                type: info.type
+                id: info.id
             });
+            if (!info.multiline) {
+                textInput.type = info.type;
+            }
             if (info.oninput) textInput.oninput = () => {
                 info.oninput(textInput.value);
             }

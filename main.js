@@ -2150,9 +2150,6 @@ async function repairMinecraft(instance_id, loader, vanilla_version, loader_vers
         }
         updateInstance("mc_installed", true, instance_id);
         updateInstance("provided_java_args", r.java_args, instance_id);
-        if (!instance.uses_custom_java_args) {
-            updateInstance("java_args", r.java_args, instance_id);
-        }
         return true;
     } catch (err) {
         updateInstance("failed", true, instance_id);
