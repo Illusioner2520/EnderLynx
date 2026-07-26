@@ -413,7 +413,7 @@
     "app.instances.file.description": "Select a .mrpack file, .elpack file, CurseForge .zip file or a MultiMC/Prism .zip file",
     "app.instances.file.types": "Instance File",
     "app.instances.no_game_version": "Could not create instance because you didn't specify a game version",
-    "app.instances.no_name": "Could not create instance because you didn't specify a name",
+    "app.instances.untitled": "Untitled Instance",
     "app.instances.play_time": "Play Time",
     "app.instances.last_played": "Last Played: %t",
     "app.instances.loading": "Loading",

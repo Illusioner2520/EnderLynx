@@ -9243,8 +9243,7 @@ async function showCreateInstanceDialog() {
                 return;
             }
             if (!info.name) {
-                displayError(translate("app.instances.no_name"));
-                return;
+                info.name = translate("app.instances.untitled");
             }
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
             let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
@@ -11492,8 +11491,7 @@ class VanillaTweaksSelector {
                             return;
                         }
                         if (!info.name) {
-                            displayError(translate("app.instances.no_name"));
-                            return;
+                            info.name = translate("app.instances.untitled");
                         }
                         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
                         let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
@@ -13500,8 +13498,7 @@ async function installButtonClick(content, version, instance_id) {
                     return;
                 }
                 if (!info.name) {
-                    displayError(translate("app.instances.no_name"));
-                    return;
+                    info.name = translate("app.instances.untitled");
                 }
                 let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
                 let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
