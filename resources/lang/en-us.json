@@ -1256,5 +1256,8 @@
     "app.discover.failed_to_install": "Failed to install %n",
     "app.discover.filters": "Filters",
     "app.categories.unable_to_load": "Unable to Load Categories",
-    "app.categories.active": "%n active"
+    "app.categories.active": "%n active",
+    "app.instances.instance_in_use": "This instance is already running.",
+    "app.instances.instance_installing": "This instance isn't installed yet.",
+    "app.instances.instance_failed": "This instance failed to install."
 }

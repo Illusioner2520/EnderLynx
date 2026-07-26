@@ -662,7 +662,8 @@ async function getMultiplayerWorlds(instance_id) {
                 icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
                 acceptTextures: server.acceptTextures?.value ?? false,
                 last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null,
-                index: i
+                index: i,
+                type: "multiplayer"
             });
             i++;
         }
@@ -740,6 +741,7 @@ async function getWorld(levelDatPath) {
         seed = null;
     }
     return ({
+        type: "singleplayer",
         name: levelData.LevelName.value,
         id: parentFolder,
         seed: seed,
@@ -1252,8 +1254,8 @@ async function processCfZip(instance_id, info, title = ".zip file") {
             signal.throwIfAborted();
             win.webContents.send('progress-update', translate("app.installing", "%t", title), ((i + 1) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", i + 1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
-            let project_id = file.projectID;
-            let file_id = file.fileID;
+            let project_id = Number(file.projectID).toString();
+            let file_id = Number(file.fileID).toString();
 
             project_ids.push(project_id);
 
@@ -1652,7 +1654,9 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                 if (file.source === "modrinth") {
                     url = `https://cdn.modrinth.com/data/${file.source_info}/versions/${file.version_id}/${file.file_name.replace(".disabled", "")}`;
                 } else if (file.source === "curseforge") {
-                    url = `https://www.curseforge.com/api/v1/mods/${Number(file.source_info)}/files/${Number(file.version_id)}/download`;
+                    file.source_info = Number(file.source_info).toString();
+                    file.version_id = Number(file.version_id).toString();
+                    url = `https://www.curseforge.com/api/v1/mods/${file.source_info}/files/${file.version_id}/download`;
                 } else if (file.source === "vanilla_tweaks") {
                     url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
                 }
@@ -1684,8 +1688,8 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                     mr_project_ids.push(file.source_info);
                     mr_version_ids.push(file.version_id);
                 } else if (file.source == "curseforge") {
-                    cf_project_ids.push(Number(file.source_info));
-                    cf_version_ids.push(Number(file.version_id));
+                    cf_project_ids.push(file.source_info);
+                    cf_version_ids.push(file.version_id);
                 }
                 signal.throwIfAborted();
                 if (count == manifest_json.files.length - 1) {
@@ -1785,7 +1789,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                 const response = await fetch("https://api.curse.tools/v1/mods", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false }),
+                    body: JSON.stringify({ modIds: cf_project_ids.map(Number), filterPcOnly: false }),
                     signal
                 });
                 if (response.ok) {
@@ -1990,7 +1994,8 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
     if (!instance_info) {
         throw new Error(translate("app.launch.unable_to_find_instance"));
     }
-    updateInstance("last_played", new Date(), instance_id);
+    let last_played = new Date();
+    updateInstance("last_played", last_played, instance_id);
     if (!player_info?.id) throw new Error(translate("app.launch.sign_in"));
 
     if (new Date(player_info.expires) < new Date()) {
@@ -2028,6 +2033,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
         settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
+        watchProcessForExit(minecraft.pid, last_played, instance_id);
         return { minecraft, player_info }
     } catch (err) {
         console.error(err);
@@ -4108,7 +4114,10 @@ async function convertToType(input, outputPath, type = "ico") {
     await fsPromises.writeFile(outputPath, icoBuffer);
 }
 
-ipcMain.handle('analyze-logs', async (_, instance_id, last_log_date, current_log_path) => {
+ipcMain.handle('analyze-logs', async (_, instance_id) => {
+    let instanceInfo = getInstance(instance_id);
+    let last_log_date = instanceInfo.last_analyzed_log;
+    let current_log_path = checkForProcess(instanceInfo.pid) ? instanceInfo.current_log_file : "";
     let lastDate = null;
     if (last_log_date) {
         let date = last_log_date.replace(".log", "").split("_");
@@ -4760,16 +4769,10 @@ function addInstance(name, date_created, date_modified, last_played, loader, van
 // Content management
 function getContent(content_id) {
     let info = db.prepare("SELECT * FROM content WHERE id = ? LIMIT 1").get(content_id);
-    if (info.source_info?.endsWith(".0")) info.source_info = Number(info.source_info).toString();
-    if (info.version_id?.endsWith(".0")) info.version_id = Number(info.version_id).toString();
     return info;
 }
 function getInstanceContentDatabase(instance_id) {
     let info = db.prepare("SELECT * FROM content WHERE instance = ?").all(instance_id);
-    for (let i in info) {
-        if (i.source_info?.endsWith(".0")) i.source_info = Number(i.source_info).toString();
-        if (i.version_id?.endsWith(".0")) i.version_id = Number(i.version_id).toString();
-    }
     return info;
 }
 function updateContent(key, value, content_id) {
@@ -5590,6 +5593,28 @@ async function validateSha1(sha1, install_path) {
     }
 }
 
+function watchProcessForExit(pid, last_played, instance_id) {
+    let startTime = new Date(last_played);
+    const timer = setInterval(async () => {
+        let check = checkForProcess(pid);
+        if (!check) {
+            clearInterval(timer);
+            if (win) {
+                win.webContents.send('instance-stopped', instance_id);
+            }
+            updateInstance("pid", null, instance_id);
+        }
+    }, 1000);
+}
+
+getInstances().forEach(instance => {
+    if (checkForProcess(instance.pid)) {
+        watchProcessForExit(instance.pid, instance.last_played, instance.instance_id);
+    } else {
+        updateInstance("pid", null, instance.instance_id);
+    }
+});
+
 function hasColumn(table, column) {
     return db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
 }
@@ -5668,10 +5693,6 @@ try {
         case "0.9.1":
         case "0.10.0":
         case "0.10.1":
-            db.prepare("UPDATE content SET source_info = substr(source_info, 1, length(source_info) - 2) WHERE source_info LIKE '%.0';").run();
-            db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
-            db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
-            db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
         case "0.10.2":
             addColumnIfMissing("skins", "tag", "TEXT");
         case "0.10.3":
@@ -5693,6 +5714,10 @@ try {
             db.prepare("DELETE FROM options_defaults WHERE key = ?").run("version");
         case "0.11.0":
         case "0.11.1":
+            db.prepare("UPDATE content SET source_info = substr(source_info, 1, length(source_info) - 2) WHERE source_info LIKE '%.0';").run();
+            db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
+            db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
+            db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
             db.prepare("UPDATE content SET type = ? WHERE type = ?").run("resourcepack", "resource_pack");
     }
     setDefault("saved_version", version);

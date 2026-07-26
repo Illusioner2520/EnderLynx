@@ -1121,19 +1121,17 @@ h1 {
     background-color: color-mix(in srgb, 70% var(--go-color), var(--text-color));
 }
 
-.instance-top-loading-button {
-    border-radius: 8px;
-    background-color: color-mix(in srgb, var(--go-color), black);
-    padding: 10px;
-    font-size: 1.5rem;
-    color: black;
-    display: flex;
-    gap: 10px;
-    font-weight: bold;
-    align-items: center;
+.instance-top-play-button.stop {
+    background-color: var(--danger-color);
+}
+
+.instance-top-play-button.stop:hover {
+    background-color: color-mix(in srgb, 70% var(--danger-color), var(--text-color));
+}
+
+.instance-top-play-button.disabled {
+    opacity: .5;
     cursor: not-allowed;
-    transition: background-color .25s, scale .1s;
-    margin-left: auto;
 }
 
 .spinner {
@@ -1157,29 +1155,6 @@ h1 {
     to {
         rotate: 360deg;
     }
-}
-
-.instance-top-stop-button {
-    border-radius: 8px;
-    background-color: var(--danger-color);
-    padding: 10px;
-    font-size: 1.5rem;
-    color: black;
-    display: flex;
-    gap: 10px;
-    font-weight: bold;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color .25s, scale .1s;
-    margin-left: auto;
-}
-
-.instance-top-stop-button:active {
-    scale: .95;
-}
-
-.instance-top-stop-button:hover {
-    background-color: color-mix(in srgb, 70% var(--danger-color), var(--text-color));
 }
 
 .instance-top-more {
@@ -3991,11 +3966,24 @@ textarea.dialog-text-input {
     background-color: color-mix(in srgb, 70% var(--go-color), var(--text-color));
 }
 
-.home-stop-button {
-    border-radius: 8px;
+.home-play-button.stop {
     background-color: var(--danger-color);
+}
+
+.home-play-button.stop:hover {
+    background-color: color-mix(in srgb, 70% var(--danger-color), var(--text-color));
+}
+
+.home-play-button.disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.world-play-button {
+    border-radius: 8px;
+    background-color: var(--go-color);
     padding: 8px;
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: black;
     display: flex;
     gap: 8px;
@@ -4006,12 +3994,25 @@ textarea.dialog-text-input {
     margin-left: auto;
 }
 
-.home-stop-button:active {
+.world-play-button:active {
     scale: .95;
 }
 
-.home-stop-button:hover {
+.world-play-button:hover {
+    background-color: color-mix(in srgb, 70% var(--go-color), var(--text-color));
+}
+
+.world-play-button.stop {
+    background-color: var(--danger-color);
+}
+
+.world-play-button.stop:hover {
     background-color: color-mix(in srgb, 70% var(--danger-color), var(--text-color));
+}
+
+.world-play-button.disabled {
+    opacity: .5;
+    cursor: not-allowed;
 }
 
 .home-list-more {
@@ -4030,21 +4031,6 @@ textarea.dialog-text-input {
 
 .home-list-more:hover {
     background-color: var(--accent-color);
-}
-
-.home-loading-button {
-    border-radius: 8px;
-    background-color: color-mix(in srgb, var(--go-color), black);
-    padding: 8px;
-    font-size: 1.1rem;
-    color: black;
-    display: flex;
-    gap: 8px;
-    font-weight: bold;
-    align-items: center;
-    cursor: not-allowed;
-    transition: background-color .25s, scale .1s;
-    margin-left: auto;
 }
 
 .home-discover-title {

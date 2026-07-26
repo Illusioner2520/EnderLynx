@@ -235,6 +235,9 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     if (instance?.listeners?.get(key)) {
         instance.listeners.get(key)(value);
     }
+    if (key == "mc_installed" || key == "failed") {
+        InstanceStateManagement.calculateInstanceStatus(instance);
+    }
 });
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
@@ -460,6 +463,25 @@ class Instance {
         return await window.enderlynx.addContentDatabase(name, author, image, file_name, source, type, version, this.instance_id, source_info, disabled, version_id);
     }
 
+    supportsQuickPlaySingleplayer() {
+        if (!minecraftVersions) return true;
+        let instanceIndex = minecraftVersions.indexOf(this.vanilla_version);
+        let firstSupportIndex = minecraftVersions.indexOf("23w14a");
+        return instanceIndex >= firstSupportIndex;
+    }
+
+    supportsQuickPlayMultiplayer() {
+        if (!minecraftVersions) return true;
+        let instanceIndex = minecraftVersions.indexOf(this.vanilla_version);
+        let firstSupportIndex = minecraftVersions.indexOf("13w16a");
+        return instanceIndex >= firstSupportIndex && this.vanilla_version != "1.5.2";
+    }
+
+    supportsQuickPlayType(type) {
+        if (type == "multiplayer") return this.supportsQuickPlayMultiplayer();
+        return this.supportsQuickPlaySingleplayer();
+    }
+
     async getContent() {
         let content = await window.enderlynx.getInstanceContentDatabase(this.instance_id);
         let contentList = [];
@@ -495,11 +517,16 @@ class Instance {
 
     async play(settings) {
         try {
+            InstanceStateManagement.setInstanceStatus(this.instance_id, InstanceState.LOADING, settings?.quickPlay?.info);
             await window.enderlynx.playMinecraft(this.instance_id, settings);
             await live.findLive();
+            if (Display.currentScreen instanceof InstanceScreen && Display.currentScreen.currentTab == "logs") {
+                Display.currentScreen.showLogs();
+            }
         } catch (e) {
             displayError(e);
         }
+        InstanceStateManagement.calculateInstanceStatus(this);
     }
 
     async playSingleplayerWorld(world_id) {
@@ -515,8 +542,10 @@ class Instance {
     }
 
     async stop() {
+        InstanceStateManagement.setInstanceStatus(this.instance_id, InstanceState.STOPPING);
         let success = await window.enderlynx.stopInstance(this.instance_id);
         if (!success) displayError(translate("app.instance.stop.failed"));
+        InstanceStateManagement.calculateInstanceStatus(this);
         return success;
     }
 
@@ -1759,6 +1788,11 @@ class TabContent {
     selectOption(val) {
         let opt;
         for (let i = 0; i < this.options.length; i++) {
+            if (this.options[i].value == this.selected) {
+                if (this.options[i].closeFunc) {
+                    this.options[i].closeFunc();
+                }
+            }
             if (this.options[i].value == val) {
                 opt = this.options[i];
                 this.options[i].element.classList.add("selected");
@@ -1852,18 +1886,22 @@ class MoreMenu {
     }
     async refreshButtons() {
         this.element.innerHTML = "";
-        for (let i = 0; i < this.buttons.buttons.length; i++) {
-            let buttonElement = document.createElement("button");
-            buttonElement.classList.add("context-menu-button");
-            let icon = typeof this.buttons.buttons[i].icon === "function" ? await this.buttons.buttons[i].icon() : this.buttons.buttons[i].icon;
-            let title = typeof this.buttons.buttons[i].title === "function" ? await this.buttons.buttons[i].title() : this.buttons.buttons[i].title;
+        for (let button of this.buttons.buttons) {
+            let buttonElement = createElement("button", "context-menu-button");
+            let icon = typeof button.icon === "function" ? await button.icon() : button.icon;
+            let title = typeof button.title === "function" ? await button.title() : button.title;
             buttonElement.innerHTML = icon + sanitize(title);
-            if (this.buttons.buttons[i].danger) {
+            if (button.danger) {
                 buttonElement.classList.add("danger");
             }
             buttonElement.onclick = (e) => {
                 this.element.hidePopover();
-                this.buttons.buttons[i].func(new MenuOption(buttonElement, this.buttons.buttons[i].title, this.buttons.buttons[i].icon), this.element);
+                button.func(new MenuOption(buttonElement, button.title, button.icon), this.element);
+            }
+            if (button.type == "play-button") {
+                InstanceStateManagement.registerButton(buttonElement, button.instance, button.world || null, false, true, () => {
+                    this.element.hidePopover();
+                });
             }
             this.element.appendChild(buttonElement);
         }
@@ -1873,6 +1911,7 @@ class MoreMenu {
         [...document.getElementsByClassName("more-menu")].forEach(e => {
             let id = e.id;
             if (!document.querySelector(`[popovertarget="${id}"]`)) {
+                InstanceStateManagement.removeButtons(e.children);
                 e.remove();
             }
         });
@@ -1897,7 +1936,7 @@ class ContextMenu {
                 ignoreNextPointerUp = true;
                 return;
             }
-            this.element.hidePopover();
+            this.hideContextMenu();
         });
 
         document.body.addEventListener("pointerdown", (e) => {
@@ -1906,7 +1945,7 @@ class ContextMenu {
 
         document.body.addEventListener('keydown', (e) => {
             if (e.key == "Escape") {
-                this.element.hidePopover();
+                this.hideContextMenu();
             }
         });
     }
@@ -1924,18 +1963,22 @@ class ContextMenu {
         this.element.style.translate = xTranslate + " " + yTranslate;
         this.element.style.top = y + "px";
         this.element.innerHTML = "";
-        for (let i = 0; i < buttons.buttons.length; i++) {
-            let buttonElement = document.createElement("button");
-            buttonElement.classList.add("context-menu-button");
-            let icon = typeof buttons.buttons[i].icon === "function" ? await buttons.buttons[i].icon() : buttons.buttons[i].icon;
-            let title = typeof buttons.buttons[i].title === "function" ? await buttons.buttons[i].title() : buttons.buttons[i].title;
+        for (let button of buttons.buttons) {
+            let buttonElement = createElement("button", "context-menu-button");
+            let icon = typeof button.icon === "function" ? await button.icon() : button.icon;
+            let title = typeof button.title === "function" ? await button.title() : button.title;
             buttonElement.innerHTML = icon + sanitize(title);
-            if (buttons.buttons[i].danger) {
+            if (button.danger) {
                 buttonElement.classList.add("danger");
             }
             buttonElement.onclick = (e) => {
-                this.element.hidePopover();
-                buttons.buttons[i].func(new MenuOption(buttonElement, buttons.buttons[i].title, buttons.buttons[i].icon));
+                this.hideContextMenu();
+                button.func(new MenuOption(buttonElement, button.title, button.icon));
+            }
+            if (button.type == "play-button") {
+                InstanceStateManagement.registerButton(buttonElement, button.instance, button.world || null, false, true, () => {
+                    this.hideContextMenu();
+                });
             }
             this.element.appendChild(buttonElement);
         }
@@ -1943,6 +1986,7 @@ class ContextMenu {
         ignoreNextPointerUp = true;
     }
     hideContextMenu() {
+        InstanceStateManagement.removeButtons(this.element.children);
         this.element.hidePopover();
     }
 }
@@ -2707,6 +2751,11 @@ class ContentList {
                 item.content_info = contentInfo.pass_to_checkbox;
                 item.toggle = toggle;
             }
+            if (contentInfo?.play?.enabled) {
+                let playButton = createElement("button", "world-play-button");
+                contentInfo.play.register(playButton);
+                contentEle.appendChild(playButton);
+            }
             if (features?.remove?.enabled) {
                 let removeElement = document.createElement("button");
                 removeElement.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
@@ -2734,11 +2783,8 @@ class ContentList {
                         }
                     }
                     return {
-                        "title": e.title,
-                        "icon": e.icon,
-                        "func": func,
-                        "func_id": e.func_id,
-                        "danger": e.danger ?? false
+                        ...e,
+                        "func": func
                     }
                 })
                 theActionList = new ContextMenuButtons(actionList);
@@ -3323,6 +3369,9 @@ class Screen {
             navButtons[i].removeSelected();
         }
         this.navButton.setSelected();
+        if (Display.currentScreen) {
+            Display.currentScreen.onClose();
+        }
         Display.currentScreen = this;
         this.content.innerHTML = "";
         this.content.appendChild(this.contentElement);
@@ -3339,12 +3388,20 @@ class Screen {
     setNavButton(button) {
         this.navButton = button;
     }
+
+    onClose() { }
 }
 
 class InstanceScreen extends Screen {
     constructor(instance) {
         super("instance", instancesButton);
         this.instance = instance;
+        this.world_play_buttons = [];
+    }
+
+    onClose() {
+        InstanceStateManagement.removeButtons([this.playButton]);
+        this.closeWorlds();
     }
 
     calculateContent(default_tab, make_button_loading) {
@@ -3419,17 +3476,9 @@ class InstanceScreen extends Screen {
         instanceSubInfo.appendChild(instanceTopLastPlayed);
         instanceInfo.appendChild(instanceSubInfo);
         topBar.appendChild(instanceInfo);
-        this.playButton = createElement("button");
-        this.calculatePlayButtonState(make_button_loading);
-        this.instance.watchForChange("mc_installed", () => {
-            this.calculatePlayButtonState();
-        });
-        this.instance.watchForChange("failed", () => {
-            this.calculatePlayButtonState();
-        });
-        this.instance.watchForChange("pid", () => {
-            this.calculatePlayButtonState();
-        });
+        this.playButton = createElement("button", "instance-top-play-button");
+        InstanceStateManagement.registerButton(this.playButton, this.instance, null);
+        this.analyzeLogs();
         let threeDots = createElement("button", "instance-top-more", { innerHTML: '<i class="fa-solid fa-ellipsis-vertical"></i>' });
         let buttons = new ContextMenuButtons([
             {
@@ -3506,32 +3555,47 @@ class InstanceScreen extends Screen {
         this.tabElement = tabsInfo;
         this.tabs = new TabContent(tabContent, [
             {
-                "name": translate("app.instances.tabs.content"), "value": "content", "func": () => {
+                "name": translate("app.instances.tabs.content"),
+                "value": "content",
+                "func": () => {
                     this.showContent();
                 }
             },
             {
-                "name": translate("app.instances.tabs.worlds"), "value": "worlds", "func": () => {
+                "name": translate("app.instances.tabs.worlds"),
+                "value": "worlds",
+                "func": () => {
                     this.showWorlds();
+                },
+                "closeFunc": () => {
+                    this.closeWorlds();
                 }
             },
             {
-                "name": translate("app.instances.tabs.logs"), "value": "logs", "func": async () => {
+                "name": translate("app.instances.tabs.logs"),
+                "value": "logs",
+                "func": async () => {
                     this.showLogs();
                 }
             },
             {
-                "name": translate("app.instances.tabs.options"), "value": "options", "func": () => {
+                "name": translate("app.instances.tabs.options"),
+                "value": "options",
+                "func": () => {
                     this.showOptions();
                 }
             },
             {
-                "name": translate("app.instances.tabs.files"), "value": "files", "func": () => {
+                "name": translate("app.instances.tabs.files"),
+                "value": "files",
+                "func": () => {
                     this.showFiles();
                 }
             },
             {
-                "name": translate("app.instances.tabs.screenshots"), "value": "screenshots", "func": () => {
+                "name": translate("app.instances.tabs.screenshots"),
+                "value": "screenshots",
+                "func": () => {
                     this.showScreenshots();
                 }
             }
@@ -3541,70 +3605,10 @@ class InstanceScreen extends Screen {
 
     async display(dont_add_to_log, ...args) {
         await super.display(dont_add_to_log, ...args);
-        this.calculatePlayButtonState(args[1]);
-    }
-
-    async calculatePlayButtonState(make_loading) {
-        this.running = checkForProcess(this.instance.pid);
-        if (make_loading) {
-            this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
-            this.playButton.removeAttribute("title");
-            this.playButton.className = "instance-top-loading-button";
-            this.playButton.onclick = () => { };
-        } else if (this.instance.failed) {
-            this.playButton.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
-            this.playButton.title = translate("app.instances.failed.tooltip");
-            this.playButton.className = "instance-top-loading-button";
-            this.playButton.onclick = () => { };
-        } else if (!this.instance.mc_installed) {
-            this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-            this.playButton.removeAttribute("title");
-            this.playButton.className = "instance-top-loading-button";
-            this.playButton.onclick = () => { };
-        } else if (!this.running) {
-            this.playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            this.playButton.removeAttribute("title");
-            this.playButton.className = "instance-top-play-button";
-            this.playButton.onclick = async () => {
-                this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
-                this.playButton.className = "instance-top-loading-button";
-                this.playButton.onclick = () => { };
-                await this.play();
-                this.calculatePlayButtonState();
-                if (this.currentTab == "logs") {
-                    this.showLogs();
-                }
-            }
-        } else {
-            this.playButton.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-            this.playButton.removeAttribute("title");
-            this.playButton.className = "instance-top-stop-button";
-            this.playButton.onclick = async () => {
-                this.playButton.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
-                this.playButton.classList.add("instance-top-loading-button");
-                this.playButton.onclick = () => { };
-                let success = await this.stop();
-                this.calculatePlayButtonState();
-            }
-            window.enderlynx.clearProcessWatches();
-            window.enderlynx.watchProcessForExit(this.instance.pid, () => {
-                this.calculatePlayButtonState();
-                live.findLive();
-            });
-        }
-        this.analyzeLogs();
-    }
-
-    async play() {
-        return await this.instance.play();
-    }
-
-    async stop() {
-        return await this.instance.stop();
     }
 
     async analyzeLogs() {
-        let info = await window.enderlynx.analyzeLogs(this.instance.instance_id, this.instance.last_analyzed_log, this.running ? this.instance.current_log_file : "");
+        let info = await window.enderlynx.analyzeLogs(this.instance.instance_id);
         await this.instance.setPlaytime(info.total_playtime + this.instance.playtime);
         if (info.most_recent_log) await this.instance.setLastAnalyzedLog(info.most_recent_log);
         for (let i = 0; i < info.last_played_servers.length; i++) {
@@ -4050,11 +4054,16 @@ class InstanceScreen extends Screen {
         this.tabElement.appendChild(fragment);
     }
 
+    closeWorlds() {
+        InstanceStateManagement.removeButtons(this.world_play_buttons);
+    }
+
     async showWorlds() {
         this.currentTab = "worlds";
         let loading = new LoadingContainer();
         this.tabElement.innerHTML = "";
         this.tabElement.appendChild(loading.element);
+        this.world_play_buttons = [];
         await this.requestFrame();
         MoreMenu.clearMenus();
         let searchAndFilter = document.createElement("div");
@@ -4184,207 +4193,223 @@ class InstanceScreen extends Screen {
             if (worlds[i].commands) {
                 world_description += " - " + translate("app.worlds.description.commands");
             }
-            worldList.push(
-                {
-                    "primary_column": {
-                        "title": worlds[i].name,
-                        "desc": translate("app.worlds.last_played").replace("%s", formatTimeRelatively(worlds[i].last_played))
-                    },
-                    "secondary_column": {
-                        "title": () => translate("app.worlds.description.singleplayer"),
-                        "desc": () => world_description
-                    },
-                    "type": "singleplayer",
-                    "image": worlds[i].icon ?? getDefaultImage(worlds[i].id),
-                    "onremove": (ele) => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.worlds.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.worlds.delete.confirm")
+            let info =
+            {
+                "primary_column": {
+                    "title": worlds[i].name,
+                    "desc": translate("app.worlds.last_played").replace("%s", formatTimeRelatively(worlds[i].last_played))
+                },
+                "secondary_column": {
+                    "title": () => translate("app.worlds.description.singleplayer"),
+                    "desc": () => world_description
+                },
+                "type": "singleplayer",
+                "image": worlds[i].icon ?? getDefaultImage(worlds[i].id),
+                "onremove": (ele) => {
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
+                        {
+                            "type": "cancel",
+                            "content": translate("app.worlds.delete.cancel")
+                        },
+                        {
+                            "type": "confirm",
+                            "content": translate("app.worlds.delete.confirm")
+                        }
+                    ], [], async () => {
+                        let success = await window.enderlynx.deleteWorld(this.instance.instance_id, worlds[i].id);
+                        if (success) {
+                            contentList.removeElement(ele);
+                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
+                        } else {
+                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
+                        }
+                    });
+                },
+                "more": {
+                    "actionsList": [
+                        this.instance.supportsQuickPlaySingleplayer() ? {
+                            "type": "play-button",
+                            "instance": this.instance,
+                            "world": worlds[i]
+                        } : null,
+                        {
+                            "title": translate("app.worlds.open"),
+                            "icon": '<i class="fa-solid fa-folder"></i>',
+                            "func": () => {
+                                window.enderlynx.openWorldFolder(this.instance.instance_id, worlds[i].id);
                             }
-                        ], [], async () => {
-                            let success = await window.enderlynx.deleteWorld(this.instance.instance_id, worlds[i].id);
-                            if (success) {
-                                contentList.removeElement(ele);
-                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
-                            } else {
-                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
+                        },
+                        {
+                            "title": async () => await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                            "icon": async () => await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                            "func": async (e) => {
+                                let world_pinned = await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer");
+                                world_pinned ? await unpinSingleplayerWorld(worlds[i].id, this.instance.instance_id) : await pinSingleplayerWorld(worlds[i].id, this.instance.instance_id)
+                                e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
+                                e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                             }
-                        });
-                    },
-                    "more": {
-                        "actionsList": [
-                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
-                                "title": translate("app.worlds.play"),
-                                "icon": '<i class="fa-solid fa-play"></i>',
-                                "func": async () => {
-                                    this.instance.playSingleplayerWorld(worlds[i].id);
-                                }
-                            } : null,
-                            {
-                                "title": translate("app.worlds.open"),
-                                "icon": '<i class="fa-solid fa-folder"></i>',
-                                "func": () => {
-                                    window.enderlynx.openWorldFolder(this.instance.instance_id, worlds[i].id);
-                                }
-                            },
-                            {
-                                "title": async () => await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                                "icon": async () => await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                                "func": async (e) => {
-                                    let world_pinned = await isWorldPinned(worlds[i].id, this.instance.instance_id, "singleplayer");
-                                    world_pinned ? await unpinSingleplayerWorld(worlds[i].id, this.instance.instance_id) : await pinSingleplayerWorld(worlds[i].id, this.instance.instance_id)
-                                    e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
-                                    e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                                }
-                            },
-                            // {
-                            //     "title": translate("app.worlds.share"),
-                            //     "icon": '<i class="fa-solid fa-share"></i>',
-                            //     "func": () => { }
-                            // },
-                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("23w14a") || !minecraftVersions ? {
-                                "icon": '<i class="fa-solid fa-desktop"></i>',
-                                "title": translate("app.worlds.desktop_shortcut"),
-                                "func": (e) => {
-                                    addDesktopShortcutWorld(this.instance, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? getDefaultImage(worlds[i].id));
-                                }
-                            } : null,
-                            {
-                                "title": translate("app.worlds.delete"),
-                                "icon": '<i class="fa-solid fa-trash-can"></i>',
-                                "danger": true,
-                                "func_id": "delete",
-                                "func": (ele) => {
-                                    let dialog = new Dialog();
-                                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
-                                        {
-                                            "type": "cancel",
-                                            "content": translate("app.worlds.delete.cancel")
-                                        },
-                                        {
-                                            "type": "confirm",
-                                            "content": translate("app.worlds.delete.confirm")
-                                        }
-                                    ], [], async () => {
-                                        let success = await window.enderlynx.deleteWorld(this.instance.instance_id, worlds[i].id);
-                                        if (success) {
-                                            contentList.removeElement(ele);
-                                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
-                                        } else {
-                                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
-                                        }
-                                    });
-                                }
+                        },
+                        // {
+                        //     "title": translate("app.worlds.share"),
+                        //     "icon": '<i class="fa-solid fa-share"></i>',
+                        //     "func": () => { }
+                        // },
+                        this.instance.supportsQuickPlaySingleplayer() ? {
+                            "icon": '<i class="fa-solid fa-desktop"></i>',
+                            "title": translate("app.worlds.desktop_shortcut"),
+                            "func": (e) => {
+                                addDesktopShortcutWorld(this.instance, worlds[i].name, "singleplayer", worlds[i].id, worlds[i].icon ?? getDefaultImage(worlds[i].id));
                             }
-                        ].filter(e => e)
-                    },
-                    "pass_to_checkbox": { "type": "singleplayer", "id": worlds[i].id, "name": worlds[i].name }
-                });
+                        } : null,
+                        {
+                            "title": translate("app.worlds.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "func_id": "delete",
+                            "func": (ele) => {
+                                let dialog = new Dialog();
+                                dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", parseMinecraftFormatting(worlds[i].name)), [
+                                    {
+                                        "type": "cancel",
+                                        "content": translate("app.worlds.delete.cancel")
+                                    },
+                                    {
+                                        "type": "confirm",
+                                        "content": translate("app.worlds.delete.confirm")
+                                    }
+                                ], [], async () => {
+                                    let success = await window.enderlynx.deleteWorld(this.instance.instance_id, worlds[i].id);
+                                    if (success) {
+                                        contentList.removeElement(ele);
+                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worlds[i].name)));
+                                    } else {
+                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worlds[i].name)));
+                                    }
+                                });
+                            }
+                        }
+                    ].filter(e => e)
+                },
+                "pass_to_checkbox": { "type": "singleplayer", "id": worlds[i].id, "name": worlds[i].name }
+            };
+            if (this.instance.supportsQuickPlaySingleplayer()) {
+                info.play = {
+                    "enabled": true,
+                    "register": (button) => {
+                        InstanceStateManagement.registerButton(button, this.instance, worlds[i]);
+                        this.world_play_buttons.push(button);
+                    }
+                }
+            }
+            worldList.push(info);
         }
         for (let i = 0; i < worldsMultiplayer.length; i++) {
             let last_played = await getServerLastPlayed(this.instance.instance_id, worldsMultiplayer[i].ip);
-            worldList.push(
-                {
-                    "primary_column": {
-                        "title": worldsMultiplayer[i].name,
-                        "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatTimeRelatively(last_played.toString()))
-                    },
-                    "secondary_column": {
-                        "title": () => translate("app.worlds.description.multiplayer"),
-                        "desc": () => worldsMultiplayer[i].ip,
-                        "desc_hidden": true
-                    },
-                    "type": "multiplayer",
-                    "image": worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip),
-                    "onremove": (ele) => {
-                        let dialog = new Dialog();
-                        dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
-                            {
-                                "type": "cancel",
-                                "content": translate("app.worlds.delete.cancel")
-                            },
-                            {
-                                "type": "confirm",
-                                "content": translate("app.worlds.delete.confirm")
+            let info =
+            {
+                "primary_column": {
+                    "title": worldsMultiplayer[i].name,
+                    "desc": last_played.getFullYear() < 2000 || isNaN(last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatTimeRelatively(last_played.toString()))
+                },
+                "secondary_column": {
+                    "title": () => translate("app.worlds.description.multiplayer"),
+                    "desc": () => worldsMultiplayer[i].ip,
+                    "desc_hidden": true
+                },
+                "type": "multiplayer",
+                "image": worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip),
+                "onremove": (ele) => {
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
+                        {
+                            "type": "cancel",
+                            "content": translate("app.worlds.delete.cancel")
+                        },
+                        {
+                            "type": "confirm",
+                            "content": translate("app.worlds.delete.confirm")
+                        }
+                    ], [], async () => {
+                        let success = await window.enderlynx.deleteServer(this.instance.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                        if (success) {
+                            contentList.removeElement(ele);
+                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                        } else {
+                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                        }
+                    });
+                },
+                "more": {
+                    "actionsList": [
+                        this.instance.supportsQuickPlayMultiplayer() ? {
+                            "type": "play-button",
+                            "instance": this.instance,
+                            "world": worldsMultiplayer[i]
+                        } : null,
+                        {
+                            "title": async () => await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
+                            "icon": async () => await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                            "func": async (e) => {
+                                let world_pinned = await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer");
+                                world_pinned ? await unpinMultiplayerWorld(worldsMultiplayer[i].ip, this.instance.instance_id) : await pinMultiplayerWorld(worldsMultiplayer[i].ip, this.instance.instance_id)
+                                e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
+                                e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                             }
-                        ], [], async () => {
-                            let success = await window.enderlynx.deleteServer(this.instance.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
-                            if (success) {
-                                contentList.removeElement(ele);
-                                displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                            } else {
-                                displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                        },
+                        // {
+                        //     "title": translate("app.worlds.share"),
+                        //     "icon": '<i class="fa-solid fa-share"></i>',
+                        //     "func": () => { }
+                        // },
+                        this.instance.supportsQuickPlayMultiplayer() ? {
+                            "icon": '<i class="fa-solid fa-desktop"></i>',
+                            "title": translate("app.worlds.desktop_shortcut"),
+                            "func": (e) => {
+                                addDesktopShortcutWorld(this.instance, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip));
                             }
-                        });
-                    },
-                    "more": {
-                        "actionsList": [
-                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("13w16a") && this.instance.vanilla_version != "1.5.2" || !minecraftVersions ? {
-                                "title": translate("app.worlds.play"),
-                                "icon": '<i class="fa-solid fa-play"></i>',
-                                "func": async () => {
-                                    this.instance.playMultiplayerWorld(worldsMultiplayer[i].ip);
-                                }
-                            } : null,
-                            {
-                                "title": async () => await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer") ? translate("app.worlds.unpin") : translate("app.worlds.pin"),
-                                "icon": async () => await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer") ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                                "func": async (e) => {
-                                    let world_pinned = await isWorldPinned(worldsMultiplayer[i].ip, this.instance.instance_id, "multiplayer");
-                                    world_pinned ? await unpinMultiplayerWorld(worldsMultiplayer[i].ip, this.instance.instance_id) : await pinMultiplayerWorld(worldsMultiplayer[i].ip, this.instance.instance_id)
-                                    e.setTitle(!world_pinned ? translate("app.worlds.unpin") : translate("app.worlds.pin"));
-                                    e.setIcon(!world_pinned ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                                }
-                            },
-                            // {
-                            //     "title": translate("app.worlds.share"),
-                            //     "icon": '<i class="fa-solid fa-share"></i>',
-                            //     "func": () => { }
-                            // },
-                            minecraftVersions.indexOf(this.instance.vanilla_version) >= minecraftVersions.indexOf("13w16a") && this.instance.vanilla_version != "1.5.2" || !minecraftVersions ? {
-                                "icon": '<i class="fa-solid fa-desktop"></i>',
-                                "title": translate("app.worlds.desktop_shortcut"),
-                                "func": (e) => {
-                                    addDesktopShortcutWorld(this.instance, worldsMultiplayer[i].name, "multiplayer", worldsMultiplayer[i].ip, worldsMultiplayer[i].icon ?? getDefaultImage(worldsMultiplayer[i].ip));
-                                }
-                            } : null,
-                            {
-                                "title": translate("app.worlds.delete"),
-                                "icon": '<i class="fa-solid fa-trash-can"></i>',
-                                "danger": true,
-                                "func_id": "delete",
-                                "func": (ele) => {
-                                    let dialog = new Dialog();
-                                    dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
-                                        {
-                                            "type": "cancel",
-                                            "content": translate("app.worlds.delete.cancel")
-                                        },
-                                        {
-                                            "type": "confirm",
-                                            "content": translate("app.worlds.delete.confirm")
-                                        }
-                                    ], [], async () => {
-                                        let success = await window.enderlynx.deleteServer(this.instance.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
-                                        if (success) {
-                                            contentList.removeElement(ele);
-                                            displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                                        } else {
-                                            displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
-                                        }
-                                    });
-                                }
+                        } : null,
+                        {
+                            "title": translate("app.worlds.delete"),
+                            "icon": '<i class="fa-solid fa-trash-can"></i>',
+                            "danger": true,
+                            "func_id": "delete",
+                            "func": (ele) => {
+                                let dialog = new Dialog();
+                                dialog.showDialog(translate("app.worlds.delete.confirm.title"), "notice", translate("app.worlds.delete.confirm.description", "%w", worldsMultiplayer[i].name), [
+                                    {
+                                        "type": "cancel",
+                                        "content": translate("app.worlds.delete.cancel")
+                                    },
+                                    {
+                                        "type": "confirm",
+                                        "content": translate("app.worlds.delete.confirm")
+                                    }
+                                ], [], async () => {
+                                    let success = await window.enderlynx.deleteServer(this.instance.instance_id, [worldsMultiplayer[i].ip], [worldsMultiplayer[i].index]);
+                                    if (success) {
+                                        contentList.removeElement(ele);
+                                        displaySuccess(translate("app.worlds.delete.success", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                                    } else {
+                                        displayError(translate("app.worlds.delete.fail", "%w", parseMinecraftFormatting(worldsMultiplayer[i].name)));
+                                    }
+                                });
                             }
-                        ].filter(e => e)
-                    },
-                    "pass_to_checkbox": { "type": "multiplayer", "ip": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name, "index": worldsMultiplayer[i].index }
-                });
+                        }
+                    ].filter(e => e)
+                },
+                "pass_to_checkbox": { "type": "multiplayer", "ip": worldsMultiplayer[i].ip, "name": worldsMultiplayer[i].name, "index": worldsMultiplayer[i].index }
+            }
+            if (this.instance.supportsQuickPlayMultiplayer()) {
+                info.play = {
+                    "enabled": true,
+                    "register": (button) => {
+                        InstanceStateManagement.registerButton(button, this.instance, worldsMultiplayer[i]);
+                        this.world_play_buttons.push(button);
+                    }
+                }
+            }
+            worldList.push(info);
         }
 
         let contentListWrap = document.createElement("div");
@@ -5560,6 +5585,7 @@ class HomeScreen extends Screen {
     }
 
     display(dont_add_to_log, ...args) {
+        this.instance_buttons = [];
         super.display(dont_add_to_log, ...args);
     }
     calculateContent() {
@@ -5579,7 +5605,14 @@ class HomeScreen extends Screen {
         }
     }
 
+    onClose() {
+        InstanceStateManagement.removeButtons(this.instance_buttons);
+    }
+
     async updateHomeGrid() {
+        InstanceStateManagement.removeButtons(this.instance_buttons);
+        this.instance_buttons = [];
+
         let pinnedWorldsList = await getPinnedWorlds();
         let pinnedInstancesList = await getPinnedInstances();
         let lastPlayedWorldsList = await getRecentlyPlayedWorlds();
@@ -5667,37 +5700,17 @@ class HomeScreen extends Screen {
             itemInfo.appendChild(itemDesc);
             item.appendChild(itemInfo);
             let instanceInfo = Instance.getInstance(e.instance_id);
-            let playButton = document.createElement("button");
-            playButton.setAttribute("title", ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("13w16a") && instanceInfo.vanilla_version != "1.5.2" && e.type == "multiplayer") || !minecraftVersions) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance"));
-            playButton.className = "home-play-button";
-            playButton.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            playButton.onclick = async () => {
-                playButton.className = "home-loading-button";
-                playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading");
-                if (e.type == "singleplayer") {
-                    await instanceInfo.playSingleplayerWorld(e.id);
-                } else {
-                    await instanceInfo.playMultiplayerWorld(e.ip);
-                }
-                instanceInfo.display();
-            }
+            let playButton = createElement("button", "home-play-button");
+            InstanceStateManagement.registerButton(playButton, instanceInfo, e, true);
+            this.instance_buttons.push(playButton);
             let morebutton = document.createElement("button");
             morebutton.className = "home-list-more";
             morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
             let buttons = new ContextMenuButtons([
-                ((minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("13w16a") && instanceInfo.vanilla_version != "1.5.2" && e.type == "multiplayer") || !minecraftVersions) ? {
-                    "title": translate("app.worlds.play"),
-                    "icon": '<i class="fa-solid fa-play"></i>',
-                    "func": async () => {
-                        playButton.className = "home-loading-button";
-                        playButton.innerHTML = '<i class="spinner"></i>' + translate("app.loading");
-                        if (e.type == "singleplayer") {
-                            await instanceInfo.playSingleplayerWorld(e.id);
-                        } else {
-                            await instanceInfo.playMultiplayerWorld(e.ip);
-                        }
-                        instanceInfo.display();
-                    }
+                instanceInfo.supportsQuickPlayType(e.type) ? {
+                    "type": "play-button",
+                    "instance": instanceInfo,
+                    "world": e
                 } : null,
                 {
                     "title": translate("app.instance.view"),
@@ -5735,7 +5748,7 @@ class HomeScreen extends Screen {
                 //     "icon": '<i class="fa-solid fa-share"></i>',
                 //     "func": () => { }
                 // },
-                (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("23w14a") && e.type == "singleplayer") || (minecraftVersions.indexOf(instanceInfo.vanilla_version) >= minecraftVersions.indexOf("13w16a") && instanceInfo.vanilla_version != "1.5.2" && e.type == "multiplayer") || !minecraftVersions ? {
+                instanceInfo.supportsQuickPlayType(e.type) ? {
                     "icon": '<i class="fa-solid fa-desktop"></i>',
                     "title": translate("app.worlds.desktop_shortcut"),
                     "func": () => {
@@ -5863,53 +5876,15 @@ class HomeScreen extends Screen {
             itemInfo.appendChild(itemDesc);
             item.appendChild(itemInfo);
             let instanceInfo = e;
-            let running = checkForProcess(instanceInfo.pid);
-            if (!running) instanceInfo.setPid(null);
-            if (running) {
-                window.enderlynx.watchProcessForExit(instanceInfo.pid, () => {
-                    if (Display.currentScreen.tabName != "home") return;
-                    formatPlayButton(false);
-                    live.findLive();
-                });
-            }
-            let more;
-            let playButton = document.createElement("button");
-            let formatPlayButton = (isRunning) => {
-                running = isRunning;
-                playButton.setAttribute("title", isRunning ? translate("app.button.instances.stop") : translate("app.button.instances.play"));
-                playButton.className = isRunning ? "home-stop-button" : "home-play-button";
-                playButton.innerHTML = isRunning ? '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short") : '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-                playButton.onclick = isRunning ? async () => {
-                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.stopping")
-                    await instanceInfo.stop();
-                    formatPlayButton(checkForProcess(instanceInfo.pid));
-                } : async () => {
-                    playButton.className = "home-loading-button";
-                    playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                    await instanceInfo.play();
-                    instanceInfo.display();
-                }
-                if (more) more.refreshButtons();
-            }
-            formatPlayButton(running);
+            let playButton = createElement("button", "home-play-button");
+            InstanceStateManagement.registerButton(playButton, instanceInfo, null, true);
             let morebutton = document.createElement("button");
             morebutton.className = "home-list-more";
             morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
             let buttons = new ContextMenuButtons([
                 {
-                    "icon": () => running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-                    "title": () => running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-                    "func": async (e) => {
-                        if (running) {
-                            await instanceInfo.stop();
-                            formatPlayButton(checkForProcess(instanceInfo.pid));
-                        } else {
-                            playButton.className = "home-loading-button";
-                            playButton.innerHTML = '<i class="spinner"></i>' + translate("app.home.loading")
-                            await instanceInfo.play();
-                            instanceInfo.display();
-                        }
-                    }
+                    "type": "play-button",
+                    "instance": instanceInfo
                 },
                 instanceInfo.locked ? null : {
                     "icon": '<i class="fa-solid fa-plus"></i>',
@@ -5968,7 +5943,7 @@ class HomeScreen extends Screen {
                     "danger": true
                 }
             ].filter(e => e))
-            more = new MoreMenu(morebutton, buttons);
+            new MoreMenu(morebutton, buttons);
             item.oncontextmenu = (e) => {
                 contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
             }
@@ -6288,20 +6263,12 @@ class InstancesScreen extends Screen {
             instanceElement.dataset.id = instances[i].instance_id;
             if (running) {
                 instanceElement.classList.add("running");
-                window.enderlynx.watchProcessForExit(instances[i].pid, () => {
-                    instanceElement.classList.remove("running");
-                    live.findLive();
-                });
             }
             instances[i].watchForChange("pid", (pid) => {
                 running = checkForProcess(pid);
                 live.findLive();
                 if (running) {
                     instanceElement.classList.add("running");
-                    window.enderlynx.watchProcessForExit(instances[i].pid, () => {
-                        instanceElement.classList.remove("running");
-                        live.findLive();
-                    });
                 } else {
                     instanceElement.classList.remove("running");
                 }
@@ -6352,14 +6319,8 @@ class InstancesScreen extends Screen {
             instanceElement.appendChild(instanceInfoEle);
             let buttons = new ContextMenuButtons([
                 {
-                    "icon": running ? '<i class="fa-solid fa-circle-stop"></i>' : '<i class="fa-solid fa-play"></i>',
-                    "title": running ? translate("app.button.instances.stop") : translate("app.button.instances.play"),
-                    "func": running ? async (e) => {
-                        instances[i].stop();
-                    } : async (e) => {
-                        instances[i].display(undefined, true);
-                        instances[i].play();
-                    }
+                    "type": "play-button",
+                    "instance": instances[i]
                 },
                 instances[i].locked ? null : {
                     "icon": '<i class="fa-solid fa-plus"></i>',
@@ -6817,7 +6778,6 @@ class DiscoverScreen extends Screen {
             if (source == "modrinth") results = await Modrinth.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by, this.active_categories);
             else if (source == "curseforge") results = await CurseForge.search(query, this.loader_dropdown, this.currentTab, this.game_version, page, this.view, this.sort_by, this.active_categories);
             if (this.pageId != pageId) return;
-            this.discoverList.innerHTML = "";
         } catch (err) {
             loading.errorOut(err, () => {
                 this.getContent(page);
@@ -6832,6 +6792,7 @@ class DiscoverScreen extends Screen {
         this.totalPages = Math.ceil(results.total_hits / this.view);
         this.paginationBottom.setTotalPages(this.totalPages);
         this.paginationTop.setTotalPages(this.totalPages);
+        this.discoverList.innerHTML = "";
         if (!results.projects || !results.projects.length) {
             let noresults = new NoResultsFound();
             this.discoverList.appendChild(noresults.element);
@@ -11802,7 +11763,13 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let content = await instance.getContent();
     let modrinth_ids = content.filter(e => e.source == "modrinth").map(e => e.source_info);
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => e.source_info);
-    let initialContent = await addContent(instance_id, project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
+    let initialContent = {};
+    try {
+        await addContent(instance_id, project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
+    } catch (e) {
+        DiscoverStateManagement.setContentStatus(version.project_id, instance_id, DiscoverState.NOT_INSTALLED);
+        throw e;
+    }
     DiscoverStateManagement.setContentStatus(version.project_id, instance_id, DiscoverState.INSTALLED);
     if (isUpdate) return initialContent;
     let version_number = version.version_number || "";
@@ -12986,7 +12953,7 @@ function hideTooltip(target) {
     if (!tooltip) return;
     tooltip.hidePopover();
     while (target && target !== document.body) {
-        if (target.hasAttribute && target.hasAttribute("data-tooltip-title")) {
+        if (target.hasAttribute && target.hasAttribute("data-tooltip-title") && !target.hasAttribute("title")) {
             target.setAttribute("title", target.getAttribute("data-tooltip-title"));
             target.removeAttribute("data-tooltip-title");
         }
@@ -14207,7 +14174,7 @@ class DiscoverStateManagement {
         }
         this.updateButton(info, this.states[content_id + "-" + instance_id]);
     }
-    static async applyInstallButtonState(state, buttonInfo) {
+    static applyInstallButtonState(state, buttonInfo) {
         let button = buttonInfo.element;
         if (state != InstallButtonState.INSTALLING) {
             button.style.removeProperty("--percent-preview");
@@ -14304,19 +14271,19 @@ class DiscoverStateManagement {
             button.classList.add("disabled");
         }
         if (buttonInfo.locked) {
-            button.onclick = () => {};
+            button.onclick = () => { };
             button.classList.add("disabled");
             button.title = translate("app.discover.locked.tooltip");
         }
     }
-    static async updateAllButtons(content_id, instance_id) {
+    static updateAllButtons(content_id, instance_id) {
         if (!this.states[content_id + "-" + instance_id]) return;
         let info = this.states[content_id + "-" + instance_id];
         for (let buttonInfo of info.buttons) {
             this.updateButton(buttonInfo, info);
         }
     }
-    static async updateButton(buttonInfo, info) {
+    static updateButton(buttonInfo, info) {
         if (info.state == DiscoverState.LOADING && buttonInfo.version_id == null) {
             this.applyInstallButtonState(InstallButtonState.LOADING, buttonInfo);
             return;
@@ -14348,7 +14315,7 @@ class DiscoverStateManagement {
             }
         }
     }
-    static async setInstallProgress(content_id, instance_id, install_progress) {
+    static setInstallProgress(content_id, instance_id, install_progress) {
         if (!this.states[content_id + "-" + instance_id]) return;
         if (this.states[content_id + "-" + instance_id].state != DiscoverState.INSTALLING) return;
         this.states[content_id + "-" + instance_id].install_progress = install_progress;
@@ -14358,7 +14325,7 @@ class DiscoverStateManagement {
             }
         }
     }
-    static async setContentStatus(content_id, instance_id, state) {
+    static setContentStatus(content_id, instance_id, state) {
         if (!this.states[content_id + "-" + instance_id]) {
             this.states[content_id + "-" + instance_id] = {
                 state,
@@ -14371,12 +14338,219 @@ class DiscoverStateManagement {
         }
         this.updateAllButtons(content_id, instance_id);
     }
-    static async setVersionInstalled(content_id, instance_id, version_id) {
+    static setVersionInstalled(content_id, instance_id, version_id) {
         if (!this.states[content_id + "-" + instance_id]) return;
         this.states[content_id + "-" + instance_id].version_installed = version_id;
         this.updateAllButtons(content_id, instance_id);
     }
+    static removeButtons(buttons) {
+        if (!buttons) return;
+        let buttonArray = Array.isArray(buttons) ? buttons : Array.from(buttons || []);
+        let buttonSet = new Set(buttonArray);
+        for (let instance_id in this.states) {
+            let stateInfo = this.states[instance_id];
+            if (!stateInfo || !Array.isArray(stateInfo.buttons)) continue;
+            stateInfo.buttons = stateInfo.buttons.filter(button => !buttonSet.has(button.element));
+        }
+    }
 }
+
+const PlayButtonState = Object.freeze({
+    PLAY: 'PLAY',
+    PLAY_SPECIFIC_WORLD: 'PLAY_SPECIFIC_WORLD',
+    STOP: 'STOP',
+    INSTALLING: "INSTALLING",
+    FAILED: "FAILED",
+    LOADING: 'LOADING',
+    STOPPING: 'STOPPING',
+    SPECIFIC_WORLD_DISABLED: 'SPECIFIC_WORLD_DISABLED',
+    SPECIFIC_WORLD_FAILED: 'SPECIFIC_WORLD_FAILED',
+    SPECIFIC_WORLD_INSTALLING: 'SPECIFIC_WORLD_INSTALLING'
+});
+
+const InstanceState = Object.freeze({
+    FAILED: 'FAILED',
+    INSTALLING: 'INSTALLING',
+    PLAYABLE: 'PLAYABLE',
+    STOPPABLE: 'STOPPABLE',
+    LOADING: 'LOADING',
+    STOPPING: 'STOPPING'
+});
+
+class InstanceStateManagement {
+    static states = {};
+    static active_world = "";
+    constructor() { }
+    static calculateState(instance) {
+        let running = checkForProcess(instance.pid);
+        if (instance.failed) {
+            return InstanceState.FAILED;
+        } else if (!instance.mc_installed) {
+            return InstanceState.INSTALLING;
+        } else if (!running) {
+            return InstanceState.PLAYABLE;
+        } else {
+            return InstanceState.STOPPABLE;
+        }
+    }
+    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun) {
+        let info = {
+            element: button,
+            instance,
+            world,
+            useTooltip,
+            isInContextMenu,
+            callWhenRun
+        }
+        let instance_id = instance.instance_id;
+        if (this.states[instance_id]?.buttons) {
+            this.states[instance_id].buttons.push(info);
+        } else {
+            this.states[instance_id] = {
+                state: this.calculateState(instance),
+                buttons: [info]
+            }
+        }
+        this.updateButton(info, this.states[instance_id]);
+    }
+    static applyPlayButtonState(state, buttonInfo) {
+        let button = buttonInfo.element;
+        button.classList.remove("disabled");
+        button.classList.remove("stop");
+        button.removeAttribute("title");
+        button.style.display = "";
+        if (state == PlayButtonState.PLAY) {
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            if (buttonInfo.isInContextMenu) {
+                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play");
+            }
+            button.onclick = () => {
+                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                buttonInfo.instance.play();
+            }
+            if (buttonInfo.useTooltip) {
+                button.title = translate("app.home.tooltip.instance");
+            }
+        } else if (state == PlayButtonState.STOP) {
+            button.classList.add("stop");
+            button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
+            if (buttonInfo.isInContextMenu) {
+                button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop");
+            }
+            button.onclick = () => {
+                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                buttonInfo.instance.stop();
+            }
+            if (buttonInfo.useTooltip) {
+                button.title = translate("app.button.instances.stop");
+            }
+        } else if (state == PlayButtonState.FAILED) {
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
+            button.onclick = () => { }
+            button.title = translate("app.instances.failed.tooltip");
+        } else if (state == PlayButtonState.INSTALLING) {
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+            button.onclick = () => { }
+        } else if (state == PlayButtonState.LOADING) {
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+            button.onclick = () => { }
+        } else if (state == PlayButtonState.PLAY_SPECIFIC_WORLD) {
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            if (buttonInfo.isInContextMenu) {
+                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.worlds.play");
+            }
+            button.onclick = () => {
+                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                if (buttonInfo.world.type == "singleplayer") {
+                    buttonInfo.instance.playSingleplayerWorld(buttonInfo.world.id);
+                } else {
+                    buttonInfo.instance.playMultiplayerWorld(buttonInfo.world.ip);
+                }
+            }
+            if (buttonInfo.useTooltip) {
+                button.title = buttonInfo.instance.supportsQuickPlayType(buttonInfo.world.type) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance");
+            }
+        } else if (state == PlayButtonState.STOPPING) {
+            button.classList.add("stop");
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
+            button.onclick = () => { }
+        } else if (state == PlayButtonState.SPECIFIC_WORLD_DISABLED || state == PlayButtonState.SPECIFIC_WORLD_FAILED || state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) {
+            if (buttonInfo.isInContextMenu) {
+                button.style.display = "none";
+            }
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            button.onclick = () => { }
+            let str = "app.instances.instance_in_use";
+            if (state == PlayButtonState.SPECIFIC_WORLD_FAILED) str = "app.instances.instance_failed";
+            if (state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) str = "app.instances.instance_installing";
+            button.title = translate(str);
+        }
+    }
+    static updateAllButtons(instance_id) {
+        if (!this.states[instance_id]) return;
+        let info = this.states[instance_id];
+        for (let buttonInfo of info.buttons) {
+            this.updateButton(buttonInfo, info);
+        }
+    }
+    static updateButton(buttonInfo, info) {
+        if (buttonInfo.world == null) {
+            if (info.state == InstanceState.FAILED) this.applyPlayButtonState(PlayButtonState.FAILED, buttonInfo);
+            if (info.state == InstanceState.INSTALLING) this.applyPlayButtonState(PlayButtonState.INSTALLING, buttonInfo);
+            if (info.state == InstanceState.PLAYABLE) this.applyPlayButtonState(PlayButtonState.PLAY, buttonInfo);
+            if (info.state == InstanceState.STOPPABLE) this.applyPlayButtonState(PlayButtonState.STOP, buttonInfo);
+            if (info.state == InstanceState.STOPPING) this.applyPlayButtonState(PlayButtonState.STOPPING, buttonInfo);
+            if (info.state == InstanceState.LOADING) this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
+        } else {
+            if (info.state == InstanceState.LOADING && (buttonInfo.world.id == this.active_world || buttonInfo.world.ip == this.active_world)) {
+                this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
+            } else if (info.state == InstanceState.PLAYABLE) {
+                this.applyPlayButtonState(PlayButtonState.PLAY_SPECIFIC_WORLD, buttonInfo);
+            } else if (info.state == InstanceState.INSTALLING) {
+                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_INSTALLING, buttonInfo);
+            } else if (info.state == InstanceState.FAILED) {
+                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_FAILED, buttonInfo);
+            } else {
+                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_DISABLED, buttonInfo);
+            }
+        }
+    }
+    static setInstanceStatus(instance_id, state, world_id) {
+        if (!this.states[instance_id]) {
+            this.states[instance_id] = {
+                state,
+                buttons: []
+            }
+        } else {
+            this.states[instance_id].state = state;
+        }
+        this.active_world = world_id;
+        this.updateAllButtons(instance_id);
+    }
+    static calculateInstanceStatus(instance) {
+        this.setInstanceStatus(instance.instance_id, this.calculateState(instance))
+    }
+    static removeButtons(buttons) {
+        if (!buttons) return;
+        let buttonArray = Array.isArray(buttons) ? buttons : Array.from(buttons || []);
+        let buttonSet = new Set(buttonArray);
+        for (let instance_id in this.states) {
+            let stateInfo = this.states[instance_id];
+            if (!stateInfo || !Array.isArray(stateInfo.buttons)) continue;
+            stateInfo.buttons = stateInfo.buttons.filter(button => !buttonSet.has(button.element));
+        }
+    }
+}
+
+window.enderlynx.onInstanceStopped((instance_id) => {
+    let instance = Instance.getInstance(instance_id);
+    InstanceStateManagement.calculateInstanceStatus(instance);
+    live.findLive();
+});
 
 class CategoryFilter {
     constructor(element, categories, defaultActiveCategories = [], onchange) {
@@ -14490,6 +14664,7 @@ class CategoryFilter {
 
 window.debug = {
     DiscoverStateManagement,
+    InstanceStateManagement,
     Modrinth,
     CurseForge
 }

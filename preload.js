@@ -32,8 +32,6 @@ let svgData = process.argv.find(arg => arg.startsWith('--svgData=')).split('=').
 
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
-let processWatches = {};
-
 function openInBrowser(url) {
     if (!url) return;
     if (url.length > 2048) return;
@@ -375,9 +373,14 @@ contextBridge.exposeInMainWorld('enderlynx', {
             callback(key, value, content_id);
         });
     },
+    onInstanceStopped: (callback) => {
+        ipcRenderer.on('instance-stopped', (_, instance_id) => {
+            callback(instance_id);
+        });  
+    },
     onPage: async (callback) => {
         pageCallback = callback;
-        if (startingPage) callback (startingPage);
+        if (startingPage) callback(startingPage);
     },
     onLaunchInstance: async (callback) => {
         launchInstanceCallback = callback;
@@ -436,30 +439,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     stopWatching: (filepath) => {
         ipcRenderer.invoke('stop-watching-file', filepath)
-    },
-    clearProcessWatches: () => {
-        let keys = Object.keys(processWatches);
-        for (let i = 0; i < keys.length; i++) {
-            clearInterval(processWatches[keys[i]]['interval']);
-            delete processWatches[keys[i]];
-        }
-    },
-    watchProcessForExit: (pid, callback) => {
-        if (processWatches[pid]) {
-            processWatches[pid].callback = callback;
-        } else {
-            processWatches[pid] = {};
-            processWatches[pid].callback = callback;
-            const timer = setInterval(() => {
-                let check = checkForProcess(pid);
-                if (!check) {
-                    clearInterval(timer);
-                    processWatches[pid].callback();
-                    delete processWatches[pid];
-                }
-            }, 1000);
-            processWatches[pid]['interval'] = timer;
-        }
     },
     deleteContent: async (instance_id, project_type, filename) => {
         return await ipcRenderer.invoke('delete-content', instance_id, project_type, filename);
@@ -629,8 +608,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteFoldersForModpackUpdate: async (instance_id) => {
         return await ipcRenderer.invoke('delete-folders-for-modpack-update', instance_id);
     },
-    analyzeLogs: async (instance_id, last_log_date, current_log_path) => {
-        return await ipcRenderer.invoke('analyze-logs', instance_id, last_log_date, current_log_path);
+    analyzeLogs: async (instance_id) => {
+        return await ipcRenderer.invoke('analyze-logs', instance_id);
     },
     saveToDisk: async (file_path) => {
         let result = await ipcRenderer.invoke('show-save-dialog', {
