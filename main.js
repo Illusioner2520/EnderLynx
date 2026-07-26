@@ -1252,7 +1252,6 @@ async function processCfZip(instance_id, info, title = ".zip file") {
 
         const downloadPromises = manifest_json.files.map((file, i) => limit(async () => {
             signal.throwIfAborted();
-            win.webContents.send('progress-update', translate("app.installing", "%t", title), ((i + 1) / manifest_json.files.length) * 84 + 10, translate("app.installing.downloading", "%a", i + 1, "%b", manifest_json.files.length), processId, "good", cancelId);
 
             let project_id = Number(file.projectID).toString();
             let file_id = Number(file.fileID).toString();
