@@ -511,8 +511,8 @@ class Instance {
         this.listeners.set(key, callback);
     }
 
-    display(default_tab, make_button_loading) {
-        this.instanceScreen.display(false, default_tab, make_button_loading);
+    display(default_tab) {
+        this.instanceScreen.display(false, default_tab);
     }
 
     async play(settings) {
@@ -1901,7 +1901,7 @@ class MoreMenu {
             if (button.type == "play-button") {
                 InstanceStateManagement.registerButton(buttonElement, button.instance, button.world || null, false, true, () => {
                     this.element.hidePopover();
-                });
+                }, button.goToInstancePageWhenClicked);
             }
             this.element.appendChild(buttonElement);
         }
@@ -1978,7 +1978,7 @@ class ContextMenu {
             if (button.type == "play-button") {
                 InstanceStateManagement.registerButton(buttonElement, button.instance, button.world || null, false, true, () => {
                     this.hideContextMenu();
-                });
+                }, button.goToInstancePageWhenClicked);
             }
             this.element.appendChild(buttonElement);
         }
@@ -3404,7 +3404,7 @@ class InstanceScreen extends Screen {
         this.closeWorlds();
     }
 
-    calculateContent(default_tab, make_button_loading) {
+    calculateContent(default_tab) {
         this.contentElement.innerHTML = "";
         this.contentElement.className = "instance-content";
         let topBar = createElement("div", "instance-top");
@@ -5701,7 +5701,7 @@ class HomeScreen extends Screen {
             item.appendChild(itemInfo);
             let instanceInfo = Instance.getInstance(e.instance_id);
             let playButton = createElement("button", "home-play-button");
-            InstanceStateManagement.registerButton(playButton, instanceInfo, e, true);
+            InstanceStateManagement.registerButton(playButton, instanceInfo, e, true, false, undefined, true);
             this.instance_buttons.push(playButton);
             let morebutton = document.createElement("button");
             morebutton.className = "home-list-more";
@@ -5710,7 +5710,8 @@ class HomeScreen extends Screen {
                 instanceInfo.supportsQuickPlayType(e.type) ? {
                     "type": "play-button",
                     "instance": instanceInfo,
-                    "world": e
+                    "world": e,
+                    "goToInstancePageWhenClicked": true
                 } : null,
                 {
                     "title": translate("app.instance.view"),
@@ -5877,14 +5878,15 @@ class HomeScreen extends Screen {
             item.appendChild(itemInfo);
             let instanceInfo = e;
             let playButton = createElement("button", "home-play-button");
-            InstanceStateManagement.registerButton(playButton, instanceInfo, null, true);
+            InstanceStateManagement.registerButton(playButton, instanceInfo, null, true, false, undefined, true);
             let morebutton = document.createElement("button");
             morebutton.className = "home-list-more";
             morebutton.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
             let buttons = new ContextMenuButtons([
                 {
                     "type": "play-button",
-                    "instance": instanceInfo
+                    "instance": instanceInfo,
+                    "goToInstancePageWhenClicked": true
                 },
                 instanceInfo.locked ? null : {
                     "icon": '<i class="fa-solid fa-plus"></i>',
@@ -6320,7 +6322,8 @@ class InstancesScreen extends Screen {
             let buttons = new ContextMenuButtons([
                 {
                     "type": "play-button",
-                    "instance": instances[i]
+                    "instance": instances[i],
+                    "goToInstancePageWhenClicked": true
                 },
                 instances[i].locked ? null : {
                     "icon": '<i class="fa-solid fa-plus"></i>',
@@ -14393,14 +14396,15 @@ class InstanceStateManagement {
             return InstanceState.STOPPABLE;
         }
     }
-    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun) {
+    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun, goToInstancePageWhenClicked = false) {
         let info = {
             element: button,
             instance,
             world,
             useTooltip,
             isInContextMenu,
-            callWhenRun
+            callWhenRun,
+            goToInstancePageWhenClicked
         }
         let instance_id = instance.instance_id;
         if (this.states[instance_id]?.buttons) {
@@ -14426,6 +14430,7 @@ class InstanceStateManagement {
             }
             button.onclick = () => {
                 if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                if (buttonInfo.goToInstancePageWhenClicked) buttonInfo.instance.display();
                 buttonInfo.instance.play();
             }
             if (buttonInfo.useTooltip) {
@@ -14464,6 +14469,7 @@ class InstanceStateManagement {
             }
             button.onclick = () => {
                 if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                if (buttonInfo.goToInstancePageWhenClicked) buttonInfo.instance.display();
                 if (buttonInfo.world.type == "singleplayer") {
                     buttonInfo.instance.playSingleplayerWorld(buttonInfo.world.id);
                 } else {
