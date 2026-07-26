@@ -785,6 +785,7 @@ h1 {
     image-rendering: pixelated;
     object-fit: contain;
     background-color: var(--color-1);
+    flex-shrink: 0;
 }
 
 .instance-name {
@@ -1059,6 +1060,7 @@ h1 {
     border-width: 1px;
     border-style: solid;
     object-fit: contain;
+    flex-shrink: 0;
 }
 
 .instance-top-info {
