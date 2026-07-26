@@ -28,7 +28,7 @@ function processInfo(info) {
     if (pageCallback) pageCallback(info.page);
 }
 
-let svgData = process.argv.find(arg => arg.startsWith('--svgData=')).split('=').slice(1).join('=');
+let svgData = "";
 
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
@@ -658,6 +658,9 @@ contextBridge.exposeInMainWorld('enderlynx', {
         let strokeColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
         if (code === undefined) {
             strokeColor = `#777`;
+        }
+        if (!svgData) {
+            svgData = ipcRenderer.sendSync('svg-data');
         }
         let data = svgData.replaceAll("currentColor", strokeColor);
         return data;

@@ -228,7 +228,7 @@ ipcMain.handle('translate', (_, key, ...params) => {
 });
 
 const createWindow = (sendToWindow = {}) => {
-    let additionalArguments = [`--userDataPath=${user_path}`, `--svgData=${svgData}`];
+    let additionalArguments = [`--userDataPath=${user_path}`];
     if (isDev) additionalArguments.push('--dev');
     let state = windowStateKeeper({
         defaultWidth: 1000,
@@ -5243,6 +5243,7 @@ async function getPinnedWorlds() {
     return allWorlds;
 }
 
+ipcMain.on('svg-data', (_) => _.returnValue = svgData);
 
 ipcMain.on('get-instance', (_, ...params) => _.returnValue = getInstance(...params));
 ipcMain.handle('get-instances', (_, ...params) => getInstances(...params));
