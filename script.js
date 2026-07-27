@@ -11766,7 +11766,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => e.source_info);
     let initialContent = {};
     try {
-        await addContent(instance_id, project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
+        initialContent = await addContent(instance_id, project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
     } catch (e) {
         DiscoverStateManagement.setContentStatus(version.project_id, instance_id, DiscoverState.NOT_INSTALLED);
         throw e;
