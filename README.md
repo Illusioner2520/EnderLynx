@@ -1,10 +1,12 @@
 # EnderLynx
 
-EnderLynx is a Minecraft launcher that is currently a work in progress. We are currently in beta, therefore expect plenty of bugs. If you encounter a bug when using the app, please report it in the issues tab. If you want something added to the app, please request it in the issues tab.
+EnderLynx is a Minecraft launcher focused on providing features for you to have your best Minecraft experience.
+
+We are currently in beta, therefore expect plenty of bugs. If you encounter a bug when using the app, please report it on the [issues tab](https://github.com/Illusioner2520/EnderLynx/issues). If you want something added to the app, please request it in the issues tab.
 
 ## Installation
 
-Download the latest version from the [releases page](https://github.com/Illusioner2520/EnderLynx/releases). You can download an installer for your OS or just the files in the form of a .zip file. If on Windows, you will be able to get updates from within the app. Other operating systems must manually install each update.
+Download the latest version from the [releases page](https://github.com/Illusioner2520/EnderLynx/releases). You can download an installer for your OS or the files in the form of a .zip file. If you are on Windows, you will be able to receive updates from within the app. Other operating systems will have to manually install each update.
 
 ## Requirements
 
@@ -12,47 +14,31 @@ Currently, EnderLynx supports Windows and Linux. We offer a macOS distribution, 
 
 ## Features
 
- - 🖥️ Launch any version of Minecraft from rd-132211 to present day
- - 🔃 Launch Vanilla, Fabric, Forge, NeoForge or Quilt
- - 👤 Easily switch between Minecraft accounts
-   - 🟥 Supports Microsoft sign-in
- - ℹ️ Create separate instances of Minecraft independent from each other
- - 🛜 Full integration with Modrinth and CurseForge
-   - 📃 Select any version or download the most recent one
-   - 📷 View the gallery for any project
-   - 📄 View the description for any project
- - 🧑 Change your skin and cape in the launcher
-   - 🧑‍🦰 Includes all default skins and skins from official skin packs
-   - ↩️ Import skins from a file, username or URL
-   - ⭐ Favorite skins to come back to them later
- - 👥 View and edit your Minecraft Java friends list
- - 🔗 Share instances through a new .elpack file format
- - 📁 Add instances from a CurseForge .zip, Modrinth .mrpack, MultiMC/Prism .zip or a CurseForge profile code
- - 🔔 Includes the most recent Minecraft news on the home page
- - ❓ Includes a random assortment of modpacks to discover on the home page
- - 🎁 Manage mods, resource packs and shaders, including the ability to disable.
-   - 📈 Update content, including when an instance's game version is edited
- - 🍫 Jump directly into a world if the version supports it
- - ⌚ View your most recently played worlds and instances to jump back in
- - 📌 Pin your instances or worlds to the home screen
- - ✂️ Add a desktop shortcut for instances or worlds to jump back in without opening the launcher
- - 🌍 View an instance's singleplayer and multiplayer worlds
-   - 🌏 Add worlds and servers from CurseForge
-   - 🗺️ Import worlds from other launchers
-   - 📦 Add data packs from Modrinth and CurseForge to any singleplayer world
- - 🪵 View the logs for an instance in real time (and past logs)
- - 📂 View and edit the files in the launcher for each instance
- - 🤔 Set default options that are applied to any newly created instance
- - 🖼️ View the screenshots for any instance
- - 🔧 Easily Repair instances (and select which parts to repair)
- - 📚 Organize your instance list with custom groups
- - ⏲️ Keeps track of your play time per instance
- - 🔵 Multiple accent colors to choose from
- - 🍵 Automatic downloads of Java
-   - ☕ Change the Java Installation the launcher uses
-   - 🐏 Change the amount of RAM each instance can use
- - ⬆️ Update from inside of the App (Only on Windows) (It will never update automatically to give you control)
- - ✅ Many other helpful features and more to come!
+### Supported Versions
+
+EnderLynx supports all versions of Minecraft supported by the vanilla Minecraft launcher.
+
+### Supported Loaders
+
+EnderLynx supports Fabric, Forge, NeoForge, Quilt or no loader at all.
+
+### Other Features
+
+- Easily swap between Minecraft accounts
+- Full integration with both [Modrinth](https://modrinth.com/) and [CurseForge](https://www.curseforge.com/)
+- Change your skin and cape within the launcher with many default skins to choose from
+- View and edit your Minecraft Java friends list
+- Share instances through a new `.elpack` file format
+- Import instances from a CurseForge `.zip`, Modrinth `.mrpack`, MultiMC/Prism `.zip` or a CurseForge profile code
+- Easily manage your mods, resource packs and shaders
+- Jump directly into a world or server
+- Add a desktop shortcut for worlds or instances
+- View the logs for an instance in real time
+- View and edit files for an instance
+- Set default options to apply to newly-created instances
+- View screenshots for an instance easily
+- Automatic Java downloads
+- Manually-triggered updates from inside the app (Windows exclusive)
 
 ## Technologies
 
