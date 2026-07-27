@@ -5604,7 +5604,7 @@ class HomeScreen extends Screen {
                     "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
                     "func": async (e, c) => {
                         if (c) c.remove();
-                        await instanceInfo.isPinned() ? await unpinInstance(instanceInfo) : await pinInstance(instanceInfo);
+                        await instanceInfo.isPinned() ? await instanceInfo.unpin() : await instanceInfo.pin();
                         e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
                         e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                         if (await instanceInfo.isPinned()) {
@@ -6040,7 +6040,7 @@ class InstancesScreen extends Screen {
                     "icon": async () => await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
                     "title": async () => await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
                     "func": async (e) => {
-                        await instances[i].isPinned() ? await unpinInstance(instances[i]) : await pinInstance(instances[i]);
+                        await instances[i].isPinned() ? await instances[i].unpin() : await instances[i].pin();
                         e.setTitle(await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
                         e.setIcon(await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                         instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
@@ -11546,7 +11546,7 @@ async function getPinnedInstances() {
     for (let i = 0; i < instances.length; i++) {
         let instance = Instance.getInstance(instances[i].instance_id);
         if (!instance) {
-            await unpinInstance(instance, true);
+            await instance.unpin(true);
             continue;
         }
         instanceList.push(instance);
