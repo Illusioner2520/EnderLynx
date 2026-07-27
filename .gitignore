@@ -24,3 +24,5 @@ updater/target
 updater/Cargo.lock
 
 .vscode/
+
+main.py

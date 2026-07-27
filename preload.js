@@ -759,7 +759,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteFiles: async (instance_id, paths, files) => ipcRenderer.invoke('delete-files', instance_id, paths, files),
     editFile: async (instance_id, filePath, data) => ipcRenderer.invoke('edit-file', instance_id, filePath, data),
     renameFile: async (instance_id, filePath, newFilePath) => ipcRenderer.invoke('rename-file', instance_id, filePath, newFilePath),
-    importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths)
+    importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths),
+    convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value)
 });
 
 async function getServerLastPlayed(instance_id, ip) {

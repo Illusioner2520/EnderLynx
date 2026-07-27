@@ -661,7 +661,6 @@ async function getMultiplayerWorlds(instance_id) {
                 ip: server.ip?.value || "",
                 icon: server.icon?.value ? "data:image/png;base64," + server.icon?.value : "",
                 acceptTextures: server.acceptTextures?.value ?? false,
-                last_played: server.lastOnline?.value ? Number(server.lastOnline.value) : null,
                 index: i,
                 type: "multiplayer"
             });
@@ -3521,7 +3520,7 @@ async function setOptionsTXT(instance_id, dont_complete_if_already_exists, dont_
     const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
     let alreadyExists = fs.existsSync(optionsPath);
     let instance = getInstance(instance_id);
-    let content = getDefaultOptionsTXT(instance.vanilla_version);
+    let content = await getDefaultOptionsTXT(instance.vanilla_version);
     if (dont_complete_if_already_exists && alreadyExists) {
         return;
     }
@@ -3554,7 +3553,7 @@ async function applyResourcePack(instance_id, file_name) {
         const optionsPath = path.resolve(user_path, `minecraft/instances/${instance_id}/options.txt`);
         let alreadyExists = fs.existsSync(optionsPath);
         let instance = getInstance(instance_id);
-        let content = getDefaultOptionsTXT(instance.vanilla_version);
+        let content = await getDefaultOptionsTXT(instance.vanilla_version);
         if (!alreadyExists) {
             await fsPromises.writeFile(optionsPath, `version:${content.version}\nresourcePacks:["${file_name}"]`, "utf-8");
             return true;
@@ -4968,153 +4967,10 @@ function setDefaultOption(key, value) {
 function deleteDefaultOption(key) {
     return db.prepare("DELETE FROM options_defaults WHERE key = ?").run(key);
 }
-let keyToNum = {
-    "key.keyboard.apostrophe": 40,
-    "key.keyboard.backslash": 43,
-    "key.keyboard.backspace": 14,
-    "key.keyboard.caps.lock": 58,
-    "key.keyboard.comma": 51,
-    "key.keyboard.delete": 211,
-    "key.keyboard.down": 208,
-    "key.keyboard.end": 207,
-    "key.keyboard.enter": 28,
-    "key.keyboard.equal": 13,
-    "key.keyboard.f1": 59,
-    "key.keyboard.f2": 60,
-    "key.keyboard.f3": 61,
-    "key.keyboard.f4": 62,
-    "key.keyboard.f5": 63,
-    "key.keyboard.f6": 64,
-    "key.keyboard.f7": 65,
-    "key.keyboard.f8": 66,
-    "key.keyboard.f9": 67,
-    "key.keyboard.f10": 68,
-    "key.keyboard.f11": 87,
-    "key.keyboard.f12": 88,
-    "key.keyboard.f13": 100,
-    "key.keyboard.f14": 101,
-    "key.keyboard.f15": 102,
-    "key.keyboard.f16": 103,
-    "key.keyboard.f17": 104,
-    "key.keyboard.f18": 105,
-    "key.keyboard.f19": 113,
-    "key.keyboard.f20": 114,
-    "key.keyboard.f21": 115,
-    "key.keyboard.f22": 116,
-    "key.keyboard.f23": 117,
-    "key.keyboard.f24": 118,
-    "key.keyboard.f25": 119,
-    "key.keyboard.grave.accent": 41,
-    "key.keyboard.home": 199,
-    "key.keyboard.insert": 210,
-    "key.keyboard.keypad.0": 82,
-    "key.keyboard.keypad.1": 79,
-    "key.keyboard.keypad.2": 80,
-    "key.keyboard.keypad.3": 81,
-    "key.keyboard.keypad.4": 75,
-    "key.keyboard.keypad.5": 76,
-    "key.keyboard.keypad.6": 77,
-    "key.keyboard.keypad.7": 71,
-    "key.keyboard.keypad.8": 72,
-    "key.keyboard.keypad.9": 73,
-    "key.keyboard.keypad.add": 78,
-    "key.keyboard.keypad.decimal": 83,
-    "key.keyboard.keypad.divide": 181,
-    "key.keyboard.keypad.enter": 156,
-    "key.keyboard.keypad.equal": 141,
-    "key.keyboard.keypad.multiply": 55,
-    "key.keyboard.keypad.subtract": 74,
-    "key.keyboard.left": 203,
-    "key.keyboard.left.alt": 56,
-    "key.keyboard.left.bracket": 26,
-    "key.keyboard.left.control": 29,
-    "key.keyboard.left.shift": 42,
-    "key.keyboard.left.win": 219,
-    "key.keyboard.menu": 221,
-    "key.keyboard.minus": 12,
-    "key.keyboard.num.lock": 69,
-    "key.keyboard.page.down": 209,
-    "key.keyboard.page.up": 201,
-    "key.keyboard.pause": 197,
-    "key.keyboard.period": 52,
-    "key.keyboard.print.screen": 183,
-    "key.keyboard.right": 205,
-    "key.keyboard.right.alt": 184,
-    "key.keyboard.right.bracket": 27,
-    "key.keyboard.right.control": 157,
-    "key.keyboard.right.shift": 54,
-    "key.keyboard.right.win": 220,
-    "key.keyboard.scroll.lock": 70,
-    "key.keyboard.semicolon": 39,
-    "key.keyboard.slash": 53,
-    "key.keyboard.space": 57,
-    "key.keyboard.tab": 15,
-    "key.keyboard.unknown": -1,
-    "key.keyboard.up": 200,
-    "key.keyboard.a": 30,
-    "key.keyboard.b": 48,
-    "key.keyboard.c": 46,
-    "key.keyboard.d": 32,
-    "key.keyboard.e": 18,
-    "key.keyboard.f": 33,
-    "key.keyboard.g": 34,
-    "key.keyboard.h": 35,
-    "key.keyboard.i": 23,
-    "key.keyboard.j": 36,
-    "key.keyboard.k": 37,
-    "key.keyboard.l": 38,
-    "key.keyboard.m": 50,
-    "key.keyboard.n": 49,
-    "key.keyboard.o": 24,
-    "key.keyboard.p": 25,
-    "key.keyboard.q": 16,
-    "key.keyboard.r": 19,
-    "key.keyboard.s": 31,
-    "key.keyboard.t": 20,
-    "key.keyboard.u": 22,
-    "key.keyboard.v": 47,
-    "key.keyboard.w": 17,
-    "key.keyboard.x": 45,
-    "key.keyboard.y": 21,
-    "key.keyboard.z": 44,
-    "key.keyboard.0": 11,
-    "key.keyboard.1": 2,
-    "key.keyboard.2": 3,
-    "key.keyboard.3": 4,
-    "key.keyboard.4": 5,
-    "key.keyboard.5": 6,
-    "key.keyboard.6": 7,
-    "key.keyboard.7": 8,
-    "key.keyboard.8": 9,
-    "key.keyboard.9": 10,
-    "key.mouse.left": -100,
-    "key.mouse.right": -99,
-    "key.mouse.middle": -98,
-    "key.mouse.1": -97,
-    "key.mouse.2": -96,
-    "key.mouse.3": -95,
-    "key.mouse.4": -94,
-    "key.mouse.5": -93,
-    "key.mouse.6": -92,
-    "key.mouse.7": -91,
-    "key.mouse.8": -90,
-    "key.mouse.9": -89,
-    "key.mouse.10": -88,
-    "key.mouse.11": -87,
-    "key.mouse.12": -86,
-    "key.mouse.13": -85,
-    "key.mouse.14": -84,
-    "key.mouse.15": -83,
-    "key.mouse.16": -82,
-    "key.mouse.17": -81,
-    "key.mouse.18": -80,
-    "key.mouse.19": -79,
-    "key.mouse.20": -78
-};
 function getVersionsWithDataVersions() {
     return db.prepare("SELECT * FROM mc_versions_cache WHERE data_version IS NOT NULL").all();
 }
-function getDefaultOptionsTXT(version) {
+async function getDefaultOptionsTXT(version) {
     let data_version = 100;
     let thisIndex = minecraftVersions.indexOf(version);
     let versions = getVersionsWithDataVersions();
@@ -5130,14 +4986,20 @@ function getDefaultOptionsTXT(version) {
     let options = db.prepare("SELECT * FROM options_defaults").all();
     let content = "";
     content = "version:" + data_version + "\n";
-    options.forEach(e => {
-        if (data_version <= 1343 && keyToNum[e.value]) {
-            content += e.key + ":" + keyToNum[e.value] + "\n"
+    let keys = [];
+    let values = [];
+    for (let e of options) {
+        let old_key_code = await convertKeyInfo("lwjgl_code", "old_lwjgl_code", e.value);
+        if (data_version <= 1343 && old_key_code) {
+            content += e.key + ":" + old_key_code + "\n"
+            values.push(old_key_code);
         } else {
             content += e.key + ":" + e.value + "\n"
+            values.push(e.value);
         }
-    });
-    return { "content": content, "version": data_version, "keys": options.map(e => e.key), "values": options.map(e => e.value).map(e => (data_version <= 1343 && keyToNum[e]) ? keyToNum[e] : e) };
+        keys.push(e.key);
+    }
+    return { content, version: data_version, keys, values };
 }
 function getDefaultOptions() {
     return db.prepare("SELECT * FROM options_defaults").all();
@@ -5617,6 +5479,19 @@ getInstances().forEach(instance => {
     } else {
         updateInstance("pid", null, instance.instance_id);
     }
+});
+
+let key_info = null;
+
+async function convertKeyInfo(from, to, value) {
+    if (!key_info) {
+        key_info = JSON.parse(await fsPromises.readFile(path.resolve(__dirname, "resources/keys.json"), 'utf-8'));
+    }
+    let entry = key_info.find(item => item[from] == value);
+    return entry ? entry[to] : null;
+}
+ipcMain.handle('convert-key-info', async (_, from, to, value) => {
+    return await convertKeyInfo(from, to, value);
 });
 
 function hasColumn(table, column) {

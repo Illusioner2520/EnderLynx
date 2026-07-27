@@ -546,7 +546,7 @@ class Minecraft {
             let paths = [];
             for (let i = 0; i < libraries.length; i++) {
                 signal.throwIfAborted();
-                this.win.webContents.send('progress-update', this.translate("app.downloading.neoforge"), ((i + 1) / libraries.length) * 40 + 20, this.translate("app.downloading.forge.libraries", "%a", i + 1, "%b", libraries.length), processId, "good", cancelId, true);
+                this.win.webContents.send('progress-update', this.translate("app.downloading.neoforge"), ((i + 1) / libraries.length) * 40 + 20, this.translate("app.downloading.neoforge.libraries", "%a", i + 1, "%b", libraries.length), processId, "good", cancelId, true);
                 let e = libraries[i];
                 if (e.downloads.artifact) {
                     if (!e.downloads.artifact.url) {
