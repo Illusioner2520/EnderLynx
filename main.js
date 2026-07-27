@@ -4513,10 +4513,14 @@ ipcMain.handle('delete-content', async (_, instance_id, project_type, filename) 
         install_path = path.resolve(user_path, `minecraft/instances/${instance_id}/shaderpacks`, filename);
     }
     if (fs.existsSync(install_path)) {
-        await fsPromises.unlink(install_path);
-        return true;
+        try {
+            await fsPromises.unlink(install_path);
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
-    return false;
+    return true;
 });
 
 ipcMain.handle('delete-screenshot', async (_, instance_id, file_name) => {
