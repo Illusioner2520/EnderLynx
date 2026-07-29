@@ -44,16 +44,8 @@ function openInBrowser(url) {
     }
 }
 
-async function readElPack(file_path) {
-    return await ipcRenderer.invoke('read-elpack', file_path);
-}
-
-async function readMrPack(file_path) {
-    return await ipcRenderer.invoke('read-mrpack', file_path);
-}
-
-async function readZip(file_path) {
-    return await ipcRenderer.invoke('read-zip', file_path);
+async function readPackFile(info) {
+    return await ipcRenderer.invoke('read-pack-file', info);
 }
 
 ipcRenderer.on('arg-info', (event, info) => {
@@ -64,14 +56,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     onOpenFile: (callback) => {
         ipcRenderer.on('open-file', async (event, filePath) => {
             let ext = path.extname(filePath);
-            let info = {};
-            if (ext == ".elpack") {
-                info = await readElPack(filePath);
-            } else if (ext == ".mrpack") {
-                info = await readMrPack(filePath);
-            } else if (ext == ".zip") {
-                info = await readCfZip(filePath);
-            }
+            let info = await readPackFile(filePath);
             if (info) callback(info, filePath);
         });
     },
@@ -111,16 +96,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         let appMetrics = await ipcRenderer.invoke('get-app-metrics');
         return appMetrics;
     },
-    readPackFile: async (info) => {
-        let ext = path.extname(info.has_buffer ? info.name : info);
-        if (ext == ".elpack") {
-            return await readElPack(info);
-        } else if (ext == ".mrpack") {
-            return await readMrPack(info);
-        } else if (ext == ".zip") {
-            return await readZip(info);
-        }
-    },
+    readPackFile,
     getInstanceFiles: async (instance_id) => {
         return await ipcRenderer.invoke('get-instance-files', instance_id);
     },

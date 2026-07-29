@@ -8937,19 +8937,19 @@ async function showCreateInstanceDialog() {
             instance.display();
             await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
         } else if (info.selected_tab == "file") {
-            if (!info.name_if) info.name_if = "";
-            let instance_id = await window.enderlynx.getInstanceFolderName(info.name_f);
-            let instance = await addInstance(info.name_f, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_f, instance_id, 0, "", "", true, false);
+            let pack_info = await window.enderlynx.readPackFile(info.files[0].path);
+            let instance_id = await window.enderlynx.getInstanceFolderName(info.name_f || pack_info.name);
+            let instance = await addInstance(info.name_f || pack_info.name, new Date(), new Date(), "", pack_info.loader, pack_info.game_version, pack_info.loader_version, false, true, "", info.icon_f || pack_info.image, instance_id, 0, "", "", true, false);
             instance.display();
             try {
-                await window.enderlynx.installModpack(info.files[0].path, "file", instance_id, info.name_f, null);
+                await window.enderlynx.installModpack(info.files[0].path, "file", instance_id, info.name_f || pack_info.name, null);
             } catch (e) {
                 await instance.setFailed(true);
                 await instance.setInstalling(false);
                 return;
             }
         } else if (info.selected_tab == "code") {
-            let instance_id = await window.enderlynx.getInstanceFolderName(info.name_c);
+            let instance_id = await window.enderlynx.getInstanceFolderName(info.profile_code);
             let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
             instance.display();
             try {

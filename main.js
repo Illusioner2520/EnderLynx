@@ -2270,6 +2270,19 @@ async function processPackFile(info, instance_id, title) {
     }
 }
 
+async function readPackFile(info) {
+    let extension = path.extname(info.has_buffer ? info.name : info);
+    if (extension == ".mrpack") {
+        return await readMrPack(info);
+    } else if (extension == ".zip") {
+        return await readZip(info);
+    } else if (extension == ".elpack") {
+        return await readElPack(info);
+    } else if (extension == "") {
+        return;
+    }
+}
+
 let vt_rp = {}, vt_dp = {}, vt_ct = {};
 
 async function getVanillaTweaksResourcePackLink(packs, version) {
@@ -3500,16 +3513,8 @@ function readZip(info) {
     }
 }
 
-ipcMain.handle('read-elpack', async (_, info) => {
-    return readElPack(info);
-});
-
-ipcMain.handle('read-mrpack', async (_, info) => {
-    return readMrPack(info);
-});
-
-ipcMain.handle('read-zip', async (_, info) => {
-    return readZip(info);
+ipcMain.handle('read-pack-file', async (_, info) => {
+    return await readPackFile(info);
 });
 
 ipcMain.handle('set-options-txt', async (_, instance_id, dont_complete_if_already_exists, dont_add_to_end_if_already_exists) => {
