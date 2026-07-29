@@ -541,14 +541,12 @@ class Instance {
         try {
             InstanceStateManagement.setInstanceStatus(this.instance_id, InstanceState.LOADING, settings?.quickPlay?.info);
             await window.enderlynx.playMinecraft(this.instance_id, settings);
-            await live.findLive();
             if (Display.currentScreen instanceof InstanceScreen && Display.currentScreen.currentTab == "logs") {
                 Display.currentScreen.showLogs();
             }
         } catch (e) {
             displayError(e);
         }
-        InstanceStateManagement.calculateInstanceStatus(this);
     }
 
     async playSingleplayerWorld(world_id) {
@@ -567,7 +565,6 @@ class Instance {
         InstanceStateManagement.setInstanceStatus(this.instance_id, InstanceState.STOPPING);
         let success = await window.enderlynx.stopInstance(this.instance_id);
         if (!success) displayError(translate("app.instance.stop.failed"));
-        InstanceStateManagement.calculateInstanceStatus(this);
         return success;
     }
 
@@ -1380,6 +1377,178 @@ class Instance {
             displaySuccess(translate("app.worlds.shortcut.created"));
         } else {
             displayError(translate("app.worlds.shortcut.failed"));
+        }
+    }
+}
+
+class InstanceStateManagement {
+    static states = {};
+    static active_world = "";
+    constructor() { }
+    static calculateState(instance) {
+        let running = checkForProcess(instance.pid);
+        if (instance.failed) {
+            return InstanceState.FAILED;
+        } else if (!instance.mc_installed) {
+            return InstanceState.INSTALLING;
+        } else if (!running) {
+            return InstanceState.PLAYABLE;
+        } else {
+            return InstanceState.STOPPABLE;
+        }
+    }
+    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun, goToInstancePageWhenClicked = false) {
+        let info = {
+            element: button,
+            instance,
+            world,
+            useTooltip,
+            isInContextMenu,
+            callWhenRun,
+            goToInstancePageWhenClicked
+        }
+        let instance_id = instance.instance_id;
+        if (this.states[instance_id]?.buttons) {
+            this.states[instance_id].buttons.push(info);
+        } else {
+            this.states[instance_id] = {
+                state: this.calculateState(instance),
+                buttons: [info]
+            }
+        }
+        this.updateButton(info, this.states[instance_id]);
+    }
+    static applyPlayButtonState(state, buttonInfo) {
+        let button = buttonInfo.element;
+        button.classList.remove("disabled");
+        button.classList.remove("stop");
+        button.removeAttribute("title");
+        button.style.display = "";
+        if (state == PlayButtonState.PLAY) {
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            if (buttonInfo.isInContextMenu) {
+                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play");
+            }
+            button.onclick = () => {
+                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                if (buttonInfo.goToInstancePageWhenClicked) buttonInfo.instance.display();
+                buttonInfo.instance.play();
+            }
+            if (buttonInfo.useTooltip) {
+                button.title = translate("app.home.tooltip.instance");
+            }
+        } else if (state == PlayButtonState.STOP) {
+            button.classList.add("stop");
+            button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
+            if (buttonInfo.isInContextMenu) {
+                button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop");
+            }
+            button.onclick = () => {
+                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                buttonInfo.instance.stop();
+            }
+            if (buttonInfo.useTooltip) {
+                button.title = translate("app.button.instances.stop");
+            }
+        } else if (state == PlayButtonState.FAILED) {
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
+            button.onclick = () => { }
+            button.title = translate("app.instances.failed.tooltip");
+        } else if (state == PlayButtonState.INSTALLING) {
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+            button.onclick = () => { }
+        } else if (state == PlayButtonState.LOADING) {
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+            button.onclick = () => { }
+        } else if (state == PlayButtonState.PLAY_SPECIFIC_WORLD) {
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            if (buttonInfo.isInContextMenu) {
+                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.worlds.play");
+            }
+            button.onclick = () => {
+                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
+                if (buttonInfo.goToInstancePageWhenClicked) buttonInfo.instance.display();
+                if (buttonInfo.world.type == "singleplayer") {
+                    buttonInfo.instance.playSingleplayerWorld(buttonInfo.world.id);
+                } else {
+                    buttonInfo.instance.playMultiplayerWorld(buttonInfo.world.ip);
+                }
+            }
+            if (buttonInfo.useTooltip) {
+                button.title = buttonInfo.instance.supportsQuickPlayType(buttonInfo.world.type) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance");
+            }
+        } else if (state == PlayButtonState.STOPPING) {
+            button.classList.add("stop");
+            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
+            button.onclick = () => { }
+        } else if (state == PlayButtonState.SPECIFIC_WORLD_DISABLED || state == PlayButtonState.SPECIFIC_WORLD_FAILED || state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) {
+            if (buttonInfo.isInContextMenu) {
+                button.style.display = "none";
+            }
+            button.classList.add("disabled");
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            button.onclick = () => { }
+            let str = "app.instances.instance_in_use";
+            if (state == PlayButtonState.SPECIFIC_WORLD_FAILED) str = "app.instances.instance_failed";
+            if (state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) str = "app.instances.instance_installing";
+            button.title = translate(str);
+        }
+    }
+    static updateAllButtons(instance_id) {
+        if (!this.states[instance_id]) return;
+        let info = this.states[instance_id];
+        for (let buttonInfo of info.buttons) {
+            this.updateButton(buttonInfo, info);
+        }
+    }
+    static updateButton(buttonInfo, info) {
+        if (buttonInfo.world == null) {
+            if (info.state == InstanceState.FAILED) this.applyPlayButtonState(PlayButtonState.FAILED, buttonInfo);
+            if (info.state == InstanceState.INSTALLING) this.applyPlayButtonState(PlayButtonState.INSTALLING, buttonInfo);
+            if (info.state == InstanceState.PLAYABLE) this.applyPlayButtonState(PlayButtonState.PLAY, buttonInfo);
+            if (info.state == InstanceState.STOPPABLE) this.applyPlayButtonState(PlayButtonState.STOP, buttonInfo);
+            if (info.state == InstanceState.STOPPING) this.applyPlayButtonState(PlayButtonState.STOPPING, buttonInfo);
+            if (info.state == InstanceState.LOADING) this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
+        } else {
+            if (info.state == InstanceState.LOADING && (buttonInfo.world.id == this.active_world || buttonInfo.world.ip == this.active_world)) {
+                this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
+            } else if (info.state == InstanceState.PLAYABLE) {
+                this.applyPlayButtonState(PlayButtonState.PLAY_SPECIFIC_WORLD, buttonInfo);
+            } else if (info.state == InstanceState.INSTALLING) {
+                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_INSTALLING, buttonInfo);
+            } else if (info.state == InstanceState.FAILED) {
+                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_FAILED, buttonInfo);
+            } else {
+                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_DISABLED, buttonInfo);
+            }
+        }
+    }
+    static setInstanceStatus(instance_id, state, world_id) {
+        if (!this.states[instance_id]) {
+            this.states[instance_id] = {
+                state,
+                buttons: []
+            }
+        } else {
+            this.states[instance_id].state = state;
+        }
+        this.active_world = world_id;
+        this.updateAllButtons(instance_id);
+    }
+    static calculateInstanceStatus(instance) {
+        this.setInstanceStatus(instance.instance_id, this.calculateState(instance))
+    }
+    static removeButtons(buttons) {
+        if (!buttons) return;
+        let buttonArray = Array.isArray(buttons) ? buttons : Array.from(buttons || []);
+        let buttonSet = new Set(buttonArray);
+        for (let instance_id in this.states) {
+            let stateInfo = this.states[instance_id];
+            if (!stateInfo || !Array.isArray(stateInfo.buttons)) continue;
+            stateInfo.buttons = stateInfo.buttons.filter(button => !buttonSet.has(button.element));
         }
     }
 }
@@ -3177,6 +3346,9 @@ class Screen {
     }
     calculateContent() { }
     async display(dont_add_to_log, ...args) {
+        if (Display.currentScreen) {
+            Display.currentScreen.onClose();
+        }
         await this.calculateContent(...args);
         if (!dont_add_to_log) {
             Display.pageLog = Display.pageLog.slice(0, Display.pageIndex + 1).concat([() => {
@@ -3189,9 +3361,6 @@ class Screen {
             navButtons[i].removeSelected();
         }
         this.navButton.setSelected();
-        if (Display.currentScreen) {
-            Display.currentScreen.onClose();
-        }
         Display.currentScreen = this;
         this.content.innerHTML = "";
         this.content.appendChild(this.contentElement);
@@ -9651,10 +9820,11 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
         dont_override_my_page = true;
         let pid = instance.pid;
         if (checkForProcess(pid)) {
-            instance.display(launch_info.world ? "worlds" : "content");
+            instance.display(launch_info.world_id ? "worlds" : "content");
         } else {
-            instance.display(launch_info.world ? "worlds" : "content", true);
+            instance.display(launch_info.world_id ? "worlds" : "content", true);
         }
+        InstanceStateManagement.setInstanceStatus(launch_info.instance_id, PlayButtonState.LOADING, launch_info.world_id);
     } catch (e) {
         displayError(translate("app.launch_error"));
     }
@@ -13992,7 +14162,6 @@ class DiscoverStateManagement {
                 }
                 if (!theContent) return;
                 await updateContent(buttonInfo.content.source, theContent, buttonInfo.content, buttonInfo.version, buttonInfo.instance);
-                console.log(buttonInfo.content_list_to_update);
                 if (buttonInfo.content_list_to_update?.updateSecondaryColumn) buttonInfo.content_list_to_update.updateSecondaryColumn();
             }
             button.classList.remove("disabled");
@@ -14109,179 +14278,13 @@ const InstanceState = Object.freeze({
     STOPPING: 'STOPPING'
 });
 
-class InstanceStateManagement {
-    static states = {};
-    static active_world = "";
-    constructor() { }
-    static calculateState(instance) {
-        let running = checkForProcess(instance.pid);
-        if (instance.failed) {
-            return InstanceState.FAILED;
-        } else if (!instance.mc_installed) {
-            return InstanceState.INSTALLING;
-        } else if (!running) {
-            return InstanceState.PLAYABLE;
-        } else {
-            return InstanceState.STOPPABLE;
-        }
-    }
-    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun, goToInstancePageWhenClicked = false) {
-        let info = {
-            element: button,
-            instance,
-            world,
-            useTooltip,
-            isInContextMenu,
-            callWhenRun,
-            goToInstancePageWhenClicked
-        }
-        let instance_id = instance.instance_id;
-        if (this.states[instance_id]?.buttons) {
-            this.states[instance_id].buttons.push(info);
-        } else {
-            this.states[instance_id] = {
-                state: this.calculateState(instance),
-                buttons: [info]
-            }
-        }
-        this.updateButton(info, this.states[instance_id]);
-    }
-    static applyPlayButtonState(state, buttonInfo) {
-        let button = buttonInfo.element;
-        button.classList.remove("disabled");
-        button.classList.remove("stop");
-        button.removeAttribute("title");
-        button.style.display = "";
-        if (state == PlayButtonState.PLAY) {
-            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            if (buttonInfo.isInContextMenu) {
-                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play");
-            }
-            button.onclick = () => {
-                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
-                if (buttonInfo.goToInstancePageWhenClicked) buttonInfo.instance.display();
-                buttonInfo.instance.play();
-            }
-            if (buttonInfo.useTooltip) {
-                button.title = translate("app.home.tooltip.instance");
-            }
-        } else if (state == PlayButtonState.STOP) {
-            button.classList.add("stop");
-            button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
-            if (buttonInfo.isInContextMenu) {
-                button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop");
-            }
-            button.onclick = () => {
-                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
-                buttonInfo.instance.stop();
-            }
-            if (buttonInfo.useTooltip) {
-                button.title = translate("app.button.instances.stop");
-            }
-        } else if (state == PlayButtonState.FAILED) {
-            button.classList.add("disabled");
-            button.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
-            button.onclick = () => { }
-            button.title = translate("app.instances.failed.tooltip");
-        } else if (state == PlayButtonState.INSTALLING) {
-            button.classList.add("disabled");
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
-            button.onclick = () => { }
-        } else if (state == PlayButtonState.LOADING) {
-            button.classList.add("disabled");
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
-            button.onclick = () => { }
-        } else if (state == PlayButtonState.PLAY_SPECIFIC_WORLD) {
-            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            if (buttonInfo.isInContextMenu) {
-                button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.worlds.play");
-            }
-            button.onclick = () => {
-                if (buttonInfo.callWhenRun) buttonInfo.callWhenRun();
-                if (buttonInfo.goToInstancePageWhenClicked) buttonInfo.instance.display();
-                if (buttonInfo.world.type == "singleplayer") {
-                    buttonInfo.instance.playSingleplayerWorld(buttonInfo.world.id);
-                } else {
-                    buttonInfo.instance.playMultiplayerWorld(buttonInfo.world.ip);
-                }
-            }
-            if (buttonInfo.useTooltip) {
-                button.title = buttonInfo.instance.supportsQuickPlayType(buttonInfo.world.type) ? translate("app.home.tooltip.world") : translate("app.home.tooltip.instance");
-            }
-        } else if (state == PlayButtonState.STOPPING) {
-            button.classList.add("stop");
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
-            button.onclick = () => { }
-        } else if (state == PlayButtonState.SPECIFIC_WORLD_DISABLED || state == PlayButtonState.SPECIFIC_WORLD_FAILED || state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) {
-            if (buttonInfo.isInContextMenu) {
-                button.style.display = "none";
-            }
-            button.classList.add("disabled");
-            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
-            button.onclick = () => { }
-            let str = "app.instances.instance_in_use";
-            if (state == PlayButtonState.SPECIFIC_WORLD_FAILED) str = "app.instances.instance_failed";
-            if (state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) str = "app.instances.instance_installing";
-            button.title = translate(str);
-        }
-    }
-    static updateAllButtons(instance_id) {
-        if (!this.states[instance_id]) return;
-        let info = this.states[instance_id];
-        for (let buttonInfo of info.buttons) {
-            this.updateButton(buttonInfo, info);
-        }
-    }
-    static updateButton(buttonInfo, info) {
-        if (buttonInfo.world == null) {
-            if (info.state == InstanceState.FAILED) this.applyPlayButtonState(PlayButtonState.FAILED, buttonInfo);
-            if (info.state == InstanceState.INSTALLING) this.applyPlayButtonState(PlayButtonState.INSTALLING, buttonInfo);
-            if (info.state == InstanceState.PLAYABLE) this.applyPlayButtonState(PlayButtonState.PLAY, buttonInfo);
-            if (info.state == InstanceState.STOPPABLE) this.applyPlayButtonState(PlayButtonState.STOP, buttonInfo);
-            if (info.state == InstanceState.STOPPING) this.applyPlayButtonState(PlayButtonState.STOPPING, buttonInfo);
-            if (info.state == InstanceState.LOADING) this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
-        } else {
-            if (info.state == InstanceState.LOADING && (buttonInfo.world.id == this.active_world || buttonInfo.world.ip == this.active_world)) {
-                this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
-            } else if (info.state == InstanceState.PLAYABLE) {
-                this.applyPlayButtonState(PlayButtonState.PLAY_SPECIFIC_WORLD, buttonInfo);
-            } else if (info.state == InstanceState.INSTALLING) {
-                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_INSTALLING, buttonInfo);
-            } else if (info.state == InstanceState.FAILED) {
-                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_FAILED, buttonInfo);
-            } else {
-                this.applyPlayButtonState(PlayButtonState.SPECIFIC_WORLD_DISABLED, buttonInfo);
-            }
-        }
-    }
-    static setInstanceStatus(instance_id, state, world_id) {
-        if (!this.states[instance_id]) {
-            this.states[instance_id] = {
-                state,
-                buttons: []
-            }
-        } else {
-            this.states[instance_id].state = state;
-        }
-        this.active_world = world_id;
-        this.updateAllButtons(instance_id);
-    }
-    static calculateInstanceStatus(instance) {
-        this.setInstanceStatus(instance.instance_id, this.calculateState(instance))
-    }
-    static removeButtons(buttons) {
-        if (!buttons) return;
-        let buttonArray = Array.isArray(buttons) ? buttons : Array.from(buttons || []);
-        let buttonSet = new Set(buttonArray);
-        for (let instance_id in this.states) {
-            let stateInfo = this.states[instance_id];
-            if (!stateInfo || !Array.isArray(stateInfo.buttons)) continue;
-            stateInfo.buttons = stateInfo.buttons.filter(button => !buttonSet.has(button.element));
-        }
-    }
-}
-
 window.enderlynx.onInstanceStopped((instance_id) => {
+    let instance = Instance.getInstance(instance_id);
+    InstanceStateManagement.calculateInstanceStatus(instance);
+    live.findLive();
+});
+
+window.enderlynx.onInstanceStarted((instance_id) => {
     let instance = Instance.getInstance(instance_id);
     InstanceStateManagement.calculateInstanceStatus(instance);
     live.findLive();

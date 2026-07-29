@@ -175,7 +175,7 @@ function processArgs(args) {
 
     let sendToWindow = {
         instance_id: instance_id_to_launch,
-        world: Boolean(world_type_to_launch),
+        world_id: world_id_to_launch,
         installInfo,
         page: startingPage
     }
@@ -2031,6 +2031,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
         settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
+        if (win) win.webContents.send('instance-started', instance_id);
         watchProcessForExit(minecraft.pid, last_played, instance_id);
         return { minecraft, player_info }
     } catch (err) {

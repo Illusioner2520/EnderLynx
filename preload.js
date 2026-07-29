@@ -18,7 +18,7 @@ let launchInfo = {};
 function processInfo(info) {
     launchInfo = {
         instance_id: info.instance_id,
-        world: info.world
+        world_id: info.world_id
     }
     startingPage = info.page;
     installInfo = info.installInfo;
@@ -353,6 +353,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
         ipcRenderer.on('instance-stopped', (_, instance_id) => {
             callback(instance_id);
         });  
+    },
+    onInstanceStarted: (callback) => {
+        ipcRenderer.on('instance-started', (_, instance_id) => {
+            callback(instance_id);
+        });
     },
     onPage: async (callback) => {
         pageCallback = callback;
