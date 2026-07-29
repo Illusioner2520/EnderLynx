@@ -11682,6 +11682,8 @@ async function displayContentInfo(content_source, content, content_id, instance_
     if (content.project_type == "datapack") type = translate("app.content.data_pack");
     if (content.project_type == "world") type = translate("app.content.world");
     if (content.project_type == "server") type = translate("app.content.server");
+    if (!content.project_type) type = translate("app.content.unknown");
+    let allow_downloads = Boolean(content.project_type);
     contentTopType.innerHTML = `<i class="fa-solid fa-gamepad"></i>${type}`;
     let contentTopDownloads = document.createElement("div");
     contentTopDownloads.classList.add("content-top-sub-info-specific");
@@ -11889,7 +11891,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
         }
     ].concat(links));
     let moreMenu = new MoreMenu(threeDots, buttons);
-    if ((content.project_type != "modpack" && content.project_type != "server") || !instance_id) topBar.appendChild(installButton);
+    if (allow_downloads && ((content.project_type != "modpack" && content.project_type != "server") || !instance_id)) topBar.appendChild(installButton);
     else threeDots.style.marginLeft = "auto";
     topBar.appendChild(threeDots);
     topBar.appendChild(moreMenu.element);
@@ -12162,7 +12164,8 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         let installButton = document.createElement("button");
                         installButton.className = "version-file-install"
                         DiscoverStateManagement.registerButton(content.id, e.version_id, installButton, content, e, instance, content_list_to_update, locked);
-                        versionEle.appendChild(installButton);
+                        if (allow_downloads) versionEle.appendChild(installButton);
+                        else versionEle.appendChild(createElement("div"));
 
                         // Changelog Button
                         let changeLogButton = document.createElement("button");

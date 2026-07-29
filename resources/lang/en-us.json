@@ -508,6 +508,7 @@
     "app.content.world": "World",
     "app.content.server": "Server",
     "app.content.shader": "Shader",
+    "app.content.unknown": "Unknown",
     "app.content.import.cancel": "Cancel",
     "app.content.import.confirm": "Import",
     "app.content.import.failed": "Failed to import %f",
