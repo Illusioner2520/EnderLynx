@@ -630,7 +630,11 @@ class Modrinth {
         if (loader && ["minecraft_java_server"].includes(project_type)) facets.push("minecraft_java_server.content.kind IN [\"" + loader + "\"]");
         if (version) {
             version = Modrinth.convertToModrinthVersionName(version);
-            facets.push("(game_versions IN [\"" + version + "\"] OR minecraft_java_server.content.supported_game_versions IN [\"" + version + "\"])");
+            if (project_type == "minecraft_java_server") {
+                facets.push("minecraft_java_server.content.supported_game_versions IN [\"" + version + "\"]");
+            } else {
+                facets.push("game_versions IN [\"" + version + "\"]");
+            }
         }
         facets.push("project_types = " + project_type);
         for (let category of activeCategories) {
