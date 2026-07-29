@@ -58,7 +58,14 @@ class Skin {
 
     static getSkin(skin_id) {
         if (!this.skins.has(skin_id)) {
-            let newSkin = new Skin(window.enderlynx.getSkin(skin_id));
+            return Skin.applySkin(skin_id, window.enderlynx.getSkin(skin_id));
+        }
+        return this.skins.get(skin_id);
+    }
+    
+    static applySkin(skin_id, info) {
+        if (!this.skins.has(skin_id)) {
+            let newSkin = new Skin(info);
             this.skins.set(skin_id, newSkin);
         }
         return this.skins.get(skin_id);
@@ -136,7 +143,14 @@ class Cape {
 
     static getCape(cape_id) {
         if (!this.capes.has(cape_id)) {
-            let newCape = new Cape(window.enderlynx.getCape(cape_id));
+            return Cape.applyCape(cape_id, window.enderlynx.getCape(cape_id));
+        }
+        return this.capes.get(cape_id);
+    }
+    
+    static applyCape(cape_id, info) {
+        if (!this.capes.has(cape_id)) {
+            let newCape = new Cape(info);
             this.capes.set(cape_id, newCape);
         }
         return this.capes.get(cape_id);
@@ -173,16 +187,18 @@ class Content {
 
     static getContent(content_id) {
         if (!this.content.has(content_id)) {
-            let newContent = new Content(window.enderlynx.getContent(content_id));
+            return Content.applyContent(content_id, window.enderlynx.getContent(content_id));
+        }
+        return this.content.get(content_id);
+    }
+    
+    static applyContent(content_id, info) {
+        if (!this.content.has(content_id)) {
+            let newContent = new Content(info);
             this.content.set(content_id, newContent);
         }
         return this.content.get(content_id);
     }
-
-    async refresh() {
-        return Content.getContent(this.id);
-    }
-
     async setName(name) {
         await window.enderlynx.updateContent("name", name, this.id);
     }
@@ -333,7 +349,13 @@ class Instance {
 
     static getInstance(instance_id) {
         if (!this.instances.has(instance_id)) {
-            let newInstance = new Instance(window.enderlynx.getInstance(instance_id));
+            return Instance.applyInstance(instance_id, window.enderlynx.getInstance(instance_id));
+        }
+        return this.instances.get(instance_id);
+    }
+    static applyInstance(instance_id, info) {
+        if (!this.instances.has(instance_id)) {
+            let newInstance = new Instance(info);
             this.instances.set(instance_id, newInstance);
         }
         return this.instances.get(instance_id);
@@ -486,7 +508,7 @@ class Instance {
         let content = await window.enderlynx.getInstanceContentDatabase(this.instance_id);
         let contentList = [];
         for (let i = 0; i < content.length; i++) {
-            contentList.push(Content.getContent(content[i].id));
+            contentList.push(Content.applyContent(content[i].id, content[i]));
         }
         return contentList;
     }
@@ -1365,30 +1387,30 @@ class Instance {
 async function getInstances() {
     let instances = await window.enderlynx.getInstances();
     let instanceList = [];
-    for (let i = 0; i < instances.length; i++) {
-        instanceList.push(Instance.getInstance(instances[i].instance_id));
+    for (let instance of instances) {
+        instanceList.push(Instance.applyInstance(instance.instance_id, instance));
     }
     return instanceList;
 }
 async function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
-    await window.enderlynx.addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed);
-    return Instance.getInstance(instance_id);
+    let info = await window.enderlynx.addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed);
+    return Instance.applyInstance(instance_id, info);
 }
 async function getProfiles() {
     let profiles = await window.enderlynx.getProfiles();
     let profileList = [];
-    for (let i = 0; i < profiles.length; i++) {
-        profileList.push(Profile.getProfile(profiles[i].id));
+    for (let profile of profiles) {
+        profileList.push(Profile.applyProfile(profile.id, profile));
     }
     return profileList;
 }
 async function getDefaultProfile() {
     let profile = await window.enderlynx.getDefaultProfile();
-    return profile ? Profile.getProfile(profile.id) : null;
+    return profile ? Profile.applyProfile(profile.id, profile) : null;
 }
 async function getProfileFromUUID(uuid) {
     let profile = await window.enderlynx.getProfileDatabase(uuid);
-    return Profile.getProfile(profile.id);
+    return Profile.applyProfile(profile.id, profile);
 }
 async function getDefault(type) {
     return await window.enderlynx.getDefault(type);
@@ -1398,17 +1420,17 @@ async function setDefault(type, value) {
 }
 async function getSkinsNoDefaults() {
     let skins = await window.enderlynx.getSkinsNoDefaults();
-    return skins.map(e => Skin.getSkin(e.id));
+    return skins.map(e => Skin.applySkin(e.id, e));
 }
 async function getDefaultSkins(callback) {
     let info = await window.enderlynx.getDefaultSkins();
-    info.skins = info.skins.map(e => Skin.getSkin(e.id));
+    info.skins = info.skins.map(e => Skin.applySkin(e.id, e));
     callback(info);
     return info;
 }
 async function addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key) {
     let info = await window.enderlynx.addSkin(name, model, active_uuid, skin_id, skin_url, overrideCheck, last_used, texture_key);
-    return Skin.getSkin(info.id);
+    return Skin.applySkin(info.id, info);
 }
 
 class Profile {
@@ -1423,7 +1445,13 @@ class Profile {
 
     static getProfile(profile_id) {
         if (!this.profiles.has(profile_id)) {
-            let newProfile = new Profile(window.enderlynx.getProfileFromId(profile_id));
+            return Profile.applyProfile(profile_id, window.enderlynx.getProfileFromId(profile_id));
+        }
+        return this.profiles.get(profile_id);
+    }
+    static applyProfile(profile_id, info) {
+        if (!this.profiles.has(profile_id)) {
+            let newProfile = new Profile(info);
             this.profiles.set(profile_id, newProfile);
         }
         return this.profiles.get(profile_id);
@@ -1440,22 +1468,22 @@ class Profile {
 
     async getCapes() {
         let capes = await window.enderlynx.getCapes(this.uuid);
-        return capes.map(e => Cape.getCape(e.id));
+        return capes.map(e => Cape.applyCape(e.id, e));
     }
 
     async addCape(cape_name, cape_id, cape_url) {
         let info = await window.enderlynx.addCape(cape_name, cape_id, cape_url, this.uuid);
-        return Cape.getCape(info.id);
+        return Cape.applyCape(info.id, info);
     }
 
     async getActiveSkin() {
         let info = await window.enderlynx.getActiveSkin(this.uuid);
-        return Skin.getSkin(info.id);
+        return Skin.applySkin(info.id, info);
     }
 
     async getActiveCape() {
         let info = await window.enderlynx.getActiveCape(this.uuid);
-        return info ? Cape.getCape(info.id) : null;
+        return info ? Cape.applyCape(info.id, info) : null;
     }
 
     async removeActiveCape() {
@@ -11535,8 +11563,8 @@ async function getRecentlyPlayedInstances(ignore_instance_ids = []) {
     instances = instances.filter(e => !ignore_instance_ids.includes(e.instance_id));
     instances.sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
     let instanceList = [];
-    for (let i = 0; i < instances.length; i++) {
-        instanceList.push(Instance.getInstance(instances[i].instance_id))
+    for (let instance of instances) {
+        instanceList.push(Instance.applyInstance(instance.instance_id, instance));
     }
     return instanceList;
 }
