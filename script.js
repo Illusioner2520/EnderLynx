@@ -1381,6 +1381,28 @@ class Instance {
     }
 }
 
+const PlayButtonState = Object.freeze({
+    PLAY: 'PLAY',
+    PLAY_SPECIFIC_WORLD: 'PLAY_SPECIFIC_WORLD',
+    STOP: 'STOP',
+    INSTALLING: "INSTALLING",
+    FAILED: "FAILED",
+    LOADING: 'LOADING',
+    STOPPING: 'STOPPING',
+    SPECIFIC_WORLD_DISABLED: 'SPECIFIC_WORLD_DISABLED',
+    SPECIFIC_WORLD_FAILED: 'SPECIFIC_WORLD_FAILED',
+    SPECIFIC_WORLD_INSTALLING: 'SPECIFIC_WORLD_INSTALLING'
+});
+
+const InstanceState = Object.freeze({
+    FAILED: 'FAILED',
+    INSTALLING: 'INSTALLING',
+    PLAYABLE: 'PLAYABLE',
+    STOPPABLE: 'STOPPABLE',
+    LOADING: 'LOADING',
+    STOPPING: 'STOPPING'
+});
+
 class InstanceStateManagement {
     static states = {};
     static active_world = "";
@@ -14255,28 +14277,6 @@ class DiscoverStateManagement {
         }
     }
 }
-
-const PlayButtonState = Object.freeze({
-    PLAY: 'PLAY',
-    PLAY_SPECIFIC_WORLD: 'PLAY_SPECIFIC_WORLD',
-    STOP: 'STOP',
-    INSTALLING: "INSTALLING",
-    FAILED: "FAILED",
-    LOADING: 'LOADING',
-    STOPPING: 'STOPPING',
-    SPECIFIC_WORLD_DISABLED: 'SPECIFIC_WORLD_DISABLED',
-    SPECIFIC_WORLD_FAILED: 'SPECIFIC_WORLD_FAILED',
-    SPECIFIC_WORLD_INSTALLING: 'SPECIFIC_WORLD_INSTALLING'
-});
-
-const InstanceState = Object.freeze({
-    FAILED: 'FAILED',
-    INSTALLING: 'INSTALLING',
-    PLAYABLE: 'PLAYABLE',
-    STOPPABLE: 'STOPPABLE',
-    LOADING: 'LOADING',
-    STOPPING: 'STOPPING'
-});
 
 window.enderlynx.onInstanceStopped((instance_id) => {
     let instance = Instance.getInstance(instance_id);
