@@ -2193,7 +2193,7 @@ class Dropdown {
             this.optEles.push(optEle);
         }
     }
-    selectOption(option) {
+    selectOption(option, disableOnChange) {
         let name = "";
         for (let i = 0; i < this.options.length; i++) {
             if (this.options[i].value == option) {
@@ -2212,7 +2212,7 @@ class Dropdown {
         this.selected = option;
         this.value = option;
         this.popover.hidePopover();
-        if (this.onchange) this.onchange(option);
+        if (this.onchange && !disableOnChange) this.onchange(option);
     }
     get getSelected() {
         return this.selected;
@@ -6417,6 +6417,7 @@ class DiscoverScreen extends Screen {
             this.loader_dropdown = new_loader;
             this.getContent();
         });
+        this.loaderDropdown = loaderDropdown;
         let categoryWrapperElement = createElement("div");
         let categoryFilters = new CategoryFilter(categoryWrapperElement, [], [], (active_categories) => {
             this.active_categories = active_categories;
@@ -6454,6 +6455,7 @@ class DiscoverScreen extends Screen {
         if (this.currentTab != "server") {
             if (this.loader_dropdown == "vanilla" || this.loader_dropdown == "modpack") this.loader_dropdown = "all";
         }
+        this.loaderDropdown.selectOption(this.loader_dropdown, true);
         let content_ids = instance_content.map(e => e.source_info);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
