@@ -10725,7 +10725,7 @@ class ContentSearchEntry {
         let installButton = document.createElement("button");
         installButton.className = "discover-item-install";
         DiscoverStateManagement.registerButton(content.id, null, installButton, content, null, instance);
-        actions.appendChild(installButton);
+        if (project_type) actions.appendChild(installButton);
     }
 }
 
