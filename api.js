@@ -511,6 +511,7 @@ class GalleryImage {
 
 class Author {
     constructor(info, source) {
+        this.source = source;
         if (source == "modrinth_organization") {
             this.name = info.name;
             this.url = `https://modrinth.com/organization/${info.id}`;
@@ -525,6 +526,7 @@ class Author {
             this.bio = info.user.bio || "";
             this.id = info.user.id;
             this.role = info.role;
+            this.created = new Date(info.user.created);
         } else if (source == "curseforge") {
             this.name = info.name;
             this.url = info.url;
@@ -534,6 +536,51 @@ class Author {
             this.role = "";
         } else {
             this.name = info;
+        }
+    }
+    async getAuthorInformation() {
+        if (this.source == "modrinth_organization") {
+            if (this.downloads != null) return;
+            let project_url = `https://api.modrinth.com/v3/organization/${this.id}/projects`;
+            let urlInfo = (await (await fetch(project_url)).json());
+            this.downloads = urlInfo.reduce((a,b) => a + b.downloads, 0);
+            this.projects = urlInfo.map(e => {
+                let project = new Project();
+                project.applyInfoFromModrinth(e);
+                return project;
+            }).sort((a, b) => b.downloads - a.downloads);
+            this.total_projects = this.projects.length;
+        } else if (this.source == "modrinth") {
+            if (this.downloads != null) return;
+            let project_url = `https://api.modrinth.com/v3/user/${this.id}/projects`;
+            let urlInfo = (await (await fetch(project_url)).json());
+            this.downloads = urlInfo.reduce((a,b) => a + b.downloads, 0);
+            this.projects = urlInfo.map(e => {
+                let project = new Project();
+                project.applyInfoFromModrinth(e);
+                return project;
+            }).sort((a, b) => b.downloads - a.downloads);
+            this.total_projects = this.projects.length;
+        } else if (this.source == "curseforge") {
+            if (this.downloads != null) return;
+            let url = `https://api.curse.tools/v1/users/${this.id}`;
+            let urlInfo = (await (await fetch(url)).json()).data;
+            this.created = new Date(urlInfo.dateCreated);
+            this.downloads = urlInfo.modsDownloadCount;
+        }
+    }
+    async getProjects(page) {
+        if (this.projects) {
+            return this.projects.slice(page * 20 - 20, page * 20);
+        } else if (this.source == "curseforge") {
+            let url = `https://api.curse.tools/v1/cf/mods/search?gameId=432&index=${(page - 1) * 20}&pageSize=20&authorId=${this.id}&sortField=6&sortOrder=desc`;
+            let urlInfo = (await (await fetch(url)).json());
+            this.total_projects = urlInfo.pagination.totalCount;
+            return urlInfo.data.map(e => {
+                let project = new Project();
+                project.applyInfoFromCurseForge(e);
+                return project;
+            });
         }
     }
 }

@@ -1040,7 +1040,8 @@ h1 {
     }
 }
 
-.instance-top {
+.instance-top,
+.author-top {
     display: flex;
     gap: 10px;
     align-items: center;
@@ -1063,7 +1064,20 @@ h1 {
     flex-shrink: 0;
 }
 
-.instance-top-info {
+.author-top-image {
+    height: 98px;
+    width: 98px;
+    border-radius: 10000px;
+    background-color: var(--color-1);
+    border-color: var(--color-2);
+    border-width: 1px;
+    border-style: solid;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.instance-top-info,
+.author-top-info {
     align-self: stretch;
     display: flex;
     flex-direction: column;
@@ -1071,12 +1085,14 @@ h1 {
     gap: 10px;
 }
 
-.instance-top-sub-info {
+.instance-top-sub-info,
+.author-top-sub-info {
     display: flex;
     gap: 20px;
 }
 
-.instance-top-sub-info-specific {
+.instance-top-sub-info-specific,
+.author-top-sub-info-specific {
     display: flex;
     gap: 10px;
     color: var(--text-color);
@@ -1086,11 +1102,13 @@ h1 {
     align-items: center;
 }
 
-.instance-top-sub-info-specific i {
+.instance-top-sub-info-specific i,
+.author-top-sub-info-specific i {
     color: var(--subtle-text-color);
 }
 
-.instance-top-sub-info-specific:not(:last-of-type)::after {
+.instance-top-sub-info-specific:not(:last-of-type)::after,
+.author-top-sub-info-specific:not(:last-of-type)::after {
     width: 2px;
     background-color: var(--color-2t);
     height: 100%;
@@ -1172,12 +1190,38 @@ h1 {
     place-items: center;
 }
 
-.instance-top-more:hover {
+.author-top-more {
+    padding: 10px;
+    height: calc(1lh + 20px);
+    aspect-ratio: 1;
+    cursor: pointer;
+    color: var(--text-color);
+    font-size: 1.5rem;
+    transition: background-color .25s;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    margin-left: auto;
+}
+
+.instance-top-more:hover,
+.author-top-more:hover {
     background-color: var(--color-2t);
 }
 
 .instance-top-title {
     font-size: 2rem;
+}
+
+.author-top-name {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.author-top-bio {
+    font-size: 1.2rem;
+    color: var(--subtle-text-color);
+    margin-top: -5px;
 }
 
 .tab-list {
@@ -4229,6 +4273,7 @@ textarea.dialog-text-input {
     box-shadow: 0px 0px 10px black;
     width: 100%;
     height: 100%;
+    position: relative;
 }
 
 .dialog-full {
@@ -4686,7 +4731,8 @@ button.dependency:active {
 
 .authors-wrapper {
     width: 100%;
-    display: grid;
+    display: flex;
+    gap: 10px;
 }
 
 .authors {
@@ -4694,6 +4740,45 @@ button.dependency:active {
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 8px;
     font-size: 1.2rem;
+    width: 100%;
+    max-height: 100%;
+    overflow: auto;
+    grid-template-rows: repeat(auto-fit, 68px);
+    position: sticky;
+    top: 20px;
+    max-height: calc(100dvh - 4em - 52px);
+    padding-right: 8px;
+    flex-shrink: 0;
+}
+
+.authors-wrapper:has(.author-full-info) .authors {
+    width: 300px;
+}
+
+.author-full-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    width: 100%;
+    position: relative;
+}
+
+.author-content-list {
+    display: grid;
+    gap: 10px;
+}
+
+.author-full-info::after {
+    content: "";
+    width: 0px;
+    height: 100%;
+    position: absolute;
+    top: 0px;
+    left: -8px;
+    border-left-style: solid;
+    border-color: var(--color-2);
+    border-width: 2px;
 }
 
 .author {
@@ -4701,11 +4786,21 @@ button.dependency:active {
     display: flex;
     gap: 8px;
     background-color: var(--color-1);
-    border-radius: 16px;
+    border-radius: 8px;
     align-items: center;
     border-width: 1px;
     border-color: var(--color-2);
     border-style: solid;
+    cursor: pointer;
+    transition: background-color .25s, scale .1s;
+}
+
+.author:active {
+    scale: .95;
+}
+
+.author:hover {
+    background-color: var(--color-2);
 }
 
 .author-image {

@@ -6491,9 +6491,8 @@ class DiscoverScreen extends Screen {
             this.discoverList.appendChild(noresults.element);
             return;
         }
-        for (let i = 0; i < results.projects.length; i++) {
-            let content = results.projects[i];
-            let entry = new ContentSearchEntry(content, this.instance, this.game_version == "all" ? null : this.game_version, this.currentTab == "server" ? null : this.loader_dropdown == "all" ? null : this.loader_dropdown, content_ids.includes(content.id), false, this.currentTab, undefined);
+        for (let content of results.projects) {
+            let entry = new ContentSearchEntry(content, this.instance, this.game_version == "all" ? null : this.game_version, this.currentTab == "server" ? null : this.loader_dropdown == "all" ? null : this.loader_dropdown, false, this.currentTab, undefined);
             this.discoverList.appendChild(entry.element);
         }
         this.discoverList.appendChild(this.paginationBottom.element);
@@ -10647,7 +10646,7 @@ class Dialog {
 }
 
 class ContentSearchEntry {
-    constructor(content, instance, vanilla_version, loader, alreadyInstalled, experimental, project_type, offline) {
+    constructor(content, instance, vanilla_version, loader, experimental, project_type, offline) {
         let element = document.createElement("div");
         element.className = "discover-item";
         if (experimental) {
@@ -12275,26 +12274,20 @@ async function displayContentInfo(content_source, content, content_id, instance_
             "func": () => {
                 tabContent.style.paddingTop = "0";
                 tabContent.innerHTML = "";
-                let wrapper = document.createElement("div");
-                wrapper.className = "authors-wrapper";
-                let authors = document.createElement("div");
-                authors.className = "authors";
-                content.authors.forEach(e => {
+                let wrapper = createElement("div", "authors-wrapper");
+                let authors = createElement("div", "authors");
+                let authorFullInfo = createElement("div", "author-full-info");
+                let currentlySelectedAuthor = null;
+                for (let e of content.authors) {
                     if (e.organization) e.role = translate("app.discover.authors.organization");
-                    let author = document.createElement("div");
-                    author.className = "author";
-                    if (e.bio) author.setAttribute("title", e.bio);
-                    let authorImg = document.createElement("img");
-                    authorImg.className = "author-image";
+                    let author = createElement("button", "author");
+                    let authorImg = createElement("img", "author-image");
                     authorImg.src = e.avatar || getDefaultImage(e.name);
-                    let authorInfo = document.createElement("div");
-                    authorInfo.className = "author-info";
-                    let authorTitle = document.createElement("div");
-                    authorTitle.className = "author-title";
-                    authorTitle.innerHTML = e.name;
-                    let authorRole = document.createElement("div");
-                    authorRole.className = "author-role";
-                    authorRole.innerHTML = e.role;
+                    let authorInfo = createElement("div", "author-info");
+                    let authorTitle = createElement("div", "author-name");
+                    authorTitle.textContent = e.name;
+                    let authorRole = createElement("div", "author-role");
+                    authorRole.textContent = e.role;
                     authorInfo.appendChild(authorTitle);
                     authorInfo.appendChild(authorRole);
                     author.appendChild(authorImg);
@@ -12323,9 +12316,98 @@ async function displayContentInfo(content_source, content, content_id, instance_
                     author.oncontextmenu = (e) => {
                         dialogContextMenu.showContextMenu(buttons, e.clientX, e.clientY);
                     }
+                    let requestFrame = () => {
+                        return new Promise((resolve) => {
+                            requestAnimationFrame(() => {
+                                resolve();
+                            });
+                        });
+                    }
+                    author.onclick = async () => {
+                        if (currentlySelectedAuthor == e.id) {
+                            authorFullInfo.remove();
+                            currentlySelectedAuthor = null;
+                            return;
+                        }
+                        currentlySelectedAuthor = e.id;
+                        let loaderContainer = new LoadingContainer();
+                        wrapper.appendChild(authorFullInfo);
+                        loaderContainer.element.style.flexGrow = "0";
+                        authorFullInfo.innerHTML = '';
+                        authorFullInfo.appendChild(loaderContainer.element);
+                        requestFrame();
+                        try {
+                            await e.getAuthorInformation();
+                        } catch (e) {
+                            loaderContainer.errorOut(e);
+                            return;
+                        }
+                        let authorTop = createElement("div", "author-top");
+                        let authorImg = createElement("img", "author-top-image", { src: e.avatar || getDefaultImage(e.name) });
+                        let authorInfo = createElement("div", "author-top-info");
+                        let authorName = createElement("span", "author-top-name", { textContent: e.name });
+                        let authorBio = createElement("span", "author-top-bio", { textContent: e.bio });
+                        let authorSubInfo = createElement("div", "author-top-sub-info");
+                        let authorSubInfoProjects = createElement("div", "author-top-sub-info-specific");
+                        authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-download"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
+                        let authorSubInfoDownloads = createElement("div", "author-top-sub-info-specific");
+                        authorSubInfoDownloads.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(e.downloads))}`;
+                        let authorSubInfoCreated = createElement("div", "author-top-sub-info-specific");
+                        authorSubInfoCreated.innerHTML = `<i class="fa-solid fa-calendar-days"></i>${formatTimeRelatively(e.created)}`;
+                        authorSubInfoCreated.setAttribute("title", translate("app.discover.created", "%d", formatDate(e.created)));
+                        if (e.total_projects) authorSubInfo.appendChild(authorSubInfoProjects);
+                        authorSubInfo.appendChild(authorSubInfoDownloads);
+                        if (e.created) authorSubInfo.appendChild(authorSubInfoCreated);
+                        authorInfo.appendChild(authorName);
+                        authorInfo.appendChild(authorBio);
+                        authorInfo.appendChild(authorSubInfo);
+                        authorTop.appendChild(authorImg);
+                        authorTop.appendChild(authorInfo);
+                        let more = createElement("button", "author-top-more");
+                        more.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+                        let moreMenu = new MoreMenu(more, buttons);
+                        authorTop.appendChild(more);
+                        authorTop.appendChild(moreMenu.element);
+                        authorFullInfo.innerHTML = '';
+                        authorFullInfo.appendChild(authorTop);
+                        let authorContentList = createElement("div", "author-content-list");
+                        authorFullInfo.appendChild(authorContentList);
+                        let setPage = async (page) => {
+                            let loaderContainer = new LoadingContainer();
+                            authorContentList.innerHTML = '';
+                            authorContentList.appendChild(loaderContainer.element);
+                            requestFrame();
+                            let projects = [];
+                            try {
+                                projects = await e.getProjects(page);
+                            } catch (e) {
+                                loaderContainer.errorOut(e);
+                                return;
+                            }
+                            paginationTop.setPage(page);
+                            paginationBottom.setPage(page);
+                            paginationTop.setTotalPages(Math.ceil(e.total_projects / 20));
+                            paginationBottom.setTotalPages(Math.ceil(e.total_projects / 20));
+                            authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-download"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
+                            authorSubInfo.prepend(authorSubInfoProjects);
+                            authorContentList.innerHTML = '';
+                            authorContentList.appendChild(paginationTop.element);
+                            for (let project of projects) {
+                                let entry = new ContentSearchEntry(project, instance, vanilla_version, loader, false, project.project_type, false);
+                                authorContentList.appendChild(entry.element);
+                            }
+                            authorContentList.appendChild(paginationBottom.element);
+                        }
+                        let paginationTop = new Pagination(1, 0, setPage);
+                        let paginationBottom = new Pagination(1, 0, setPage);
+                        setPage(1);
+                    }
                     authors.appendChild(author);
-                });
+                }
                 wrapper.appendChild(authors);
+                if (content.authors.length == 1) {
+                    authors.children[0].click();
+                }
                 tabContent.appendChild(wrapper);
             }
         } : null,
