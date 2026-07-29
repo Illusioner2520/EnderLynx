@@ -12574,7 +12574,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         let authorBio = createElement("span", "author-top-bio", { textContent: e.bio });
                         let authorSubInfo = createElement("div", "author-top-sub-info");
                         let authorSubInfoProjects = createElement("div", "author-top-sub-info-specific");
-                        authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-download"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
+                        authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
                         let authorSubInfoDownloads = createElement("div", "author-top-sub-info-specific");
                         authorSubInfoDownloads.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(e.downloads))}`;
                         let authorSubInfoCreated = createElement("div", "author-top-sub-info-specific");
@@ -12613,7 +12613,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             paginationBottom.setPage(page);
                             paginationTop.setTotalPages(Math.ceil(e.total_projects / 20));
                             paginationBottom.setTotalPages(Math.ceil(e.total_projects / 20));
-                            authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-download"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
+                            authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
                             authorSubInfo.prepend(authorSubInfoProjects);
                             authorContentList.innerHTML = '';
                             authorContentList.appendChild(paginationTop.element);
