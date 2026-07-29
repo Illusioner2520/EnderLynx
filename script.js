@@ -9656,8 +9656,8 @@ class MultiSelect {
             options[i].element = buttonElement;
         }
         this.options = options;
-        options[0].element.classList.add("selected");
-        this.selected = options[0].value;
+        options[0]?.element?.classList.add("selected");
+        this.selected = options[0]?.value;
     }
     get value() {
         return this.selected;
@@ -13080,16 +13080,16 @@ async function installButtonClick(content, version, instance_id) {
                 "maxlength": 50
             },
             {
+                "type": "multi-select",
+                "name": translate("app.instances.loader"),
+                "id": "loader",
+                "options": options
+            },
+            {
                 "type": "dropdown",
                 "name": translate("app.instances.game_version"),
                 "id": "game_version",
                 "options": sortByVersion(game_versions, true).map(e => ({ "name": e, "value": e }))
-            },
-            {
-                "type": "dropdown",
-                "name": translate("app.instances.loader"),
-                "id": "loader",
-                "options": options
             },
             project_type == "server" ? {
                 "type": "toggle",
