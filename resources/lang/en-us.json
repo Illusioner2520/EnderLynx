@@ -728,7 +728,7 @@
     "app.discover.copy_image_link.success": "Image address copied to clipboard",
     "app.discover.copy_image_link.fail": "Failed to copy image address to clipboard",
     "app.discover.tabs.description": "Description",
-    "app.discover.tabs.files": "Files",
+    "app.discover.tabs.files": "Versions",
     "app.discover.files.name": "Name",
     "app.discover.files.versions": "Versions",
     "app.discover.files.versions.title": "%t Versions",
