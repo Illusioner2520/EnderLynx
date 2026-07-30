@@ -4741,18 +4741,17 @@ button.dependency:active {
     gap: 8px;
     font-size: 1.2rem;
     width: 100%;
-    max-height: 100%;
-    overflow: auto;
-    grid-template-rows: repeat(auto-fit, 68px);
-    position: sticky;
-    top: 20px;
-    max-height: calc(100dvh - 4em - 52px);
-    padding-right: 8px;
     flex-shrink: 0;
+    grid-template-rows: repeat(auto-fit, 68px);
 }
 
 .authors-wrapper:has(.author-full-info) .authors {
     width: 300px;
+    max-height: calc(100dvh - 4em - 52px);
+    padding-right: 8px;
+    position: sticky;
+    top: 20px;
+    overflow: auto;
 }
 
 .author-full-info {
@@ -4793,6 +4792,7 @@ button.dependency:active {
     border-style: solid;
     cursor: pointer;
     transition: background-color .25s, scale .1s;
+    height: 68px;
 }
 
 .author:active {
