@@ -1947,12 +1947,10 @@ class NavigationButton {
 }
 
 function resetDiscordStatus(bypassLock) {
-    if (!Display.currentScreen) return;
     if (!rpcLocked || bypassLock) {
         window.enderlynx.setActivity({
-            "details": Display.currentScreen.tabName == "home" ? translate("app.discord_rpc.home") : Display.currentScreen.tabName == "instances" || Display.currentScreen.tabName == "instance" ? translate("app.discord_rpc.instances") : Display.currentScreen.tabName == "discover" ? translate("app.discord_rpc.discover") : Display.currentScreen.tabName == "wardrobe" ? translate("app.discord_rpc.wardrobe") : Display.currentScreen.tabName == "friends" ? translate("app.discord_rpc.friends") : translate("app.discord_rpc.unknown"),
-            "state": translate("app.discord_rpc.not_playing"),
-            startTimestamp: new Date(),
+            details: translate("app.discord_rpc.enderlynx"),
+            state: translate("app.discord_rpc.not_playing"),
             largeImageKey: 'icon',
             largeImageText: translate("app.discord_rpc.logo"),
             instance: false
@@ -1993,6 +1991,7 @@ class LiveMinecraft {
         element.appendChild(indicator);
         element.appendChild(name);
         element.appendChild(buttons);
+        this.live_instance_id = null;
     }
     setLive(instanceInfo) {
         this.nameElement.textContent = instanceInfo.name;
@@ -2007,14 +2006,17 @@ class LiveMinecraft {
         this.viewButton.onclick = () => {
             instanceInfo.display();
         }
-        window.enderlynx.setActivity({
-            "details": translate("app.discord_rpc.playing").replace("%i", instanceInfo.name),
-            "state": translate("app.discord_rpc.description").replace("%l", loaders[instanceInfo.loader]).replace("%v", instanceInfo.vanilla_version),
+        if (this.live_instance_id != instanceInfo.instance_id) window.enderlynx.setActivity({
+            details: translate("app.discord_rpc.playing", "%i", instanceInfo.name),
+            state: translate("app.discord_rpc.description", "%l", loaders[instanceInfo.loader], "%v", instanceInfo.vanilla_version),
             startTimestamp: new Date(),
             largeImageKey: 'icon',
             largeImageText: translate("app.discord_rpc.logo"),
+            smallImageKey: 'minecraft',
+            smallImageText: translate("app.discord_rpc.minecraft.logo"),
             instance: false
         });
+        this.live_instance_id = instanceInfo.instance_id;
         rpcLocked = true;
     }
     removeLive() {
@@ -2024,6 +2026,7 @@ class LiveMinecraft {
         this.stopButton.onclick = () => { };
         this.logButton.onclick = () => { };
         this.viewButton.onclick = () => { };
+        this.live_instance_id = null;
         resetDiscordStatus(true);
         rpcLocked = false;
     }
