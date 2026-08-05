@@ -62,7 +62,7 @@ class Skin {
         }
         return this.skins.get(skin_id);
     }
-    
+
     static applySkin(skin_id, info) {
         if (!this.skins.has(skin_id)) {
             let newSkin = new Skin(info);
@@ -147,7 +147,7 @@ class Cape {
         }
         return this.capes.get(cape_id);
     }
-    
+
     static applyCape(cape_id, info) {
         if (!this.capes.has(cape_id)) {
             let newCape = new Cape(info);
@@ -191,7 +191,7 @@ class Content {
         }
         return this.content.get(content_id);
     }
-    
+
     static applyContent(content_id, info) {
         if (!this.content.has(content_id)) {
             let newContent = new Content(info);
@@ -7037,20 +7037,20 @@ class WardrobeScreen extends Screen {
         let filteredEntries = this.skinEntries.filter(e => e.name.toLowerCase().includes(search));
         let filteredDefaultSkinEntries = this.defaultSkinEntryList.filter(e => e.skinEntry.name.toLowerCase().includes(search));
         filteredEntries.sort((a, b) => {
-            if (sort == "last_used") {
-                let c = a.skin.last_used;
-                let d = b.skin.last_used;
-                c = c.getTime();
-                d = d.getTime();
-                if (isNaN(c)) c = 0;
-                if (isNaN(d)) d = 0;
-                return d - c;
+            if (sort == "name") {
+                let av = a.name.toLowerCase();
+                let bv = b.name.toLowerCase();
+                if (av > bv) return 1;
+                if (av < bv) return -1;
+                return 0;
             }
-            let av = a.name.toLowerCase();
-            let bv = b.name.toLowerCase();
-            if (av > bv) return 1;
-            if (av < bv) return -1;
-            return 0;
+            let c = a.skin.last_used;
+            let d = b.skin.last_used;
+            c = c.getTime();
+            d = d.getTime();
+            if (isNaN(c)) c = 0;
+            if (isNaN(d)) d = 0;
+            return d - c;
         });
         if (sort == "favorites_first") {
             filteredEntries.sort((a, b) => {
@@ -12574,7 +12574,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         let authorBio = createElement("span", "author-top-bio", { textContent: e.bio });
                         let authorSubInfo = createElement("div", "author-top-sub-info");
                         let authorSubInfoProjects = createElement("div", "author-top-sub-info-specific");
-                        authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-download"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
+                        authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
                         let authorSubInfoDownloads = createElement("div", "author-top-sub-info-specific");
                         authorSubInfoDownloads.innerHTML = `<i class="fa-solid fa-download"></i>${translate("app.discover.download_count", "%d", formatNumber(e.downloads))}`;
                         let authorSubInfoCreated = createElement("div", "author-top-sub-info-specific");
@@ -12613,7 +12613,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                             paginationBottom.setPage(page);
                             paginationTop.setTotalPages(Math.ceil(e.total_projects / 20));
                             paginationBottom.setTotalPages(Math.ceil(e.total_projects / 20));
-                            authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-download"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
+                            authorSubInfoProjects.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i>${e.total_projects == 1 ? translate("app.discover.projects.singular") : translate("app.discover.projects", "%n", formatNumber(e.total_projects))}`;
                             authorSubInfo.prepend(authorSubInfoProjects);
                             authorContentList.innerHTML = '';
                             authorContentList.appendChild(paginationTop.element);
