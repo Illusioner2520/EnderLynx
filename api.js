@@ -637,6 +637,24 @@ class Modrinth {
             }
         }
         facets.push("project_types = " + project_type);
+        let activeEnvironments = [];
+        let clientEnvironments = ["client_only", "client_only_server_optional", "client_or_server_prefers_both", "client_or_server"];
+        let serverEnvironments = ["server_only", "dedicated_server_only", "server_only_client_optional", "client_or_server_prefers_both", "client_or_server"];
+        let bothEnvironments = ["client_only_server_optional", "server_only_client_optional", "client_and_server", "client_or_server", "client_or_server_prefers_both"];
+        let clientChecked = false;
+        if (activeCategories.includes("client")) {
+            activeCategories = activeCategories.filter(e => e != "client");
+            clientChecked = true;
+        }
+        let serverChecked = false;
+        if (activeCategories.includes("server")) {
+            activeCategories = activeCategories.filter(e => e != "server");
+            serverChecked = true;
+        }
+        if (clientChecked && !serverChecked) activeEnvironments = clientEnvironments;
+        else if (serverChecked && !clientChecked) activeEnvironments = serverEnvironments;
+        else if (serverChecked && clientChecked) activeEnvironments = bothEnvironments;
+        if (activeEnvironments.length > 0) facets.push("(" + activeEnvironments.map(e => `environment = \"${e}\"`).join(" OR ") + ")");
         for (let category of activeCategories) {
             facets.push(`categories = \"${category}\"`);
         }
@@ -669,7 +687,19 @@ class Modrinth {
             let urlInfo = await (await fetch(url)).json();
             this.categories = urlInfo.map(e => new Category(e, "modrinth"));
         }
-        return this.categories.filter(e => e.project_type == project_type);
+        let modrinth_categories = this.categories.filter(e => e.project_type == project_type);
+        let client = new Category({
+            name: "client",
+            header: "environment",
+            project_type
+        }, "modrinth");
+        let server = new Category({
+            name: "server",
+            header: "environment",
+            project_type
+        }, "modrinth");
+        if (["mod", "modpack"].includes(project_type)) modrinth_categories = [client, server].concat(modrinth_categories);
+        return modrinth_categories;
     }
 }
 
