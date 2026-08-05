@@ -6853,6 +6853,7 @@ body:has(dialog[open]) .title-bar-button {
     position-visibility: anchors-visible;
     opacity: 0;
     scale: .8;
+    padding-bottom: 4px;
 }
 
 .category-list:popover-open {
@@ -6870,6 +6871,7 @@ body:has(dialog[open]) .title-bar-button {
     display: flex;
     transition: background-color .1s;
     align-items: center;
+    padding-left: 4px;
 }
 
 .category-wrapper:not(:has(.category-button)) {
@@ -6883,7 +6885,7 @@ body:has(dialog[open]) .title-bar-button {
     padding: 8px;
     flex-grow: 1;
     font-size: .8rem;
-    padding-right: 60px;
+    padding-right: 80px;
 }
 
 .category-checkbox {
@@ -6904,4 +6906,5 @@ body:has(dialog[open]) .title-bar-button {
     padding: 8px;
     font-size: 1rem;
     font-weight: bold;
+    padding-bottom: 4px;
 }
