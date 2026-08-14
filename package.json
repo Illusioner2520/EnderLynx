@@ -3,14 +3,14 @@
   "version": "0.11.4",
   "main": "main.js",
   "scripts": {
-    "start": "npx install-electron && electron-forge start",
+    "start": "npm run prepare-electron && electron-forge start",
     "make": "electron-forge make",
     "installer:windows": "makensis installer/installer.nsi",
     "updater:windows": "cd updater && cargo build --release && cd .. && copy updater\\target\\release\\updater.exe up.exe",
     "build:windows": "npm run prepare-electron && npm run updater:windows && npm run make && npm run installer:windows",
     "build:linux": "npm run prepare-electron && npm run make",
     "build:macos": "npm run prepare-electron && npm run make",
-    "prepare-electron": "npx install-electron && electron-rebuild"
+    "prepare-electron": "install-electron"
   },
   "author": "Illusioner",
   "license": "MIT",
@@ -24,14 +24,13 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron/fuses": "^1.8.0",
-    "@electron/rebuild": "^4.0.4",
-    "electron": "^43.3.0"
+    "electron": "^43.4.0"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",
     "ace-builds": "^1.43.6",
     "adm-zip": "^0.6.0",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "create-desktop-shortcuts": "^1.11.1",
     "discord-rpc": "^4.0.1",
     "electron-window-state": "^5.0.3",

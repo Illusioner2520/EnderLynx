@@ -53,7 +53,9 @@ module.exports = {
             }
         }
     },
-    rebuildConfig: {},
+    rebuildConfig: {
+        onlyModules: []
+    },
     makers: [
         // Windows
         ...(isWindows ? [{
