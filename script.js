@@ -846,7 +846,7 @@ class Instance {
                                 "icon": '<i class="fa-solid fa-play"></i>',
                                 "func": async (value, button) => {
                                     let num = Math.floor(Math.random() * 10000);
-                                    button.setAttribute("data-num", num);
+                                    button.dataset.num = num;
                                     button.classList.remove("failed");
                                     button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
                                     let success = await window.enderlynx.testJavaInstallation(value);
@@ -857,7 +857,7 @@ class Instance {
                                         button.classList.add("failed");
                                     }
                                     setTimeout(() => {
-                                        if (button.getAttribute("data-num") == num) {
+                                        if (button.dataset.num == num) {
                                             button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
                                             button.classList.remove("failed");
                                         }
@@ -1788,10 +1788,10 @@ class MinecraftAccountSwitcher {
                         this.onPlayerClickDelete(this.players[i]);
                     }
                 });
-                playerDelete.setAttribute("data-uuid", this.players[i].uuid);
+                playerDelete.dataset.uuid = this.players[i].uuid;
                 playerElement.appendChild(playerDelete);
                 playerElement.addEventListener('click', (e) => this.onPlayerClick(this.players[i]));
-                playerElement.setAttribute("data-uuid", this.players[i].uuid);
+                playerElement.dataset.uuid = this.players[i].uuid;
                 dropdownElement.appendChild(playerElement);
                 this.playerElements.push(playerElement);
             }
@@ -1857,7 +1857,7 @@ class MinecraftAccountSwitcher {
         pChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
         this.element.appendChild(pChevron);
         for (let i = 0; i < this.playerElements.length; i++) {
-            if (this.playerElements[i].getAttribute("data-uuid") != newPlayerInfo.uuid) {
+            if (this.playerElements[i].dataset.uuid != newPlayerInfo.uuid) {
                 this.playerElements[i].classList.add("not-selected");
             } else {
                 this.playerElements[i].classList.remove("not-selected");
@@ -2934,7 +2934,7 @@ class ContentList {
                 }
             }
             if (contentInfo.class) contentEle.classList.add(contentInfo.class);
-            if (contentInfo.type) contentEle.setAttribute("data-type", contentInfo.type);
+            if (contentInfo.type) contentEle.dataset.type = contentInfo.type;
             let item = {
                 "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title(), contentInfo.secondary_column.desc()].join("!!!!!!!!!!"),
                 "element": contentEle,
@@ -4663,7 +4663,7 @@ class InstanceScreen extends Screen {
         contentSearch.style.flexGrow = 2;
         let searchBar = new SearchBar(contentSearch, (v) => {
             for (let i = 0; i < values.length; i++) {
-                if (values[i].key.toLowerCase().includes(v.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == dropdownInfo.value || dropdownInfo.value == "all")) {
+                if (values[i].key.toLowerCase().includes(v.toLowerCase().trim()) && (values[i].element.dataset.type == dropdownInfo.value || dropdownInfo.value == "all")) {
                     values[i].element.style.display = "grid";
                 } else {
                     values[i].element.style.display = "none";
@@ -4698,7 +4698,7 @@ class InstanceScreen extends Screen {
             }
         ], typeDropdown, "all", (v) => {
             for (let i = 0; i < values.length; i++) {
-                if (values[i].key.toLowerCase().includes(searchBar.value.toLowerCase().trim()) && (values[i].element.getAttribute("data-type") == v || v == "all")) {
+                if (values[i].key.toLowerCase().includes(searchBar.value.toLowerCase().trim()) && (values[i].element.dataset.type == v || v == "all")) {
                     values[i].element.style.display = "grid";
                     values[i].element.classList.remove("hidden");
                 } else {
@@ -4750,74 +4750,6 @@ class InstanceScreen extends Screen {
         let optionList = document.createElement("div");
         optionList.className = "option-list";
         fragment.appendChild(optionList);
-        let selectedKeySelect;
-        let selectedKeySelectFunction;
-
-        document.body.removeEventListener("keydown", previousKeyDownEventListener);
-        document.body.removeEventListener("mousedown", previousMouseDownEventListener);
-
-        previousKeyDownEventListener = async (e) => {
-            if (selectedKeySelect) {
-                e.preventDefault();
-                e.stopPropagation();
-                let keyCode = await window.enderlynx.convertKeyInfo("web_code", "key_code", e.code);
-                let oldInnerHtml = selectedKeySelect.innerHTML;
-                let oldValue = selectedKeySelect.value;
-                let tempSelected = selectedKeySelect;
-                if (keyCode) {
-                    selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", keyCode)) || keyCode;
-                    selectedKeySelect.value = keyCode;
-                } else {
-                    selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", "key.keyboard.unknown"));
-                    selectedKeySelect.value = "key.keyboard.unknown";
-                }
-                selectedKeySelect.classList.remove("selected");
-                let key = selectedKeySelect.getAttribute("data-key")
-                selectedKeySelect = null;
-                try {
-                    await window.enderlynx.updateOptionsTXT(this.instance.instance_id, key, keyCode ? keyCode : "key.keyboard.unknown");
-                    displaySuccess(translate("app.options.updated"));
-                    if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
-                } catch (e) {
-                    displayError(translate("app.options.failed"));
-                    tempSelected.innerHTML = oldInnerHtml;
-                    tempSelected.value = oldValue;
-                }
-            }
-        }
-
-        previousMouseDownEventListener = async (e) => {
-            if (selectedKeySelect) {
-                e.preventDefault();
-                e.stopPropagation();
-                let mouseKey;
-                if (e.button === 0) mouseKey = "key.mouse.left";
-                else if (e.button === 1) mouseKey = "key.mouse.middle";
-                else if (e.button === 2) mouseKey = "key.mouse.right";
-                else if (e.button >= 3 && e.button <= 20) mouseKey = `key.mouse.${e.button + 1}`;
-                else mouseKey = "key.keyboard.unknown";
-                let oldInnerHtml = selectedKeySelect.innerHTML;
-                let oldValue = selectedKeySelect.value;
-                let tempSelected = selectedKeySelect;
-                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", mouseKey)) || mouseKey;
-                selectedKeySelect.classList.remove("selected");
-                selectedKeySelect.value = mouseKey;
-                let key = selectedKeySelect.getAttribute("data-key")
-                selectedKeySelect = null;
-                try {
-                    await window.enderlynx.updateOptionsTXT(this.instance.instance_id, key, mouseKey);
-                    displaySuccess(translate("app.options.updated"));
-                    if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
-                } catch (e) {
-                    displayError(translate("app.options.failed"));
-                    tempSelected.innerHTML = oldInnerHtml;
-                    tempSelected.value = oldValue;
-                }
-            }
-        }
-
-        document.body.addEventListener("keydown", previousKeyDownEventListener);
-        document.body.addEventListener("mousedown", previousMouseDownEventListener);
 
         for (let i = 0; i < values.length; i++) {
             let e = values[i];
@@ -4857,7 +4789,7 @@ class InstanceScreen extends Screen {
                 type = "key";
             }
             let inputElement;
-            item.setAttribute("data-type", type);
+            item.dataset.type = type;
             if (type == "text") {
                 inputElement = document.createElement("input");
                 inputElement.className = "option-input";
@@ -4934,17 +4866,20 @@ class InstanceScreen extends Screen {
                 inputElement = document.createElement("button");
                 inputElement.className = "option-key-input";
                 inputElement.value = e.value;
-                inputElement.setAttribute("data-key", e.key);
+                inputElement.dataset.key = e.key;
                 inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", e.value)) || e.value;
                 inputElement.onclick = () => {
-                    [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
-                        e.classList.remove("selected");
+                    OptionsKeyManagement.keyButtonClick(inputElement, async (keyCode, oldInnerHTML, oldValue, oldElement) => {
+                        try {
+                            await window.enderlynx.updateOptionsTXT(this.instance.instance_id, e.key, keyCode);
+                            displaySuccess(translate("app.options.updated"));
+                            onChange(keyCode);
+                        } catch (e) {
+                            displayError(translate("app.options.failed"));
+                            oldElement.innerHTML = oldInnerHtml;
+                            oldElement.value = oldValue;
+                        }
                     });
-                    inputElement.classList.add("selected");
-                    selectedKeySelect = inputElement;
-                    selectedKeySelectFunction = (v) => {
-                        onChange(v);
-                    }
                 }
                 item.appendChild(inputElement);
             }
@@ -5379,7 +5314,7 @@ class InstanceScreen extends Screen {
         screenshots.forEach(e => {
             let screenshotElement = document.createElement("button");
             screenshotElement.className = "gallery-screenshot";
-            screenshotElement.setAttribute("data-title", formatDateAndTime(e.file_name));
+            screenshotElement.dataset.title = formatDateAndTime(e.file_name);
             screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
             let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
             screenshotElement.onclick = () => {
@@ -5491,6 +5426,49 @@ class InstanceScreen extends Screen {
         }
     }
 }
+
+class OptionsKeyManagement {
+    static activeKeySelection;
+    static activeKeySelectionFunction;
+    static async processEvent(e) {
+        if (!this.activeKeySelection) return;
+        e.preventDefault();
+        e.stopPropagation();
+        let keyCode = "";
+        if (e instanceof MouseEvent) {
+            if (e.button == 0) keyCode = "key.mouse.left";
+            else if (e.button == 1) keyCode = "key.mouse.middle";
+            else if (e.button == 2) keyCode = "key.mouse.right";
+            else keyCode = `key.mouse.${e.button + 1}`;
+        } else if (e instanceof KeyboardEvent) {
+            let code = e.code;
+            if (e.key == "NumLock") {
+                // because e.code for NumLock is returning "" on some systems.
+                code = "NumLock";
+            }
+            keyCode = await window.enderlynx.convertKeyInfo("web_code", "key_code", code);
+        }
+        if (!keyCode) keyCode = "key.keyboard.unknown";
+        let oldInnerHTML = this.activeKeySelection.innerHTML;
+        let oldValue = this.activeKeySelection.value;
+        let oldElement = this.activeKeySelection;
+        this.activeKeySelection.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", keyCode)) || keyCode;
+        this.activeKeySelection.value = keyCode;
+        this.activeKeySelection.classList.remove("selected");
+        let key = this.activeKeySelection.dataset.key;
+        this.activeKeySelection = null;
+        await this.activeKeySelectionFunction(keyCode, oldInnerHTML, oldValue, oldElement);
+        this.activeKeySelectionFunction = null;
+    }
+    static async keyButtonClick(button, func) {
+        if (this.activeKeySelection) this.activeKeySelection.classList.remove("selected");
+        button.classList.add("selected");
+        this.activeKeySelection = button;
+        this.activeKeySelectionFunction = func;
+    }
+}
+document.addEventListener("keydown", (e) => OptionsKeyManagement.processEvent(e));
+document.addEventListener("mousedown", (e) => OptionsKeyManagement.processEvent(e));
 
 class HomeScreen extends Screen {
     constructor() {
@@ -7546,56 +7524,6 @@ friendsScreen.setNavButton(friendsButton);
 new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa-solid fa-gear"></i>');
 
 settingsButtonEle.onclick = async () => {
-    let selectedKeySelect;
-    let selectedKeySelectFunction;
-
-    document.body.removeEventListener("keydown", previousKeyDownEventListener);
-    document.body.removeEventListener("mousedown", previousMouseDownEventListener);
-
-    previousKeyDownEventListener = async (e) => {
-        if (selectedKeySelect) {
-            e.preventDefault();
-            e.stopPropagation();
-            let keyCode = await window.enderlynx.convertKeyInfo("web_code", "key_code", e.code);
-            if (keyCode) {
-                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", keyCode)) || keyCode;
-                selectedKeySelect.value = keyCode;
-            } else {
-                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", "key.keyboard.unknown"));
-                selectedKeySelect.value = "key.keyboard.unknown";
-            }
-            selectedKeySelect.classList.remove("selected");
-            let key = selectedKeySelect.getAttribute("data-key")
-            selectedKeySelect = null;
-            DefaultOptions.setDefault(key, keyCode ? keyCode : "key.keyboard.unknown");
-            displaySuccess(translate("app.options.updated_default"));
-            if (selectedKeySelectFunction) selectedKeySelectFunction(keyCode ? keyCode : "key.keyboard.unknown");
-        }
-    }
-    previousMouseDownEventListener = async (e) => {
-        if (selectedKeySelect) {
-            e.preventDefault();
-            e.stopPropagation();
-            let mouseKey;
-            if (e.button === 0) mouseKey = "key.mouse.left";
-            else if (e.button === 1) mouseKey = "key.mouse.middle";
-            else if (e.button === 2) mouseKey = "key.mouse.right";
-            else if (e.button >= 3 && e.button <= 20) mouseKey = `key.mouse.${e.button + 1}`;
-            else mouseKey = "key.keyboard.unknown";
-            selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", mouseKey)) || mouseKey;
-            selectedKeySelect.classList.remove("selected");
-            selectedKeySelect.value = mouseKey;
-            let key = selectedKeySelect.getAttribute("data-key")
-            selectedKeySelect = null;
-            DefaultOptions.setDefault(key, mouseKey ? mouseKey : "key.keyboard.unknown");
-            displaySuccess(translate("app.options.updated_default"));
-            if (selectedKeySelectFunction) selectedKeySelectFunction(mouseKey);
-        }
-    }
-
-    document.body.addEventListener("keydown", previousKeyDownEventListener);
-    document.body.addEventListener("mousedown", previousMouseDownEventListener);
-
     let values = await window.enderlynx.getDefaultOptions();
     let def_opts = document.createElement("div");
     def_opts.className = "option-list";
@@ -7637,7 +7565,7 @@ settingsButtonEle.onclick = async () => {
                 type = "key";
             }
             let inputElement;
-            item.setAttribute("data-type", type);
+            item.dataset.type = type;
             if (type == "text") {
                 inputElement = document.createElement("input");
                 inputElement.className = "option-input";
@@ -7690,17 +7618,14 @@ settingsButtonEle.onclick = async () => {
                 inputElement = document.createElement("button");
                 inputElement.className = "option-key-input";
                 inputElement.value = e.value;
-                inputElement.setAttribute("data-key", e.key);
+                inputElement.dataset.key = e.key;
                 inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", e.value)) || e.value;
                 inputElement.onclick = () => {
-                    [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
-                        e.classList.remove("selected");
+                    OptionsKeyManagement.keyButtonClick(inputElement, (keyCode, oldInnerHTML, oldValue, oldElement) => {
+                        DefaultOptions.setDefault(e.key, keyCode);
+                        displaySuccess(translate("app.options.updated_default"));
+                        onChange(keyCode);
                     });
-                    inputElement.classList.add("selected");
-                    selectedKeySelect = inputElement;
-                    selectedKeySelectFunction = (v) => {
-                        onChange(v);
-                    }
                 }
                 item.appendChild(inputElement);
             }
@@ -7908,7 +7833,7 @@ settingsButtonEle.onclick = async () => {
                     "icon": '<i class="fa-solid fa-play"></i>',
                     "func": async (value, button, setter) => {
                         let num = Math.floor(Math.random() * 10000);
-                        button.setAttribute("data-num", num);
+                        button.dataset.num = num;
                         button.classList.remove("failed");
                         button.innerHTML = '<i class="spinner"></i>' + translate("app.settings.java.test.testing");
                         let success = await window.enderlynx.testJavaInstallation(value);
@@ -7919,7 +7844,7 @@ settingsButtonEle.onclick = async () => {
                             button.classList.add("failed");
                         }
                         setTimeout(() => {
-                            if (button.getAttribute("data-num") == num) {
+                            if (button.dataset.num == num) {
                                 button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.settings.java.test");
                                 button.classList.remove("failed");
                             }
