@@ -3702,13 +3702,19 @@ textarea.dialog-text-input {
 }
 
 .option-key-input.selected::before {
-    color: var(--secondary-accent-color);
-    content: "> "
+    color: var(--text-color);
+    content: "\f105";
+    font-weight: bold;
+    font-family: 'Font Awesome 6 Free';
+    margin-right: 6px;
 }
 
 .option-key-input.selected::after {
-    color: var(--secondary-accent-color);;
-    content: " <"
+    color: var(--text-color);
+    content: "\f104";
+    font-weight: bold;
+    font-family: 'Font Awesome 6 Free';
+    margin-left: 6px;
 }
 
 .option-key-input:hover {
