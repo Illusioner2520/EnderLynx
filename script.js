@@ -4759,15 +4759,15 @@ class InstanceScreen extends Screen {
             if (selectedKeySelect) {
                 e.preventDefault();
                 e.stopPropagation();
-                let keyCode = await window.enderlynx.convertKeyInfo("web_code", "lwjgl_code", e.code);
+                let keyCode = await window.enderlynx.convertKeyInfo("web_code", "key_code", e.code);
                 let oldInnerHtml = selectedKeySelect.innerHTML;
                 let oldValue = selectedKeySelect.value;
                 let tempSelected = selectedKeySelect;
                 if (keyCode) {
-                    selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", keyCode)) || keyCode;
+                    selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", keyCode)) || keyCode;
                     selectedKeySelect.value = keyCode;
                 } else {
-                    selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", "key.keyboard.unknown"));
+                    selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", "key.keyboard.unknown"));
                     selectedKeySelect.value = "key.keyboard.unknown";
                 }
                 selectedKeySelect.classList.remove("selected");
@@ -4798,7 +4798,7 @@ class InstanceScreen extends Screen {
                 let oldInnerHtml = selectedKeySelect.innerHTML;
                 let oldValue = selectedKeySelect.value;
                 let tempSelected = selectedKeySelect;
-                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", mouseKey)) || mouseKey;
+                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", mouseKey)) || mouseKey;
                 selectedKeySelect.classList.remove("selected");
                 selectedKeySelect.value = mouseKey;
                 let key = selectedKeySelect.getAttribute("data-key")
@@ -4934,7 +4934,7 @@ class InstanceScreen extends Screen {
                 inputElement.className = "option-key-input";
                 inputElement.value = e.value;
                 inputElement.setAttribute("data-key", e.key);
-                inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", e.value)) || e.value;
+                inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", e.value)) || e.value;
                 inputElement.onclick = () => {
                     [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
                         e.classList.remove("selected");
@@ -7555,12 +7555,12 @@ settingsButtonEle.onclick = async () => {
         if (selectedKeySelect) {
             e.preventDefault();
             e.stopPropagation();
-            let keyCode = await window.enderlynx.convertKeyInfo("web_code", "lwjgl_code", e.code);
+            let keyCode = await window.enderlynx.convertKeyInfo("web_code", "key_code", e.code);
             if (keyCode) {
-                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", keyCode)) || keyCode;
+                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", keyCode)) || keyCode;
                 selectedKeySelect.value = keyCode;
             } else {
-                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", "key.keyboard.unknown"));
+                selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", "key.keyboard.unknown"));
                 selectedKeySelect.value = "key.keyboard.unknown";
             }
             selectedKeySelect.classList.remove("selected");
@@ -7581,7 +7581,7 @@ settingsButtonEle.onclick = async () => {
             else if (e.button === 2) mouseKey = "key.mouse.right";
             else if (e.button >= 3 && e.button <= 20) mouseKey = `key.mouse.${e.button + 1}`;
             else mouseKey = "key.keyboard.unknown";
-            selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", mouseKey)) || mouseKey;
+            selectedKeySelect.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", mouseKey)) || mouseKey;
             selectedKeySelect.classList.remove("selected");
             selectedKeySelect.value = mouseKey;
             let key = selectedKeySelect.getAttribute("data-key")
@@ -7690,7 +7690,7 @@ settingsButtonEle.onclick = async () => {
                 inputElement.className = "option-key-input";
                 inputElement.value = e.value;
                 inputElement.setAttribute("data-key", e.key);
-                inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("lwjgl_code", "text", e.value)) || e.value;
+                inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", e.value)) || e.value;
                 inputElement.onclick = () => {
                     [...document.querySelectorAll(".option-key-input.selected")].forEach(e => {
                         e.classList.remove("selected");

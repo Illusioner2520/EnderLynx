@@ -4995,7 +4995,7 @@ async function getDefaultOptionsTXT(version) {
     let keys = [];
     let values = [];
     for (let e of options) {
-        let old_key_code = await convertKeyInfo("lwjgl_code", "old_lwjgl_code", e.value);
+        let old_key_code = await convertKeyInfo("key_code", "old_lwjgl_code", e.value);
         if (data_version <= 1343 && old_key_code) {
             content += e.key + ":" + old_key_code + "\n"
             values.push(old_key_code);
@@ -5488,8 +5488,28 @@ getInstances().forEach(instance => {
 });
 
 let key_info = null;
+let mouse_info = {
+    "key_code": /^key\.mouse\.(\d+)$/,
+    "text": /^Button (\d+)$/,
+    "web_code": /^Mouse(\d+)$/,
+    "old_lwjgl_code": /^(\-\d+)$/
+}
+let mouse_conversions = {
+    "key_code": (n) => `key.mouse.${n}`,
+    "text": (n) => `Button ${n}`,
+    "web_code": (n) => `Mouse${n}`,
+    "old_lwjgl_code": (n) => n - 101
+}
 
 async function convertKeyInfo(from, to, value) {
+    let mouse_result = value.match(mouse_info[from]);
+    if (mouse_result) {
+        let number = Number(mouse_result[1]);
+        if (from == "old_lwjgl_code") number += 101;
+        if (mouse_conversions[to]) {
+            return mouse_conversions[to](number);
+        }
+    }
     if (!key_info) {
         key_info = JSON.parse(await fsPromises.readFile(path.resolve(__dirname, "resources/keys.json"), 'utf-8'));
     }
