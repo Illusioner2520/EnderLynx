@@ -9132,9 +9132,6 @@ class Display {
     }
 }
 
-let previousKeyDownEventListener;
-let previousMouseDownEventListener;
-
 function displayScreenshot(name, desc, file, file_name, instanceInfo, list, currentIndex, word = translate("app.screenshot")) {
     let index = currentIndex;
     let buttonLeft = document.createElement("button");
@@ -9299,37 +9296,30 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
     document.getElementsByClassName("toasts")[0].showPopover();
 }
 
-let hideToast = (e) => {
-    e.classList.remove("shown");
+function hideToast(element) {
+    element.classList.remove("shown");
     setTimeout(() => {
-        e.remove();
+        element.remove();
     }, 1000);
 }
 
-function displayError(error) {
-    let element = document.createElement("div");
-    element.classList.add("error");
-    element.innerHTML = (error.toString());
+function displayToast(type, message) {
+    let element = createElement("div", type);
+    element.innerHTML = message;
     let toasts = document.getElementsByClassName("toasts")[0];
     toasts.appendChild(element);
     element.classList.add("shown");
-    element.onclick = () => {
-        hideToast(element);
-    }
-    setTimeout(() => { hideToast(element) }, 3000);
+    setTimeout(() => {
+        hideToast(element)
+    }, 3000);
+}
+
+function displayError(error) {
+    displayToast("error", error.toString());
 }
 
 function displaySuccess(success) {
-    let element = document.createElement("div");
-    element.classList.add("success");
-    element.innerHTML = success.toString();
-    let toasts = document.getElementsByClassName("toasts")[0];
-    toasts.appendChild(element);
-    element.classList.add("shown");
-    element.onclick = () => {
-        hideToast(element);
-    }
-    setTimeout(() => { hideToast(element) }, 3000);
+    displayToast("success", success.toString());
 }
 
 function formatTime(secs) {
