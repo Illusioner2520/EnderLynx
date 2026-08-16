@@ -7891,7 +7891,7 @@ settingsButtonEle.onclick = async () => {
                         ], [], (info) => {
                             setter(info.java_path);
                         });
-                        button.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>Detect';
+                        button.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>' + translate("app.settings.java.detect");
                     }
                 },
                 {
