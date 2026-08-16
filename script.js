@@ -836,8 +836,9 @@ class Instance {
                                 "name": translate("app.instances.settings.java_installation.browse"),
                                 "icon": '<i class="fa-solid fa-folder"></i>',
                                 "func": async (value, button, setter) => {
-                                    let newValue = await window.enderlynx.triggerFileBrowse(value);
-                                    if (newValue) setter(newValue);
+                                    let os = window.enderlynx.osplatform();
+                                    let files = await window.enderlynx.triggerBrowse(value, "file", os == 'win32' ? ["exe"] : [], os == 'win32' ? translate("app.import.select.executables") : "", translate("app.import.select.java_executable"), false);
+                                    if (files[0]?.path) setter(files[0].path);
                                 }
                             },
                             {
@@ -7897,8 +7898,9 @@ settingsButtonEle.onclick = async () => {
                     "name": translate("app.settings.java.browse"),
                     "icon": '<i class="fa-solid fa-folder"></i>',
                     "func": async (value, button, setter) => {
-                        let newValue = await window.enderlynx.triggerFileBrowse(value);
-                        if (newValue) setter(newValue);
+                        let os = window.enderlynx.osplatform();
+                        let files = await window.enderlynx.triggerBrowse(value, "file", os == 'win32' ? ["exe"] : [], os == 'win32' ? translate("app.import.select.executables") : "", translate("app.import.select.java_executable"), false);
+                        if (files[0]?.path) setter(files[0].path);
                     }
                 },
                 {

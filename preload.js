@@ -500,19 +500,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getInstanceFolderPath: () => {
         return path.resolve(userPath, "minecraft/instances");
     },
-    triggerFileBrowse: async (file_path) => {
-        let startDir = file_path;
-        const result = await ipcRenderer.invoke('show-open-dialog', {
-            title: await translate("app.import.select.java_executable"),
-            defaultPath: startDir,
-            properties: ['openFile'],
-            filters: os.platform() == "win32" ? [{ name: await translate("app.import.select.executables"), extensions: ['exe'] }] : []
-        });
-        if (result.canceled || !result.filePaths || !result.filePaths[0]) {
-            return null;
-        }
-        return result.filePaths[0];
-    },
     detectJavaInstallations: async (v) => {
         return await ipcRenderer.invoke('detect-java-installations', v);
     },
