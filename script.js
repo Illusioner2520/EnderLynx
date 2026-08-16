@@ -835,30 +835,30 @@ class Instance {
                             {
                                 "name": translate("app.instances.settings.java_installation.browse"),
                                 "icon": '<i class="fa-solid fa-folder"></i>',
-                                "func": async (v, b, i) => {
-                                    let newValue = await window.enderlynx.triggerFileBrowse(v);
-                                    if (newValue) i.value = newValue;
+                                "func": async (value, button, setter) => {
+                                    let newValue = await window.enderlynx.triggerFileBrowse(value);
+                                    if (newValue) setter(newValue);
                                 }
                             },
                             {
                                 "name": translate("app.instances.settings.java_installation.test"),
                                 "icon": '<i class="fa-solid fa-play"></i>',
-                                "func": async (v, b) => {
+                                "func": async (value, button) => {
                                     let num = Math.floor(Math.random() * 10000);
-                                    b.setAttribute("data-num", num);
-                                    b.classList.remove("failed");
-                                    b.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
-                                    let success = await window.enderlynx.testJavaInstallation(v);
+                                    button.setAttribute("data-num", num);
+                                    button.classList.remove("failed");
+                                    button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.settings.java_installation.test.testing");
+                                    let success = await window.enderlynx.testJavaInstallation(value);
                                     if (success) {
-                                        b.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
+                                        button.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.instances.settings.java_installation.test.success");
                                     } else {
-                                        b.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
-                                        b.classList.add("failed");
+                                        button.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.instances.settings.java_installation.test.fail");
+                                        button.classList.add("failed");
                                     }
                                     setTimeout(() => {
-                                        if (b.getAttribute("data-num") == num) {
-                                            b.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
-                                            b.classList.remove("failed");
+                                        if (button.getAttribute("data-num") == num) {
+                                            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.instances.settings.java_installation.test");
+                                            button.classList.remove("failed");
                                         }
                                     }, 3000);
                                 }
