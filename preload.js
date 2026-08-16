@@ -62,8 +62,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     version: enableDevMode ? version + "-dev" : version,
     userPath,
-    isDev: enableDevMode,
-    resourcePath: process.resourcesPath,
     osplatform: () => os.platform(),
     osrelease: () => os.release(),
     osarch: () => os.arch(),
@@ -92,16 +90,9 @@ contextBridge.exposeInMainWorld('enderlynx', {
         }
         return { IPv4: ipv4s || [translate("app.settings.info.local_ip_address.na")], IPv6: ipv6s || [translate("app.settings.info.local_ip_address.na")] }
     },
-    getAppMetrics: async () => {
-        let appMetrics = await ipcRenderer.invoke('get-app-metrics');
-        return appMetrics;
-    },
     readPackFile,
     getInstanceFiles: async (instance_id) => {
         return await ipcRenderer.invoke('get-instance-files', instance_id);
-    },
-    getWorldFiles: async (instance_id, world_id) => {
-        return await ipcRenderer.invoke('get-world-files', instance_id, world_id);
     },
     parseMarkdown: (md) => {
         const mkd = new MarkdownIt('default', {
@@ -172,8 +163,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     stopInstance: async (instance_id) => {
         return await ipcRenderer.invoke('stop-instance', instance_id);
     },
-    getWorld,
-    getWorlds,
     getSinglePlayerWorlds,
     deleteServer: async (instance_id, ip, index) => {
         return await ipcRenderer.invoke('delete-server', instance_id, ip, index);
@@ -427,9 +416,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     addContent: async (instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
         return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     },
-    processPackFile: async (file_path, instance_id, title) => {
-        return await ipcRenderer.invoke('process-pack-file', file_path, instance_id, title);
-    },
     getScreenshots: async (instance_id) => {
         return await ipcRenderer.invoke('get-screenshots', instance_id);
     },
@@ -451,10 +437,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getSkinFromUsername,
     getSkinFromURL,
     pathToDataUrl,
-    downloadSkin,
-    downloadCape: async (url, id) => {
-        return await ipcRenderer.invoke('download-cape', url, id);
-    },
     setCape: async (player_id, cape_id) => {
         return await ipcRenderer.invoke('set-cape', player_id, cape_id);
     },
@@ -497,27 +479,11 @@ contextBridge.exposeInMainWorld('enderlynx', {
         const result = await ipcRenderer.invoke('show-open-dialog', settings);
         return result;
     },
-    getInstanceFolderPath: () => {
-        return path.resolve(userPath, "minecraft/instances");
-    },
     detectJavaInstallations: async (v) => {
         return await ipcRenderer.invoke('detect-java-installations', v);
     },
     getJavaInstallations: async () => {
         return await ipcRenderer.invoke('get-java-installations');
-    },
-    getWorldsFromOtherLauncher: async (instance_path) => {
-        let the_path = path.resolve(instance_path, "saves");
-        return (await getWorlds(the_path)).map(e => ({ "name": e.name, "value": path.resolve(the_path, e.id) }));
-    },
-    transferWorld: async (old_world_path, instance_id, delete_previous_files) => {
-        return await ipcRenderer.invoke('transfer-world', old_world_path, instance_id, delete_previous_files);
-    },
-    getLauncherInstances: async (instance_path) => {
-        return await ipcRenderer.invoke('get-launcher-instances', instance_path);
-    },
-    getLauncherInstancePath: async (launcher) => {
-        return await ipcRenderer.invoke('get-launcher-instance-path', launcher);
     },
     getInstanceOptions: async (instance_id) => {
         const optionsPath = path.resolve(userPath, `minecraft/instances/${instance_id}/options.txt`);
@@ -611,9 +577,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     isInstanceFile: async (file_path) => {
         return await ipcRenderer.invoke('is-instance-file', file_path);
-    },
-    queryServer: async (host, port) => {
-        return await ipcRenderer.invoke('query-server', host, port);
     },
     addServer: async (instance_id, ip, name) => {
         return await ipcRenderer.invoke('add-server', instance_id, ip, name);

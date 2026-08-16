@@ -388,10 +388,6 @@ ipcMain.handle('show-save-dialog', async (event, options, file_path) => {
     await fsPromises.copyFile(file_path, result.filePath);
 });
 
-ipcMain.handle('get-app-metrics', (event) => {
-    return app.getAppMetrics();
-});
-
 ipcMain.handle('get-desktop', (_) => {
     return app.getPath("desktop");
 });
@@ -2252,10 +2248,6 @@ async function downloadCurseForgePack(instance_id, url, title, sha1) {
     }
 }
 
-ipcMain.handle('process-pack-file', async (_, info, instance_id, title) => {
-    return await processPackFile(info, instance_id, title);
-});
-
 async function processPackFile(info, instance_id, title) {
     let extension = path.extname(info.has_buffer ? info.name : info);
     if (extension == ".mrpack") {
@@ -2710,19 +2702,12 @@ async function addContent(instance_id, project_type, project_url, sha1, filename
     };
 }
 
-ipcMain.handle('download-cape', async (_, url, id) => {
-    return await downloadCape(url, id);
-});
 async function downloadCape(url, id) {
     let capePath = path.resolve(user_path, `minecraft/capes/${id}.png`);
     if (!url.includes("textures.minecraft.net")) throw new Error("Attempted XSS");
     if (fs.existsSync(capePath)) return;
     await urlToFile(url, capePath);
 }
-
-ipcMain.handle('query-server', async (_, host, port) => {
-    return await queryServer(host, port);
-});
 
 async function addServer(instance_id, ip, title, image) {
     if (!title) title = translate("app.server.name.default");
@@ -3379,12 +3364,6 @@ async function getAllFilesRecursive(baseDir, relDir = "", processDatFiles) {
     return { results, datFileData };
 }
 
-ipcMain.handle('get-world-files', async (_, instance_id, world_id) => {
-    const dirPath = path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id);
-    if (!fs.existsSync(dirPath)) return [];
-    return await getAllFilesRecursive(dirPath, undefined, true);
-});
-
 function readElPack(info) {
     try {
         const zip = new AdmZip(info.has_buffer ? Buffer.from(info.buffer) : info);
@@ -3964,28 +3943,6 @@ ipcMain.handle('test-java-installation', async (_, file_path) => {
     } catch {
         return false;
     }
-});
-
-ipcMain.handle('transfer-world', async (_, old_world_path, instance_id, delete_previous_files) => {
-    const savesPath = path.resolve(user_path, `minecraft/instances/${instance_id}/saves`);
-    fs.mkdirSync(savesPath, { recursive: true });
-
-    const worldName = path.basename(old_world_path);
-    let targetName = worldName;
-    let counter = 1;
-    while (fs.existsSync(path.join(savesPath, targetName))) {
-        targetName = `${worldName}_${counter}`;
-        counter++;
-    }
-    const destPath = path.join(savesPath, targetName);
-
-    await fsPromises.cp(old_world_path, destPath, { recursive: true });
-
-    if (delete_previous_files) {
-        await fsPromises.rm(old_world_path, { recursive: true, force: true });
-    }
-
-    return { new_world_path: destPath };
 });
 
 ipcMain.handle('create-desktop-shortcut', async (_, instance_id, instance_name, iconSource, worldType, worldId) => {
@@ -4630,59 +4587,6 @@ function folderExists(folderPath) {
         return false;
     }
 }
-
-ipcMain.handle('get-launcher-instances', async (_, instance_path) => {
-    if (!fs.existsSync(instance_path)) return [{ "name": translate("app.launchers.instance.unable_to_locate"), "value": "error" }];
-    return fs.readdirSync(instance_path)
-        .filter(f => {
-            const fullPath = path.join(instance_path, f);
-            return fs.statSync(fullPath).isDirectory();
-        })
-        .map(f => ({
-            name: f,
-            value: path.resolve(instance_path, f)
-        }));
-});
-
-ipcMain.handle('get-launcher-instance-path', async (_, launcher) => {
-    switch (launcher.toLowerCase()) {
-        case "modrinth": {
-            const p = path.join(os.homedir(), "AppData", "Roaming", "com.modrinth.theseus", "profiles");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "curseforge": {
-            const p = path.join(os.homedir(), "curseforge", "minecraft", "Instances");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "vanilla": {
-            const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "multimc": {
-            const p = path.join(os.homedir(), "AppData", "Roaming", ".minecraft", "instances");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "prism": {
-            const p = path.join(os.homedir(), "AppData", "Roaming", "PrismLauncher", "instances");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "atlauncher": {
-            const p = path.join(os.homedir(), "AppData", "Roaming", "ATLauncher", "instances");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "gdlauncher": {
-            const p = path.join(os.homedir(), "AppData", "Roaming", "GDLauncher", "instances");
-            return fs.existsSync(p) ? p : "";
-        }
-        case "current": {
-            const p = path.join(user_path, "minecraft/instances");
-            return fs.existsSync(p) ? p : "";
-        }
-        default:
-            return "";
-    }
-});
-
 
 const watchers = new Map();
 
