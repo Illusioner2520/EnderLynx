@@ -695,10 +695,6 @@ ipcMain.handle('get-worlds', async (_, savesPath) => {
     return await getWorlds(savesPath);
 });
 
-ipcMain.handle('get-world', async (_, instance_id, world_id) => {
-    return await getWorld(path.resolve(user_path, "minecraft", "instances", instance_id, "saves", world_id, "level.dat"));
-});
-
 async function getWorlds(savesPath) {
     fs.mkdirSync(savesPath, { recursive: true });
     let worldDirs = fs.opendirSync(savesPath);

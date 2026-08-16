@@ -707,10 +707,6 @@ function hashString(str) {
     return Math.abs(hash);
 }
 
-async function getWorld(instance_id, world_id) {
-    return await ipcRenderer.invoke('get-world', instance_id, world_id);
-}
-
 async function getWorlds(patha) {
     return await ipcRenderer.invoke('get-worlds', patha);
 }
