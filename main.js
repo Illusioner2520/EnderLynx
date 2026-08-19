@@ -5430,11 +5430,11 @@ function isValidDownloadURL(urlString) {
     try {
         let url = new URL(urlString);
 
-        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
             return false;
         }
 
-        const hostname = parsedUrl.hostname.toLowerCase();
+        const hostname = url.hostname.toLowerCase();
 
         return allowedDomains.some(domain => {
             const lowerDomain = domain.toLowerCase();
