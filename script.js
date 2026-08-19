@@ -482,7 +482,7 @@ class Instance {
     }
 
     async addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
-        return await window.enderlynx.addContentDatabase(name, author, image, file_name, source, type, version, this.instance_id, source_info, disabled, version_id);
+        return await window.enderlynx.addContent(name, author, image, file_name, source, type, version, this.instance_id, source_info, disabled, version_id);
     }
 
     supportsQuickPlaySingleplayer() {
@@ -1379,6 +1379,10 @@ class Instance {
         } else {
             displayError(translate("app.worlds.shortcut.failed"));
         }
+    }
+
+    async installContent(project_type, project_url, sha1, filename, data_pack_world, content_id) {
+        return await window.enderlynx.installContent(this.instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     }
 }
 
@@ -11541,7 +11545,7 @@ class Details {
 async function installContent(source, project, version, instance, data_pack_world) {
     DiscoverStateManagement.setContentStatus(project.id, instance.instance_id, DiscoverState.INSTALLING);
     if (project.server_modpack?.kind == "vanilla") {
-        await addContent(instance.instance_id, "server", project.ip_address, null, project.name, project.icon);
+        await instance.installContent(instance, "server", project.ip_address, null, project.name, project.icon);
         DiscoverStateManagement.setContentStatus(project.id, instance.instance_id, DiscoverState.INSTALLED);
         return { id: true };
     }
@@ -11569,7 +11573,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => e.source_info);
     let initialContent = {};
     try {
-        initialContent = await addContent(instance_id, project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
+        initialContent = await instance.installContent(project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
     } catch (e) {
         DiscoverStateManagement.setContentStatus(version.project_id, instance_id, DiscoverState.NOT_INSTALLED);
         throw e;
@@ -11599,10 +11603,6 @@ async function installSpecificVersion(version, source, instance, project_type, t
         }
     }
     return initialContent;
-}
-
-async function addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
-    return await window.enderlynx.addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
 }
 
 function sanitize(input) {
@@ -13262,7 +13262,7 @@ async function installButtonClick(content, version, instance_id) {
             }
             if (project_type == "server") {
                 if (info.link_to_server) await instance.setSourceServer(ip_address);
-                await addContent(instance.instance_id, "server", ip_address, null, server_name, server_icon);
+                await instance.installContent("server", ip_address, null, server_name, server_icon);
             }
         })
     } else if (instance_id) {

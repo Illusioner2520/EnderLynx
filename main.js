@@ -2020,7 +2020,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "height": height || 480,
             "fullscreen": Boolean(fullscreen || false)
         },
-        settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+            settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
         if (win) win.webContents.send('instance-started', instance_id);
@@ -2574,8 +2574,8 @@ async function downloadVanillaTweaksResourcePacks(packs, version, instance_id, f
     }
 }
 
-ipcMain.handle('add-content', async (_, instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
-    return await addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
+ipcMain.handle('install-content', async (_, instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
+    return await installContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
 });
 
 ipcMain.handle('add-server', async (_, instance_id, ip, name) => {
@@ -2593,11 +2593,13 @@ async function getServerImage(ip) {
     return info.favicon;
 }
 
-async function addContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
+async function installContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
     if (project_type == "server") {
         let v = await addServer(instance_id, project_url, filename, data_pack_world);
         return v;
     }
+
+    if (!isValidDownloadURL(project_url)) throw new Error("Unknown host");
 
     let stop_installing_dependencies = false;
 
@@ -4691,7 +4693,7 @@ function updateContent(key, value, content_id) {
     if (win && win.webContents) win.webContents.send('content-updated', key, value, content_id);
     return db.prepare(`UPDATE content SET ${key} = ? WHERE id = ?`).run(value, content_id);
 }
-function addContentDatabase(name, author, image, file_name, source, type, version, instance_id, source_info, disabled, version_id) {
+function addContent(name, author, image, file_name, source, type, version, instance_id, source_info, disabled, version_id) {
     let result = db.prepare('INSERT into content (name, author, image, file_name, source, type, version, instance, source_info, disabled, version_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(name, author, image, file_name, source, type, version, instance_id, source_info, Number(disabled), version_id);
     return getContent(result.lastInsertRowid);
 }
@@ -5024,7 +5026,7 @@ ipcMain.handle('add-instance', (_, ...params) => addInstance(...params));
 ipcMain.on('get-content', (_, ...params) => _.returnValue = getContent(...params));
 ipcMain.handle('get-instance-content-database', (_, ...params) => getInstanceContentDatabase(...params));
 ipcMain.handle('update-content', (_, ...params) => updateContent(...params));
-ipcMain.handle('add-content-database', (_, ...params) => addContentDatabase(...params));
+ipcMain.handle('add-content', (_, ...params) => addContent(...params));
 ipcMain.handle('delete-content-database', (_, ...params) => deleteContentDatabase(...params));
 ipcMain.handle('get-content-by-source-info', (_, ...params) => getContentBySourceInfo(...params));
 ipcMain.handle('get-default-profile', (_, ...params) => getDefaultProfile(...params));
@@ -5201,8 +5203,10 @@ ipcMain.handle('install-minecraft', async (_, instance_id, loader, game_version,
 async function installModpack(info, type, instance_id, name, sha1) {
     try {
         if (type == "cf_url") {
+            if (!isValidDownloadURL(info)) throw new Error("Unknown host");
             info = await downloadCurseForgePack(instance_id, info, name, sha1);
         } else if (type == "mr_url") {
+            if (!isValidDownloadURL(info)) throw new Error("Unknown host");
             info = await downloadModrinthPack(instance_id, info, name, sha1);
         }
     } catch (e) {
@@ -5226,7 +5230,7 @@ async function installModpack(info, type, instance_id, name, sha1) {
     if (packInfo.height) updateInstance("window_height", packInfo.height, instance_id);
     for (let i = 0; i < packInfo.content.length; i++) {
         let e = packInfo.content[i];
-        addContentDatabase(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, instance_id, e.source_id, e.disabled, e.version_id);
+        addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, instance_id, e.source_id, e.disabled, e.version_id);
     }
     updateInstance("installing", false, instance_id);
     await installMinecraft(instance_id, packInfo.loader, packInfo.vanilla_version, packInfo.loader_version);
@@ -5419,6 +5423,28 @@ async function convertKeyInfo(from, to, value) {
 ipcMain.handle('convert-key-info', async (_, from, to, value) => {
     return await convertKeyInfo(from, to, value);
 });
+
+let allowedDomains = ["modrinth.com", "curseforge.com", "vanillatweaks.net", "forgecdn.net"];
+
+function isValidDownloadURL(urlString) {
+    try {
+        let url = new URL(urlString);
+
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+            return false;
+        }
+
+        const hostname = parsedUrl.hostname.toLowerCase();
+
+        return allowedDomains.some(domain => {
+            const lowerDomain = domain.toLowerCase();
+            return hostname == lowerDomain || hostname.endsWith('.' + lowerDomain);
+        });
+
+    } catch (error) {
+        return false;
+    }
+}
 
 function hasColumn(table, column) {
     return db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);

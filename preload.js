@@ -413,8 +413,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     deleteContent: async (instance_id, project_type, filename) => {
         return await ipcRenderer.invoke('delete-content', instance_id, project_type, filename);
     },
-    addContent: async (instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
-        return await ipcRenderer.invoke('add-content', instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
+    installContent: async (instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
+        return await ipcRenderer.invoke('install-content', instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     },
     getScreenshots: async (instance_id) => {
         return await ipcRenderer.invoke('get-screenshots', instance_id);
@@ -640,7 +640,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getContent: (...params) => ipcRenderer.sendSync('get-content', ...params),
     getInstanceContentDatabase: async (...params) => ipcRenderer.invoke('get-instance-content-database', ...params),
     updateContent: async (...params) => ipcRenderer.invoke('update-content', ...params),
-    addContentDatabase: async (...params) => ipcRenderer.invoke('add-content-database', ...params),
+    addContent: async (...params) => ipcRenderer.invoke('add-content', ...params),
     deleteContentDatabase: async (...params) => ipcRenderer.invoke('delete-content-database', ...params),
     getContentBySourceInfo: async (...params) => ipcRenderer.invoke('get-content-by-source-info', ...params),
     getDefaultProfile: async (...params) => ipcRenderer.invoke('get-default-profile', ...params),
