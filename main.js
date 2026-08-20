@@ -12,7 +12,6 @@ const pLimit = require('p-limit').default;
 const { Minecraft, Java, Fabric, urlToFile, urlToFolder, Forge, NeoForge, Quilt } = require('./launch.js');
 const { queryServer } = require('./servers.js');
 const { Auth } = require('msmc');
-const querystring = require('querystring');
 const https = require('https');
 const stringArgv = require('string-argv').default;
 const crypto = require('crypto');
@@ -2272,308 +2271,6 @@ async function readPackFile(info) {
     }
 }
 
-let vt_rp = {}, vt_dp = {}, vt_ct = {};
-
-async function getVanillaTweaksResourcePackLink(packs, version) {
-    if (version.split(".").length > 2) {
-        version = version.split(".").splice(0, 2).join(".");
-    }
-    let data_json = vt_rp[version];
-    if (!vt_rp[version]) {
-        let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
-        data_json = await data.json();
-        vt_rp[version] = data_json;
-    }
-    let pack_info = {};
-
-    let process_category = (category, previous_categories = []) => {
-        previous_categories.push(category.category);
-        let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
-        let packs = category.packs.map(e => e.name);
-        packs.forEach(e => {
-            pack_info[e] = id;
-        });
-        if (category.categories) {
-            category.categories.forEach(e => {
-                process_category(e, structuredClone(previous_categories));
-            })
-        }
-    }
-    for (let i = 0; i < data_json.categories.length; i++) {
-        process_category(data_json.categories[i]);
-    }
-
-    let packs_send = {};
-    for (let i = 0; i < packs.length; i++) {
-        if (!packs_send[pack_info[packs[i].id]]) {
-            packs_send[pack_info[packs[i].id]] = [packs[i].id]
-        } else {
-            packs_send[pack_info[packs[i].id]].push(packs[i].id);
-        }
-    }
-
-    let h = querystring.stringify({
-        "packs": JSON.stringify(packs_send),
-        "version": version
-    });
-
-    const options = {
-        hostname: 'vanillatweaks.net',
-        path: '/assets/server/zipresourcepacks.php',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': h.length
-        }
-    };
-    let data_vt = await new Promise((resolve, reject) => {
-        const req = https.request(options, (res) => {
-            let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            res.on('end', () => {
-                resolve(data);
-            });
-        });
-
-        req.on('error', (error) => {
-            reject(error);
-        });
-
-        req.write(h);
-        req.end();
-    });
-    data_vt = JSON.parse(data_vt);
-    if (data_vt.link) return "https://vanillatweaks.net" + data_vt.link;
-    return null;
-}
-
-ipcMain.handle('download-vanilla-tweaks-data-packs', async (_, packs, version, instance_id, world_id) => {
-    return await downloadVanillaTweaksDataPacks(packs, version, instance_id, world_id);
-});
-
-async function downloadVanillaTweaksDataPacks(packs, version, instance_id, world_id) {
-    if (version.split(".").length > 2) {
-        version = version.split(".").splice(0, 2).join(".");
-    }
-    let data_json = vt_dp[version];
-    let data_ct_json = vt_ct[version];
-    if (!vt_dp[version]) {
-        let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
-        data_json = await data.json();
-        vt_dp[version] = data_json;
-    }
-    if (!vt_ct[version]) {
-        let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
-        data_ct_json = await data_ct.json();
-        vt_ct[version] = data_ct_json;
-    }
-    let pack_info = {};
-    let pack_ct_info = {};
-
-    let process_category = (category, previous_categories = [], type) => {
-        previous_categories.push(category.category);
-        let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
-        let packs = category.packs.map(e => e.name);
-        packs.forEach(e => {
-            if (type == "dp") pack_info[e] = id;
-            if (type == "ct") pack_ct_info[e] = id;
-        });
-        if (category.categories) {
-            category.categories.forEach(e => {
-                process_category(e, structuredClone(previous_categories), type);
-            })
-        }
-    }
-    for (let i = 0; i < data_json.categories.length; i++) {
-        process_category(data_json.categories[i], [], "dp");
-    }
-    for (let i = 0; i < data_ct_json.categories.length; i++) {
-        process_category(data_ct_json.categories[i], [], "ct");
-    }
-
-    let useDatapacks = false;
-    let useCraftingTweaks = false;
-
-    let packs_send = {};
-    let packs_ct_send = {};
-    for (let i = 0; i < packs.length; i++) {
-        if (packs[i].type == "ct") {
-            useCraftingTweaks = true;
-            let info = pack_ct_info[packs[i].id];
-            if (!packs_ct_send[info]) {
-                packs_ct_send[info] = [packs[i].id]
-            } else {
-                packs_ct_send[info].push(packs[i].id);
-            }
-        } else {
-            useDatapacks = true;
-            let info = pack_info[packs[i].id];
-            if (!packs_send[info]) {
-                packs_send[info] = [packs[i].id]
-            } else {
-                packs_send[info].push(packs[i].id);
-            }
-        }
-    }
-
-    let h = querystring.stringify({
-        "packs": JSON.stringify(packs_send),
-        "version": version
-    });
-    let h_ct = querystring.stringify({
-        "packs": JSON.stringify(packs_ct_send),
-        "version": version
-    });
-
-    const options = (type) => ({
-        hostname: 'vanillatweaks.net',
-        path: type == "dp" ? '/assets/server/zipdatapacks.php' : '/assets/server/zipcraftingtweaks.php',
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': type == "dp" ? h.length : h_ct.length
-        }
-    });
-    let data_vt = "{}";
-    let data_ct_vt = "{}";
-    if (useDatapacks) data_vt = await new Promise((resolve, reject) => {
-        const req = https.request(options("dp"), (res) => {
-            let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            res.on('end', () => {
-                resolve(data);
-            });
-        });
-
-        req.on('error', (error) => {
-            reject(error);
-        });
-
-        req.write(h);
-        req.end();
-    });
-
-    if (useCraftingTweaks) data_ct_vt = await new Promise((resolve, reject) => {
-        const req = https.request(options("ct"), (res) => {
-            let data = '';
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            res.on('end', () => {
-                resolve(data);
-            });
-        });
-
-        req.on('error', (error) => {
-            reject(error);
-        });
-
-        req.write(h_ct);
-        req.end();
-    });
-
-    data_vt = JSON.parse(data_vt);
-    data_ct_vt = JSON.parse(data_ct_vt);
-
-    const datapacksDir = path.resolve(user_path, `minecraft/instances/${instance_id}/saves/${world_id}/datapacks`);
-    if (data_ct_vt.link) {
-        fs.mkdirSync(datapacksDir, { recursive: true });
-        let baseName = "vanilla_tweaks.zip";
-        let filePath = path.join(datapacksDir, baseName);
-        let counter = 1;
-        while (fs.existsSync(filePath)) {
-            baseName = `vanilla_tweaks_${counter}.zip`;
-            filePath = path.join(datapacksDir, baseName);
-            counter++;
-        }
-        await urlToFile("https://vanillatweaks.net" + data_ct_vt.link, filePath);
-    }
-    if (data_vt.link) {
-        const tempDir = path.resolve(user_path, `minecraft/instances/${instance_id}/temp_datapacks`);
-        fs.mkdirSync(tempDir, { recursive: true });
-        let baseName = "vanilla_tweaks.zip";
-        let filePath = path.join(tempDir, baseName);
-        let counter = 1;
-        while (fs.existsSync(filePath)) {
-            baseName = `vanilla_tweaks_${counter}.zip`;
-            filePath = path.join(tempDir, baseName);
-            counter++;
-        }
-        await urlToFile("https://vanillatweaks.net" + data_vt.link, filePath);
-
-        const zip = new AdmZip(filePath);
-        const entries = zip.getEntries();
-
-        for (const entry of entries) {
-            let entryName = entry.entryName;
-            let destPath = path.join(datapacksDir, entryName);
-
-            if (fs.existsSync(destPath)) {
-                let ext = path.extname(entryName);
-                let base = path.basename(entryName, ext);
-                let dir = path.dirname(destPath);
-                let i = 1;
-                let newName;
-                do {
-                    newName = ext
-                        ? `${base}_${i}${ext}`
-                        : `${base}_${i}`;
-                    destPath = path.join(dir, newName);
-                    i++;
-                } while (fs.existsSync(destPath));
-            }
-
-            if (entry.isDirectory) {
-                fs.mkdirSync(destPath, { recursive: true });
-            } else {
-                fs.mkdirSync(path.dirname(destPath), { recursive: true });
-                await fsPromises.writeFile(destPath, entry.getData());
-            }
-        }
-
-        await fsPromises.unlink(filePath);
-    }
-
-    return true;
-}
-
-ipcMain.handle('download-vanilla-tweaks-resource-packs', async (_, packs, version, instance_id, file_path) => {
-    return await downloadVanillaTweaksResourcePacks(packs, version, instance_id, file_path);
-});
-
-async function downloadVanillaTweaksResourcePacks(packs, version, instance_id, file_path) {
-    let link = await getVanillaTweaksResourcePackLink(packs, version);
-    if (link) {
-        const resourcepacksDir = path.resolve(user_path, `minecraft/instances/${instance_id}/resourcepacks`);
-        fs.mkdirSync(resourcepacksDir, { recursive: true });
-        let baseName = "vanilla_tweaks.zip";
-        let filePath = path.join(resourcepacksDir, baseName);
-        if (file_path) {
-            filePath = path.join(resourcepacksDir, file_path);
-        } else {
-            let counter = 1;
-            while (fs.existsSync(filePath)) {
-                baseName = `vanilla_tweaks_${counter}.zip`;
-                filePath = path.join(resourcepacksDir, baseName);
-                counter++;
-            }
-        }
-        await urlToFile(link, filePath);
-
-        if (getDefault("auto_apply_resource_packs") == "true") {
-            applyResourcePack(instance_id, baseName);
-        }
-
-        return baseName;
-    } else {
-        return false;
-    }
-}
-
 ipcMain.handle('install-content', async (_, instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) => {
     return await installContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
 });
@@ -2594,6 +2291,12 @@ async function getServerImage(ip) {
 }
 
 async function installContent(instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id) {
+    let unzip = false;
+    if (!project_url) throw new Error("Unknown source");
+    if (typeof project_url == 'object') {
+        unzip = project_url.unzip;
+        project_url = project_url.link;
+    }
     if (project_type == "server") {
         let v = await addServer(instance_id, project_url, filename, data_pack_world);
         return v;
@@ -2628,7 +2331,20 @@ async function installContent(instance_id, project_type, project_url, sha1, file
         }
     });
 
-    await validateSha1(sha1, install_path);
+    if (unzip) {
+        let archivePath = install_path;
+        let extractDir = path.dirname(archivePath);
+
+        if (fs.existsSync(archivePath)) {
+            let archive = new AdmZip(archivePath);
+            archive.extractAllTo(extractDir, true);
+            await fsPromises.unlink(archivePath);
+        }
+    }
+
+    if (sha1) {
+        await validateSha1(sha1, install_path);
+    }
 
     win.webContents.send('content-install-update', content_id, instance_id, 100);
 
@@ -5016,6 +4732,12 @@ async function getPinnedWorlds() {
     return allWorlds;
 }
 
+async function getInstalledVanillaTweaksResourcePacks(instance_id) {
+    if (!instance_id) return "[]";
+    let info = db.prepare("SELECT * FROM content WHERE instance = ? AND source = ? AND type = ?").get(instance_id, "vanilla_tweaks", "resourcepack");
+    return info?.version_id || "[]";
+}
+
 ipcMain.on('svg-data', (_) => _.returnValue = svgData);
 
 ipcMain.on('get-instance', (_, ...params) => _.returnValue = getInstance(...params));
@@ -5072,6 +4794,7 @@ ipcMain.handle('pin-world', (_, ...params) => pinWorld(...params));
 ipcMain.handle('unpin-world', (_, ...params) => unpinWorld(...params));
 ipcMain.handle('get-pinned-instances', (_, ...params) => getPinnedInstances(...params));
 ipcMain.handle('get-pinned-worlds', (_, ...params) => getPinnedWorlds(...params));
+ipcMain.handle('get-installed-vanilla-tweaks-resource-packs', (_, instance_id) => getInstalledVanillaTweaksResourcePacks(instance_id));
 
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
@@ -5550,6 +5273,10 @@ try {
             db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
             db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
             db.prepare("UPDATE content SET type = ? WHERE type = ?").run("resourcepack", "resource_pack");
+        case "0.11.2":
+        case "0.11.3":
+        case "0.11.4":
+            db.prepare("UPDATE content SET version_id = source_info, source_info = NULL WHERE source = ? AND version_id IS NULL").run("vanilla_tweaks");
     }
     setDefault("saved_version", version);
 } catch (e) {

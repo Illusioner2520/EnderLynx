@@ -113,6 +113,17 @@ class Project {
         this.loaders = [...new Set(urlInfo.latestFilesIndexes.map(e => Project.curseforge_mod_loader_conversion[e.modLoader]).filter(e => e))];
         this.game_versions = [...new Set(urlInfo.latestFilesIndexes.map(e => e.gameVersion))];
     }
+    static getVanillaTweaks(version, project_type) {
+        let project = new Project();
+        project.source = "vanilla_tweaks";
+        project.project_type = project_type;
+        project.game_versions = [version];
+        project.id = "vt-" + project_type;
+        project.name = project_type == "resourcepack" ? "Vanilla Tweaks Resource Pack" : "Vanilla Tweaks Data Pack";
+        project.author = "Vanilla Tweaks";
+        project.icon = "https://vanillatweaks.net/assets/images/logo.png";
+        return project;
+    }
     setDescription(description) {
         this.description = description;
     }
@@ -143,23 +154,6 @@ class Project {
             this.setDescription((await (await fetch(`https://api.curse.tools/v1/mods/${urlInfo.data[0].id}/description`)).json()).data);
         }
     }
-    applyInfoFromCurseForgeServers(urlInfo) {
-        this.icon = urlInfo.favicon;
-        this.name = urlInfo.name;
-        this.project_type = "server";
-        this.online_players = urlInfo.latestPing.online;
-        this.max_players = urlInfo.latestPing.total;
-        this.source = "curseforge";
-        this.updated = new Date(urlInfo.latestPing.pingedAt);
-        this.ip_address = urlInfo.serverConnection;
-        this.id = urlInfo.serverConnection;
-        this.links = {};
-        this.links.browser = `https://www.curseforge.com/servers/minecraft/game/${urlInfo.slug}`;
-        this.links.discord = (urlInfo.discord?.startsWith("https://") || urlInfo.discord?.startsWith("http://")) ? urlInfo.discord : (urlInfo.discord ? `https://discord.gg/${urlInfo.discord}` : null);
-        this.links.discord = (urlInfo.twitter?.startsWith("https://") || urlInfo.twitter?.startsWith("http://")) ? urlInfo.twitter : (urlInfo.twitter ? `https://x.com/${urlInfo.twitter}` : null);
-        this.description = urlInfo.description;
-        this.summary = urlInfo.serverConnection;
-    }
     async getAllVersions(id, source) {
         if ((this.versions?.length || 0) > 0) return;
         if (id) this.id = id;
@@ -185,7 +179,10 @@ class Project {
     static async getCurseForgeVersionPage(page, id) {
         let url = `https://api.curse.tools/v1/mods/${id}/files?pageSize=50&index=${page * 50 - 50}`;
         let urlInfo = await (await fetch(url)).json();
-        return { versions: urlInfo.data.map(e => new ProjectVersion(e, "curseforge")), max_pages: Math.ceil(urlInfo.pagination.totalCount / 50)};
+        return {
+            versions: urlInfo.data.map(e => new ProjectVersion(e, "curseforge")),
+            max_pages: Math.ceil(urlInfo.pagination.totalCount / 50)
+        };
     }
     async getVersion(loader, game_version, project_type, id, source) {
         if (!project_type && this.project_type) project_type = this.project_type;
@@ -406,6 +403,15 @@ class ProjectVersion {
             }
             this.required_dependencies = info.dependencies.filter(e => e.relationType == 3).map(e => ({ project_id: e.modId.toString() }));
             this.dependencies = info.dependencies.map(e => ({ project_id: e.modId.toString(), type: Project.curseforge_dependency_type_conversion[e.relationType] }));
+        } else if (source == "vanilla_tweaks") {
+            this.download_url = info.link;
+            this.project_type = project_type;
+            if (project_type == "datapack") {
+                this.unzip = true;
+            }
+            this.project_id = "vt-" + project_type;
+            this.filename = "vanilla_tweaks.zip";
+            this.version_id = JSON.stringify(info.packs);
         }
     }
     async getChangelog(callback, errorCallback) {
@@ -543,7 +549,7 @@ class Author {
             if (this.downloads != null) return;
             let project_url = `https://api.modrinth.com/v3/organization/${this.id}/projects`;
             let urlInfo = (await (await fetch(project_url)).json());
-            this.downloads = urlInfo.reduce((a,b) => a + b.downloads, 0);
+            this.downloads = urlInfo.reduce((a, b) => a + b.downloads, 0);
             this.projects = urlInfo.map(e => {
                 let project = new Project();
                 project.applyInfoFromModrinth(e);
@@ -554,7 +560,7 @@ class Author {
             if (this.downloads != null) return;
             let project_url = `https://api.modrinth.com/v3/user/${this.id}/projects`;
             let urlInfo = (await (await fetch(project_url)).json());
-            this.downloads = urlInfo.reduce((a,b) => a + b.downloads, 0);
+            this.downloads = urlInfo.reduce((a, b) => a + b.downloads, 0);
             this.projects = urlInfo.map(e => {
                 let project = new Project();
                 project.applyInfoFromModrinth(e);
@@ -751,4 +757,189 @@ class CurseForge {
     }
 }
 
-export { Project, ProjectVersion, ProjectList, ProjectVersionList, Author, GalleryImage, Modrinth, CurseForge };
+class VanillaTweaks {
+    static resource_pack_cache = {};
+    static data_pack_cache = {};
+    static crafting_tweak_cache = {};
+    static default_vanilla_tweaks_version = "26.2";
+    static async getDataPacksVersion(packs, version) {
+        let link = [
+            {
+                link: await this.getLink(packs.filter(e => e.type == "dp"), version, "datapack"),
+                unzip: true
+            },
+            await this.getLink(packs.filter(e => e.type == "ct"), version, "craftingtweak")
+        ].filter(e => e);
+        if (link.length == 1) link = link[0];
+        return new ProjectVersion({
+            link,
+            packs
+        }, "vanilla_tweaks", "datapack");
+    }
+    static async getResourcePacksVersion(packs, version) {
+        return new ProjectVersion({
+            link: await this.getLink(packs, version, "resourcepack"),
+            packs
+        }, "vanilla_tweaks", "resourcepack");
+    }
+    static async getLink(packs, version, type) {
+        if (!["resourcepack", "datapack", "craftingtweak"].includes(type)) return null;
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let cache = this.resource_pack_cache;
+        if (type == "datapack") cache = this.data_pack_cache;
+        if (type == "craftingtweak") cache = this.crafting_tweak_cache;
+        let shorthand = "rp";
+        if (type == "datapack") shorthand = "dp";
+        if (type == "craftingtweak") shorthand = "ct";
+        let data = cache[version];
+        if (!cache[version]) {
+            let urlInfo = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/${shorthand}categories.json?${(new Date()).getTime()}`);
+            data = await urlInfo.json();
+            cache[version] = data;
+        }
+        let pack_info = {};
+
+        let process_category = (category, previous_categories = []) => {
+            previous_categories.push(category.category);
+            let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
+            let packs = category.packs.map(e => e.name);
+            packs.forEach(e => {
+                pack_info[e] = id;
+            });
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e, structuredClone(previous_categories));
+                })
+            }
+        }
+        for (let i = 0; i < data.categories.length; i++) {
+            process_category(data.categories[i]);
+        }
+
+        let packs_send = {};
+        for (let i = 0; i < packs.length; i++) {
+            if (!packs_send[pack_info[packs[i].id]]) {
+                packs_send[pack_info[packs[i].id]] = [packs[i].id]
+            } else {
+                packs_send[pack_info[packs[i].id]].push(packs[i].id);
+            }
+        }
+
+        let body = new URLSearchParams({
+            packs: JSON.stringify(packs_send),
+            version
+        }).toString();
+
+        let response = await fetch(`https://vanillatweaks.net/assets/server/zip${type}s.php`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': body.length
+            },
+            body
+        });
+
+        let urlInfo = await response.json();
+        if (urlInfo.link) return "https://vanillatweaks.net" + urlInfo.link;
+        return null;
+    }
+    static async getResourcePacks(query = "", version = this.default_vanilla_tweaks_version) {
+        query = query.toLowerCase().trim();
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let data_json = this.resource_pack_cache[version];
+        if (!this.resource_pack_cache[version]) {
+            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
+            data_json = await data.json();
+            this.resource_pack_cache[version] = data_json;
+        }
+
+        let return_data = {};
+        return_data.hits = [];
+
+        let process_category = (category, previous_categories = []) => {
+            previous_categories.push(category.category);
+            let packs = category.packs;
+            packs = packs.map(e => ({
+                "title": e.display,
+                "description": e.description,
+                "icon_url": `https://vanillatweaks.net/assets/resources/icons/resourcepacks/${version}/${e.name}.png`,
+                "breadcrumb": previous_categories.join(" > "),
+                "incompatible": e.incompatible,
+                "vt_id": e.name,
+                "experiment": e.experiment,
+                "categories": previous_categories,
+                "image": `https://vanillatweaks.net/assets/resources/previews/resourcepacks/${version}/${e.name}.${e.previewExtension ? e.previewExtension : "png"}?v2`
+            }));
+            packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
+            return_data.hits = return_data.hits.concat(packs);
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e, structuredClone(previous_categories));
+                })
+            }
+        }
+        for (let i = 0; i < data_json.categories.length; i++) {
+            process_category(data_json.categories[i]);
+        }
+        return return_data;
+    }
+    static async getDataPacks(query = "", version = this.default_vanilla_tweaks_version) {
+        query = query.toLowerCase().trim();
+        if (version.split(".").length > 2) {
+            version = version.split(".").splice(0, 2).join(".");
+        }
+        let data_json = this.data_pack_cache[version];
+        let data_ct_json = this.crafting_tweak_cache[version];
+        if (!this.data_pack_cache[version]) {
+            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
+            data_json = await data.json();
+            this.data_pack_cache[version] = data_json;
+        }
+        if (!this.crafting_tweak_cache[version]) {
+            let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
+            data_ct_json = await data_ct.json();
+            this.crafting_tweak_cache[version] = data_ct_json;
+        }
+
+
+        let return_data = {};
+        return_data.hits = [];
+
+        let process_category = (category, type, previous_categories = []) => {
+            previous_categories.push(category.category);
+            let packs = category.packs;
+            packs = packs.map(e => ({
+                "title": e.display,
+                "description": e.description,
+                "icon_url": `https://vanillatweaks.net/assets/resources/icons/${type == "dp" ? "datapacks" : "craftingtweaks"}/${version}/${e.name}.png`,
+                "breadcrumb": previous_categories.join(" > "),
+                "incompatible": e.incompatible,
+                "vt_id": e.name,
+                "type": type,
+                "experiment": e.experiment,
+                "categories": previous_categories,
+                "image": `https://vanillatweaks.net/assets/resources/previews/${type == "dp" ? "datapacks" : "craftingtweaks"}/${version}/${e.name}.${e.previewExtension ? e.previewExtension : "png"}?v2`
+            }));
+            packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
+            return_data.hits = return_data.hits.concat(packs);
+            if (category.categories) {
+                category.categories.forEach(e => {
+                    process_category(e, type, structuredClone(previous_categories));
+                })
+            }
+        }
+        for (let i = 0; i < data_json.categories.length; i++) {
+            process_category(data_json.categories[i], "dp");
+        }
+        for (let i = 0; i < data_ct_json.categories.length; i++) {
+            process_category(data_ct_json.categories[i], "ct");
+        }
+        return return_data;
+    }
+}
+
+export { Project, ProjectVersion, ProjectList, ProjectVersionList, Author, GalleryImage, Modrinth, CurseForge, VanillaTweaks };

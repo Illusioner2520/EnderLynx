@@ -1,4 +1,4 @@
-import { Project, ProjectVersion, ProjectList, ProjectVersionList, Author, GalleryImage, Modrinth, CurseForge } from './api.js';
+import { Project, ProjectVersion, ProjectList, ProjectVersionList, Author, GalleryImage, Modrinth, CurseForge, VanillaTweaks } from './api.js';
 
 let lang = null;
 document.getElementsByTagName("title")[0].textContent = translate("app.name");
@@ -3866,7 +3866,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.content.edit_packs"),
                                 "icon": '<i class="fa-solid fa-pencil"></i>',
                                 "func": async () => {
-                                    displayVanillaTweaksEditor(this.instance.instance_id, this.instance.vanilla_version, JSON.parse(e.source_info), e.file_name, e);
+                                    displayVanillaTweaksEditor(this.instance.instance_id, this.instance.vanilla_version, JSON.parse(e.version_id), e.file_name, e);
                                 }
                             } : null,
                             this.instance.locked ? null : e.source == "player_install" ? null : {
@@ -6668,6 +6668,9 @@ class DiscoverScreen extends Screen {
         this.requestFrame();
         if (source == "vanilla_tweaks") {
             this.discoverListTop.style.display = "none";
+            if (added_vt_packs.length == 0 && this.currentTab == "resourcepack") {
+                added_vt_packs = JSON.parse(await window.enderlynx.getInstalledVanillaTweaksResourcePacks(this.instance?.instance_id));
+            }
             new VanillaTweaksSelector(this.currentTab, this.game_version, this.instance?.instance_id, undefined, this.discoverList, query);
             return;
         }
@@ -10990,6 +10993,7 @@ let added_vt_packs = [];
 function displayVanillaTweaksEditor(instance_id, version, packs, file_name, content) {
     let wrapper = document.createElement("div");
     wrapper.className = "vt-editor-wrapper";
+    let instance = Instance.getInstance(instance_id);
     let dialog = new Dialog();
     let searchElement = document.createElement("div");
     searchElement.style.height = "48.8px";
@@ -11012,13 +11016,17 @@ function displayVanillaTweaksEditor(instance_id, version, packs, file_name, cont
             "content": translate("app.content.edit_packs.confirm")
         }
     ], [], async () => {
-        let instanceInfo = Instance.getInstance(instance_id);
-        let file = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, instanceInfo.vanilla_version, instanceInfo.instance_id, file_name);
-        if (!file) {
-            displayError(translate("app.discover.vt.fail"));
-        } else {
+        try {
+            await updateContent(
+                "vanilla_tweaks",
+                content,
+                Project.getVanillaTweaks(instance.vanilla_version, "resourcepack"),
+                await VanillaTweaks.getResourcePacksVersion(added_vt_packs, instance.vanilla_version),
+                instance
+            );
             displaySuccess(translate("app.discover.vt.success_edit"));
-            content.setSourceInfo(JSON.stringify(added_vt_packs));
+        } catch (e) {
+            displayError(translate("app.discover.vt.fail"));
         }
     }, () => { }, true);
 }
@@ -11034,6 +11042,27 @@ class VanillaTweaksSelector {
         this.query = query;
         this.hide_install_button = hide_install_button;
         this.initialize();
+    }
+    sortPacks() {
+        added_vt_packs.sort((a,b) => (a?.id || "").localeCompare(b?.id || ""));
+    }
+    addSelected(item) {
+        let low = 0;
+        let high = added_vt_packs.length;
+
+        while (low < high) {
+            const mid = (low + high) >> 1;
+            if ((added_vt_packs[mid]?.id || "").localeCompare(item?.id || "") < 0) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+
+        added_vt_packs.splice(low, 0, item);
+    }
+    removeSelected(id) {
+        added_vt_packs = added_vt_packs.filter(e => e.id != id);
     }
     async initialize() {
         this.element.innerHTML = "";
@@ -11062,12 +11091,13 @@ class VanillaTweaksSelector {
         if (this.version && !this.vt_version) {
             this.vt_version = this.version.split(".").splice(0, 2).join(".");
         }
-        if (!this.vt_version) this.vt_version = "26.2";
+        this.sortPacks();
+        if (!this.vt_version) this.vt_version = VanillaTweaks.default_vanilla_tweaks_version;
         try {
             if (this.type == "resourcepack") {
-                result = await window.enderlynx.getVanillaTweaksResourcePacks(this.query, this.vt_version);
+                result = await VanillaTweaks.getResourcePacks(this.query, this.vt_version);
             } else if (this.type == "datapack") {
-                result = await window.enderlynx.getVanillaTweaksDataPacks(this.query, this.vt_version);
+                result = await VanillaTweaks.getDataPacks(this.query, this.vt_version);
             }
             this.element.innerHTML = "";
         } catch (err) {
@@ -11176,210 +11206,16 @@ class VanillaTweaksSelector {
         incompatibleSelectedPackCount.className = "vt-selected-pack-count";
         buttonWrapper.appendChild(incompatibleSelectedPackCount);
         let submitButton = document.createElement("button");
-        submitButton.className = "vt-submit-button";
-        submitButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.vt.install");
-        submitButton.onclick = async () => {
-            if (this.type == "datapack") {
-                let dialog = new Dialog();
-                dialog.showDialog(translate("app.discover.datapacks.title"), "form", [
-                    this.instance_id ? null : {
-                        "type": "dropdown",
-                        "id": "instance",
-                        "name": translate("app.discover.datapacks.instance"),
-                        "options": (await getInstances()).map(e => ({ "name": e.name, "value": e.instance_id }))
-                    },
-                    {
-                        "type": "dropdown",
-                        "id": "world",
-                        "name": translate("app.discover.datapacks.world"),
-                        "options": this.instance_id ? (await Instance.getInstance(this.instance_id).getSingleplayerWorlds()).map(e => ({ "name": e.name, "value": e.id })) : [],
-                        "input_source": this.instance_id ? null : "instance",
-                        "source": this.instance_id ? null : async (i) => {
-                            return (await Instance.getInstance(i).getSingleplayerWorlds()).map(e => ({ "name": e.name, "value": e.id }));
-                        }
-                    }
-                ].filter(e => e), [
-                    { "content": translate("app.discover.datapacks.cancel"), "type": "cancel" },
-                    { "content": translate("app.discover.datapacks.confirm"), "type": "confirm" }
-                ], [], async (info) => {
-                    let instance = this.instance_id ? this.instance_id : info.instance;
-                    let world = info.world;
-                    if (world == "loading" || world == "" || !world) {
-                        displayError(translate("app.discover.vt.datapack.world"));
-                        return;
-                    }
-                    if (this.instance_id) {
-                        submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                        submitButton.classList.add("disabled");
-                        submitButton.onclick = () => { };
-                    }
-                    let success = await window.enderlynx.downloadVanillaTweaksDataPacks(added_vt_packs, this.vt_version, instance, world);
-                    if (this.instance_id) {
-                        if (success) {
-                            submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                        } else {
-                            submitButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed")
-                        }
-                    } else {
-                        if (success) {
-                            displaySuccess(translate("app.discover.vt.success", "%i", (Instance.getInstance(instance)).name));
-                        } else {
-                            displayError(translate("app.discover.vt.fail"));
-                        }
-                    }
-                })
-            } else if (this.instance_id) {
-                submitButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                submitButton.onclick = () => { };
-                let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, this.instance_id);
-                if (!file_name) {
-                    displayError(translate("app.discover.vt.fail"));
-                    return;
-                }
-                let instance = Instance.getInstance(this.instance_id);
-                await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resourcepack", "", JSON.stringify(added_vt_packs), false);
-                submitButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-            } else {
-                let dialog = new Dialog();
-                let instances = await getInstances();
-
-                let installGrid = document.createElement("div");
-                installGrid.className = "install-grid";
-
-                let installGridEntry = document.createElement("div");
-                installGridEntry.className = "install-grid-entry";
-
-                let createNewButton = document.createElement("button");
-                createNewButton.className = "install-grid-create";
-                createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
-                createNewButton.onclick = async () => {
-                    let dialog2 = new Dialog();
-                    dialog2.showDialog(translate("app.button.instances.create"), "form", [
-                        {
-                            "type": "image-upload",
-                            "id": "icon",
-                            "name": translate("app.instances.icon")
-                        },
-                        {
-                            "type": "text",
-                            "name": translate("app.instances.name"),
-                            "id": "name",
-                            "maxlength": 50
-                        },
-                        {
-                            "type": "multi-select",
-                            "name": translate("app.instances.loader"),
-                            "options": [
-                                { "name": loaders["vanilla"], "value": "vanilla" },
-                                { "name": loaders["fabric"], "value": "fabric" },
-                                { "name": loaders["forge"], "value": "forge" },
-                                { "name": loaders["neoforge"], "value": "neoforge" },
-                                { "name": loaders["quilt"], "value": "quilt" }
-                            ],
-                            "id": "loader"
-                        },
-                        {
-                            "type": "dropdown",
-                            "name": translate("app.instances.game_version"),
-                            "options": [],
-                            "id": "game_version",
-                            "input_source": "loader",
-                            "source": VersionList.getVersions,
-                            "default": await VersionList.getLatestRelease()
-                        }
-                    ], [
-                        { "content": translate("app.instances.cancel"), "type": "cancel" },
-                        { "content": translate("app.instances.submit"), "type": "confirm" }
-                    ], [], async (info) => {
-                        dialog.closeDialog();
-                        contentInfo.close();
-                        if (info.game_version == "loading") {
-                            displayError(translate("app.instances.no_game_version"));
-                            return;
-                        }
-                        if (!info.name) {
-                            info.name = translate("app.instances.untitled");
-                        }
-                        let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-                        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
-                        await instance.setInstalling(true);
-                        instance.display();
-                        let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instance_id);
-                        if (file_name) {
-                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resourcepack", "", JSON.stringify(added_vt_packs), false);
-                        }
-                        await instance.setInstalling(false);
-                        await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
-                    });
-                }
-
-                installGridEntry.appendChild(createNewButton);
-                installGrid.appendChild(installGridEntry);
-                for (let i = 0; i < instances.length; i++) {
-                    if (instances[i].locked) continue;
-                    let installGridEntry = document.createElement("div");
-                    installGridEntry.className = "install-grid-entry";
-
-                    let installGridInstance = document.createElement("div");
-                    installGridInstance.className = "install-grid-instance";
-
-                    let image = document.createElement("img");
-                    image.src = instances[i].image ? instances[i].image : getDefaultImage(instances[i].instance_id);
-                    image.className = "instance-image";
-                    image.onerror = () => {
-                        image.src = getDefaultImage(instances[i].instance_id);
-                    }
-
-                    let info = document.createElement("div");
-                    info.className = "instance-info";
-
-                    let name = document.createElement("div");
-                    name.className = "instance-name";
-                    name.innerText = instances[i].name;
-
-                    let desc = document.createElement("div");
-                    desc.className = "instance-desc";
-                    desc.innerText = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
-
-                    info.appendChild(name);
-                    info.appendChild(desc);
-
-                    installGridInstance.appendChild(image);
-                    installGridInstance.appendChild(info);
-
-                    let installButton = document.createElement("button");
-                    installButton.className = "install-grid-install";
-                    installButton.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
-                    installButton.onclick = async () => {
-                        let success;
-                        installButton.innerHTML = '<i class="spinner"></i>' + translate("app.discover.installing");
-                        installButton.classList.add("disabled");
-                        installButton.onclick = () => { };
-                        let file_name = await window.enderlynx.downloadVanillaTweaksResourcePacks(added_vt_packs, this.vt_version, instances[i].instance_id);
-                        if (!file_name) {
-                            success = false;
-                        } else {
-                            success = true;
-                        }
-                        if (success) {
-                            let instance = instances[i];
-                            await instance.addContent(translate("app.discover.vt.title"), translate("app.discover.vt.author"), "https://vanillatweaks.net/assets/images/logo.png", file_name, "vanilla_tweaks", "resourcepack", "", JSON.stringify(added_vt_packs), false);
-                            installButton.innerHTML = '<i class="fa-solid fa-check"></i>' + translate("app.discover.installed");
-                        } else {
-                            installButton.innerHTML = '<i class="fa-solid fa-xmark"></i>' + translate("app.discover.failed");
-                        }
-                    }
-
-                    installGridEntry.appendChild(installGridInstance);
-                    installGridEntry.appendChild(installButton);
-
-                    installGrid.appendChild(installGridEntry);
-                }
-                dialog.showDialog(translate("app.discover.select_instance.vt.title"), "notice", installGrid, [
-                    { "content": translate("app.discover.select_instance.confirm"), "type": "confirm" }
-                ], null, () => { });
+        submitButton.className = "vt-submit-button version-file-install";
+        DiscoverStateManagement.registerButton("vt-" + this.type, () => JSON.stringify(added_vt_packs), submitButton, () => {
+            return Project.getVanillaTweaks(this.vt_version, this.type)
+        }, async () => {
+            if (this.type == "resourcepack") {
+                return await VanillaTweaks.getResourcePacksVersion(added_vt_packs, this.vt_version);
+            } else if (this.type == "datapack") {
+                return await VanillaTweaks.getDataPacksVersion(added_vt_packs, this.vt_version);
             }
-        }
+        }, this.instance_id ? Instance.getInstance(this.instance_id) : null, undefined, undefined, undefined, true);
         if (!this.hide_install_button) buttonWrapper.append(submitButton);
         let vanillaTweaksEntries = document.createElement("div");
         vanillaTweaksEntries.className = "vt-entries";
@@ -11456,12 +11292,13 @@ class VanillaTweaksSelector {
             vtToggle.className = "vt-toggle";
             let toggle = new Toggle(vtToggle, (v) => {
                 if (v) {
-                    added_vt_packs.push({ "id": e.vt_id, "type": e.type })
+                    this.addSelected({ "id": e.vt_id, "type": e.type })
                 } else {
-                    added_vt_packs = added_vt_packs.filter(f => f.id != e.vt_id);
+                    this.removeSelected(e.vt_id);
                 }
                 checkForIncompatibilities();
                 updatePackCount();
+                DiscoverStateManagement.updateAllButtons("vt-" + this.type, this.instance_id);
             }, current_ids.includes(e.vt_id), true);
             entry.onclick = () => {
                 toggle.toggle();
@@ -11573,7 +11410,13 @@ async function installSpecificVersion(version, source, instance, project_type, t
     let curseforge_ids = content.filter(e => e.source == "curseforge").map(e => e.source_info);
     let initialContent = {};
     try {
-        initialContent = await instance.installContent(project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
+        if (Array.isArray(version.download_url)) {
+            for (let url of version.download_url) {
+                initialContent = await instance.installContent(project_type, url, version.sha1_hash, version.filename, data_pack_world, project_id);
+            }
+        } else {
+            initialContent = await instance.installContent(project_type, version.download_url, version.sha1_hash, version.filename, data_pack_world, project_id);
+        }
     } catch (e) {
         DiscoverStateManagement.setContentStatus(version.project_id, instance_id, DiscoverState.NOT_INSTALLED);
         throw e;
@@ -13072,10 +12915,6 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
 }
 
 async function updateContent(source, content, project, version, instance) {
-    if (source == "vanilla_tweaks") {
-        await window.enderlynx.downloadVanillaTweaksResourcePacks(JSON.parse(content.source_info), instance.vanilla_version, instance.instance_id, content.file_name);
-        return;
-    }
     if (source == "player_install") return;
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, content.type, content.source_info, content.source);
     if (!version) {
@@ -13132,10 +12971,10 @@ async function installButtonClick(content, version, instance_id) {
     let count = 0;
     let project_type = version?.project_type || content.project_type;
     let source = content.source;
-    let content_loaders = version?.loaders || content.loaders;
+    let content_loaders = version?.loaders || content?.loaders || [];
     let icon = content.icon;
     let title = content.name;
-    let game_versions = version?.game_versions || content.game_versions;
+    let game_versions = version?.game_versions || content?.game_versions || [];
     let project_id = content.id;
     content_loaders.forEach(e => {
         if (plugin_loaders.includes(e)) count++;
@@ -13963,7 +13802,7 @@ const InstallButtonState = Object.freeze({
 
 class DiscoverStateManagement {
     static instance;
-    static states;
+    static states = {};
     constructor() { }
     static async setInstance(instance) {
         this.instance = instance;
@@ -13990,7 +13829,7 @@ class DiscoverStateManagement {
             }
         }
     }
-    static async registerButton(content_id, version_id, button, content, version, instance, content_list_to_update, locked, showUpdateInsteadOfChangeVersion) {
+    static async registerButton(content_id, version_id, button, content, version, instance, content_list_to_update, locked, showUpdateInsteadOfChangeVersion, usesDynamicContentAndVersion) {
         let instance_id = instance?.instance_id || "null";
         if ((!this.instance || this.instance.instance_id != instance_id) && instance) {
             await this.loadStartingStates(instance);
@@ -14004,7 +13843,8 @@ class DiscoverStateManagement {
             instance,
             content_list_to_update,
             locked,
-            showUpdateInsteadOfChangeVersion
+            showUpdateInsteadOfChangeVersion,
+            usesDynamicContentAndVersion
         }
         if (this.states[content_id + "-" + instance_id]?.buttons) {
             this.states[content_id + "-" + instance_id].buttons.push(info);
@@ -14046,16 +13886,28 @@ class DiscoverStateManagement {
         } else if (state == InstallButtonState.INSTALL_ANY_VERSION) {
             button.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
             button.removeAttribute("title");
-            button.onclick = (event) => {
+            button.onclick = async (event) => {
                 event.stopPropagation();
-                installButtonClick(buttonInfo.content, null, buttonInfo.instance?.instance_id);
+                let content = buttonInfo.content;
+                if (buttonInfo.usesDynamicContentAndVersion) {
+                    this.setContentStatus(buttonInfo.content_id, buttonInfo.instance?.instance_id, DiscoverState.INSTALLING);
+                    content = await content();
+                }
+                installButtonClick(content, null, buttonInfo.instance?.instance_id);
             };
             button.classList.remove("disabled");
         } else if (state == InstallButtonState.INSTALL_SPECIFIC_VERSION) {
             button.innerHTML = '<i class="fa-solid fa-download"></i>' + translate("app.discover.install");
             button.title = translate("app.discover.install_specific_version");
-            button.onclick = () => {
-                installButtonClick(buttonInfo.content, buttonInfo.version, buttonInfo.instance?.instance_id);
+            button.onclick = async () => {
+                let content = buttonInfo.content;
+                let version = buttonInfo.version;
+                if (buttonInfo.usesDynamicContentAndVersion) {
+                    this.setContentStatus(buttonInfo.content_id, buttonInfo.instance?.instance_id, DiscoverState.INSTALLING);
+                    content = await content();
+                    version = await version();
+                }
+                installButtonClick(content, version, buttonInfo.instance?.instance_id);
             };
             button.classList.remove("disabled");
         } else if (state == InstallButtonState.SWITCH_VERSION) {
@@ -14066,11 +13918,18 @@ class DiscoverStateManagement {
                 button.removeAttribute("title");
             }
             button.onclick = async () => {
+                let content = buttonInfo.content;
+                let version = buttonInfo.version;
+                if (buttonInfo.usesDynamicContentAndVersion) {
+                    this.setContentStatus(buttonInfo.content_id, buttonInfo.instance?.instance_id, DiscoverState.INSTALLING);
+                    content = await content();
+                    version = await version();
+                }
                 let count = 0;
-                buttonInfo.version.loaders.forEach(e => {
+                version?.loaders?.forEach(e => {
                     if (plugin_loaders.includes(e)) count++;
                 });
-                if (buttonInfo.version.loaders && count == buttonInfo.version.loaders.length) {
+                if (version?.loaders && count == version?.loaders?.length) {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.discover.plugin.title"), "notice", translate("app.discover.plugin.description"), [
                         {
@@ -14080,7 +13939,7 @@ class DiscoverStateManagement {
                     ], [], () => { });
                     return;
                 }
-                if (buttonInfo.version.loaders.includes("datapack")) {
+                if (version?.loaders?.includes("datapack")) {
                     let dialog = new Dialog();
                     dialog.showDialog(translate("app.discover.datapack.title"), "notice", translate("app.discover.datapack.description"), [
                         {
@@ -14090,9 +13949,9 @@ class DiscoverStateManagement {
                     ], [], () => { });
                     return;
                 }
-                if (buttonInfo.content.project_type == "modpack" || buttonInfo.content.project_type == "server") {
+                if (content.project_type == "modpack" || content.project_type == "server") {
                     contentInfo.close();
-                    runModpackUpdate(buttonInfo.instance, buttonInfo.content.source, buttonInfo.version);
+                    runModpackUpdate(buttonInfo.instance, content.source, version);
                     return;
                 }
                 let contentList = await buttonInfo.instance.getContent();
@@ -14103,7 +13962,7 @@ class DiscoverStateManagement {
                     }
                 }
                 if (!theContent) return;
-                await updateContent(buttonInfo.content.source, theContent, buttonInfo.content, buttonInfo.version, buttonInfo.instance);
+                await updateContent(content.source, theContent, buttonInfo.content, version, buttonInfo.instance);
                 if (buttonInfo.content_list_to_update?.updateSecondaryColumn) buttonInfo.content_list_to_update.updateSecondaryColumn();
             }
             button.classList.remove("disabled");
@@ -14127,11 +13986,15 @@ class DiscoverStateManagement {
         }
     }
     static updateButton(buttonInfo, info) {
-        if (info.state == DiscoverState.LOADING && buttonInfo.version_id == null) {
+        let version_id = buttonInfo.version_id;
+        if (buttonInfo.usesDynamicContentAndVersion) {
+            version_id = version_id();
+        }
+        if (info.state == DiscoverState.LOADING && version_id == null) {
             this.applyInstallButtonState(InstallButtonState.LOADING, buttonInfo);
             return;
         }
-        if (buttonInfo.version_id == null) {
+        if (version_id == null) {
             if (info.state == DiscoverState.INSTALLED) {
                 this.applyInstallButtonState(InstallButtonState.INSTALLED_ANY_VERSION, buttonInfo);
             } else if (info.state == DiscoverState.INSTALLING) {
@@ -14139,7 +14002,7 @@ class DiscoverStateManagement {
             } else if (info.state == DiscoverState.NOT_INSTALLED) {
                 this.applyInstallButtonState(InstallButtonState.INSTALL_ANY_VERSION, buttonInfo);
             }
-        } else if (buttonInfo.version_id == info.version_installed) {
+        } else if (version_id == info.version_installed) {
             if (info.state == DiscoverState.INSTALLED) {
                 this.applyInstallButtonState(InstallButtonState.INSTALLED_SPECIFIC_VERSION, buttonInfo);
             } else if (info.state == DiscoverState.INSTALLING) {
@@ -14163,7 +14026,11 @@ class DiscoverStateManagement {
         if (this.states[content_id + "-" + instance_id].state != DiscoverState.INSTALLING) return;
         this.states[content_id + "-" + instance_id].install_progress = install_progress;
         for (let buttonInfo of this.states[content_id + "-" + instance_id].buttons) {
-            if (buttonInfo.version_id == null || buttonInfo.version_id == this.states[content_id + "-" + instance_id].version_installed) {
+            let version_id = buttonInfo.version_id;
+            if (buttonInfo.usesDynamicContentAndVersion) {
+                version_id = version_id();
+            }
+            if (version_id == null || version_id == this.states[content_id + "-" + instance_id].version_installed) {
                 buttonInfo.element.style.setProperty("--percent-preview", install_progress + "%");
             }
         }

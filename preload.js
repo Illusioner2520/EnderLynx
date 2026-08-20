@@ -30,8 +30,6 @@ function processInfo(info) {
 
 let svgData = "";
 
-let vt_rp = {}, vt_dp = {}, vt_ct = {};
-
 function openInBrowser(url) {
     if (!url) return;
     if (url.length > 2048) return;
@@ -187,107 +185,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
     },
     getInstanceContent: async (instance_id) => {
         return await ipcRenderer.invoke('get-instance-content', instance_id);
-    },
-    downloadVanillaTweaksDataPacks: async (packs, version, instance_id, world_id) => {
-        return await ipcRenderer.invoke('download-vanilla-tweaks-data-packs', packs, version, instance_id, world_id)
-    },
-    downloadVanillaTweaksResourcePacks: async (packs, version, instance_id, file_path) => {
-        return await ipcRenderer.invoke('download-vanilla-tweaks-resource-packs', packs, version, instance_id, file_path);
-    },
-    getVanillaTweaksResourcePacks: async (query = "", version = "1.21") => {
-        query = query.toLowerCase().trim();
-        if (version.split(".").length > 2) {
-            version = version.split(".").splice(0, 2).join(".");
-        }
-        let data_json = vt_rp[version];
-        if (!vt_rp[version]) {
-            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/rpcategories.json?${(new Date()).getTime()}`);
-            data_json = await data.json();
-            vt_rp[version] = data_json;
-        }
-
-        let return_data = {};
-        return_data.hits = [];
-
-        let process_category = (category, previous_categories = []) => {
-            previous_categories.push(category.category);
-            let packs = category.packs;
-            packs = packs.map(e => ({
-                "title": e.display,
-                "description": e.description,
-                "icon_url": `https://vanillatweaks.net/assets/resources/icons/resourcepacks/${version}/${e.name}.png`,
-                "breadcrumb": previous_categories.join(" > "),
-                "incompatible": e.incompatible,
-                "vt_id": e.name,
-                "experiment": e.experiment,
-                "categories": previous_categories,
-                "image": `https://vanillatweaks.net/assets/resources/previews/resourcepacks/${version}/${e.name}.${e.previewExtension ? e.previewExtension : "png"}?v2`
-            }));
-            packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
-            return_data.hits = return_data.hits.concat(packs);
-            if (category.categories) {
-                category.categories.forEach(e => {
-                    process_category(e, structuredClone(previous_categories));
-                })
-            }
-        }
-        for (let i = 0; i < data_json.categories.length; i++) {
-            process_category(data_json.categories[i]);
-        }
-        return return_data;
-    },
-    getVanillaTweaksDataPacks: async (query = "", version = "1.21") => {
-        query = query.toLowerCase().trim();
-        if (version.split(".").length > 2) {
-            version = version.split(".").splice(0, 2).join(".");
-        }
-        let data_json = vt_dp[version];
-        let data_ct_json = vt_ct[version];
-        if (!vt_dp[version]) {
-            let data = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/dpcategories.json`);
-            data_json = await data.json();
-            vt_dp[version] = data_json;
-        }
-        if (!vt_ct[version]) {
-            let data_ct = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/ctcategories.json`);
-            data_ct_json = await data_ct.json();
-            vt_ct[version] = data_ct_json;
-        }
-
-
-        let return_data = {};
-        return_data.hits = [];
-
-        let process_category = (category, type, previous_categories = []) => {
-            previous_categories.push(category.category);
-            let packs = category.packs;
-            packs = packs.map(e => ({
-                "title": e.display,
-                "description": e.description,
-                "icon_url": `https://vanillatweaks.net/assets/resources/icons/${type == "dp" ? "datapacks" : "craftingtweaks"}/${version}/${e.name}.png`,
-                "breadcrumb": previous_categories.join(" > "),
-                "incompatible": e.incompatible,
-                "vt_id": e.name,
-                "type": type,
-                "experiment": e.experiment,
-                "categories": previous_categories,
-                "image": `https://vanillatweaks.net/assets/resources/previews/${type == "dp" ? "datapacks" : "craftingtweaks"}/${version}/${e.name}.${e.previewExtension ? e.previewExtension : "png"}?v2`
-            }));
-            packs = packs.filter(e => e.title.toLowerCase().includes(query) || e.description.toLowerCase().includes(query) || e.categories.join().toLowerCase().includes(query));
-            return_data.hits = return_data.hits.concat(packs);
-            if (category.categories) {
-                category.categories.forEach(e => {
-                    process_category(e, type, structuredClone(previous_categories));
-                })
-            }
-        }
-        for (let i = 0; i < data_json.categories.length; i++) {
-            process_category(data_json.categories[i], "dp");
-        }
-        for (let i = 0; i < data_ct_json.categories.length; i++) {
-            process_category(data_ct_json.categories[i], "ct");
-        }
-        return return_data;
     },
     onProgressUpdate: (callback) => {
         ipcRenderer.on('progress-update', (_event, title, progress, desc, id, status, cancel_id, from_launch) => {
@@ -691,7 +588,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     editFile: async (instance_id, filePath, data) => ipcRenderer.invoke('edit-file', instance_id, filePath, data),
     renameFile: async (instance_id, filePath, newFilePath) => ipcRenderer.invoke('rename-file', instance_id, filePath, newFilePath),
     importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths),
-    convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value)
+    convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value),
+    getInstalledVanillaTweaksResourcePacks: async (instance_id) => ipcRenderer.invoke('get-installed-vanilla-tweaks-resource-packs', instance_id)
 });
 
 async function getServerLastPlayed(instance_id, ip) {

@@ -2783,7 +2783,7 @@ textarea.dialog-text-input {
     width: 300px;
     flex-shrink: 0;
     position: sticky;
-    top: 8px;
+    top: 0;
     align-self: start;
     max-height: calc(100dvh - 16px);
 }
@@ -2874,28 +2874,6 @@ textarea.dialog-text-input {
 
 .vt-toggle {
     margin-left: auto;
-}
-
-.vt-submit-button {
-    border-radius: 8px;
-    padding: 8px;
-    background-color: var(--color-1t);
-    align-self: center;
-    cursor: pointer;
-    transition: background-color .25s, scale .1s;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    font-size: 1rem;
-    font-weight: bold;
-}
-
-.vt-submit-button:active {
-    scale: .95;
-}
-
-.vt-submit-button:hover {
-    background-color: var(--color-2t);
 }
 
 .gallery-screenshot {
@@ -5096,6 +5074,10 @@ button.dependency:active {
 
 .version-file-install.disabled:hover {
     --button-bg-color: transparent;
+}
+
+.vt-submit-button {
+    margin-right: auto;
 }
 
 .version-file-text {
