@@ -1964,7 +1964,9 @@ async function processMMCZip(instance_id, info, title = ".zip file") {
             "allocated_ram": manifest_json.MaxMemAlloc,
             "width": manifest_json.MinecraftWinWidth,
             "height": manifest_json.MinecraftWinHeight,
-            "playtime": manifest_json.totalTimePlayed
+            "playtime": manifest_json.totalTimePlayed,
+            "java_args": manifest_json.JvmArgs,
+            "uses_custom_java_args": Boolean(manifest_json.JvmArgs)
         })
     } catch (err) {
         console.error(err);
@@ -4951,6 +4953,8 @@ async function installModpack(info, type, instance_id, name, sha1) {
     if (packInfo.allocated_ram) updateInstance("allocated_ram", packInfo.allocated_ram, instance_id);
     if (packInfo.width) updateInstance("window_width", packInfo.width, instance_id);
     if (packInfo.height) updateInstance("window_height", packInfo.height, instance_id);
+    if (packInfo.java_args) updateInstance("java_args", packInfo.java_args, instance_id);
+    if (packInfo.uses_custom_java_args) updateInstance("uses_custom_java_args", packInfo.uses_custom_java_args, instance_id);
     for (let i = 0; i < packInfo.content.length; i++) {
         let e = packInfo.content[i];
         addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, instance_id, e.source_id, e.disabled, e.version_id);
