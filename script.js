@@ -1502,6 +1502,7 @@ class Instance {
         element.oncontextmenu = (e) => {
             contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
+        this.instanceButton = element;
         return element;
     }
 }
@@ -6207,7 +6208,8 @@ class InstancesScreen extends Screen {
 
     async showInstances() {
         this.hasRequestGoing = true;
-        this.instanceElements = [];
+        this.instances = [];
+        this.groupElements = [];
         this.contentElement.innerHTML = "";
         let ele = document.createDocumentFragment();
         let title = createElement("div", "title-top");
@@ -6227,12 +6229,14 @@ class InstancesScreen extends Screen {
         let search = document.createElement("div");
         new SearchBar(search, (v) => this.searchInstances(v), null);
         let sort = document.createElement('div');
-        this.sortBy = new Dropdown(translate("app.instances.sort.by"), [{ "name": translate("app.instances.sort.name"), "value": "name" },
-        { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
-        { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
-        { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
-        { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
-        { "name": translate("app.instances.sort.game_version"), "value": "game_version" }], sort, await getDefault("default_sort"), () => {
+        this.sortBy = new Dropdown(translate("app.instances.sort.by"), [
+            { "name": translate("app.instances.sort.name"), "value": "name" },
+            { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
+            { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
+            { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
+            { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
+            { "name": translate("app.instances.sort.game_version"), "value": "game_version" }
+        ], sort, await getDefault("default_sort"), () => {
             this.groupInstances(this.groupBy.getSelected);
         });
         let group = document.createElement('div');
@@ -6246,12 +6250,9 @@ class InstancesScreen extends Screen {
         searchAndFilter.appendChild(search);
         searchAndFilter.appendChild(sort);
         searchAndFilter.appendChild(group);
-        let instanceGrid = document.createElement("div");
-        instanceGrid.classList.add("group-list");
+        let instanceGrid = createElement("div", "group-list");
         this.groupList = instanceGrid;
-        let groupOne = document.createElement("div");
-        groupOne.setAttribute("data-group-title", "");
-        groupOne.classList.add("group");
+        let groupOne = createElement("div", "group");
         let noResultsEle = new NoResultsFound(translate("app.instances.none")).element;
         noResultsEle.style.gridColumn = "1 / -1";
         ele.appendChild(noResultsEle);
@@ -6260,9 +6261,9 @@ class InstancesScreen extends Screen {
         let instances = await getInstances();
         for (let instance of instances) {
             let element = instance.getInstanceButton();
-            this.instanceElements.push(element);
             groupOne.appendChild(element);
         }
+        this.instances = instances;
         this.contentElement.appendChild(ele);
         await this.groupInstances(this.groupBy.getSelected, true);
         this.hasRequestGoing = false;
@@ -6273,26 +6274,27 @@ class InstancesScreen extends Screen {
         if (!noAnimate) animateGridReorderStart(".instance-item");
         if (!this.groupList) return;
         await setDefault("default_group", how);
-        let attrhow = how.toLowerCase().replaceAll("_", "-");
-        attrhow = "data-" + attrhow;
-        let instances = this.instanceElements;
         let groupMap = {};
-        instances.forEach(inst => {
-            let key = inst.getAttribute(attrhow) || "";
+        for (let instance of this.instances) {
+            let key = "";
+            if (how == "custom_groups") key = instance.group_id;
+            if (how == "pinned") key = (await instance.isPinned()).toString();
+            if (how == "loader") key = instance.loader;
+            if (how == "game_version") key = instance.vanilla_version;
             if (!groupMap[key]) groupMap[key] = [];
-            groupMap[key].push(inst);
-        });
-        let groupList = this.groupList;
-        while (groupList.firstChild) groupList.removeChild(groupList.firstChild);
+            groupMap[key].push(instance);
+        }
+        this.groupList.innerHTML = "";
         let groups = Object.keys(groupMap);
         if (how == "game_version") {
             sortByVersion(groups, true);
         } else if (how == "pinned") {
             groups.sort((a, b) => {
-                if (a === "" && b !== "") return -1;
-                if (a !== "" && b === "") return 1;
-                return b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" });
+                if (a == "false") return -1;
+                return 1;
             });
+        } else if (how == "custom_groups") {
+            // todo sort by custom order
         } else {
             groups.sort((a, b) => {
                 if (a === "" && b !== "") return -1;
@@ -6301,9 +6303,9 @@ class InstancesScreen extends Screen {
             });
         }
         this.groupElements = [];
+        // todo change groups a lot
         groups.forEach(groupKey => {
-            let newElement = document.createElement("div");
-            newElement.classList.add("group");
+            let newElement = createElement("div", "group");
             this.groupElements.push(newElement);
             newElement.setAttribute("data-group-title", how == "loader" ? loaders[groupKey] : groupKey);
             let frag = document.createDocumentFragment();

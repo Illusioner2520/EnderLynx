@@ -590,6 +590,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths),
     convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value),
     getInstalledVanillaTweaksResourcePacks: async (instance_id) => ipcRenderer.invoke('get-installed-vanilla-tweaks-resource-packs', instance_id)
+    // todo add group handlers
 });
 
 async function getServerLastPlayed(instance_id, ip) {

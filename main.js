@@ -76,7 +76,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT
 
 db.pragma('journal_mode = WAL');
 
-let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "pinned", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false", "default_fullscreen": "false", "auto_apply_resource_packs": "false" };
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "false", "default_fullscreen": "false", "auto_apply_resource_packs": "false" };
 
 let minecraftVersions = [];
 
@@ -4741,6 +4741,21 @@ async function getInstalledVanillaTweaksResourcePacks(instance_id) {
     return info?.version_id || "[]";
 }
 
+function getGroup(group_id) {
+    return db.prepare("SELECT * FROM groups WHERE id = ?").get(group_id);
+}
+
+function addGroup(group_name) {
+    // todo new group
+    db.prepare("INSERT INTO groups (name, order) VALUES (?, ?)").run(group_name, 1);
+    // todo return new group
+}
+
+function getGroupPosition(group_id, group_name) {
+    if (!getGroup(group_id)) addGroup(group_name);
+    // todo return group position
+}
+
 ipcMain.on('svg-data', (_) => _.returnValue = svgData);
 
 ipcMain.on('get-instance', (_, ...params) => _.returnValue = getInstance(...params));
@@ -4798,6 +4813,7 @@ ipcMain.handle('unpin-world', (_, ...params) => unpinWorld(...params));
 ipcMain.handle('get-pinned-instances', (_, ...params) => getPinnedInstances(...params));
 ipcMain.handle('get-pinned-worlds', (_, ...params) => getPinnedWorlds(...params));
 ipcMain.handle('get-installed-vanilla-tweaks-resource-packs', (_, instance_id) => getInstalledVanillaTweaksResourcePacks(instance_id));
+// todo add group handlers
 
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
