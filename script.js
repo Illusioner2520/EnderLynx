@@ -1384,6 +1384,126 @@ class Instance {
     async installContent(project_type, project_url, sha1, filename, data_pack_world, content_id) {
         return await window.enderlynx.installContent(this.instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     }
+
+    applyImage(imgElement) {
+        imgElement.src = this.getImage();
+        imgElement.onerror = () => {
+            imgElement.src = getDefaultImage(this.instance_id);
+        }
+        this.watchForChange("image", () => {
+            imgElement.src = this.getImage();
+        });
+    }
+
+    getImage() {
+        return this.image || getDefaultImage(this.instance_id);
+    }
+
+    getInstanceButton() {
+        let running = checkForProcess(this.pid);
+        if (!running && this.pid != null) this.setPid(null);
+        let element = createElement("button", "instance-item");
+        element.onclick = () => {
+            this.display();
+        }
+        element.dataset.id = this.instance_id;
+        if (running) {
+            element.classList.add("running");
+        }
+        this.watchForChange("pid", (pid) => {
+            running = checkForProcess(pid);
+            live.findLive();
+            if (running) {
+                element.classList.add("running");
+            } else {
+                element.classList.remove("running");
+            }
+        });
+        let instanceImage = createElement("img", "instance-image");
+        this.applyImage(instanceImage);
+        element.appendChild(instanceImage);
+        let instanceInfoEle = createElement("div", "instance-info");
+        let instanceName = createElement("div", "instance-name");
+        this.watchForChange("name", async (title) => {
+            instanceName.textContent = title;
+            element.setAttribute("data-name", title);
+        });
+        instanceName.textContent = this.name;
+        instanceInfoEle.appendChild(instanceName);
+        let instanceDesc = createElement("div", "instance-desc");
+        let updateLoaderAndGameVersion = () => {
+            instanceDesc.textContent = loaders[this.loader] + " " + this.vanilla_version;
+        }
+        updateLoaderAndGameVersion();
+        this.watchForChange("loader", async (l) => {
+            updateLoaderAndGameVersion();
+        });
+        this.watchForChange("vanilla_version", async (v) => {
+            updateLoaderAndGameVersion();
+        });
+        instanceInfoEle.appendChild(instanceDesc);
+        element.appendChild(instanceInfoEle);
+        let buttons = new ContextMenuButtons([
+            {
+                "type": "play-button",
+                "instance": this,
+                "goToInstancePageWhenClicked": true
+            },
+            this.locked ? null : {
+                "icon": '<i class="fa-solid fa-plus"></i>',
+                "title": translate("app.button.content.add"),
+                "func": () => {
+                    discoverScreen.display(false, this, this.vanilla_version, this.loader);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-folder"></i>',
+                "title": translate("app.button.instances.open_folder"),
+                "func": () => {
+                    window.enderlynx.openInstanceFolder(this.instance_id);
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-gear"></i>',
+                "title": translate("app.button.instances.open_settings"),
+                "func": () => {
+                    this.showSettingsDialog();
+                }
+            },
+            {
+                "icon": async () => await this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": async () => await this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                "func": async (e) => {
+                    await this.isPinned() ? await this.unpin() : await this.pin();
+                    e.setTitle(await this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                    e.setIcon(await this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    element.setAttribute("data-pinned", await this.isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-copy"></i>',
+                "title": translate("app.button.instances.duplicate"),
+                "func": () => {
+                    this.showDuplicateDialog();
+                }
+            },
+            {
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "title": translate("app.button.instances.delete"),
+                "func": () => {
+                    this.showDeleteDialog(() => {
+                        // animateGridReorderStart(".instance-item");
+                        // instancesScreen.display(true, true);
+                    });
+                },
+                "danger": true
+            }
+        ].filter(e => e));
+        element.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
+        return element;
+    }
 }
 
 const PlayButtonState = Object.freeze({
@@ -6138,143 +6258,10 @@ class InstancesScreen extends Screen {
         instanceGrid.appendChild(groupOne);
         ele.appendChild(instanceGrid);
         let instances = await getInstances();
-        for (let i = 0; i < instances.length; i++) {
-            let running = checkForProcess(instances[i].pid);
-            if (!running && instances[i].pid != null) instances[i].setPid(null);
-            let instanceElement = document.createElement("button");
-            instanceElement.setAttribute("data-name", instances[i].name);
-            instanceElement.setAttribute("data-last-played", instances[i].last_played);
-            instanceElement.setAttribute("data-date-created", instances[i].date_created);
-            instanceElement.setAttribute("data-date-modified", instances[i].date_modified);
-            instanceElement.setAttribute("data-play-time", instances[i].playtime);
-            instanceElement.setAttribute("data-game-version", instances[i].vanilla_version);
-            instanceElement.setAttribute("data-custom-groups", instances[i].group_id);
-            instanceElement.setAttribute("data-loader", instances[i].loader);
-            instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
-            instanceElement.setAttribute("data-none", "");
-            instanceElement.onclick = () => {
-                instances[i].display();
-            }
-            instanceElement.classList.add("instance-item");
-            this.instanceElements.push(instanceElement);
-            instanceElement.dataset.id = instances[i].instance_id;
-            if (running) {
-                instanceElement.classList.add("running");
-            }
-            instances[i].watchForChange("pid", (pid) => {
-                running = checkForProcess(pid);
-                live.findLive();
-                if (running) {
-                    instanceElement.classList.add("running");
-                } else {
-                    instanceElement.classList.remove("running");
-                }
-            });
-            let instanceImage = document.createElement("img");
-            instanceImage.classList.add("instance-image");
-            instanceImage.src = instances[i].image || getDefaultImage(instances[i].instance_id);
-            instanceImage.onerror = () => {
-                instanceImage.src = getDefaultImage(instances[i].instance_id);
-            }
-            instances[i].watchForChange("image", (image) => {
-                instanceImage.src = image || getDefaultImage(instances[i].instance_id);
-            });
-            instanceElement.appendChild(instanceImage);
-            let instanceInfoEle = document.createElement("div");
-            instanceInfoEle.classList.add("instance-info");
-            let instanceName = document.createElement("div");
-            instances[i].watchForChange("name", async (t) => {
-                instanceName.textContent = t;
-                instanceElement.setAttribute("data-name", t);
-                this.groupInstances(await getDefault("default_group"));
-            });
-            instanceName.classList.add("instance-name");
-            instanceName.textContent = instances[i].name;
-            instanceInfoEle.appendChild(instanceName);
-            let instanceDesc = document.createElement("div");
-            instanceDesc.classList.add("instance-desc");
-            instanceDesc.textContent = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
-            let loader_text = loaders[instances[i].loader];
-            let version_text = instances[i].vanilla_version;
-            instances[i].watchForChange("loader", async (l) => {
-                loader_text = loaders[l];
-                instanceDesc.textContent = loader_text + " " + version_text;
-                instanceElement.setAttribute("data-loader", l);
-                this.groupInstances(await getDefault("default_group"));
-            });
-            instances[i].watchForChange("vanilla_version", async (v) => {
-                version_text = v;
-                instanceDesc.textContent = loader_text + " " + version_text;
-                instanceElement.setAttribute("data-game-version", v);
-                this.groupInstances(await getDefault("default_group"));
-            });
-            instances[i].watchForChange("group", async (g) => {
-                instanceElement.setAttribute("data-custom-groups", g);
-                this.groupInstances(await getDefault("default_group"));
-            });
-            instanceInfoEle.appendChild(instanceDesc);
-            instanceElement.appendChild(instanceInfoEle);
-            let buttons = new ContextMenuButtons([
-                {
-                    "type": "play-button",
-                    "instance": instances[i],
-                    "goToInstancePageWhenClicked": true
-                },
-                instances[i].locked ? null : {
-                    "icon": '<i class="fa-solid fa-plus"></i>',
-                    "title": translate("app.button.content.add"),
-                    "func": (e) => {
-                        discoverScreen.display(false, instances[i], instances[i].vanilla_version, instances[i].loader);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-folder"></i>',
-                    "title": translate("app.button.instances.open_folder"),
-                    "func": (e) => {
-                        window.enderlynx.openInstanceFolder(instances[i].instance_id);
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-gear"></i>',
-                    "title": translate("app.button.instances.open_settings"),
-                    "func": async (e) => {
-                        instances[i].showSettingsDialog();
-                    }
-                },
-                {
-                    "icon": async () => await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                    "title": async () => await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
-                    "func": async (e) => {
-                        await instances[i].isPinned() ? await instances[i].unpin() : await instances[i].pin();
-                        e.setTitle(await instances[i].isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                        e.setIcon(await instances[i].isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                        instanceElement.setAttribute("data-pinned", await instances[i].isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
-                        instancesScreen.groupInstances();
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-copy"></i>',
-                    "title": translate("app.button.instances.duplicate"),
-                    "func": (e) => {
-                        instances[i].showDuplicateDialog();
-                    }
-                },
-                {
-                    "icon": '<i class="fa-solid fa-trash-can"></i>',
-                    "title": translate("app.button.instances.delete"),
-                    "func": (e) => {
-                        instances[i].showDeleteDialog(() => {
-                            animateGridReorderStart(".instance-item");
-                            instancesScreen.display(true, true);
-                        });
-                    },
-                    "danger": true
-                }
-            ].filter(e => e));
-            instanceElement.oncontextmenu = (e) => {
-                contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
-            }
-            groupOne.appendChild(instanceElement);
+        for (let instance of instances) {
+            let element = instance.getInstanceButton();
+            this.instanceElements.push(element);
+            groupOne.appendChild(element);
         }
         this.contentElement.appendChild(ele);
         await this.groupInstances(this.groupBy.getSelected, true);
@@ -11044,7 +11031,7 @@ class VanillaTweaksSelector {
         this.initialize();
     }
     sortPacks() {
-        added_vt_packs.sort((a,b) => (a?.id || "").localeCompare(b?.id || ""));
+        added_vt_packs.sort((a, b) => (a?.id || "").localeCompare(b?.id || ""));
     }
     addSelected(item) {
         let low = 0;

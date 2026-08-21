@@ -72,6 +72,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, 
 db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT, data_version INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, version INTEGER UNIQUE, file_path TEXT, package_uuid TEXT)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT, order INTEGER)').run();
 
 db.pragma('journal_mode = WAL');
 
