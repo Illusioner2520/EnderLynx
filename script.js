@@ -360,8 +360,8 @@ class Instance {
         }
         return this.instances.get(instance_id);
     }
-    async isPinned() {
-        return await window.enderlynx.isInstancePinned(this.instance_id);
+    isPinned() {
+        return window.enderlynx.isInstancePinned(this.instance_id);
     }
     async setLastAnalyzedLog(last_analyzed_log) {
         await window.enderlynx.updateInstance("last_analyzed_log", last_analyzed_log, this.instance_id);
@@ -643,14 +643,6 @@ class Instance {
                 "default": this.name,
                 "tab": "general",
                 "maxlength": 50
-            },
-            {
-                "type": "text",
-                "name": translate("app.instances.settings.group"),
-                "id": "group",
-                "default": this.group_id,
-                "tab": "general",
-                "desc": translate("app.instances.settings.group.description")
             },
             this.locked ? null : {
                 "type": "multi-select",
@@ -936,7 +928,6 @@ class Instance {
             await this.setDateModified(new Date());
             await this.setName(info.name);
             await this.setImage(info.icon);
-            await this.setGroup(info.group);
             await this.setWindowWidth(info.width);
             await this.setWindowHeight(info.height);
             await this.setFullscreen(info.fullscreen);
@@ -1471,13 +1462,13 @@ class Instance {
                 }
             },
             {
-                "icon": async () => await this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                "title": async () => await this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                "icon": this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
                 "func": async (e) => {
-                    await this.isPinned() ? await this.unpin() : await this.pin();
-                    e.setTitle(await this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                    e.setIcon(await this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                    element.setAttribute("data-pinned", await this.isPinned() ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title"));
+                    this.isPinned() ? await this.unpin() : await this.pin();
+                    e.setTitle(this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                    e.setIcon(this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    // todo reflow instances
                 }
             },
             {
@@ -1901,17 +1892,8 @@ class MinecraftAccountSwitcher {
                 let playerDelete = document.createElement("div");
                 playerDelete.classList.add("player-delete");
                 playerDelete.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-                playerDelete.setAttribute("tabindex", "0");
-                playerDelete.role = "button";
-                playerDelete.addEventListener('click', (e) => {
-                    e.stopPropagation();
+                makeArtificialButton(playerDelete, () => {
                     this.onPlayerClickDelete(this.players[i]);
-                });
-                playerDelete.addEventListener('keydown', (e) => {
-                    e.stopPropagation();
-                    if (e.key == "Enter" || e.key == " ") {
-                        this.onPlayerClickDelete(this.players[i]);
-                    }
                 });
                 playerDelete.dataset.uuid = this.players[i].uuid;
                 playerElement.appendChild(playerDelete);
@@ -3040,23 +3022,10 @@ class ContentList {
             let contentEle = document.createElement("div");
             contentEle.classList.add("content-list-item");
             if (contentInfo.onclick) {
-                contentEle.role = "button";
-                contentEle.tabIndex = 0;
-                contentEle.classList.add("content-list-button");
-                contentEle.onclick = (event) => {
-                    if (event.target.matches("button")) return;
-                    if (event.target.matches("i")) return;
-                    if (event.target.matches("input")) return;
+                makeArtificialButton(contentEle, () => {
                     contentInfo.onclick();
-                }
-                contentEle.onkeydown = (event) => {
-                    if (event.target.matches("button")) return;
-                    if (event.target.matches("i")) return;
-                    if (event.target.matches("input")) return;
-                    if (event.key == "Enter" || event.key == " ") {
-                        contentInfo.onclick();
-                    }
-                }
+                }, ["button", "i", "input"]);
+                contentEle.classList.add("content-list-button");
             }
             if (contentInfo.class) contentEle.classList.add(contentInfo.class);
             if (contentInfo.type) contentEle.dataset.type = contentInfo.type;
@@ -3636,12 +3605,12 @@ class InstanceScreen extends Screen {
                 }
             },
             {
-                "icon": async () => await this.instance.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                "title": async () => await this.instance.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                "icon": this.instance.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                "title": this.instance.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
                 "func": async (e) => {
-                    await this.instance.isPinned() ? await this.instance.unpin() : await this.instance.pin();
-                    e.setTitle(await this.instance.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                    e.setIcon(await this.instance.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                    this.instance.isPinned() ? await this.instance.unpin() : await this.instance.pin();
+                    e.setTitle(this.instance.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                    e.setIcon(this.instance.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
                 }
             },
             {
@@ -5828,20 +5797,9 @@ class HomeScreen extends Screen {
             let e = instances[i];
             let item = document.createElement("div");
             item.className = "home-entry";
-            item.onclick = (event) => {
-                if (event.target.matches("button")) return;
-                if (event.target.matches("i")) return;
+            makeArtificialButton(item, () => {
                 e.display();
-            }
-            item.role = "button";
-            item.setAttribute("tabindex", "0");
-            item.onkeydown = (event) => {
-                if (event.target.matches("button")) return;
-                if (event.target.matches("i")) return;
-                if (event.key == "Enter" || event.key == " ") {
-                    e.display();
-                }
-            }
+            }, ["button", "i"]);
             item.dataset.id = "instance:" + e.instance_id;
             let icon = document.createElement("img");
             icon.className = "instance-image";
@@ -5926,14 +5884,14 @@ class HomeScreen extends Screen {
                     }
                 },
                 {
-                    "icon": async () => await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
-                    "title": async () => await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
+                    "icon": instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>',
+                    "title": instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"),
                     "func": async (e, c) => {
                         if (c) c.remove();
-                        await instanceInfo.isPinned() ? await instanceInfo.unpin() : await instanceInfo.pin();
-                        e.setTitle(await instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
-                        e.setIcon(await instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                        if (await instanceInfo.isPinned()) {
+                        instanceInfo.isPinned() ? await instanceInfo.unpin() : await instanceInfo.pin();
+                        e.setTitle(instanceInfo.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
+                        e.setIcon(instanceInfo.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
+                        if (instanceInfo.isPinned()) {
                             pinnedInstancesList.push(instanceInfo);
                         } else {
                             pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
@@ -6186,6 +6144,106 @@ class HomeScreen extends Screen {
     }
 }
 
+class Group {
+    static groups = new Map();
+    constructor(group) {
+        if (!group) return;
+        this.id = group.id;
+        this.name = group.name;
+        this.position = group.position;
+        this.collapsed = Boolean(group.collapsed);
+        this.type = group.type;
+    }
+
+    static getGroup(group_id) {
+        if (!this.groups.has(group_id)) {
+            return Group.applyGroup(group_id, window.enderlynx.getGroup(group_id));
+        }
+        return this.groups.get(group_id);
+    }
+
+    static applyGroup(group_id, info) {
+        if (!this.groups.has(group_id)) {
+            let newGroup = new Group(info);
+            this.groups.set(group_id, newGroup);
+        }
+        return this.groups.get(group_id);
+    }
+
+    toggleCollapsed() {
+        this.collapsed = !this.collapsed;
+        this.element.classList.toggle("open", !this.collapsed);
+        window.enderlynx.setGroupCollapsed(this.id, this.collapsed);
+    }
+
+    formGroupElement(instances) {
+        let groupElement = createElement("div", "group");
+        groupElement.dataset.id = group;
+        this.element = groupElement;
+        if (!this.collapsed) {
+            groupElement.classList.add("open");
+        }
+        let groupHeader = createElement("div", "group-header");
+        makeArtificialButton(groupHeader, () => {
+            this.toggleCollapsed();
+        }, ["button", "button > i"]);
+        let groupChevron = createElement("i", "group-chevron fa-solid fa-chevron-down");
+        let groupName = createElement("div", "group-name");
+        groupName.textContent = this.name;
+        if (how == "custom_groups") {
+            groupName.textContent = group == 0 ? translate("app.instances.group.uncategorized") : this.name;
+        }
+        if (how == "pinned") {
+            groupName.textContent = group == "true" ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title");
+        }
+        if (how == "loader") {
+            groupName.textContent = loaders[this.name];
+        }
+        groupHeader.appendChild(groupChevron);
+        groupHeader.appendChild(groupName);
+        let groupAction1;
+        let groupAction2;
+        if (how == "custom_groups") {
+            let groupActions = createElement("div", "group-actions");
+            groupHeader.appendChild(groupActions);
+            groupAction1 = createElement("button", "group-action", { innerHTML: '<i class="fa-solid fa-arrow-up"></i>', title: translate("app.instances.group.move.up") });
+            groupAction2 = createElement("button", "group-action", { innerHTML: '<i class="fa-solid fa-arrow-down"></i>', title: translate("app.instances.group.move.down") });
+            let groupAction3 = createElement("button", "group-action", { innerHTML: '<i class="fa-solid fa-pencil"></i>', title: translate("app.instances.group.edit_name") });
+            let groupAction4 = createElement("button", "group-action danger", { innerHTML: '<i class="fa-solid fa-trash-can"></i>', title: translate("app.instances.group.delete") });
+            groupAction1.onclick = () => {
+                // this.swapGroupPositions(group, this.getCustomGroupNeighbor(group, -1));
+            }
+            groupAction2.onclick = () => {
+                // this.swapGroupPositions(group, this.getCustomGroupNeighbor(group, 1));
+            }
+            groupActions.appendChild(groupAction1);
+            groupActions.appendChild(groupAction2);
+            groupActions.appendChild(groupAction3);
+            groupActions.appendChild(groupAction4);
+        }
+        groupElement.appendChild(groupHeader);
+        let groupInstances = createElement("div", "group-instances");
+        let fragment = document.createDocumentFragment();
+        instances.forEach(instance => fragment.appendChild(instance.instanceButton));
+        groupInstances.appendChild(fragment);
+        if (!instances || instances.length == 0) {
+            groupInstances.textContent = translate("app.instances.group.none_added");
+        }
+        groupElement.appendChild(groupInstances);
+        if (how == "none") {
+            groupInstances.classList.add("shown");
+            this.groupList.appendChild(groupInstances);
+        } else {
+            this.groupList.appendChild(groupElement);
+        }
+        this.instancesElement = groupInstances;
+        this.actions = how == "custom_groups" ? {
+            up: groupAction1,
+            down: groupAction2
+        } : null;
+    }
+}
+
 class InstancesScreen extends Screen {
     constructor() {
         super("home");
@@ -6195,21 +6253,35 @@ class InstancesScreen extends Screen {
         super.display(dont_add_to_log, ...args);
     }
 
-    calculateContent(useLoadingContainer) {
+    calculateContent() {
         this.contentElement.className = "instance-content";
-        if (useLoadingContainer) {
-            this.contentElement.innerHTML = "";
-            let loading = new LoadingContainer();
-            this.contentElement.appendChild(loading.element);
-            this.requestFrame();
-        }
         if (!this.hasRequestGoing) this.showInstances();
+    }
+
+    async getCustomGroups() {
+        let groups = await window.enderlynx.getGroups();
+        let groupList = [];
+        for (let group of groups) {
+            groupList.push(Group.applyGroup(group.id, group));
+        }
+        return groupList;
+    }
+
+    async getGroupsByType(type, list) {
+        let groups = await window.enderlynx.getGroupsByType(type, list);
+        let groupList = [];
+        for (let group of groups) {
+            groupList.push(Group.applyGroup(group.id, group));
+        }
+        return groupList;
     }
 
     async showInstances() {
         this.hasRequestGoing = true;
         this.instances = [];
         this.groupElements = [];
+        this.customGroups = await this.getCustomGroups();
+        this.groupsById = Object.fromEntries(this.customGroups.map(x => [x.id, x]));
         this.contentElement.innerHTML = "";
         let ele = document.createDocumentFragment();
         let title = createElement("div", "title-top");
@@ -6234,10 +6306,11 @@ class InstancesScreen extends Screen {
             { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
             { "name": translate("app.instances.sort.date_created"), "value": "date_created" },
             { "name": translate("app.instances.sort.date_modified"), "value": "date_modified" },
-            { "name": translate("app.instances.sort.play_time"), "value": "play_time" },
-            { "name": translate("app.instances.sort.game_version"), "value": "game_version" }
+            { "name": translate("app.instances.sort.play_time"), "value": "playtime" },
+            { "name": translate("app.instances.sort.loader"), "value": "loader" },
+            { "name": translate("app.instances.sort.game_version"), "value": "vanilla_version" }
         ], sort, await getDefault("default_sort"), () => {
-            this.groupInstances(this.groupBy.getSelected);
+            this.sortInstances();
         });
         let group = document.createElement('div');
         this.groupBy = new Dropdown(translate("app.instances.group.by"), [
@@ -6246,39 +6319,81 @@ class InstancesScreen extends Screen {
             { "name": translate("app.instances.group.pinned"), "value": "pinned" },
             { "name": translate("app.instances.group.loader"), "value": "loader" },
             { "name": translate("app.instances.group.game_version"), "value": "game_version" }
-        ], group, await getDefault("default_group"), (group) => this.groupInstances(group));
+        ], group, await getDefault("default_group"), () => {
+            this.groupInstances()
+        });
         searchAndFilter.appendChild(search);
         searchAndFilter.appendChild(sort);
         searchAndFilter.appendChild(group);
-        let instanceGrid = createElement("div", "group-list");
-        this.groupList = instanceGrid;
-        let groupOne = createElement("div", "group");
+        this.groupList = createElement("div", "group-list");
         let noResultsEle = new NoResultsFound(translate("app.instances.none")).element;
-        noResultsEle.style.gridColumn = "1 / -1";
-        ele.appendChild(noResultsEle);
-        instanceGrid.appendChild(groupOne);
-        ele.appendChild(instanceGrid);
-        let instances = await getInstances();
-        for (let instance of instances) {
-            let element = instance.getInstanceButton();
-            groupOne.appendChild(element);
+        let loading = new LoadingContainer();
+        ele.appendChild(loading.element);
+        this.instances = await getInstances();
+        for (let instance of this.instances) {
+            instance.getInstanceButton();
         }
-        this.instances = instances;
         this.contentElement.appendChild(ele);
-        await this.groupInstances(this.groupBy.getSelected, true);
+        await this.groupInstances();
+        loading.element.remove();
+        this.groupList.classList.add("disable-instance-list-transitions");
+        this.contentElement.appendChild(noResultsEle);
+        this.contentElement.appendChild(this.groupList);
+        this.groupList.offsetHeight; // force layout
+        this.groupList.classList.remove("disable-instance-list-transitions");
         this.hasRequestGoing = false;
     }
 
-    async groupInstances(how, noAnimate) {
-        if (!how) how = this.groupBy.getSelected;
-        if (!noAnimate) animateGridReorderStart(".instance-item");
+    getCustomGroupNeighbor(group_id, direction) {
+        let orderedGroups = this.groups
+            .filter(group => Number.isFinite(group.info?.position))
+            .sort((a, b) => a.info.position - b.info.position);
+        let groupIndex = orderedGroups.findIndex(group => group.group_id == group_id);
+        return orderedGroups[groupIndex + direction]?.group_id;
+    }
+
+    updateGroupActions() {
+        for (let group of this.groups) {
+            if (!group.actions) continue;
+            let hasPosition = Number.isFinite(group.info?.position);
+            group.actions.up.disabled = !hasPosition || !this.getCustomGroupNeighbor(group.group_id, -1);
+            group.actions.down.disabled = !hasPosition || !this.getCustomGroupNeighbor(group.group_id, 1);
+            group.actions.up.classList.toggle("disabled", group.actions.up.disabled);
+            group.actions.down.classList.toggle("disabled", group.actions.down.disabled);
+        }
+    }
+
+    async swapGroupPositions(group_id1, group_id2) {
+        animateGridReorderStart(".group");
+        if (!group_id2) return;
+        await window.enderlynx.swapGroupPositions(group_id1, group_id2);
+        let groupInfo1 = this.groups.find(e => e.group_id == group_id1)?.info;
+        let groupInfo2 = this.groups.find(e => e.group_id == group_id2)?.info;
+        let pos1 = groupInfo1?.position;
+        let pos2 = groupInfo2?.position;
+        if (groupInfo1) groupInfo1.position = pos2;
+        if (groupInfo2) groupInfo2.position = pos1;
+        let group1 = this.groups.find(e => e.group_id == group_id1);
+        let group2 = this.groups.find(e => e.group_id == group_id2);
+        if (pos2 < pos1) {
+            group1.element.parentNode.insertBefore(group1.element, group2.element);
+        } else {
+            group2.element.parentNode.insertBefore(group2.element, group1.element);
+        }
+        this.updateGroupActions();
+        animateGridReorderEnd(".group");
+    }
+
+    async groupInstances() {
+        let how = this.groupBy.getSelected;
         if (!this.groupList) return;
+        this.activeGroups = [];
         await setDefault("default_group", how);
         let groupMap = {};
         for (let instance of this.instances) {
             let key = "";
-            if (how == "custom_groups") key = instance.group_id;
-            if (how == "pinned") key = (await instance.isPinned()).toString();
+            if (how == "custom_groups") key = instance?.group_id || 0;
+            if (how == "pinned") key = instance.isPinned().toString();
             if (how == "loader") key = instance.loader;
             if (how == "game_version") key = instance.vanilla_version;
             if (!groupMap[key]) groupMap[key] = [];
@@ -6290,11 +6405,15 @@ class InstancesScreen extends Screen {
             sortByVersion(groups, true);
         } else if (how == "pinned") {
             groups.sort((a, b) => {
-                if (a == "false") return -1;
-                return 1;
+                if (a == "false") return 1;
+                return -1;
             });
         } else if (how == "custom_groups") {
-            // todo sort by custom order
+            groups.sort((a, b) => {
+                let groupAPos = this.groupsById[a]?.position || 0;
+                let groupBPos = this.groupsById[b]?.position || 0;
+                return groupAPos - groupBPos;
+            });
         } else {
             groups.sort((a, b) => {
                 if (a === "" && b !== "") return -1;
@@ -6302,80 +6421,78 @@ class InstancesScreen extends Screen {
                 return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
             });
         }
-        this.groupElements = [];
-        // todo change groups a lot
-        groups.forEach(groupKey => {
-            let newElement = createElement("div", "group");
-            this.groupElements.push(newElement);
-            newElement.setAttribute("data-group-title", how == "loader" ? loaders[groupKey] : groupKey);
-            let frag = document.createDocumentFragment();
-            groupMap[groupKey].forEach(inst => frag.appendChild(inst));
-            newElement.appendChild(frag);
-            groupList.appendChild(newElement);
+        let groupsInfo = {};
+        if (how != "custom_groups") {
+            let info = await this.getGroupsByType(how, groups);
+            groupsInfo = Object.fromEntries(info.map(x => [x.name, x]));
+        }
+        this.groups = [];
+        this.groupList.classList.add("disable-instance-list-transitions");
+        this.updateGroupActions();
+        await this.sortInstances(true);
+        requestAnimationFrame(() => {
+            this.groupList.classList.remove("disable-instance-list-transitions");
         });
-        await this.sortInstances(this.sortBy.getSelected);
-        if (!noAnimate) animateGridReorderEnd(".instance-item");
     }
 
     searchInstances(query) {
         query = query.toLowerCase().trim();
-        let instances = this.instanceElements;
-        for (let i = 0; i < instances.length; i++) {
-            if (!instances[i].getAttribute("data-name").toLowerCase().includes(query)) {
-                instances[i].style.display = "none";
-                instances[i].classList.add("hidden");
-            } else {
-                instances[i].style.display = "flex";
-                instances[i].classList.remove("hidden");
-            }
+        let instances = this.instances;
+        for (let instance of instances) {
+            let button = instance.instanceButton;
+            let matches = instance.name.toLowerCase().includes(query);
+            button.classList.toggle("hidden", !matches);
         }
+        this.groupList.classList.add("disable-instance-list-transitions");
+        for (let group of this.groups) {
+            let hasVisibleInstances = group.instances.some(
+                instance => !instance.instanceButton.classList.contains("hidden")
+            );
+
+            group.element.style.display = (hasVisibleInstances || !query) ? "" : "none";
+        }
+        requestAnimationFrame(() => {
+            this.groupList.classList.remove("disable-instance-list-transitions");
+        });
     }
 
-    async sortInstances(how) {
+    async sortInstances(disableAnimation) {
+        let how = this.sortBy.getSelected;
+        if (!disableAnimation) animateGridReorderStart(".instance-item");
         if (!this.groupList) return;
         await setDefault("default_sort", how);
-        let attrhow = how.toLowerCase().replaceAll("_", "-");
-        attrhow = "data-" + attrhow;
-        let groups = this.groupElements;
-        let usedates = (how == "last_played" || how == "date_created" || how == "date_modified");
-        let usenumbers = (how == "play_time");
-        let reverseOrder = ["last_played", "date_created", "date_modified", "play_time", "game_version"].includes(how);
-        let multiply = reverseOrder ? -1 : 1;
-        for (let i = 0; i < groups.length; i++) {
-            let children = Array.from(groups[i].children);
-            if (children.length > 1) {
-                children.sort((a, b) => {
-                    if (how == "game_version") {
-                        const aIndex = minecraftVersions.indexOf(a.getAttribute(attrhow));
-                        const bIndex = minecraftVersions.indexOf(b.getAttribute(attrhow));
-                        if (aIndex === -1 && bIndex === -1) {
-                            return a.getAttribute(attrhow).localeCompare(b.getAttribute(attrhow), undefined, { numeric: true, sensitivity: "base" });
-                        }
-                        if (aIndex === -1) return -1;
-                        if (bIndex === -1) return 1;
-                        return bIndex - aIndex;
+        for (let group of this.groups) {
+            let instances = group.instances;
+            instances.sort((a, b) => {
+                let valueA = a[how];
+                let valueB = b[how];
+                if (valueA instanceof Date && valueB instanceof Date) {
+                    let aTime = valueA.getTime();
+                    let bTime = valueB.getTime();
+                    if (Number.isNaN(aTime)) aTime = 0;
+                    if (Number.isNaN(bTime)) bTime = 0;
+                    return bTime - aTime;
+                }
+                if (typeof valueA == 'number' && typeof valueB == 'number') {
+                    return valueB - valueA;
+                }
+                if (how == "vanilla_version") {
+                    let aIndex = minecraftVersions.indexOf(valueA);
+                    let bIndex = minecraftVersions.indexOf(valueB);
+                    if (aIndex == -1 && bIndex == -1) {
+                        return valueA.localeCompare(valueB);
                     }
-                    if (usedates) {
-                        let c = new Date(a.getAttribute(attrhow));
-                        let d = new Date(b.getAttribute(attrhow));
-                        c = c.getTime();
-                        d = d.getTime();
-                        if (isNaN(c)) c = 0;
-                        if (isNaN(d)) d = 0;
-                        return multiply * (c - d);
-                    }
-                    if (usenumbers) {
-                        return multiply * (a.getAttribute(attrhow) - b.getAttribute(attrhow));
-                    }
-                    let av = a.getAttribute(attrhow)?.toLowerCase() ?? "";
-                    let bv = b.getAttribute(attrhow)?.toLowerCase() ?? "";
-                    if (av > bv) return 1 * multiply;
-                    if (av < bv) return -1 * multiply;
-                    return 0;
-                });
-                children.forEach(e => groups[i].appendChild(e));
-            }
+                    if (aIndex == -1) return -1;
+                    if (bIndex == -1) return 1;
+                    return bIndex - aIndex;
+                }
+                return valueA.localeCompare(valueB);
+            });
+            let fragment = document.createDocumentFragment();
+            instances.forEach(instance => fragment.appendChild(instance.instanceButton));
+            group.instancesElement.appendChild(fragment);
         }
+        if (!disableAnimation) animateGridReorderEnd(".instance-item");
     }
 }
 
@@ -8788,19 +8905,9 @@ class SkinEntry {
         if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
             skinEle.classList.add("selected");
         }
-        skinEle.role = "button";
-        skinEle.onclick = (e) => {
-            if (e.target.matches(".skin-more")) return;
-            if (e.target.matches("i")) return;
+        makeArtificialButton(skinEle, () => {
             equipSkin();
-        }
-        skinEle.onkeydown = (e) => {
-            if (e.key == "Enter" || e.key == " ") {
-                if (e.target.matches(".skin-more")) return;
-                if (e.target.matches("i")) return;
-                equipSkin();
-            }
-        }
+        }, [".skin-more", "i"]);
     }
 }
 
@@ -9079,7 +9186,7 @@ async function showCreateInstanceDialog() {
                 info.name = translate("app.instances.untitled");
             }
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, 0, info.icon, instance_id, 0, "custom", "", false, false);
             instance.display();
             await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
         } else if (info.selected_tab == "file") {
@@ -9096,7 +9203,7 @@ async function showCreateInstanceDialog() {
             }
         } else if (info.selected_tab == "code") {
             let instance_id = await window.enderlynx.getInstanceFolderName(info.profile_code);
-            let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, "", info.icon_c, instance_id, 0, "", "", true, false);
+            let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, 0, info.icon_c, instance_id, 0, "", "", true, false);
             instance.display();
             try {
                 await window.enderlynx.installModpack(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, "cf_url", instance_id, info.name_c, null);
@@ -10795,16 +10902,9 @@ class ContentSearchEntry {
             element.classList.add("incompatible");
             element.title = translate("app.discover.offline");
         }
-        element.onclick = () => {
+        makeArtificialButton(element, () => {
             displayContentInfo(content.source, undefined, content.id, instance?.instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, undefined);
-        }
-        element.setAttribute("tabindex", "0");
-        element.role = "button";
-        element.onkeydown = (e) => {
-            if (e.key == "Enter" || e.key == " ") {
-                displayContentInfo(content.source, undefined, content.id, instance?.instance_id, vanilla_version, project_type == "datapack" ? "datapack" : loader, false, false, undefined);
-            }
-        }
+        }, ["button"]);
         this.element = element;
         if (content.id) element.id = content.id;
         let image = document.createElement("img");
@@ -13077,7 +13177,7 @@ async function installButtonClick(content, version, instance_id) {
                 displayError(translate("app.discover.error_creating_modpack", "%t", title, "%v", info.game_version, "%l", loaders[info.loader]));
                 return;
             }
-            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, "", info.icon, instance_id, 0, source, project_id, true, false);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, 0, info.icon, instance_id, 0, source, project_id, true, false);
             await instance.setInstalledVersion(version.version_id);
             instance.display();
             try {
@@ -13173,7 +13273,7 @@ async function installButtonClick(content, version, instance_id) {
                     info.name = translate("app.instances.untitled");
                 }
                 let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, "", info.icon, instance_id, 0, "custom", "", false, false);
+                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, 0, info.icon, instance_id, 0, "custom", "", false, false);
                 await instance.setInstalling(true);
                 instance.display();
                 await installContent(source, content, version, instance);
@@ -13458,7 +13558,7 @@ let importInstance = (info, file_path) => {
         }
     ], [], async () => {
         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, "", info.image, instance_id, 0, "", "", true, false);
+        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, 0, info.image, instance_id, 0, "", "", true, false);
         instance.display();
         await window.enderlynx.installModpack(file_path, "file", instance_id, info.name, null);
     });
@@ -14173,6 +14273,33 @@ class CategoryFilter {
         this.activeCategories = [];
         this.setCategories(this.categories);
         this.categoryActive.textContent = translate("app.categories.active", "%n", this.activeCategories.length);
+    }
+}
+
+function makeArtificialButton(element, func, notAllowedTargets = ["button"]) {
+    element.tabIndex = 0;
+    element.setAttribute("role", "button");
+    element.onkeydown = (event) => {
+        if (notAllowedTargets.some(e => event.target.matches(e))) return;
+        if (event.key == "Enter") {
+            event.stopPropagation();
+            func();
+        }
+        if (event.key == " ") {
+            event.preventDefault();
+        }
+    }
+    element.onkeyup = (event) => {
+        if (notAllowedTargets.some(e => event.target.matches(e))) return;
+        if (event.key == " ") {
+            event.stopPropagation();
+            func();
+        }
+    }
+    element.onclick = (event) => {
+        if (notAllowedTargets.some(e => event.target.matches(e))) return;
+        event.stopPropagation();
+        func();
     }
 }
 

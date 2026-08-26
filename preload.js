@@ -575,7 +575,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     getServerLastPlayed,
     setServerLastPlayed: async (...params) => ipcRenderer.invoke('set-server-last-played', ...params),
     isWorldPinned: async (...params) => ipcRenderer.invoke('is-world-pinned', ...params),
-    isInstancePinned: async (...params) => ipcRenderer.invoke('is-instance-pinned', ...params),
+    isInstancePinned: (...params) => ipcRenderer.sendSync('is-instance-pinned', ...params),
     pinInstance: async (...params) => ipcRenderer.invoke('pin-instance', ...params),
     unpinInstance: async (...params) => ipcRenderer.invoke('unpin-instance', ...params),
     pinWorld: async (...params) => ipcRenderer.invoke('pin-world', ...params),
@@ -589,8 +589,13 @@ contextBridge.exposeInMainWorld('enderlynx', {
     renameFile: async (instance_id, filePath, newFilePath) => ipcRenderer.invoke('rename-file', instance_id, filePath, newFilePath),
     importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths),
     convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value),
-    getInstalledVanillaTweaksResourcePacks: async (instance_id) => ipcRenderer.invoke('get-installed-vanilla-tweaks-resource-packs', instance_id)
-    // todo add group handlers
+    getInstalledVanillaTweaksResourcePacks: async (instance_id) => ipcRenderer.invoke('get-installed-vanilla-tweaks-resource-packs', instance_id),
+    getGroup: (group_id) => ipcRenderer.sendSync('get-group', group_id),
+    addGroup: async (group_name) => ipcRenderer.invoke('add-group', group_name),
+    getGroups: async () => ipcRenderer.invoke('get-groups'),
+    setGroupCollapsed: async (group_id, collapsed) => ipcRenderer.invoke('set-group-collapsed', group_id, collapsed),
+    getGroupsByType: async (type, groups) => ipcRenderer.invoke('get-groups-by-type', type, groups),
+    swapGroupPositions: async (group_id1, group_id2) => ipcRenderer.invoke('swap-group-positions', group_id1, group_id2)
 });
 
 async function getServerLastPlayed(instance_id, ip) {

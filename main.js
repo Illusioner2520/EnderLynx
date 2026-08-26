@@ -61,7 +61,7 @@ if (!fs.existsSync(user_path)) {
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id TEXT, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -72,7 +72,10 @@ db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, 
 db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT, data_version INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, version INTEGER UNIQUE, file_path TEXT, package_uuid TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT, order INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT, position INTEGER, collapsed INTEGER, type TEXT)').run();
+
+db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) VALUES (?, ?, ?, ?, ?)').run(0, "uncategorized", getNextGroupPosition(), Number(false), "custom");
+
 
 db.pragma('journal_mode = WAL');
 
@@ -4745,15 +4748,49 @@ function getGroup(group_id) {
     return db.prepare("SELECT * FROM groups WHERE id = ?").get(group_id);
 }
 
-function addGroup(group_name) {
-    // todo new group
-    db.prepare("INSERT INTO groups (name, order) VALUES (?, ?)").run(group_name, 1);
-    // todo return new group
+function getNextGroupPosition() {
+    return db.prepare("SELECT COALESCE(MAX(position), 0) + 1 AS next_position FROM groups").get().next_position;
 }
 
-function getGroupPosition(group_id, group_name) {
-    if (!getGroup(group_id)) addGroup(group_name);
-    // todo return group position
+function addGroup(group_name) {
+    let result = db.prepare("INSERT INTO groups (name, position, collapsed, type) VALUES (?, ?, ?, ?)").run(group_name, getNextGroupPosition(), Number(false), "custom");
+    return getGroup(result.lastInsertRowid);
+}
+
+function getGroups() {
+    return db.prepare("SELECT * FROM groups WHERE type = ? ORDER BY position").all("custom");
+}
+
+function getGroupsByType(type, groups) {
+    let getStatement = db.prepare("SELECT * FROM groups WHERE type = ? AND name = ?");
+    let insertStatement = db.prepare("INSERT INTO groups (type, name, collapsed) VALUES (?, ?, ?)");
+    return groups.map(name => {
+        let group = getStatement.get(type, name);
+        if (!group) {
+            insertStatement.run(type, name, Number(false));
+            group = getStatement.get(type, name);
+        }
+        return group;
+    });
+}
+
+function setGroupCollapsed(group_id, collapsed) {
+    if (!group_id && group_id != 0) return;
+    db.prepare("UPDATE groups SET collapsed = ? WHERE id = ?").run(Number(collapsed), group_id);
+}
+
+function swapGroupPositions(group_id1, group_id2) {
+    if ((!group_id1 && group_id1 != 0) || (!group_id2 && group_id2 != 0) || group_id1 == group_id2) return false;
+
+    let getPositionStatement = db.prepare("SELECT position FROM groups WHERE id = ?");
+    let group1 = getPositionStatement.get(group_id1);
+    let group2 = getPositionStatement.get(group_id2);
+    if (!group1 || !group2) return false;
+
+    let updatePositionStatement = db.prepare("UPDATE groups SET position = ? WHERE id = ?");
+    updatePositionStatement.run(group2.position, group_id1);
+    updatePositionStatement.run(group1.position, group_id2);
+    return true;
 }
 
 ipcMain.on('svg-data', (_) => _.returnValue = svgData);
@@ -4805,7 +4842,7 @@ ipcMain.handle('fetch-updated-mc-versions', async (_, ...params) => await fetchU
 ipcMain.handle('get-server-last-played', (_, ...params) => getServerLastPlayed(...params));
 ipcMain.handle('set-server-last-played', (_, ...params) => setServerLastPlayed(...params));
 ipcMain.handle('is-world-pinned', (_, ...params) => isWorldPinned(...params));
-ipcMain.handle('is-instance-pinned', (_, ...params) => isInstancePinned(...params));
+ipcMain.on('is-instance-pinned', (_, ...params) => _.returnValue = isInstancePinned(...params));
 ipcMain.handle('pin-instance', (_, ...params) => pinInstance(...params));
 ipcMain.handle('unpin-instance', (_, ...params) => unpinInstance(...params));
 ipcMain.handle('pin-world', (_, ...params) => pinWorld(...params));
@@ -4813,7 +4850,12 @@ ipcMain.handle('unpin-world', (_, ...params) => unpinWorld(...params));
 ipcMain.handle('get-pinned-instances', (_, ...params) => getPinnedInstances(...params));
 ipcMain.handle('get-pinned-worlds', (_, ...params) => getPinnedWorlds(...params));
 ipcMain.handle('get-installed-vanilla-tweaks-resource-packs', (_, instance_id) => getInstalledVanillaTweaksResourcePacks(instance_id));
-// todo add group handlers
+ipcMain.on('get-group', (_, group_id) => _.returnValue = getGroup(group_id));
+ipcMain.handle('add-group', (_, group_name) => addGroup(group_name));
+ipcMain.handle('get-groups', (_) => getGroups());
+ipcMain.handle('set-group-collapsed', (_, group_id, collapsed) => setGroupCollapsed(group_id, collapsed));
+ipcMain.handle('get-groups-by-type', (_, type, groups) => getGroupsByType(type, groups));
+ipcMain.handle('swap-group-positions', (_, group_id1, group_id2) => swapGroupPositions(group_id1, group_id2));
 
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
@@ -5206,100 +5248,124 @@ function dropColumnIfExists(table, column) {
     }
 }
 
+function groupMigration() {
+    let columns = db.prepare(`PRAGMA table_info(instances)`).all();
+    let groupIdColumn = columns.find(column => column.name === "group_id");
+    if (groupIdColumn?.type.toUpperCase() === "INTEGER") return;
+    let groupNames = db.prepare("SELECT DISTINCT group_id FROM instances WHERE group_id IS NOT NULL AND group_id != ?").all("");
+    let insertGroupStatement = db.prepare("INSERT INTO groups (name, collapsed, type, position) VALUES (?, ?, ?, ?)");
+    let updateInstancesStatement = db.prepare("UPDATE instances SET group_id = ? WHERE group_id = ?");
+    for (let { group_id } of groupNames) {
+        let result = insertGroupStatement.run(group_id, Number(false), "custom", getNextGroupPosition());
+        updateInstancesStatement.run(result.lastInsertRowid, group_id);
+    }
+    db.prepare("CREATE TABLE instances_new (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)").run();
+    db.prepare("INSERT INTO instances_new SELECT * FROM instances").run();
+    db.prepare("DROP TABLE instances").run();
+    db.prepare("ALTER TABLE instances_new RENAME TO instances").run();
+}
+
 db.prepare("UPDATE instances SET failed = ?, mc_installed = ?, installing = ? WHERE mc_installed = ? OR installing = ?").run(1, 1, 0, 0, 1);
 
 // update
 try {
-    switch (getDefault("saved_version")) {
-        case "0.0.1":
-        case "0.0.2":
-        case "0.0.3":
-        case "0.0.4":
-        case "0.0.5":
-        case "0.0.6":
-        case "0.0.7":
-            if (getDefault("default_page") == "my_account") setDefault("default_page", "wardrobe");
-            dropColumnIfExists("skins", "file_name");
-            dropColumnIfExists("capes", "last_used");
-        case "0.0.8":
-        case "0.0.9":
-        case "0.1.0":
-        case "0.1.1":
-            addColumnIfMissing("instances", "failed", "INTEGER");
-        case "0.2.0":
-        case "0.3.0":
-        case "0.4.0":
-        case "0.4.1":
-        case "0.4.2":
-        case "0.4.3":
-        case "0.4.4":
-        case "0.5.0":
-            addColumnIfMissing("skins", "favorited", "INTEGER");
-            addColumnIfMissing("skins", "last_used", "TEXT");
-            addColumnIfMissing("skins", "preview", "TEXT");
-            addColumnIfMissing("skins", "preview_model", "TEXT");
-            addColumnIfMissing("skins", "head", "TEXT");
-        case "0.6.0":
-        case "0.6.1":
-        case "0.6.2":
-        case "0.6.3":
-        case "0.6.4":
-        case "0.6.5":
-            addColumnIfMissing("instances", "post_launch_hook", "TEXT");
-            addColumnIfMissing("instances", "uses_custom_java_args", "INTEGER");
-            addColumnIfMissing("instances", "provided_java_args", "TEXT");
-        case "0.6.6":
-        case "0.6.7":
-            let java = new Java(db, user_path, win, translate);
-            java.upgradeLegacy();
-        case "0.7.0":
-        case "0.7.1":
-            addColumnIfMissing("instances", "source_server", "TEXT");
-            addColumnIfMissing("java_versions", "package_uuid", "TEXT");
-            let hasUsesCustomJavaInstallationColumn = hasColumn("instances", "uses_custom_java_installation");
-            if (!hasUsesCustomJavaInstallationColumn) {
-                addColumnIfMissing("instances", "uses_custom_java_installation", "INTEGER");
-                db.prepare("UPDATE instances SET uses_custom_java_installation = ?").run(1);
-            }
-        case "0.8.0":
-        case "0.8.1":
-            dropColumnIfExists("profiles", "client_id");
-        case "0.9.0":
-        case "0.9.1":
-        case "0.10.0":
-        case "0.10.1":
-        case "0.10.2":
-            addColumnIfMissing("skins", "tag", "TEXT");
-        case "0.10.3":
-        case "0.10.4":
-        case "0.10.5":
-            addColumnIfMissing("instances", "fullscreen", "INTEGER");
-        case "0.10.6":
-            let default_width = Number(getDefault("default_width"));
-            let default_height = Number(getDefault("default_height"));
-            let default_fullscreen = getDefault("default_fullscreen") == "true" ? 1 : 0;
-            let default_allocated_ram = Number(getDefault("default_ram"));
-            addColumnIfMissing("instances", "uses_custom_window", "INTEGER");
-            addColumnIfMissing("instances", "uses_custom_allocated_ram", "INTEGER");
-            db.prepare("UPDATE instances SET uses_custom_allocated_ram = ? WHERE allocated_ram != ?").run(Number(true), default_allocated_ram);
-            db.prepare("UPDATE instances SET uses_custom_window = ? WHERE window_width != ? OR window_height != ? OR fullscreen != ?").run(Number(true), default_width, default_height, default_fullscreen);
-            dropColumnIfExists("instances", "attempted_options_txt_version");
-            addColumnIfMissing("mc_versions_cache", "data_version", "INTEGER");
-            dropColumnIfExists("options_defaults", "version");
-            db.prepare("DELETE FROM options_defaults WHERE key = ?").run("version");
-        case "0.11.0":
-        case "0.11.1":
-            db.prepare("UPDATE content SET source_info = substr(source_info, 1, length(source_info) - 2) WHERE source_info LIKE '%.0';").run();
-            db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
-            db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
-            db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
-            db.prepare("UPDATE content SET type = ? WHERE type = ?").run("resourcepack", "resource_pack");
-        case "0.11.2":
-        case "0.11.3":
-        case "0.11.4":
-            db.prepare("UPDATE content SET version_id = source_info, source_info = NULL WHERE source = ? AND version_id IS NULL").run("vanilla_tweaks");
-    }
-    setDefault("saved_version", version);
+    db.transaction(() => {
+        switch (getDefault("saved_version")) {
+            case "0.0.1":
+            case "0.0.2":
+            case "0.0.3":
+            case "0.0.4":
+            case "0.0.5":
+            case "0.0.6":
+            case "0.0.7":
+                if (getDefault("default_page") == "my_account") setDefault("default_page", "wardrobe");
+                dropColumnIfExists("skins", "file_name");
+                dropColumnIfExists("capes", "last_used");
+            case "0.0.8":
+            case "0.0.9":
+            case "0.1.0":
+            case "0.1.1":
+                addColumnIfMissing("instances", "failed", "INTEGER");
+            case "0.2.0":
+            case "0.3.0":
+            case "0.4.0":
+            case "0.4.1":
+            case "0.4.2":
+            case "0.4.3":
+            case "0.4.4":
+            case "0.5.0":
+                addColumnIfMissing("skins", "favorited", "INTEGER");
+                addColumnIfMissing("skins", "last_used", "TEXT");
+                addColumnIfMissing("skins", "preview", "TEXT");
+                addColumnIfMissing("skins", "preview_model", "TEXT");
+                addColumnIfMissing("skins", "head", "TEXT");
+            case "0.6.0":
+            case "0.6.1":
+            case "0.6.2":
+            case "0.6.3":
+            case "0.6.4":
+            case "0.6.5":
+                addColumnIfMissing("instances", "post_launch_hook", "TEXT");
+                addColumnIfMissing("instances", "uses_custom_java_args", "INTEGER");
+                addColumnIfMissing("instances", "provided_java_args", "TEXT");
+            case "0.6.6":
+            case "0.6.7":
+                let java = new Java(db, user_path, win, translate);
+                java.upgradeLegacy();
+            case "0.7.0":
+            case "0.7.1":
+                addColumnIfMissing("instances", "source_server", "TEXT");
+                addColumnIfMissing("java_versions", "package_uuid", "TEXT");
+                let hasUsesCustomJavaInstallationColumn = hasColumn("instances", "uses_custom_java_installation");
+                if (!hasUsesCustomJavaInstallationColumn) {
+                    addColumnIfMissing("instances", "uses_custom_java_installation", "INTEGER");
+                    db.prepare("UPDATE instances SET uses_custom_java_installation = ?").run(1);
+                }
+            case "0.8.0":
+            case "0.8.1":
+                dropColumnIfExists("profiles", "client_id");
+            case "0.9.0":
+            case "0.9.1":
+            case "0.10.0":
+            case "0.10.1":
+            case "0.10.2":
+                addColumnIfMissing("skins", "tag", "TEXT");
+            case "0.10.3":
+            case "0.10.4":
+            case "0.10.5":
+                addColumnIfMissing("instances", "fullscreen", "INTEGER");
+            case "0.10.6":
+                let default_width = Number(getDefault("default_width"));
+                let default_height = Number(getDefault("default_height"));
+                let default_fullscreen = getDefault("default_fullscreen") == "true" ? 1 : 0;
+                let default_allocated_ram = Number(getDefault("default_ram"));
+                addColumnIfMissing("instances", "uses_custom_window", "INTEGER");
+                addColumnIfMissing("instances", "uses_custom_allocated_ram", "INTEGER");
+                db.prepare("UPDATE instances SET uses_custom_allocated_ram = ? WHERE allocated_ram != ?").run(Number(true), default_allocated_ram);
+                db.prepare("UPDATE instances SET uses_custom_window = ? WHERE window_width != ? OR window_height != ? OR fullscreen != ?").run(Number(true), default_width, default_height, default_fullscreen);
+                dropColumnIfExists("instances", "attempted_options_txt_version");
+                addColumnIfMissing("mc_versions_cache", "data_version", "INTEGER");
+                dropColumnIfExists("options_defaults", "version");
+                db.prepare("DELETE FROM options_defaults WHERE key = ?").run("version");
+            case "0.11.0":
+            case "0.11.1":
+                db.prepare("UPDATE content SET source_info = substr(source_info, 1, length(source_info) - 2) WHERE source_info LIKE '%.0';").run();
+                db.prepare("UPDATE content SET version_id = substr(version_id, 1, length(version_id) - 2) WHERE version_id LIKE '%.0';").run();
+                db.prepare("UPDATE instances SET install_id = substr(install_id, 1, length(install_id) - 2) WHERE install_id LIKE '%.0';").run();
+                db.prepare("UPDATE instances SET installed_version = substr(installed_version, 1, length(installed_version) - 2) WHERE installed_version LIKE '%.0';").run();
+                db.prepare("UPDATE content SET type = ? WHERE type = ?").run("resourcepack", "resource_pack");
+            case "0.11.2":
+            case "0.11.3":
+            case "0.11.4":
+            case "0.11.5":
+                db.prepare("UPDATE content SET version_id = source_info, source_info = NULL WHERE source = ? AND version_id IS NULL").run("vanilla_tweaks");
+                if (getDefault("default_sort") == "play_time") setDefault("default_sort", "playtime");
+                if (getDefault("default_sort") == "game_version") setDefault("default_sort", "vanilla_version");
+                groupMigration();
+        }
+        setDefault("saved_version", version);
+    })();
 } catch (e) {
     if (win) win.webContents.send('display-error', e.message);
+    console.error(e);
 }
