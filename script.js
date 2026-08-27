@@ -622,7 +622,6 @@ class Instance {
     }
 
     async showSettingsDialog() {
-        console.log(this);
         let dialog = new Dialog();
         let default_java_installation = await window.enderlynx.getJavaInstallation(this.java_version);
         dialog.showDialog(translate("app.instances.settings.title"), "form", [
@@ -6909,14 +6908,11 @@ class DiscoverScreen extends Screen {
         let query = this.searchBar.value;
         this.paginationBottom.setPage(page);
         this.paginationTop.setPage(page);
-        let instance_content = [];
-        if (this.instance) instance_content = await this.instance.getContent();
         if (["fabric", "forge", "neoforge", "quilt"].includes(this.loader_dropdown) && this.currentTab == "server") this.loader_dropdown = "all";
         if (this.currentTab != "server") {
             if (this.loader_dropdown == "vanilla" || this.loader_dropdown == "modpack") this.loader_dropdown = "all";
         }
         this.loaderDropdown.selectOption(this.loader_dropdown, true);
-        let content_ids = instance_content.map(e => e.source_info);
         this.discoverList.innerHTML = "";
         let loading = new LoadingContainer();
         this.discoverList.appendChild(loading.element);
