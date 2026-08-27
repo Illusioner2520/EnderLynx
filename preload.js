@@ -594,8 +594,10 @@ contextBridge.exposeInMainWorld('enderlynx', {
     addGroup: async (group_name) => ipcRenderer.invoke('add-group', group_name),
     getGroups: async () => ipcRenderer.invoke('get-groups'),
     setGroupCollapsed: async (group_id, collapsed) => ipcRenderer.invoke('set-group-collapsed', group_id, collapsed),
-    getGroupsByType: async (type, groups) => ipcRenderer.invoke('get-groups-by-type', type, groups),
-    swapGroupPositions: async (group_id1, group_id2) => ipcRenderer.invoke('swap-group-positions', group_id1, group_id2)
+    getGroupsByType: (type, groups) => ipcRenderer.sendSync('get-groups-by-type', type, groups),
+    swapGroupPositions: async (group_id1, group_id2) => ipcRenderer.invoke('swap-group-positions', group_id1, group_id2),
+    setGroupName: async (group_id, name) => ipcRenderer.invoke('set-group-name', group_id, name),
+    deleteGroup: async (group_id) => ipcRenderer.invoke('delete-group', group_id)
 });
 
 async function getServerLastPlayed(instance_id, ip) {

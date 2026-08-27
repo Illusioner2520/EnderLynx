@@ -318,7 +318,6 @@ class Instance {
         this.instance_id = content.instance_id;
         this.pid = content.pid;
         this.current_log_file = content.current_log_file;
-        this.id = content.id;
         this.install_source = content.install_source;
         this.install_id = content.install_id;
         this.installing = Boolean(content.installing);
@@ -623,9 +622,8 @@ class Instance {
     }
 
     async showSettingsDialog() {
+        console.log(this);
         let dialog = new Dialog();
-        let resettingJavaArgs = false;
-        let resettingJavaInstallation = false;
         let default_java_installation = await window.enderlynx.getJavaInstallation(this.java_version);
         dialog.showDialog(translate("app.instances.settings.title"), "form", [
             {
@@ -643,6 +641,18 @@ class Instance {
                 "default": this.name,
                 "tab": "general",
                 "maxlength": 50
+            },
+            {
+                "type": "dropdown",
+                "name": translate("app.instances.settings.group"),
+                "desc": translate("app.instances.settings.group.description"),
+                "id": "group",
+                "default": this.group_id || -1,
+                "tab": "general",
+                "options": (await InstancesScreen.getCustomGroups()).map(e => ({
+                    "name": e.id == -1 ? translate("app.instances.settings.group.none") : e.name,
+                    "value": e.id
+                }))
             },
             this.locked ? null : {
                 "type": "multi-select",
@@ -928,6 +938,7 @@ class Instance {
             await this.setDateModified(new Date());
             await this.setName(info.name);
             await this.setImage(info.icon);
+            await this.setGroup(info.group);
             await this.setWindowWidth(info.width);
             await this.setWindowHeight(info.height);
             await this.setFullscreen(info.fullscreen);
@@ -1468,7 +1479,8 @@ class Instance {
                     this.isPinned() ? await this.unpin() : await this.pin();
                     e.setTitle(this.isPinned() ? translate("app.instances.unpin") : translate("app.instances.pin"));
                     e.setIcon(this.isPinned() ? '<i class="fa-solid fa-thumbtack-slash"></i>' : '<i class="fa-solid fa-thumbtack"></i>');
-                    // todo reflow instances
+                    this.getInstanceButton();
+                    instancesScreen.groupInstances();
                 }
             },
             {
@@ -1483,8 +1495,9 @@ class Instance {
                 "title": translate("app.button.instances.delete"),
                 "func": () => {
                     this.showDeleteDialog(() => {
-                        // animateGridReorderStart(".instance-item");
-                        // instancesScreen.display(true, true);
+                        animateGridReorderStart(".instance-item");
+                        this.instanceButton.remove();
+                        animateGridReorderEnd(".instance-item");
                     });
                 },
                 "danger": true
@@ -6128,7 +6141,7 @@ class HomeScreen extends Screen {
             article.onclick = () => {
                 window.enderlynx.openInBrowser("https://minecraft.net" + e.article_url);
             }
-            article.title = e.default_tile.sub_header;
+            if (e.default_tile.sub_header) article.title = e.default_tile.sub_header;
             let article_title = document.createElement("div");
             article_title.innerHTML = e.default_tile.title;
             article_title.className = "mc-news-title";
@@ -6176,9 +6189,46 @@ class Group {
         window.enderlynx.setGroupCollapsed(this.id, this.collapsed);
     }
 
-    formGroupElement(instances) {
+    editName() {
+        this.groupNameEditorElement.style.display = "";
+        this.groupNameElement.style.display = "none";
+        this.groupNameEditorElement.select();
+    }
+
+    changeName() {
+        this.name = this.groupNameEditorElement.value;
+        window.enderlynx.setGroupName(this.id, this.name);
+        this.groupNameElement.textContent = this.name;
+        this.groupNameElement.style.display = "";
+        this.groupNameEditorElement.style.display = "none";
+    }
+
+    promptDeletion() {
+        let dialog = new Dialog();
+        dialog.showDialog(translate("app.instances.group.delete.title"), "notice", translate("app.instances.group.delete.description", "%g", this.groupNameElement.textContent), [
+            {
+                "type": "cancel",
+                "content": translate("app.instances.group.delete.cancel")
+            },
+            {
+                "type": "confirm",
+                "content": translate("app.instances.group.delete.confirm")
+            }
+        ], [], () => {
+            this.delete();
+        });
+    }
+
+    delete() {
+        this.element.remove();
+        this.onDelete();
+    }
+
+    formGroupElement(instances, sort, onDelete) {
+        this.instances = instances;
+        this.onDelete = onDelete;
         let groupElement = createElement("div", "group");
-        groupElement.dataset.id = group;
+        groupElement.dataset.id = this.id;
         this.element = groupElement;
         if (!this.collapsed) {
             groupElement.classList.add("open");
@@ -6186,61 +6236,142 @@ class Group {
         let groupHeader = createElement("div", "group-header");
         makeArtificialButton(groupHeader, () => {
             this.toggleCollapsed();
-        }, ["button", "button > i"]);
+        }, ["button", "button > i", ".group-actions", "input"]);
         let groupChevron = createElement("i", "group-chevron fa-solid fa-chevron-down");
         let groupName = createElement("div", "group-name");
+        this.groupNameElement = groupName;
         groupName.textContent = this.name;
-        if (how == "custom_groups") {
-            groupName.textContent = group == 0 ? translate("app.instances.group.uncategorized") : this.name;
+        if (this.type == "custom") {
+            groupName.textContent = this.id == -1 ? translate("app.instances.group.uncategorized") : this.name;
         }
-        if (how == "pinned") {
-            groupName.textContent = group == "true" ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title");
+        if (this.type == "pinned") {
+            groupName.textContent = this.name == "true" ? translate("app.instances.group.pinned.title") : translate("app.instances.group.unpinned.title");
         }
-        if (how == "loader") {
+        if (this.type == "loader") {
             groupName.textContent = loaders[this.name];
         }
         groupHeader.appendChild(groupChevron);
+        groupHeader.appendChild(createElement("div", "group-spacer"));
+        let groupNameEditor = createElement("input", "group-inline-editor inline-name-editor");
+        groupNameEditor.value = groupName.textContent;
+        groupNameEditor.style.display = "none";
+        groupNameEditor.onkeydown = (e) => {
+            if (e.key == "Enter" || e.key == "Escape") this.changeName();
+        }
+        groupNameEditor.maxLength = 50;
+        groupNameEditor.onblur = () => this.changeName();
+        this.groupNameEditorElement = groupNameEditor;
         groupHeader.appendChild(groupName);
+        groupHeader.appendChild(groupNameEditor);
+        groupHeader.appendChild(createElement("div", "group-spacer"));
+        let groupCount = createElement("div", "group-count");
+        groupCount.textContent = this.instances.length;
+        groupHeader.appendChild(groupCount);
+        groupHeader.appendChild(createElement("div", "group-spacer"));
         let groupAction1;
         let groupAction2;
-        if (how == "custom_groups") {
+        if (this.type == "custom") {
             let groupActions = createElement("div", "group-actions");
             groupHeader.appendChild(groupActions);
             groupAction1 = createElement("button", "group-action", { innerHTML: '<i class="fa-solid fa-arrow-up"></i>', title: translate("app.instances.group.move.up") });
             groupAction2 = createElement("button", "group-action", { innerHTML: '<i class="fa-solid fa-arrow-down"></i>', title: translate("app.instances.group.move.down") });
             let groupAction3 = createElement("button", "group-action", { innerHTML: '<i class="fa-solid fa-pencil"></i>', title: translate("app.instances.group.edit_name") });
             let groupAction4 = createElement("button", "group-action danger", { innerHTML: '<i class="fa-solid fa-trash-can"></i>', title: translate("app.instances.group.delete") });
-            groupAction1.onclick = () => {
-                // this.swapGroupPositions(group, this.getCustomGroupNeighbor(group, -1));
-            }
-            groupAction2.onclick = () => {
-                // this.swapGroupPositions(group, this.getCustomGroupNeighbor(group, 1));
-            }
+            groupAction3.onclick = () => this.editName();
+            groupAction4.onclick = () => this.promptDeletion();
             groupActions.appendChild(groupAction1);
             groupActions.appendChild(groupAction2);
-            groupActions.appendChild(groupAction3);
-            groupActions.appendChild(groupAction4);
+            if (this.id != -1) {
+                groupActions.appendChild(groupAction3);
+                groupActions.appendChild(groupAction4);
+            }
+        }
+        let buttons = new ContextMenuButtons([
+            {
+                "title": translate("app.instances.group.move.up"),
+                "icon": '<i class="fa-solid fa-arrow-up"></i>',
+                "func": () => {
+                    groupAction1.click();
+                }
+            },
+            {
+                "title": translate("app.instances.group.move.down"),
+                "icon": '<i class="fa-solid fa-arrow-down"></i>',
+                "func": () => {
+                    groupAction2.click();
+                }
+            },
+            this.id != -1 ? {
+                "title": translate("app.instances.group.edit_name"),
+                "icon": '<i class="fa-solid fa-pencil"></i>',
+                "func": () => {
+                    this.editName();
+                }
+            } : null,
+            this.id != -1 ? {
+                "title": translate("app.instances.group.delete"),
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "danger": true,
+                "func": () => {
+                    this.promptDeletion();
+                }
+            } : null
+        ].filter(e => e));
+        if (this.type == "custom") groupHeader.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
         }
         groupElement.appendChild(groupHeader);
         let groupInstances = createElement("div", "group-instances");
-        let fragment = document.createDocumentFragment();
-        instances.forEach(instance => fragment.appendChild(instance.instanceButton));
-        groupInstances.appendChild(fragment);
-        if (!instances || instances.length == 0) {
-            groupInstances.textContent = translate("app.instances.group.none_added");
-        }
+        if (this.type == "none") groupInstances.classList.add("shown");
         groupElement.appendChild(groupInstances);
-        if (how == "none") {
-            groupInstances.classList.add("shown");
-            this.groupList.appendChild(groupInstances);
-        } else {
-            this.groupList.appendChild(groupElement);
-        }
         this.instancesElement = groupInstances;
-        this.actions = how == "custom_groups" ? {
+        this.actions = this.type == "custom" ? {
             up: groupAction1,
             down: groupAction2
         } : null;
+        this.sort(sort);
+    }
+
+    sort(how) {
+        this.instances.sort((a, b) => {
+            let valueA = a[how];
+            let valueB = b[how];
+            if (valueA instanceof Date && valueB instanceof Date) {
+                let aTime = valueA.getTime();
+                let bTime = valueB.getTime();
+                if (Number.isNaN(aTime)) aTime = 0;
+                if (Number.isNaN(bTime)) bTime = 0;
+                return bTime - aTime;
+            }
+            if (typeof valueA == 'number' && typeof valueB == 'number') {
+                return valueB - valueA;
+            }
+            if (how == "vanilla_version") {
+                let aIndex = minecraftVersions.indexOf(valueA);
+                let bIndex = minecraftVersions.indexOf(valueB);
+                if (aIndex == -1 && bIndex == -1) {
+                    return valueA.localeCompare(valueB);
+                }
+                if (aIndex == -1) return -1;
+                if (bIndex == -1) return 1;
+                return bIndex - aIndex;
+            }
+            return valueA.localeCompare(valueB);
+        });
+        let fragment = document.createDocumentFragment();
+        this.instances.forEach(instance => fragment.appendChild(instance.instanceButton));
+        this.instancesElement.appendChild(fragment);
+        if (!this.instances || this.instances.length == 0) {
+            this.instancesElement.textContent = translate("app.instances.group.none_added");
+        }
+    }
+
+    figureOutVisibility(query) {
+        let hasVisibleInstances = this.instances.some(
+            instance => !instance.instanceButton.classList.contains("hidden")
+        );
+
+        this.element.style.display = (hasVisibleInstances || !query) ? "" : "none";
     }
 }
 
@@ -6258,7 +6389,7 @@ class InstancesScreen extends Screen {
         if (!this.hasRequestGoing) this.showInstances();
     }
 
-    async getCustomGroups() {
+    static async getCustomGroups() {
         let groups = await window.enderlynx.getGroups();
         let groupList = [];
         for (let group of groups) {
@@ -6267,8 +6398,8 @@ class InstancesScreen extends Screen {
         return groupList;
     }
 
-    async getGroupsByType(type, list) {
-        let groups = await window.enderlynx.getGroupsByType(type, list);
+    static getGroupsByType(type, list) {
+        let groups = window.enderlynx.getGroupsByType(type, list);
         let groupList = [];
         for (let group of groups) {
             groupList.push(Group.applyGroup(group.id, group));
@@ -6280,8 +6411,8 @@ class InstancesScreen extends Screen {
         this.hasRequestGoing = true;
         this.instances = [];
         this.groupElements = [];
-        this.customGroups = await this.getCustomGroups();
-        this.groupsById = Object.fromEntries(this.customGroups.map(x => [x.id, x]));
+        this.customGroups = await InstancesScreen.getCustomGroups();
+        this.customGroupsById = Object.fromEntries(this.customGroups.map(x => [x.id, x]));
         this.contentElement.innerHTML = "";
         let ele = document.createDocumentFragment();
         let title = createElement("div", "title-top");
@@ -6294,13 +6425,39 @@ class InstancesScreen extends Screen {
             showCreateInstanceDialog();
         }
         title.appendChild(createButton);
+        let createGroupButton = createElement("button", "create-group-button");
+        createGroupButton.innerHTML = '<i class="fa-solid fa-folder-open"></i>' + translate("app.instances.group.create");
+        createGroupButton.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.instances.group.create.title"), "form", [
+                {
+                    "type": "text",
+                    "id": "name",
+                    "name": translate("app.instances.group.create.name")
+                }
+            ], [
+                {
+                    "type": "cancel",
+                    "content": translate("app.instances.group.create.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.instances.group.create.confirm")
+                }
+            ], [], async (info) => {
+                let groupInfo = await window.enderlynx.addGroup(info.name);
+                let group = Group.applyGroup(groupInfo.id, groupInfo);
+                this.activeGroups.push(group);
+                this.groupInstances();
+            });
+        }
+        title.appendChild(createGroupButton);
         ele.appendChild(title);
-        let searchAndFilter = document.createElement("div");
-        searchAndFilter.classList.add("search-and-filter");
+        let searchAndFilter = createElement("div", "search-and-filter");
         ele.appendChild(searchAndFilter);
-        let search = document.createElement("div");
-        new SearchBar(search, (v) => this.searchInstances(v), null);
-        let sort = document.createElement('div');
+        let search = createElement("div");
+        this.searchBar = new SearchBar(search, (v) => this.searchInstances(v), null);
+        let sort = createElement('div');
         this.sortBy = new Dropdown(translate("app.instances.sort.by"), [
             { "name": translate("app.instances.sort.name"), "value": "name" },
             { "name": translate("app.instances.sort.last_played"), "value": "last_played" },
@@ -6312,7 +6469,7 @@ class InstancesScreen extends Screen {
         ], sort, await getDefault("default_sort"), () => {
             this.sortInstances();
         });
-        let group = document.createElement('div');
+        let group = createElement('div');
         this.groupBy = new Dropdown(translate("app.instances.group.by"), [
             { "name": translate("app.instances.group.none"), "value": "none" },
             { "name": translate("app.instances.group.custom_groups"), "value": "custom_groups" },
@@ -6332,9 +6489,12 @@ class InstancesScreen extends Screen {
         this.instances = await getInstances();
         for (let instance of this.instances) {
             instance.getInstanceButton();
+            instance.watchForChange("group_id", async () => {
+                this.groupInstances();
+            });
         }
         this.contentElement.appendChild(ele);
-        await this.groupInstances();
+        this.groupInstances();
         loading.element.remove();
         this.groupList.classList.add("disable-instance-list-transitions");
         this.contentElement.appendChild(noResultsEle);
@@ -6345,36 +6505,44 @@ class InstancesScreen extends Screen {
     }
 
     getCustomGroupNeighbor(group_id, direction) {
-        let orderedGroups = this.groups
-            .filter(group => Number.isFinite(group.info?.position))
-            .sort((a, b) => a.info.position - b.info.position);
-        let groupIndex = orderedGroups.findIndex(group => group.group_id == group_id);
-        return orderedGroups[groupIndex + direction]?.group_id;
+        let groupIndex = this.activeGroups.findIndex(group => group.id == group_id);
+        return this.activeGroups[groupIndex + direction]?.id;
     }
 
     updateGroupActions() {
-        for (let group of this.groups) {
+        for (let group of this.activeGroups) {
             if (!group.actions) continue;
-            let hasPosition = Number.isFinite(group.info?.position);
-            group.actions.up.disabled = !hasPosition || !this.getCustomGroupNeighbor(group.group_id, -1);
-            group.actions.down.disabled = !hasPosition || !this.getCustomGroupNeighbor(group.group_id, 1);
+            let hasPosition = Number.isFinite(group.position);
+            group.actions.up.disabled = !hasPosition || !this.getCustomGroupNeighbor(group.id, -1);
+            group.actions.down.disabled = !hasPosition || !this.getCustomGroupNeighbor(group.id, 1);
             group.actions.up.classList.toggle("disabled", group.actions.up.disabled);
             group.actions.down.classList.toggle("disabled", group.actions.down.disabled);
+            group.actions.up.onclick = () => {
+                this.swapGroupPositions(group.id, this.getCustomGroupNeighbor(group.id, -1));
+            }
+            group.actions.down.onclick = () => {
+                this.swapGroupPositions(group.id, this.getCustomGroupNeighbor(group.id, 1));
+            }
         }
     }
 
-    async swapGroupPositions(group_id1, group_id2) {
+    swapGroupPositions(group_id1, group_id2) {
+        this.groupList.classList.add("disable-instance-list-transitions");
         animateGridReorderStart(".group");
         if (!group_id2) return;
-        await window.enderlynx.swapGroupPositions(group_id1, group_id2);
-        let groupInfo1 = this.groups.find(e => e.group_id == group_id1)?.info;
-        let groupInfo2 = this.groups.find(e => e.group_id == group_id2)?.info;
-        let pos1 = groupInfo1?.position;
-        let pos2 = groupInfo2?.position;
-        if (groupInfo1) groupInfo1.position = pos2;
-        if (groupInfo2) groupInfo2.position = pos1;
-        let group1 = this.groups.find(e => e.group_id == group_id1);
-        let group2 = this.groups.find(e => e.group_id == group_id2);
+        window.enderlynx.swapGroupPositions(group_id1, group_id2);
+        let group1 = this.activeGroups.find(e => e.id == group_id1);
+        let group2 = this.activeGroups.find(e => e.id == group_id2);
+        let index1 = this.activeGroups.indexOf(group1);
+        let index2 = this.activeGroups.indexOf(group2);
+        if (index1 !== -1 && index2 !== -1) {
+            [this.activeGroups[index1], this.activeGroups[index2]] = [this.activeGroups[index2], this.activeGroups[index1]];
+        }
+
+        let pos1 = group1.position;
+        let pos2 = group2.position;
+        if (group1) group1.position = pos2;
+        if (group2) group2.position = pos1;
         if (pos2 < pos1) {
             group1.element.parentNode.insertBefore(group1.element, group2.element);
         } else {
@@ -6382,17 +6550,19 @@ class InstancesScreen extends Screen {
         }
         this.updateGroupActions();
         animateGridReorderEnd(".group");
+        this.groupList.classList.remove("disable-instance-list-transitions");
     }
 
-    async groupInstances() {
+    groupInstances() {
         let how = this.groupBy.getSelected;
         if (!this.groupList) return;
         this.activeGroups = [];
-        await setDefault("default_group", how);
+        this.activeGroupsByName = {};
+        setDefault("default_group", how);
         let groupMap = {};
         for (let instance of this.instances) {
             let key = "";
-            if (how == "custom_groups") key = instance?.group_id || 0;
+            if (how == "custom_groups") key = instance?.group_id || -1;
             if (how == "pinned") key = instance.isPinned().toString();
             if (how == "loader") key = instance.loader;
             if (how == "game_version") key = instance.vanilla_version;
@@ -6401,6 +6571,9 @@ class InstancesScreen extends Screen {
         }
         this.groupList.innerHTML = "";
         let groups = Object.keys(groupMap);
+        if (how == "custom_groups") {
+            groups = this.customGroups.map(e => e.id);
+        }
         if (how == "game_version") {
             sortByVersion(groups, true);
         } else if (how == "pinned") {
@@ -6410,8 +6583,8 @@ class InstancesScreen extends Screen {
             });
         } else if (how == "custom_groups") {
             groups.sort((a, b) => {
-                let groupAPos = this.groupsById[a]?.position || 0;
-                let groupBPos = this.groupsById[b]?.position || 0;
+                let groupAPos = this.customGroupsById[a]?.position || 0;
+                let groupBPos = this.customGroupsById[b]?.position || 0;
                 return groupAPos - groupBPos;
             });
         } else {
@@ -6421,18 +6594,26 @@ class InstancesScreen extends Screen {
                 return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
             });
         }
-        let groupsInfo = {};
         if (how != "custom_groups") {
-            let info = await this.getGroupsByType(how, groups);
-            groupsInfo = Object.fromEntries(info.map(x => [x.name, x]));
+            this.activeGroups = InstancesScreen.getGroupsByType(how, groups);
+            this.activeGroupsByName = Object.fromEntries(this.activeGroups.map(x => [x.name, x]));
+        } else {
+            this.activeGroups = this.customGroups;
         }
-        this.groups = [];
         this.groupList.classList.add("disable-instance-list-transitions");
+        for (let group of this.activeGroups) {
+            group.formGroupElement(groupMap[how == "custom_groups" ? group.id : group.name] || [], this.sortBy.value, async () => {
+                await window.enderlynx.deleteGroup(group.id);
+                this.customGroups = this.customGroups.filter(e => e.id != group.id);
+                this.groupInstances();
+            });
+            group.figureOutVisibility(this.searchBar.value);
+            this.groupList.appendChild(how == "none" ? group.instancesElement : group.element);
+        }
         this.updateGroupActions();
-        await this.sortInstances(true);
-        requestAnimationFrame(() => {
+        setTimeout(() => {
             this.groupList.classList.remove("disable-instance-list-transitions");
-        });
+        }, 0);
     }
 
     searchInstances(query) {
@@ -6444,53 +6625,21 @@ class InstancesScreen extends Screen {
             button.classList.toggle("hidden", !matches);
         }
         this.groupList.classList.add("disable-instance-list-transitions");
-        for (let group of this.groups) {
-            let hasVisibleInstances = group.instances.some(
-                instance => !instance.instanceButton.classList.contains("hidden")
-            );
-
-            group.element.style.display = (hasVisibleInstances || !query) ? "" : "none";
+        for (let group of this.activeGroups) {
+            group.figureOutVisibility(query);
         }
         requestAnimationFrame(() => {
             this.groupList.classList.remove("disable-instance-list-transitions");
         });
     }
 
-    async sortInstances(disableAnimation) {
+    sortInstances(disableAnimation) {
         let how = this.sortBy.getSelected;
         if (!disableAnimation) animateGridReorderStart(".instance-item");
         if (!this.groupList) return;
-        await setDefault("default_sort", how);
-        for (let group of this.groups) {
-            let instances = group.instances;
-            instances.sort((a, b) => {
-                let valueA = a[how];
-                let valueB = b[how];
-                if (valueA instanceof Date && valueB instanceof Date) {
-                    let aTime = valueA.getTime();
-                    let bTime = valueB.getTime();
-                    if (Number.isNaN(aTime)) aTime = 0;
-                    if (Number.isNaN(bTime)) bTime = 0;
-                    return bTime - aTime;
-                }
-                if (typeof valueA == 'number' && typeof valueB == 'number') {
-                    return valueB - valueA;
-                }
-                if (how == "vanilla_version") {
-                    let aIndex = minecraftVersions.indexOf(valueA);
-                    let bIndex = minecraftVersions.indexOf(valueB);
-                    if (aIndex == -1 && bIndex == -1) {
-                        return valueA.localeCompare(valueB);
-                    }
-                    if (aIndex == -1) return -1;
-                    if (bIndex == -1) return 1;
-                    return bIndex - aIndex;
-                }
-                return valueA.localeCompare(valueB);
-            });
-            let fragment = document.createDocumentFragment();
-            instances.forEach(instance => fragment.appendChild(instance.instanceButton));
-            group.instancesElement.appendChild(fragment);
+        setDefault("default_sort", how);
+        for (let group of this.activeGroups) {
+            group.sort(how);
         }
         if (!disableAnimation) animateGridReorderEnd(".instance-item");
     }
@@ -12007,8 +12156,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
     contentWrapper.appendChild(tabContent);
     contentInfo.showModal();
     tabsElement.style.marginInline = "auto";
-    let refreshVersionsList;
-    let setVersionId;
     let descriptionElement = document.createElement("div");
     descriptionElement.className = "markdown-body";
     descriptionElement.style.maxWidth = "800px";
@@ -12034,17 +12181,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
             "value": "files",
             "func": async () => {
                 tabContent.innerHTML = "";
-                let installedVersion = "";
-                if (instance_id) {
-                    instance_content = await Instance.getInstance(instance_id).getContent();
-                    content_ids = instance_content.map(e => e.source_info);
-                    if (content_ids.includes(content.id)) {
-                        installedVersion = instance_content[content_ids.indexOf(content.id)].version_id;
-                    }
-                    if (content.project_type == "modpack" || content.project_type == "server") {
-                        installedVersion = Instance.getInstance(instance_id).installed_version;
-                    }
-                }
                 let topFilters = createElement("div", "version-file-filters");
                 let mcVersionFilter = createElement("div");
                 let allGameVersions = Array.from(new Set(content.game_versions));
@@ -12335,12 +12471,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 }
 
                 filterVersions(versionDropdown.value, loaderDropdown.value, 1);
-
-                setVersionId = (id) => {
-                    installedVersion = id;
-                }
-
-                refreshVersionsList = showVersions;
 
                 tabContent.appendChild(wrapper);
             }

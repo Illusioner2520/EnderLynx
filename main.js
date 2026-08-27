@@ -61,7 +61,7 @@ if (!fs.existsSync(user_path)) {
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -74,7 +74,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY K
 db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, version INTEGER UNIQUE, file_path TEXT, package_uuid TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT, position INTEGER, collapsed INTEGER, type TEXT)').run();
 
-db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) VALUES (?, ?, ?, ?, ?)').run(0, "uncategorized", getNextGroupPosition(), Number(false), "custom");
+db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) VALUES (?, ?, ?, ?, ?)').run(-1, "uncategorized", getNextGroupPosition(), Number(false), "custom");
 
 
 db.pragma('journal_mode = WAL');
@@ -4793,6 +4793,14 @@ function swapGroupPositions(group_id1, group_id2) {
     return true;
 }
 
+function setGroupName(group_id, name) {
+    db.prepare("UPDATE groups SET name = ? WHERE id = ?").run(name, group_id);
+}
+
+function deleteGroup(group_id) {
+    db.prepare("DELETE FROM groups WHERE id = ?").run(group_id);
+}
+
 ipcMain.on('svg-data', (_) => _.returnValue = svgData);
 
 ipcMain.on('get-instance', (_, ...params) => _.returnValue = getInstance(...params));
@@ -4854,8 +4862,10 @@ ipcMain.on('get-group', (_, group_id) => _.returnValue = getGroup(group_id));
 ipcMain.handle('add-group', (_, group_name) => addGroup(group_name));
 ipcMain.handle('get-groups', (_) => getGroups());
 ipcMain.handle('set-group-collapsed', (_, group_id, collapsed) => setGroupCollapsed(group_id, collapsed));
-ipcMain.handle('get-groups-by-type', (_, type, groups) => getGroupsByType(type, groups));
+ipcMain.on('get-groups-by-type', (_, type, groups) => _.returnValue = getGroupsByType(type, groups));
 ipcMain.handle('swap-group-positions', (_, group_id1, group_id2) => swapGroupPositions(group_id1, group_id2));
+ipcMain.handle('set-group-name', (_, group_id, name) => setGroupName(group_id, name));
+ipcMain.handle('delete-group', (_, group_id) => deleteGroup(group_id));
 
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");
@@ -5259,8 +5269,8 @@ function groupMigration() {
         let result = insertGroupStatement.run(group_id, Number(false), "custom", getNextGroupPosition());
         updateInstancesStatement.run(result.lastInsertRowid, group_id);
     }
-    db.prepare("CREATE TABLE instances_new (id INTEGER PRIMARY KEY, name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)").run();
-    db.prepare("INSERT INTO instances_new SELECT * FROM instances").run();
+    db.prepare("CREATE TABLE instances_new (name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)").run();
+    db.prepare("INSERT INTO instances_new (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, playtime, locked, downloaded, group_id, image, instance_id, java_version, java_path, current_log_file, pid, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram, java_args, env_vars, pre_launch_hook, post_launch_hook, wrapper, post_exit_hook, installed_version, last_analyzed_log, failed, uses_custom_java_args, provided_java_args, uses_custom_java_installation, source_server, fullscreen, uses_custom_window, uses_custom_allocated_ram) SELECT name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, playtime, locked, downloaded, group_id, image, instance_id, java_version, java_path, current_log_file, pid, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram, java_args, env_vars, pre_launch_hook, post_launch_hook, wrapper, post_exit_hook, installed_version, last_analyzed_log, failed, uses_custom_java_args, provided_java_args, uses_custom_java_installation, source_server, fullscreen, uses_custom_window, uses_custom_allocated_ram FROM instances").run();
     db.prepare("DROP TABLE instances").run();
     db.prepare("ALTER TABLE instances_new RENAME TO instances").run();
 }
