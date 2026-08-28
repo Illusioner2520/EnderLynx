@@ -6973,6 +6973,8 @@ class WardrobeScreen extends Screen {
     async calculateContent() {
         this.contentElement.innerHTML = "";
         this.profile = await getDefaultProfile();
+        this.activeSkin = await this.profile.getActiveSkin();
+        this.activeCape = await this.profile.getActiveCape();
         if (!this.profile) {
             this.contentElement.style.padding = "8px";
             let signInWarning = new NoResultsFound(translate("app.wardrobe.sign_in"));
@@ -7111,9 +7113,10 @@ class WardrobeScreen extends Screen {
         refreshButton.appendChild(refreshButtonText);
         refreshButton.onclick = async () => {
             refreshButtonIcon.classList.add("spinning");
-            let profile = await getDefaultProfile();
             try {
-                await window.enderlynx.getProfile(profile.id);
+                this.profile = await getDefaultProfile();
+                this.activeSkin = await this.profile.getActiveSkin();
+                this.activeCape = await this.profile.getActiveCape();
                 refreshButtonIcon.classList.remove("spinning");
                 this.showContent();
                 this.showDefaultSkins();
@@ -7311,23 +7314,21 @@ class WardrobeScreen extends Screen {
     async showContent(noAnimate) {
         if (!noAnimate) animateGridReorderStart(".skin");
         this.skinEntries = [];
-        let activeSkin = await this.profile.getActiveSkin();
-        if (this.skinViewer) this.skinViewer.loadSkin(activeSkin ? activeSkin.skin_url : null, {
-            model: activeSkin?.model == "slim" ? "slim" : "default",
+        if (this.skinViewer) this.skinViewer.loadSkin(this.activeSkin?.skin_url || null, {
+            model: this.activeSkin?.model == "slim" ? "slim" : "default",
         });
-        let activeCape = await this.profile.getActiveCape();
-        if (this.skinViewer) this.skinViewer.loadCape(activeCape ? window.enderlynx.getCapePath(activeCape.cape_id) : null);
+        if (this.skinViewer) this.skinViewer.loadCape(this.activeCape ? window.enderlynx.getCapePath(this.activeCape.cape_id) : null);
         this.skinList.innerHTML = '';
         let skins = await getSkinsNoDefaults();
-        skins.forEach((e) => {
-            let skinEntry = new SkinEntry(e, true, this.skinViewer, this.profile, () => {
+        for (let skin of skins) {
+            let skinEntry = new SkinEntry(skin, true, this.skinViewer, this.profile, () => {
                 this.showContent()
             }, (noAnimate) => {
                 this.filterSkins(noAnimate);
             });
             this.skinEntries.push(skinEntry);
             this.skinList.appendChild(skinEntry.element);
-        });
+        }
         this.filterSkins(true);
         if (!noAnimate) animateGridReorderEnd(".skin");
     }
@@ -7377,7 +7378,6 @@ class WardrobeScreen extends Screen {
 
     async showCapes() {
         this.capeList.innerHTML = "";
-        let activeCape = await this.profile.getActiveCape();
 
         let capes = await this.profile.getCapes();
         capes.sort((a, b) => {
@@ -7398,7 +7398,7 @@ class WardrobeScreen extends Screen {
                     currentEle.classList.add("selected");
                     e.setActive();
                     if (this.skinViewer) this.skinViewer.loadCape(window.enderlynx.getCapePath(e.cape_id));
-                    activeCape = e;
+                    this.activeCape = e;
                 }
                 loader.style.display = "none";
                 capeImg.style.display = "block";
@@ -7437,7 +7437,7 @@ class WardrobeScreen extends Screen {
         capeEle.appendChild(capeName);
         capeName.innerHTML = translate("app.wardrobe.no_cape");
         this.capeList.appendChild(capeEle);
-        if (!activeCape) {
+        if (!this.activeCape) {
             capeEle.classList.add("selected");
         }
         capeEle.onclick = async (event) => {
@@ -7451,7 +7451,7 @@ class WardrobeScreen extends Screen {
                 currentEle.classList.add("selected");
                 this.profile.removeActiveCape();
                 if (this.skinViewer) this.skinViewer.loadCape(null);
-                activeCape = null;
+                this.activeCape = null;
             }
             loader.style.display = "none";
             capeImg.style.display = "block";
@@ -9056,7 +9056,7 @@ class SkinEntry {
     }
 }
 
-async function importSkin(info, callback) {
+async function importSkin(info) {
     if (!info.skin) {
         displayError(translate("app.wardrobe.import.no_file"));
         return;
@@ -9072,28 +9072,28 @@ async function importSkin(info, callback) {
     }
     let model = info.model;
     if (info.model == "auto") {
-        const tempImg = new Image();
-        tempImg.onload = async () => {
-            const tempCanvas = document.createElement("canvas");
-            tempCanvas.width = dims.width;
-            tempCanvas.height = dims.height;
-            const ctx = tempCanvas.getContext("2d");
-            ctx.drawImage(tempImg, 0, 0);
-            const pixel = ctx.getImageData(54, 24, 1, 1).data;
-            // pixel is [r, g, b, a]
-            if (pixel[3] === 0) {
-                model = "slim";
-            } else {
-                model = "wide";
-            }
-            await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
-            callback();
-        };
-        tempImg.src = info.skin;
-        return;
+        return await new Promise((resolve) => {
+            const tempImg = new Image();
+            tempImg.onload = async () => {
+                const tempCanvas = document.createElement("canvas");
+                tempCanvas.width = dims.width;
+                tempCanvas.height = dims.height;
+                const ctx = tempCanvas.getContext("2d");
+                ctx.drawImage(tempImg, 0, 0);
+                const pixel = ctx.getImageData(54, 24, 1, 1).data;
+                // pixel is [r, g, b, a]
+                if (pixel[3] === 0) {
+                    model = "slim";
+                } else {
+                    model = "wide";
+                }
+                await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
+                resolve();
+            };
+            tempImg.src = info.skin;
+        });
     }
     await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
-    callback();
 }
 
 async function getImageDimensionsFromDataURL(dataURL) {
@@ -13841,14 +13841,13 @@ async function processFileDrop(overlay, files) {
     } else if (overlay.dataset.action == "skin-import") {
         for (let info of fileInfo) {
             let dataUrl = await window.enderlynx.pathToDataUrl(info.info);
-            importSkin({
+            await importSkin({
                 "skin": dataUrl,
                 "name": translate("app.wardrobe.unnamed"),
                 "model": "auto"
-            }, () => {
-                if (document.body.contains(overlay)) wardrobeScreen.display();
             });
         }
+        if (document.body.contains(overlay)) wardrobeScreen.display();
     }
 }
 
