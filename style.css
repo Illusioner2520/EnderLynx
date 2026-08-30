@@ -749,9 +749,7 @@ h1 {
 
 .instance-item:has(.instance-checkbox:checked) {
     background-color: color-mix(in srgb, 25% var(--accent-color), var(--color-1));
-    outline-color: var(--accent-color);
-    outline-style: solid;
-    outline-width: 2px;
+    box-shadow: 0 0 0 2px var(--accent-color);
 }
 
 .instance-item:hover {
