@@ -1654,7 +1654,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                     file.version_id = Number(file.version_id).toString();
                     url = `https://www.curseforge.com/api/v1/mods/${file.source_info}/files/${file.version_id}/download`;
                 } else if (file.source === "vanilla_tweaks") {
-                    url = await getVanillaTweaksPackLink(JSON.parse(file.version_id), manifest_json.game_version, "resourcepack");
+                    url = await getVanillaTweaksPackLink(JSON.parse(file.version_id || file.source_info), manifest_json.game_version, "resourcepack");
                 }
                 if (!isValidDownloadURL(url)) throw new Error("Unknown host");
                 try {

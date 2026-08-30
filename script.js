@@ -4029,7 +4029,7 @@ class InstanceScreen extends Screen {
                                 "title": translate("app.content.edit_packs"),
                                 "icon": '<i class="fa-solid fa-pencil"></i>',
                                 "func": async () => {
-                                    displayVanillaTweaksEditor(this.instance.instance_id, this.instance.vanilla_version, JSON.parse(e.version_id), e.file_name, e);
+                                    displayVanillaTweaksEditor(this.instance.instance_id, this.instance.vanilla_version, JSON.parse(e.version_id), e);
                                 }
                             } : null,
                             this.instance.locked ? null : e.source == "player_install" ? null : {
@@ -11697,7 +11697,7 @@ class Pagination {
 
 let added_vt_packs = [];
 
-function displayVanillaTweaksEditor(instance_id, version, packs, file_name, content) {
+function displayVanillaTweaksEditor(instance_id, version, packs, content) {
     let wrapper = document.createElement("div");
     wrapper.className = "vt-editor-wrapper";
     let instance = Instance.getInstance(instance_id);
