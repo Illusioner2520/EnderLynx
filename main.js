@@ -4752,9 +4752,16 @@ function getNextGroupPosition() {
     return db.prepare("SELECT COALESCE(MAX(position), 0) + 1 AS next_position FROM groups").get().next_position;
 }
 
-function addGroup(group_name) {
-    let result = db.prepare("INSERT INTO groups (name, position, collapsed, type) VALUES (?, ?, ?, ?)").run(group_name, getNextGroupPosition(), Number(false), "custom");
-    return getGroup(result.lastInsertRowid);
+function addGroup(position) {
+    if (position) {
+        db.prepare("UPDATE groups SET position = position + 1 WHERE position >= ?").run(position);
+    } else {
+        position = getNextGroupPosition();
+    }
+    let result = db.prepare("INSERT INTO groups (name, position, collapsed, type) VALUES (?, ?, ?, ?)").run("", position, Number(false), "custom");
+    let id = result.lastInsertRowid;
+    db.prepare("UPDATE groups SET name = ? WHERE id = ?").run(`Group ${id}`, id);
+    return getGroup(id);
 }
 
 function getGroups() {
@@ -4793,12 +4800,28 @@ function swapGroupPositions(group_id1, group_id2) {
     return true;
 }
 
+function setGroupPosition(group_id, position) {
+    let group = getGroup(group_id);
+    let oldPosition = group.position;
+    if (oldPosition > position) {
+        db.prepare("UPDATE groups SET position = position + 1 WHERE position >= ? AND position < ?").run(position, oldPosition)
+    } else {
+        db.prepare("UPDATE groups SET position = position - 1 WHERE position > ? AND position <= ?").run(oldPosition, position);
+    }
+    db.prepare("UPDATE groups SET position = ? WHERE id = ?").run(position, group_id);
+}
+
 function setGroupName(group_id, name) {
     db.prepare("UPDATE groups SET name = ? WHERE id = ?").run(name, group_id);
 }
 
 function deleteGroup(group_id) {
     db.prepare("DELETE FROM groups WHERE id = ?").run(group_id);
+    let instances = db.prepare("SELECT * FROM instances WHERE group_id = ?").all(group_id);
+    db.prepare("UPDATE instances SET group_id = ? WHERE group_id = ?").run(-1, group_id);
+    for (let instance of instances) {
+        if (win && win.webContents) win.webContents.send('instance-updated', "group_id", -1, instance.instance_id);
+    }
 }
 
 ipcMain.on('svg-data', (_) => _.returnValue = svgData);
@@ -4866,6 +4889,7 @@ ipcMain.on('get-groups-by-type', (_, type, groups) => _.returnValue = getGroupsB
 ipcMain.handle('swap-group-positions', (_, group_id1, group_id2) => swapGroupPositions(group_id1, group_id2));
 ipcMain.handle('set-group-name', (_, group_id, name) => setGroupName(group_id, name));
 ipcMain.handle('delete-group', (_, group_id) => deleteGroup(group_id));
+ipcMain.handle('set-group-position', (_, group_id, position) => setGroupPosition(group_id, position));
 
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");

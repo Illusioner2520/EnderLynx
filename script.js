@@ -247,10 +247,10 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     let instance = Instance.getInstance(instance_id);
     if (instance[key] instanceof Date) value = Date(value);
     if (typeof instance[key] == 'boolean') value = Boolean(value);
-    instance[key] = value;
     if (instance?.listeners?.get(key)) {
-        instance.listeners.get(key)(value);
+        instance.listeners.get(key)(value, instance[key]);
     }
+    instance[key] = value;
     if (key == "mc_installed" || key == "failed") {
         InstanceStateManagement.calculateInstanceStatus(instance);
     }
@@ -525,6 +525,7 @@ class Instance {
         content.forEach((e) => {
             e.delete();
         });
+        this.deleted = true;
         await window.enderlynx.deleteInstance(this.instance_id);
     }
 
@@ -1293,10 +1294,14 @@ class Instance {
         })
     }
 
-    async showDeleteDialog(callback) {
+    showDeleteDialog(callback) {
+        Instance.showDeleteDialogForMultiple([this], callback);
+    }
+
+    static showDeleteDialogForMultiple(instances, callback) {
         let dialog = new Dialog();
         dialog.showDialog(translate("app.instances.delete.confirm.title"), "form", [{
-            "content": translate("app.instances.delete.confirm.description").replace("%i", this.name),
+            "content": instances.length == 1 ? translate("app.instances.delete.confirm.description", "%i", instances[0].name) : translate("app.instances.delete.confirm.multiple.description", "%c", instances.length),
             "type": "notice"
         }, {
             "type": "toggle",
@@ -1313,13 +1318,15 @@ class Instance {
                 "content": translate("app.instances.delete.confirm")
             }
         ], [], async (info) => {
-            this.delete();
-            callback();
-            if (info.delete) {
-                try {
-                    await window.enderlynx.deleteInstanceFiles(this.instance_id);
-                } catch (e) {
-                    displayError(translate("app.instances.delete.files.fail"));
+            for (let instance of instances) {
+                instance.delete();
+                callback();
+                if (info.delete) {
+                    try {
+                        await window.enderlynx.deleteInstanceFiles(instance.instance_id);
+                    } catch (e) {
+                        displayError(translate("app.instances.delete.files.fail"));
+                    }
                 }
             }
         });
@@ -1400,12 +1407,60 @@ class Instance {
         return this.image || getDefaultImage(this.instance_id);
     }
 
+    setSelected(selected) {
+        if (selected) {
+            this.checkbox.checked = true;
+        } else {
+            this.checkbox.checked = false;
+        }
+    }
+
     getInstanceButton() {
         let running = checkForProcess(this.pid);
         if (!running && this.pid != null) this.setPid(null);
-        let element = createElement("button", "instance-item");
-        element.onclick = () => {
+        let element = createElement("div", "instance-item");
+        makeArtificialButton(element, (event) => {
+            if (this.suppressNextClick) {
+                this.suppressNextClick = false;
+                return;
+            }
+            if (instancesScreen.selectedInstances?.has(this)) {
+                instancesScreen.deselectInstance(this);
+                return;
+            } else if (instancesScreen.selectedInstances.size > 0 || event.shiftKey || event.target.matches("input")) {
+                if (event.shiftKey && instancesScreen.lastSelectedInstance) {
+                    instancesScreen.selectRange(this);
+                    return;
+                }
+                instancesScreen.selectInstance(this);
+                return;
+            }
             this.display();
+        }, ["button", "i"]);
+        element.onpointerdown = (event) => {
+            if (event.button != 0) return;
+            this.canDrag = true;
+            let rect = this.instanceButton.getBoundingClientRect();
+            this.dragOffsetX = event.clientX - rect.left;
+            this.dragOffsetY = event.clientY - rect.top;
+            this.dragStartX = event.clientX;
+            this.dragStartY = event.clientY;
+        }
+        element.onpointerup = (event) => {
+            if (event.button != 0) return;
+            if (instancesScreen.dragging) this.suppressNextClick = true;
+            this.canDrag = false;
+        }
+        element.onpointerleave = () => {
+            this.canDrag = false;
+        }
+        element.onpointermove = (event) => {
+            if (!this.canDrag) return;
+            const dx = event.clientX - this.dragStartX;
+            const dy = event.clientY - this.dragStartY;
+            if (Math.hypot(dx, dy) < 8) return;
+            instancesScreen.startInstanceDrag(this, event, this.dragOffsetX, this.dragOffsetY);
+            this.canDrag = false;
         }
         element.dataset.id = this.instance_id;
         if (running) {
@@ -1420,14 +1475,27 @@ class Instance {
                 element.classList.remove("running");
             }
         });
+        let instancePlay = createElement("button", "instance-play-button");
+        InstanceStateManagement.registerButton(instancePlay, this, null, true, false, undefined, false, true);
+        element.appendChild(instancePlay);
+        let instanceCheckbox = createElement("input", "instance-checkbox", { type: "checkbox" });
+        element.appendChild(instanceCheckbox);
+        instanceCheckbox.onchange = (event) => {
+            if (instanceCheckbox.checked) {
+                instancesScreen.selectInstance(this);
+            } else {
+                instancesScreen.deselectInstance(this);
+            }
+        }
+        this.checkbox = instanceCheckbox;
         let instanceImage = createElement("img", "instance-image");
+        instanceImage.draggable = false;
         this.applyImage(instanceImage);
         element.appendChild(instanceImage);
         let instanceInfoEle = createElement("div", "instance-info");
         let instanceName = createElement("div", "instance-name");
         this.watchForChange("name", async (title) => {
             instanceName.textContent = title;
-            element.setAttribute("data-name", title);
         });
         instanceName.textContent = this.name;
         instanceInfoEle.appendChild(instanceName);
@@ -1548,7 +1616,7 @@ class InstanceStateManagement {
             return InstanceState.STOPPABLE;
         }
     }
-    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun, goToInstancePageWhenClicked = false) {
+    static registerButton(button, instance, world, useTooltip = false, isInContextMenu = false, callWhenRun, goToInstancePageWhenClicked = false, iconOnly = false) {
         let info = {
             element: button,
             instance,
@@ -1556,7 +1624,8 @@ class InstanceStateManagement {
             useTooltip,
             isInContextMenu,
             callWhenRun,
-            goToInstancePageWhenClicked
+            goToInstancePageWhenClicked,
+            iconOnly
         }
         let instance_id = instance.instance_id;
         if (this.states[instance_id]?.buttons) {
@@ -1576,7 +1645,7 @@ class InstanceStateManagement {
         button.removeAttribute("title");
         button.style.display = "";
         if (state == PlayButtonState.PLAY) {
-            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + (buttonInfo.iconOnly ? "" : translate("app.button.instances.play_short"));
             if (buttonInfo.isInContextMenu) {
                 button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play");
             }
@@ -1590,7 +1659,7 @@ class InstanceStateManagement {
             }
         } else if (state == PlayButtonState.STOP) {
             button.classList.add("stop");
-            button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop_short");
+            button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + (buttonInfo.iconOnly ? "" : translate("app.button.instances.stop_short"));
             if (buttonInfo.isInContextMenu) {
                 button.innerHTML = '<i class="fa-solid fa-circle-stop"></i>' + translate("app.button.instances.stop");
             }
@@ -1603,19 +1672,19 @@ class InstanceStateManagement {
             }
         } else if (state == PlayButtonState.FAILED) {
             button.classList.add("disabled");
-            button.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.instances.failed");
+            button.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + (buttonInfo.iconOnly ? "" : translate("app.instances.failed"));
             button.onclick = () => { }
             button.title = translate("app.instances.failed.tooltip");
         } else if (state == PlayButtonState.INSTALLING) {
             button.classList.add("disabled");
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.installing");
+            button.innerHTML = '<i class="spinner"></i>' + (buttonInfo.iconOnly ? "" : translate("app.instances.installing"));
             button.onclick = () => { }
         } else if (state == PlayButtonState.LOADING) {
             button.classList.add("disabled");
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.loading");
+            button.innerHTML = '<i class="spinner"></i>' + (buttonInfo.iconOnly ? "" : translate("app.instances.loading"));
             button.onclick = () => { }
         } else if (state == PlayButtonState.PLAY_SPECIFIC_WORLD) {
-            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + (buttonInfo.iconOnly ? "" : translate("app.button.instances.play_short"));
             if (buttonInfo.isInContextMenu) {
                 button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.worlds.play");
             }
@@ -1633,14 +1702,14 @@ class InstanceStateManagement {
             }
         } else if (state == PlayButtonState.STOPPING) {
             button.classList.add("stop");
-            button.innerHTML = '<i class="spinner"></i>' + translate("app.instances.stopping");
+            button.innerHTML = '<i class="spinner"></i>' + (buttonInfo.iconOnly ? "" : translate("app.instances.stopping"));
             button.onclick = () => { }
         } else if (state == PlayButtonState.SPECIFIC_WORLD_DISABLED || state == PlayButtonState.SPECIFIC_WORLD_FAILED || state == PlayButtonState.SPECIFIC_WORLD_INSTALLING) {
             if (buttonInfo.isInContextMenu) {
                 button.style.display = "none";
             }
             button.classList.add("disabled");
-            button.innerHTML = '<i class="fa-solid fa-play"></i>' + translate("app.button.instances.play_short");
+            button.innerHTML = '<i class="fa-solid fa-play"></i>' + (buttonInfo.iconOnly ? "" : translate("app.button.instances.play_short"));
             button.onclick = () => { }
             let str = "app.instances.instance_in_use";
             if (state == PlayButtonState.SPECIFIC_WORLD_FAILED) str = "app.instances.instance_failed";
@@ -3321,11 +3390,7 @@ class ContentList {
             this.checkBox.checked = false;
             this.checkBox.indeterminate = false;
         }
-        if (checked == 0) {
-            this.floatingControls.classList.remove("shown");
-        } else {
-            this.floatingControls.classList.add("shown");
-        }
+        this.floatingControls.classList.toggle("shown", checked > 0);
         this.countElement.textContent = translate("app.list.count", "%c", checked);
     }
     checkCheckboxes() {
@@ -3336,11 +3401,7 @@ class ContentList {
                 e.checked = true;
             }
         });
-        if (count > 0) {
-            this.floatingControls.classList.add("shown");
-        } else {
-            this.floatingControls.classList.remove("shown");
-        }
+        this.floatingControls.classList.toggle("shown", count > 0);
         this.countElement.textContent = translate("app.list.count", "%c", count);
     }
     uncheckCheckboxes() {
@@ -6203,6 +6264,10 @@ class Group {
     }
 
     promptDeletion() {
+        if (this.instances.length == 0) {
+            this.delete();
+            return;
+        }
         let dialog = new Dialog();
         dialog.showDialog(translate("app.instances.group.delete.title"), "notice", translate("app.instances.group.delete.description", "%g", this.groupNameElement.textContent), [
             {
@@ -6219,8 +6284,74 @@ class Group {
     }
 
     delete() {
-        this.element.remove();
         this.onDelete();
+    }
+
+    moveToGroup(instance) {
+        this.insertInSortedOrder(instance);
+        this.updateCount();
+    }
+
+    insertInSortedOrder(instance) {
+        let how = this.sortHow;
+        let low = 0;
+        let high = this.instances.length - 1;
+        while (low <= high) {
+            let mid = Math.floor((low + high) / 2);
+            let comparison = this.compareInstances(instance, this.instances[mid], how);
+            if (comparison < 0) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+        this.instances.splice(low, 0, instance);
+        let nextInstance = this.instances[low + 1];
+        if (nextInstance) {
+            this.instancesElement.insertBefore(instance.instanceButton, nextInstance.instanceButton);
+        } else {
+            if (this.instances.length == 1) this.instancesElement.innerHTML = '';
+            this.instancesElement.appendChild(instance.instanceButton);
+        }
+    }
+
+    compareInstances(a, b, how) {
+        let valueA = a[how];
+        let valueB = b[how];
+        if (valueA instanceof Date && valueB instanceof Date) {
+            let aTime = valueA.getTime();
+            let bTime = valueB.getTime();
+            if (Number.isNaN(aTime)) aTime = 0;
+            if (Number.isNaN(bTime)) bTime = 0;
+            return bTime - aTime;
+        }
+        if (typeof valueA == 'number' && typeof valueB == 'number') {
+            return valueB - valueA;
+        }
+        if (how == "vanilla_version") {
+            let aIndex = minecraftVersions.indexOf(valueA);
+            let bIndex = minecraftVersions.indexOf(valueB);
+            if (aIndex == -1 && bIndex == -1) {
+                return valueA.localeCompare(valueB);
+            }
+            if (aIndex == -1) return -1;
+            if (bIndex == -1) return 1;
+            return bIndex - aIndex;
+        }
+        return valueA.localeCompare(valueB);
+    }
+
+    removeFromGroup(instance) {
+        this.instances = this.instances.filter(e => e.instance_id != instance.instance_id);
+        this.updateCount();
+    }
+
+    hideOverlay() {
+        this.overlay.classList.remove("shown");
+    }
+
+    showOverlay() {
+        this.overlay.classList.add("shown");
     }
 
     formGroupElement(instances, sort, onDelete) {
@@ -6229,6 +6360,17 @@ class Group {
         let groupElement = createElement("div", "group");
         groupElement.dataset.id = this.id;
         this.element = groupElement;
+        let groupOverlay = createElement("div", "group-overlay");
+        let groupOverlayInner = createElement("div", "group-overlay-inner");
+        groupOverlay.appendChild(groupOverlayInner);
+        groupElement.appendChild(groupOverlay);
+        groupElement.onpointerenter = () => {
+            groupOverlay.classList.toggle("shown", Boolean(instancesScreen.dragging));
+        }
+        groupElement.onpointerleave = () => {
+            groupOverlay.classList.remove("shown");
+        }
+        this.overlay = groupOverlay;
         if (!this.collapsed) {
             groupElement.classList.add("open");
         }
@@ -6265,6 +6407,7 @@ class Group {
         groupHeader.appendChild(createElement("div", "group-spacer"));
         let groupCount = createElement("div", "group-count");
         groupCount.textContent = this.instances.length;
+        this.countElement = groupCount;
         groupHeader.appendChild(groupCount);
         groupHeader.appendChild(createElement("div", "group-spacer"));
         let groupAction1;
@@ -6331,34 +6474,22 @@ class Group {
         this.sort(sort);
     }
 
+    updateCount() {
+        this.instances = this.instances.filter(e => !e.deleted);
+        this.countElement.textContent = this.instances.length;
+        if (!this.instances || this.instances.length == 0) {
+            this.instancesElement.textContent = translate("app.instances.group.none_added");
+        }
+    }
+
     sort(how) {
+        this.sortHow = how;
         this.instances.sort((a, b) => {
-            let valueA = a[how];
-            let valueB = b[how];
-            if (valueA instanceof Date && valueB instanceof Date) {
-                let aTime = valueA.getTime();
-                let bTime = valueB.getTime();
-                if (Number.isNaN(aTime)) aTime = 0;
-                if (Number.isNaN(bTime)) bTime = 0;
-                return bTime - aTime;
-            }
-            if (typeof valueA == 'number' && typeof valueB == 'number') {
-                return valueB - valueA;
-            }
-            if (how == "vanilla_version") {
-                let aIndex = minecraftVersions.indexOf(valueA);
-                let bIndex = minecraftVersions.indexOf(valueB);
-                if (aIndex == -1 && bIndex == -1) {
-                    return valueA.localeCompare(valueB);
-                }
-                if (aIndex == -1) return -1;
-                if (bIndex == -1) return 1;
-                return bIndex - aIndex;
-            }
-            return valueA.localeCompare(valueB);
+            return this.compareInstances(a, b, how);
         });
         let fragment = document.createDocumentFragment();
         this.instances.forEach(instance => fragment.appendChild(instance.instanceButton));
+        this.instancesElement.innerHTML = "";
         this.instancesElement.appendChild(fragment);
         if (!this.instances || this.instances.length == 0) {
             this.instancesElement.textContent = translate("app.instances.group.none_added");
@@ -6406,9 +6537,233 @@ class InstancesScreen extends Screen {
         return groupList;
     }
 
+    selectInstance(instance) {
+        this.selectedInstances.add(instance);
+        instance.setSelected(true);
+        this.countElement.textContent = translate("app.list.count", "%c", this.selectedInstances.size);
+        this.floatingControls.classList.toggle("shown", this.selectedInstances.size > 0);
+        this.lastSelectedInstance = instance;
+    }
+
+    deselectInstance(instance) {
+        this.selectedInstances.delete(instance);
+        instance.setSelected(false);
+        this.countElement.textContent = translate("app.list.count", "%c", this.selectedInstances.size);
+        this.floatingControls.classList.toggle("shown", this.selectedInstances.size > 0);
+    }
+
+    clearSelection() {
+        this.selectedInstances.forEach((instance) => {
+            instance.setSelected(false);
+        });
+        this.selectedInstances.clear();
+        this.countElement.textContent = translate("app.list.count", "%c", this.selectedInstances.size);
+        this.floatingControls.classList.toggle("shown", this.selectedInstances.size > 0);
+        this.lastSelectedInstance = null;
+    }
+
+    getAllInstances() {
+        return this.activeGroups.map(e => e.instances).flat();
+    }
+
+    selectRange(instance) {
+        let sortedInstances = this.getAllInstances();
+
+        let start = sortedInstances.indexOf(this.lastSelectedInstance);
+        let end = sortedInstances.indexOf(instance);
+
+        if (start == -1 || end == -1) return;
+
+        let from = Math.min(start, end);
+        let to = Math.max(start, end);
+
+        for (let i = from; i <= to; i++) {
+            this.selectInstance(sortedInstances[i]);
+        }
+    }
+
+    startInstanceDrag(instance, event, dragOffsetX, dragOffsetY) {
+        if (this.groupBy.value != "custom_groups") return;
+        if (this.selectedInstances.has(instance)) {
+            this.draggedInstances = [...this.selectedInstances];
+        } else {
+            this.draggedInstances = [instance];
+        }
+
+        this.dragOffsetX = dragOffsetX;
+        this.dragOffsetY = dragOffsetY;
+        this.dragCursor = { x: event.clientX, y: event.clientY };
+
+        this.dragging = true;
+        document.body.classList.add("dragging");
+
+        this.createDragPreview(instance, event);
+
+        this.customGroupsById[instance.group_id || -1].showOverlay();
+
+        for (let instance of this.draggedInstances) {
+            instance.instanceButton.classList.add("dragging");
+        }
+
+        this.instanceDrag = (event) => {
+            this.dragCursor.x = event.clientX;
+            this.dragCursor.y = event.clientY;
+            this.dragPreview.style.left = (event.clientX - this.dragOffsetX) + "px";
+            this.dragPreview.style.top = (event.clientY - this.dragOffsetY) + "px";
+        }
+
+        this.dragScroll = () => {
+            if (!this.dragging || !this.dragCursor) return;
+
+            let container = this.contentElement;
+            let threshold = 80;
+            if (!container) return;
+
+            let rect = container.getBoundingClientRect();
+            let distanceFromTop = this.dragCursor.y - rect.top;
+            let distanceFromBottom = rect.bottom - this.dragCursor.y;
+            let maxScrollTop = container.scrollHeight - container.clientHeight;
+
+            if (distanceFromTop < threshold && container.scrollTop > 0) {
+                container.scrollTop = Math.max(0, container.scrollTop - (threshold - distanceFromTop) * 0.8);
+            } else if (distanceFromBottom < threshold && container.scrollTop < maxScrollTop) {
+                container.scrollTop = Math.min(maxScrollTop, container.scrollTop + (threshold - distanceFromBottom) * 0.8);
+            }
+
+            this.dragScrollFrame = requestAnimationFrame(this.dragScroll);
+        }
+        this.dragScrollFrame = requestAnimationFrame(this.dragScroll);
+
+        this.endDrag = (e) => {
+            this.endInstanceDrag(e);
+        }
+        document.body.addEventListener("pointermove", this.instanceDrag);
+        document.body.addEventListener("pointerup", this.endDrag);
+    }
+
+    endInstanceDrag(event) {
+        for (let instance of this.draggedInstances) {
+            instance.instanceButton.classList.remove("dragging");
+        }
+
+        this.dragging = false;
+        document.body.classList.remove("dragging");
+
+        if (this.dragScrollFrame) {
+            cancelAnimationFrame(this.dragScrollFrame);
+            this.dragScrollFrame = null;
+        }
+
+        for (let group of this.activeGroups) {
+            group.hideOverlay();
+        }
+
+        this.dragPreview?.remove();
+
+        this.dragPreview = null;
+        document.body.removeEventListener("pointermove", this.instanceDrag);
+        document.body.removeEventListener("pointerup", this.endDrag);
+
+        if (!event) {
+            this.draggedInstances = null;
+            return;
+        }
+
+        let element = document.elementFromPoint(
+            event.clientX,
+            event.clientY
+        );
+
+        let groupElement = element?.closest(".group");
+        let groupId = groupElement?.dataset?.id;
+        if (!groupId) {
+            this.draggedInstances = null;
+            return;
+        }
+        let group = this.customGroupsById[groupId || -1];
+
+        animateGridReorderStart(".instance-item");
+        for (let instance of this.draggedInstances) {
+            instance.setGroup(group.id);
+        }
+        animateGridReorderEnd(".instance-item");
+        this.draggedInstances = null;
+    }
+
+    createDragPreview(instance, event) {
+        if (this.dragPreview) this.dragPreview.remove();
+
+        let preview = createElement("div", "instance-drag-preview");
+        let previewLeft = event.clientX - this.dragOffsetX;
+        let previewTop = event.clientY - this.dragOffsetY;
+        preview.style.left = previewLeft + "px";
+        preview.style.top = previewTop + "px";
+        document.body.appendChild(preview);
+
+        let targetIndex = instance ? this.draggedInstances.indexOf(instance) : this.draggedInstances.length - 1;
+        let fragment = document.createDocumentFragment();
+
+        let positions = this.draggedInstances.map(dragInstance => {
+            let rect = dragInstance.instanceButton.getBoundingClientRect();
+
+            return {
+                instance: dragInstance,
+                x: rect.left,
+                y: rect.top,
+                width: rect.width,
+                height: rect.height
+            }
+        });
+
+        positions.forEach((posInfo, index) => {
+            let dragInstance = posInfo.instance;
+            let item = dragInstance.instanceButton.cloneNode(true);
+            item.classList.add("drag-preview-item");
+
+            let depth = this.draggedInstances.length - 1 - index;
+            let isTop = index == targetIndex;
+            if (depth == 0 && !isTop) {
+                depth = this.draggedInstances.length - 1 - targetIndex;
+            }
+            if (isTop) depth = 0;
+            let travelY = -1 * Math.pow(0.5, depth - 4) + 16;
+            let scale = Math.max(1 - (depth * 0.08), 0);
+            let opacity = 1 - (depth * 0.25);
+            let zIndex = -depth + 999999;
+
+            const dx = posInfo.x - previewLeft;
+            const dy = posInfo.y - previewTop;
+
+            item.style.width = `${posInfo.width}px`;
+            item.style.height = `${posInfo.height}px`;
+            item.style.scale = 1;
+            item.style.opacity = 1;
+            item.style.zIndex = zIndex;
+            item.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
+            item.style.transition = 'none';
+            if (posInfo.y < -100 || posInfo.y > window.innerHeight) {
+                item.style.opacity = opacity;
+                item.style.transform = `translate(0px, ${isTop ? 0 : travelY}px) scale(${scale})`;
+            } else {
+                requestAnimationFrame(() => {
+                    item.style.opacity = opacity;
+                    item.style.transform = `translate(0px, ${isTop ? 0 : travelY}px) scale(${scale})`;
+                    item.style.transition = '';
+                });
+            }
+
+            fragment.appendChild(item);
+
+        });
+        preview.appendChild(fragment);
+        this.dragPreview = preview;
+    }
+
     async showInstances() {
         this.hasRequestGoing = true;
         this.instances = [];
+        this.selectedInstances = new Set();
+        this.lastSelectedInstance = null;
         this.groupElements = [];
         this.customGroups = await InstancesScreen.getCustomGroups();
         this.customGroupsById = Object.fromEntries(this.customGroups.map(x => [x.id, x]));
@@ -6426,29 +6781,10 @@ class InstancesScreen extends Screen {
         title.appendChild(createButton);
         let createGroupButton = createElement("button", "create-group-button");
         createGroupButton.innerHTML = '<i class="fa-solid fa-folder-open"></i>' + translate("app.instances.group.create");
-        createGroupButton.onclick = () => {
-            let dialog = new Dialog();
-            dialog.showDialog(translate("app.instances.group.create.title"), "form", [
-                {
-                    "type": "text",
-                    "id": "name",
-                    "name": translate("app.instances.group.create.name")
-                }
-            ], [
-                {
-                    "type": "cancel",
-                    "content": translate("app.instances.group.create.cancel")
-                },
-                {
-                    "type": "confirm",
-                    "content": translate("app.instances.group.create.confirm")
-                }
-            ], [], async (info) => {
-                let groupInfo = await window.enderlynx.addGroup(info.name);
-                let group = Group.applyGroup(groupInfo.id, groupInfo);
-                this.activeGroups.push(group);
-                this.groupInstances();
-            });
+        createGroupButton.onclick = async () => {
+            let groupInfo = await window.enderlynx.addGroup(1);
+            let group = Group.applyGroup(groupInfo.id, groupInfo);
+            this.addGroup(group, 0, false);
         }
         title.appendChild(createGroupButton);
         ele.appendChild(title);
@@ -6488,11 +6824,105 @@ class InstancesScreen extends Screen {
         this.instances = await getInstances();
         for (let instance of this.instances) {
             instance.getInstanceButton();
-            instance.watchForChange("group_id", async () => {
-                this.groupInstances();
+            instance.watchForChange("group_id", async (id, old_id) => {
+                animateGridReorderStart(".instance-item");
+                if (!old_id) old_id = -1;
+                if (this.groupBy.value != "custom_groups") return;
+                this.customGroupsById[old_id || -1]?.removeFromGroup(instance);
+                this.customGroupsById[id]?.moveToGroup(instance, this.sortBy.value);
+                animateGridReorderEnd(".instance-item");
             });
         }
         this.contentElement.appendChild(ele);
+        let floatingControls = createElement("div", "floating-controls");
+        this.contentElement.appendChild(floatingControls);
+        this.floatingControls = floatingControls;
+        let clearButton = createElement("button", "selected-clear selected-button");
+        clearButton.textContent = translate("app.list.clear");
+        clearButton.onclick = () => {
+            this.clearSelection();
+        }
+        this.keydownListener = (e) => {
+            if (e.target.matches("dialog *")) return;
+            if (e.key == "Escape") {
+                if (this.dragging) {
+                    this.endInstanceDrag();
+                } else {
+                    this.clearSelection();
+                }
+            }
+        }
+        document.body.addEventListener("keydown", this.keydownListener);
+        let countElement = createElement("div", "selected-count");
+        countElement.textContent = translate("app.list.count", "%c", 0);
+        this.countElement = countElement;
+        this.floatingControls.appendChild(countElement);
+        this.floatingControls.appendChild(clearButton);
+
+        let newGroupButton = createElement("button", "selected-button");
+        newGroupButton.innerHTML = '<i class="fa-regular fa-square-plus"></i>' + translate("app.instances.new_group");
+        newGroupButton.onclick = async () => {
+            let oldGroupId = [...this.selectedInstances][0].group_id;
+            let insertIndex = oldGroupId ? this.activeGroups.findIndex(group => group.id == oldGroupId) : this.activeGroups.length;
+            let groupInfo = await window.enderlynx.addGroup(this.activeGroups[insertIndex].position);
+            let group = Group.applyGroup(groupInfo.id, groupInfo);
+            this.addGroup(group, insertIndex, true);
+            this.selectedInstances.forEach((instance) => {
+                instance.setGroup(group.id);
+            });
+            this.clearSelection();
+        }
+        floatingControls.appendChild(newGroupButton);
+
+        let moveToGroupButton = createElement("button", "selected-button");
+        moveToGroupButton.innerHTML = '<i class="fa-solid fa-arrows-up-down-left-right"></i>' + translate("app.instances.move_to_group");
+        moveToGroupButton.onclick = () => {
+            let dialog = new Dialog();
+            dialog.showDialog(translate("app.instances.move_to_group.title"), "form", [
+                {
+                    "type": "dropdown",
+                    "id": "group",
+                    "name": translate("app.instances.move_to_group.group"),
+                    "options": this.customGroups.map(e => ({ "name": e.name, "value": e.id })),
+                    "default": -1
+                }
+            ], [
+                {
+                    "type": "cancel",
+                    "content": translate("app.instances.move_to_group.cancel")
+                },
+                {
+                    "type": "confirm",
+                    "content": translate("app.instances.move_to_group.confirm")
+                }
+            ], [], (info) => {
+                let group = this.customGroupsById[info.group];
+                if (!group) return;
+                this.selectedInstances.forEach((instance) => {
+                    instance.setGroup(group.id);
+                });
+                this.clearSelection();
+            });
+        }
+        floatingControls.appendChild(moveToGroupButton);
+
+        let deleteButton = createElement("button", "selected-button danger");
+        deleteButton.innerHTML = '<i class="fa-solid fa-trash-can"></i>' + translate("app.instances.delete");
+        deleteButton.onclick = () => {
+            Instance.showDeleteDialogForMultiple([...this.selectedInstances], () => {
+                animateGridReorderStart(".instance-item");
+                this.selectedInstances.forEach((instance) => {
+                    instance.instanceButton.remove();
+                });
+                animateGridReorderEnd(".instance-item");
+                this.activeGroups.forEach((group) => {
+                    group.updateCount();
+                });
+                this.clearSelection();
+            });
+        }
+        floatingControls.appendChild(deleteButton);
+
         this.groupInstances();
         loading.element.remove();
         this.groupList.classList.add("disable-instance-list-transitions");
@@ -6527,8 +6957,8 @@ class InstancesScreen extends Screen {
 
     swapGroupPositions(group_id1, group_id2) {
         this.groupList.classList.add("disable-instance-list-transitions");
-        animateGridReorderStart(".group");
         if (!group_id2) return;
+        animateGridReorderStart(".group");
         window.enderlynx.swapGroupPositions(group_id1, group_id2);
         let group1 = this.activeGroups.find(e => e.id == group_id1);
         let group2 = this.activeGroups.find(e => e.id == group_id2);
@@ -6550,6 +6980,46 @@ class InstancesScreen extends Screen {
         this.updateGroupActions();
         animateGridReorderEnd(".group");
         this.groupList.classList.remove("disable-instance-list-transitions");
+    }
+
+    async deleteGroup(group) {
+        await window.enderlynx.deleteGroup(group.id);
+        this.customGroups = this.customGroups.filter(e => e.id != group.id);
+        this.activeGroups = this.activeGroups.filter(e => e.id != group.id);
+        delete this.customGroupsById[group.id];
+        animateGridReorderStart(".group");
+        group.element.remove();
+        this.updateGroupActions();
+        animateGridReorderEnd(".group");
+    }
+
+    addGroup(group, insertIndex = this.activeGroups.length, scrollIntoView = false) {
+        this.customGroupsById[group.id] = group;
+        if (this.groupBy.value == "custom_groups") {
+            group.formGroupElement([], this.sortBy.value, async () => {
+                await this.deleteGroup(group);
+            });
+            this.activeGroups.splice(insertIndex, 0, group);
+            if (insertIndex < this.groupList.children.length) {
+                this.groupList.children[insertIndex].before(group.element);
+            } else {
+                this.groupList.appendChild(group.element);
+            }
+            group.editName();
+        } else {
+            this.customGroups.push(group);
+        }
+        if (scrollIntoView && group.element) {
+            const rect = group.element.getBoundingClientRect();
+            const isInView = rect.top < window.innerHeight && rect.bottom > 0;
+            if (!isInView) {
+                group.element.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest'
+                });
+            }
+        }
+        this.updateGroupActions();
     }
 
     groupInstances() {
@@ -6602,9 +7072,7 @@ class InstancesScreen extends Screen {
         this.groupList.classList.add("disable-instance-list-transitions");
         for (let group of this.activeGroups) {
             group.formGroupElement(groupMap[how == "custom_groups" ? group.id : group.name] || [], this.sortBy.value, async () => {
-                await window.enderlynx.deleteGroup(group.id);
-                this.customGroups = this.customGroups.filter(e => e.id != group.id);
-                this.groupInstances();
+                await this.deleteGroup(group);
             });
             group.figureOutVisibility(this.searchBar.value);
             this.groupList.appendChild(how == "none" ? group.instancesElement : group.element);
@@ -6641,6 +7109,11 @@ class InstancesScreen extends Screen {
             group.sort(how);
         }
         if (!disableAnimation) animateGridReorderEnd(".instance-item");
+    }
+
+    onClose() {
+        if (!this.keydownListener) return;
+        document.body.removeEventListener("keydown", this.keydownListener);
     }
 }
 
@@ -14408,7 +14881,7 @@ function makeArtificialButton(element, func, notAllowedTargets = ["button"]) {
         if (notAllowedTargets.some(e => event.target.matches(e))) return;
         if (event.key == "Enter") {
             event.stopPropagation();
-            func();
+            func(event);
         }
         if (event.key == " ") {
             event.preventDefault();
@@ -14418,13 +14891,13 @@ function makeArtificialButton(element, func, notAllowedTargets = ["button"]) {
         if (notAllowedTargets.some(e => event.target.matches(e))) return;
         if (event.key == " ") {
             event.stopPropagation();
-            func();
+            func(event);
         }
     }
     element.onclick = (event) => {
         if (notAllowedTargets.some(e => event.target.matches(e))) return;
         event.stopPropagation();
-        func();
+        func(event);
     }
 }
 

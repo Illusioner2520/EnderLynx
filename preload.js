@@ -591,13 +591,14 @@ contextBridge.exposeInMainWorld('enderlynx', {
     convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value),
     getInstalledVanillaTweaksResourcePacks: async (instance_id) => ipcRenderer.invoke('get-installed-vanilla-tweaks-resource-packs', instance_id),
     getGroup: (group_id) => ipcRenderer.sendSync('get-group', group_id),
-    addGroup: async (group_name) => ipcRenderer.invoke('add-group', group_name),
+    addGroup: async (position) => ipcRenderer.invoke('add-group', position),
     getGroups: async () => ipcRenderer.invoke('get-groups'),
     setGroupCollapsed: async (group_id, collapsed) => ipcRenderer.invoke('set-group-collapsed', group_id, collapsed),
     getGroupsByType: (type, groups) => ipcRenderer.sendSync('get-groups-by-type', type, groups),
     swapGroupPositions: async (group_id1, group_id2) => ipcRenderer.invoke('swap-group-positions', group_id1, group_id2),
     setGroupName: async (group_id, name) => ipcRenderer.invoke('set-group-name', group_id, name),
-    deleteGroup: async (group_id) => ipcRenderer.invoke('delete-group', group_id)
+    deleteGroup: async (group_id) => ipcRenderer.invoke('delete-group', group_id),
+    setGroupPosition: async (group_id, position) => ipcRenderer.invoke('set-group-position', group_id, position)
 });
 
 async function getServerLastPlayed(instance_id, ip) {
