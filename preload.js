@@ -590,6 +590,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     importFile: async (file_path, instance_id, file_name, paths) => ipcRenderer.invoke('import-file', file_path, instance_id, file_name, paths),
     convertKeyInfo: async (from, to, value) => ipcRenderer.invoke('convert-key-info', from, to, value),
     getInstalledVanillaTweaksResourcePacks: async (instance_id) => ipcRenderer.invoke('get-installed-vanilla-tweaks-resource-packs', instance_id),
+    getVanillaTweaksPackLink: async (packs, version, type, cache) => ipcRenderer.invoke('get-vanilla-tweaks-pack-link', packs, version, type, cache),
     getGroup: (group_id) => ipcRenderer.sendSync('get-group', group_id),
     addGroup: async (position) => ipcRenderer.invoke('add-group', position),
     getGroups: async () => ipcRenderer.invoke('get-groups'),

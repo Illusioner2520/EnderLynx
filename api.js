@@ -783,67 +783,10 @@ class VanillaTweaks {
         }, "vanilla_tweaks", "resourcepack");
     }
     static async getLink(packs, version, type) {
-        if (!["resourcepack", "datapack", "craftingtweak"].includes(type)) return null;
-        if (version.split(".").length > 2) {
-            version = version.split(".").splice(0, 2).join(".");
-        }
         let cache = this.resource_pack_cache;
         if (type == "datapack") cache = this.data_pack_cache;
         if (type == "craftingtweak") cache = this.crafting_tweak_cache;
-        let shorthand = "rp";
-        if (type == "datapack") shorthand = "dp";
-        if (type == "craftingtweak") shorthand = "ct";
-        let data = cache[version];
-        if (!cache[version]) {
-            let urlInfo = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/${shorthand}categories.json?${(new Date()).getTime()}`);
-            data = await urlInfo.json();
-            cache[version] = data;
-        }
-        let pack_info = {};
-
-        let process_category = (category, previous_categories = []) => {
-            previous_categories.push(category.category);
-            let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
-            let packs = category.packs.map(e => e.name);
-            packs.forEach(e => {
-                pack_info[e] = id;
-            });
-            if (category.categories) {
-                category.categories.forEach(e => {
-                    process_category(e, structuredClone(previous_categories));
-                })
-            }
-        }
-        for (let i = 0; i < data.categories.length; i++) {
-            process_category(data.categories[i]);
-        }
-
-        let packs_send = {};
-        for (let i = 0; i < packs.length; i++) {
-            if (!packs_send[pack_info[packs[i].id]]) {
-                packs_send[pack_info[packs[i].id]] = [packs[i].id]
-            } else {
-                packs_send[pack_info[packs[i].id]].push(packs[i].id);
-            }
-        }
-
-        let body = new URLSearchParams({
-            packs: JSON.stringify(packs_send),
-            version
-        }).toString();
-
-        let response = await fetch(`https://vanillatweaks.net/assets/server/zip${type}s.php`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Content-Length': body.length
-            },
-            body
-        });
-
-        let urlInfo = await response.json();
-        if (urlInfo.link) return "https://vanillatweaks.net" + urlInfo.link;
-        return null;
+        return await window.enderlynx.getVanillaTweaksPackLink(packs, version, type, cache);
     }
     static async getResourcePacks(query = "", version = this.default_vanilla_tweaks_version) {
         query = query.toLowerCase().trim();

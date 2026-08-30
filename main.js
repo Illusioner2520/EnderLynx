@@ -1257,7 +1257,9 @@ async function processCfZip(instance_id, info, title = ".zip file") {
             } catch (e) {
                 let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
                 let res_json = await res.json();
-                file_name = await urlToFolder(res_json.data.downloadUrl, path.resolve(destDir, "temp"));
+                let download_url = res_json.data.downloadUrl;
+                if (!isValidDownloadURL(download_url)) throw new Error("Unknown host");
+                file_name = await urlToFolder(download_url, path.resolve(destDir, "temp"));
             }
 
             const tempFilePath = path.resolve(destDir, "temp", file_name);
@@ -1430,6 +1432,7 @@ async function processMrPack(instance_id, info, loader, title = ".mrpack file") 
                 try {
                     signal.throwIfAborted();
                     let install_path = path.resolve(destDir, file.path);
+                    if (!isValidDownloadURL(file.downloads[0])) throw new Error("Unknown host");
                     await urlToFile(file.downloads[0], install_path, { signal });
                     await validateSha1(file.hashes.sha1, install_path);
                     version_hashes.push(file.hashes.sha512);
@@ -1651,8 +1654,9 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                     file.version_id = Number(file.version_id).toString();
                     url = `https://www.curseforge.com/api/v1/mods/${file.source_info}/files/${file.version_id}/download`;
                 } else if (file.source === "vanilla_tweaks") {
-                    url = await getVanillaTweaksResourcePackLink(JSON.parse(file.source_info), manifest_json.game_version);
+                    url = await getVanillaTweaksPackLink(JSON.parse(file.source_info), manifest_json.game_version, "resourcepack");
                 }
+                if (!isValidDownloadURL(url)) throw new Error("Unknown host");
                 try {
                     await urlToFile(url, path.resolve(destDir, install_path), { signal });
                 } catch (e) {
@@ -1660,7 +1664,14 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                         let url = `https://api.modrinth.com/v2/project/${file.source_info}/version/${file.version_id}`;
                         let res_pre_json = await fetch(url, { signal });
                         let res = await res_pre_json.json();
+                        if (!isValidDownloadURL(res.files[0].url)) throw new Error("Unknown host");
                         await urlToFile(res.files[0].url, path.resolve(destDir, install_path), { signal });
+                    } else if (file.source == "curseforge") {
+                        let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
+                        let res_json = await res.json();
+                        let download_url = res_json.data.downloadUrl;
+                        if (!isValidDownloadURL(download_url)) throw new Error("Unknown host");
+                        await urlToFile(download_url, path.resolve(destDir, install_path), { signal });
                     } else {
                         throw e;
                     }
@@ -1821,7 +1832,6 @@ async function processElPack(instance_id, info, title = ".elpack file") {
     }
 }
 async function processMMCZip(instance_id, info, title = ".zip file") {
-    let max_downloads = getMaxConcurrentDownloads();
     let processId = generateNewProcessId();
     let cancelId = generateNewCancelId();
     let abortController = new AbortController();
@@ -4744,6 +4754,76 @@ async function getInstalledVanillaTweaksResourcePacks(instance_id) {
     return info?.version_id || "[]";
 }
 
+let resource_pack_cache = {};
+let data_pack_cache = {};
+let crafting_tweak_cache = {};
+
+async function getVanillaTweaksPackLink(packs, version, type, cache) {
+    if (!["resourcepack", "datapack", "craftingtweak"].includes(type)) return null;
+    if (version.split(".").length > 2) {
+        version = version.split(".").splice(0, 2).join(".");
+    }
+    if (!cache) {
+        cache = resource_pack_cache;
+        if (type == "datapack") cache = data_pack_cache;
+        if (type == "craftingtweak") cache = crafting_tweak_cache;
+    }
+    let shorthand = "rp";
+    if (type == "datapack") shorthand = "dp";
+    if (type == "craftingtweak") shorthand = "ct";
+    let data = cache[version];
+    if (!cache[version]) {
+        let urlInfo = await fetch(`https://vanillatweaks.net/assets/resources/json/${version}/${shorthand}categories.json?${(new Date()).getTime()}`);
+        data = await urlInfo.json();
+        cache[version] = data;
+    }
+    let pack_info = {};
+
+    let process_category = (category, previous_categories = []) => {
+        previous_categories.push(category.category);
+        let id = previous_categories.join(".").toLowerCase().replaceAll(" ", "-").replaceAll("'", "-");
+        let packs = category.packs.map(e => e.name);
+        packs.forEach(e => {
+            pack_info[e] = id;
+        });
+        if (category.categories) {
+            category.categories.forEach(e => {
+                process_category(e, structuredClone(previous_categories));
+            })
+        }
+    }
+    for (let i = 0; i < data.categories.length; i++) {
+        process_category(data.categories[i]);
+    }
+
+    let packs_send = {};
+    for (let i = 0; i < packs.length; i++) {
+        if (!packs_send[pack_info[packs[i].id]]) {
+            packs_send[pack_info[packs[i].id]] = [packs[i].id]
+        } else {
+            packs_send[pack_info[packs[i].id]].push(packs[i].id);
+        }
+    }
+
+    let body = new URLSearchParams({
+        packs: JSON.stringify(packs_send),
+        version
+    }).toString();
+
+    let response = await fetch(`https://vanillatweaks.net/assets/server/zip${type}s.php`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': body.length
+        },
+        body
+    });
+
+    let urlInfo = await response.json();
+    if (urlInfo.link) return "https://vanillatweaks.net" + urlInfo.link;
+    return null;
+}
+
 function getGroup(group_id) {
     return db.prepare("SELECT * FROM groups WHERE id = ?").get(group_id);
 }
@@ -4881,6 +4961,7 @@ ipcMain.handle('unpin-world', (_, ...params) => unpinWorld(...params));
 ipcMain.handle('get-pinned-instances', (_, ...params) => getPinnedInstances(...params));
 ipcMain.handle('get-pinned-worlds', (_, ...params) => getPinnedWorlds(...params));
 ipcMain.handle('get-installed-vanilla-tweaks-resource-packs', (_, instance_id) => getInstalledVanillaTweaksResourcePacks(instance_id));
+ipcMain.handle('get-vanilla-tweaks-pack-link', (_, packs, version, type) => getVanillaTweaksPackLink(packs, version, type));
 ipcMain.on('get-group', (_, group_id) => _.returnValue = getGroup(group_id));
 ipcMain.handle('add-group', (_, group_name) => addGroup(group_name));
 ipcMain.handle('get-groups', (_) => getGroups());
