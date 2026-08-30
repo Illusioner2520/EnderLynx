@@ -28,14 +28,14 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",
-    "ace-builds": "^1.43.6",
+    "ace-builds": "^1.44.0",
     "adm-zip": "^0.6.0",
     "better-sqlite3": "^13.0.3",
-    "create-desktop-shortcuts": "^1.11.1",
+    "create-desktop-shortcuts": "^1.12.0",
     "discord-rpc": "^4.0.1",
     "electron-window-state": "^5.0.3",
     "form-data": "^4.0.6",
-    "markdown-it": "^14.3.0",
+    "markdown-it": "^15.0.1",
     "msmc": "^5.0.5",
     "p-limit": "^7.3.0",
     "png-to-ico": "^3.0.1",
@@ -44,7 +44,7 @@
     "sharp": "^0.35.3",
     "skinview3d": "^3.4.1",
     "string-argv": "^0.3.2",
-    "toml": "^3.0.0",
+    "toml": "^5.0.0",
     "winreg": "^1.2.5"
   }
 }
