@@ -2475,15 +2475,12 @@ class SearchBar {
         this.onenter = onenter;
         element.classList.add("search-bar");
         this.element = element;
-        let searchIcon = document.createElement("div");
-        searchIcon.classList.add("search-icon");
+        let searchIcon = createElement("div", "search-icon");
         searchIcon.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
-        let searchInput = document.createElement("input");
-        searchInput.classList.add("search-input");
+        let searchInput = createElement("input", "search-input");
         searchInput.setAttribute("placeholder", translate("app.hint.search"));
         this.input = searchInput;
-        let searchClear = document.createElement("button");
-        searchClear.classList.add("search-clear");
+        let searchClear = createElement("button", "search-clear hidden");
         searchClear.innerHTML = '<i class="fa-solid fa-xmark"></i>';
         this.clear = searchClear;
         element.appendChild(searchIcon);
@@ -2496,6 +2493,7 @@ class SearchBar {
         searchInput.oninput = (e) => {
             this.value = searchInput.value;
             if (this.oninput) this.oninput(searchInput.value);
+            searchClear.classList.toggle("hidden", searchInput.value.length == 0);
         };
         searchInput.onchange = (e) => {
             this.value = searchInput.value;

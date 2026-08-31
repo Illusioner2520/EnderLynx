@@ -871,6 +871,10 @@ h1 {
     background-color: var(--color-1t);
 }
 
+.search-clear.hidden {
+    display: none;
+}
+
 .search-dropdown {
     position: relative;
     background-color: var(--color-1);
