@@ -517,6 +517,9 @@ contextBridge.exposeInMainWorld('enderlynx', {
     installModpack: async (info, type, instance_id, name, sha1) => {
         return await ipcRenderer.invoke('install-modpack', info, type, instance_id, name, sha1);
     },
+    updateModpack: async (info, type, instance_id, name, sha1) => {
+        return await ipcRenderer.invoke('update-modpack', info, type, instance_id, name, sha1);
+    },
     installMinecraft: async (instance_id, loader, game_version, loader_version) => {
         return await ipcRenderer.invoke('install-minecraft', instance_id, loader, game_version, loader_version);
     },

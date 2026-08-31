@@ -4254,12 +4254,12 @@ ipcMain.handle('get-java-installations', async (_) => {
     return db.prepare("SELECT * FROM java_versions").all();
 });
 
-ipcMain.handle('delete-folders-for-modpack-update', async (_, instance_id) => {
+async function deleteFoldersForModpackUpdate(instance_id) {
     let instancePath = path.resolve(user_path, `minecraft/instances/${instance_id}`)
     let folders = ["mods", "resourcepacks", "shaderpacks", "config", "defaultconfig", "scripts", "kubejs", "overrides", "libraries"];
     try {
-        for (let i = 0; i < folders.length; i++) {
-            let pathToDelete = path.resolve(instancePath, folders[i]);
+        for (let folder of folders) {
+            let pathToDelete = path.resolve(instancePath, folder);
             if (fs.existsSync(pathToDelete)) {
                 await fsPromises.rm(pathToDelete, { recursive: true, force: true });
             }
@@ -4268,7 +4268,7 @@ ipcMain.handle('delete-folders-for-modpack-update', async (_, instance_id) => {
     } catch (e) {
         return false;
     }
-});
+}
 
 ipcMain.handle('generate-options-txt', async (_, values) => {
     const tempDir = path.resolve(user_path, "out");
@@ -4406,6 +4406,9 @@ function deleteInstance(instance_id) {
 function addInstance(name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group, image, instance_id, playtime, install_source, install_id, installing, mc_installed) {
     db.prepare(`INSERT INTO instances (name, date_created, date_modified, last_played, loader, vanilla_version, loader_version, locked, downloaded, group_id, image, instance_id, playtime, install_source, install_id, installing, mc_installed, window_width, window_height, allocated_ram, fullscreen) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(name, date_created.toISOString(), date_modified.toISOString(), last_played ? last_played.toISOString() : null, loader, vanilla_version, loader_version, Number(locked), Number(downloaded), group, image, instance_id, playtime, install_source, install_id, Number(installing), Number(mc_installed), Number(getDefault("default_width")), Number(getDefault("default_height")), Number(getDefault("default_ram")), Number(getDefault("default_fullscreen")));
     return getInstance(instance_id);
+}
+function clearInstanceContent(instance_id) {
+    return db.prepare("DELETE FROM content WHERE instance = ?").run(instance_id);
 }
 
 // Content management
@@ -5099,7 +5102,30 @@ ipcMain.handle('install-minecraft', async (_, instance_id, loader, game_version,
     return await installMinecraft(instance_id, loader, game_version, loader_version);
 });
 
-async function installModpack(info, type, instance_id, name, sha1) {
+ipcMain.handle('update-modpack', async (_, info, type, instance_id, name, sha1) => {
+    return await updateModpack(info, type, instance_id, name, sha1);
+});
+
+async function updateModpack(info, type, instance_id, name, sha1) {
+    batchUpdateInstance({
+        "installing": true,
+        "mc_installed": false,
+        "failed": false
+    }, instance_id);
+    await deleteFoldersForModpackUpdate(instance_id);
+    clearInstanceContent(instance_id);
+    try {
+        await installModpack(info, type, instance_id, name, sha1, true);
+    } catch (e) {
+        updateInstance("failed", true, instance_id);
+        updateInstance("mc_installed", true, instance_id);
+        updateInstance("installing", false, instance_id);
+        return false;
+    }
+    return true;
+}
+
+async function installModpack(info, type, instance_id, name, sha1, isUpdate = false) {
     try {
         if (type == "cf_url") {
             if (!isValidDownloadURL(info)) throw new Error("Unknown host");
@@ -5123,12 +5149,14 @@ async function installModpack(info, type, instance_id, name, sha1) {
     updateInstance("loader", packInfo.loader, instance_id);
     updateInstance("vanilla_version", packInfo.vanilla_version, instance_id);
     updateInstance("loader_version", packInfo.loader_version, instance_id);
-    if (packInfo.name && !instanceInfo.name) updateInstance("name", packInfo.name, instance_id);
-    if (packInfo.allocated_ram) updateInstance("allocated_ram", packInfo.allocated_ram, instance_id);
-    if (packInfo.width) updateInstance("window_width", packInfo.width, instance_id);
-    if (packInfo.height) updateInstance("window_height", packInfo.height, instance_id);
-    if (packInfo.java_args) updateInstance("java_args", packInfo.java_args, instance_id);
-    if (packInfo.uses_custom_java_args) updateInstance("uses_custom_java_args", packInfo.uses_custom_java_args, instance_id);
+    if (!isUpdate) {
+        if (packInfo.name && !instanceInfo.name) updateInstance("name", packInfo.name, instance_id);
+        if (packInfo.allocated_ram) updateInstance("allocated_ram", packInfo.allocated_ram, instance_id);
+        if (packInfo.width) updateInstance("window_width", packInfo.width, instance_id);
+        if (packInfo.height) updateInstance("window_height", packInfo.height, instance_id);
+        if (packInfo.java_args) updateInstance("java_args", packInfo.java_args, instance_id);
+        if (packInfo.uses_custom_java_args) updateInstance("uses_custom_java_args", packInfo.uses_custom_java_args, instance_id);
+    }
     for (let i = 0; i < packInfo.content.length; i++) {
         let e = packInfo.content[i];
         addContent(e.name, e.author, e.image, e.file_name, e.source, e.type, e.version, instance_id, e.source_id, e.disabled, e.version_id);

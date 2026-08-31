@@ -512,19 +512,8 @@ class Instance {
         return contentList;
     }
 
-    async clearContent() {
-        let content = await this.getContent();
-        content.forEach(e => {
-            e.delete();
-        });
-    }
-
     async delete() {
         Instance.instances.delete(this.instance_id);
-        let content = await this.getContent();
-        content.forEach((e) => {
-            e.delete();
-        });
         this.deleted = true;
         await window.enderlynx.deleteInstance(this.instance_id);
     }
@@ -602,6 +591,13 @@ class Instance {
                 "desc": translate("app.instances.repair.mod_loader.description", "%l", loaders[this.loader]),
                 "id": "mod_loader",
                 "default": false
+            } : null,
+            this.installed_version ? {
+                "type": "toggle",
+                "name": translate("app.instances.repair.modpack"),
+                "desc": translate("app.instances.repair.modpack.description"),
+                "id": "modpack",
+                "default": false
             } : null
         ].filter(e => e), [
             {
@@ -618,8 +614,28 @@ class Instance {
             if (info.java) whatToRepair.push("java");
             if (info.assets) whatToRepair.push("assets");
             if (info.mod_loader) whatToRepair.push("mod_loader");
-            await window.enderlynx.repairMinecraft(this.instance_id, this.loader, this.vanilla_version, this.loader_version, whatToRepair);
+            if (info.modpack) {
+                await this.reinstallModpack();
+            }
+            if (whatToRepair.length > 0) {
+                await window.enderlynx.repairMinecraft(this.instance_id, this.loader, this.vanilla_version, this.loader_version, whatToRepair);
+            }
         });
+    }
+
+    async updateModpack(version) {
+        closeAllDialogs();
+        let success = await window.enderlynx.updateModpack(version.download_url, version.source == "modrinth" ? "mr_url" : "cf_url", this.instance_id, this.name, version.sha1_hash);
+        if (success) {
+            await this.setInstalledVersion(version.version_id);
+        } else {
+            displayError(translate("app.discover.error_downloading_modpack"));
+        }
+    }
+
+    async reinstallModpack() {
+        let version = await ProjectVersion.getFromId(this.installed_version, this.install_id, this.install_source);
+        return await this.updateModpack(version);
     }
 
     async showSettingsDialog() {
@@ -722,12 +738,6 @@ class Instance {
                     return await getModpackVersions(this.install_source, this.install_id);
                 },
                 "default": this.installed_version
-            } : null,
-            this.installed_version ? {
-                "type": "toggle",
-                "name": translate("app.modpack.repair"),
-                "tab": "modpack",
-                "id": "modpack_reinstall"
             } : null,
             {
                 "type": "text",
@@ -955,10 +965,10 @@ class Instance {
             await this.setPostLaunchHook(info.post_launch_hook);
             await this.setWrapper(info.wrapper);
             await this.setPostExitHook(info.post_exit_hook);
-            if (info.modpack_version && (info.modpack_version != this.installed_version || info.modpack_reinstall) && info.modpack_version != "loading") {
+            if (info.modpack_version && info.modpack_version != this.installed_version && info.modpack_version != "loading") {
                 let source = this.install_source;
                 let modpack_info = info.modpack_version_pass;
-                runModpackUpdate(this, source, modpack_info);
+                this.updateModpack(modpack_info);
                 return;
             }
             if (this.loader == info.loader && this.vanilla_version == info.game_version && this.loader_version == info.loader_version) {
@@ -2385,12 +2395,10 @@ class MoreMenu {
     }
 }
 
-let ignoreNextPointerUp = false;
-
 class ContextMenu {
+    static ignoreNextPointerUp = false;
     constructor() {
-        let element = document.createElement("div");
-        element.classList.add("context-menu");
+        let element = createElement("div", "context-menu");
         element.setAttribute("popover", "manual");
         document.body.appendChild(element);
         this.element = element;
@@ -2399,15 +2407,12 @@ class ContextMenu {
             if (!this.element.matches(':popover-open')) return;
             const t = e.target;
             if (this.element.contains(t)) return;
-            if (ignoreNextPointerUp) {
-                ignoreNextPointerUp = true;
-                return;
-            }
+            if (ContextMenu.ignoreNextPointerUp) return;
             this.hideContextMenu();
         });
 
         document.body.addEventListener("pointerdown", (e) => {
-            ignoreNextPointerUp = false;
+            ContextMenu.ignoreNextPointerUp = false;
         });
 
         document.body.addEventListener('keydown', (e) => {
@@ -2450,7 +2455,7 @@ class ContextMenu {
             this.element.appendChild(buttonElement);
         }
         this.element.showPopover();
-        ignoreNextPointerUp = true;
+        ContextMenu.ignoreNextPointerUp = true;
     }
     hideContextMenu() {
         InstanceStateManagement.removeButtons(this.element.children);
@@ -13923,24 +13928,6 @@ async function installButtonClick(content, version, instance_id) {
     }
 }
 
-async function runModpackUpdate(instanceInfo, source, version) {
-    closeAllDialogs();
-    await instanceInfo.setInstalling(true);
-    await instanceInfo.setMcInstalled(false);
-    await instanceInfo.setFailed(false);
-    await window.enderlynx.deleteFoldersForModpackUpdate(instanceInfo.instance_id);
-    await instanceInfo.clearContent();
-    await instanceInfo.setInstalledVersion(version.version_id);
-    try {
-        await window.enderlynx.installModpack(version.download_url, source == "modrinth" ? "mr_url" : "cf_url", instanceInfo.instance_id, instanceInfo.name, version.sha1_hash);
-    } catch (e) {
-        displayError(translate("app.discover.error_downloading_modpack"));
-        await instanceInfo.setFailed(true);
-        await instanceInfo.setMcInstalled(true);
-        return;
-    }
-}
-
 function closeAllDialogs() {
     let dialogs = [...document.getElementsByTagName("dialog")];
     dialogs.forEach(e => {
@@ -14622,7 +14609,7 @@ class DiscoverStateManagement {
                 }
                 if (content.project_type == "modpack" || content.project_type == "server") {
                     contentInfo.close();
-                    runModpackUpdate(buttonInfo.instance, content.source, version);
+                    buttonInfo.instance.updateModpack(version);
                     return;
                 }
                 let contentList = await buttonInfo.instance.getContent();
