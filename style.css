@@ -743,8 +743,21 @@ h1 {
     display: none;
 }
 
+.instance-item.running::after {
+    content: attr(data-running-text);
+    font-size: .7rem;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    border-radius: 4px;
+    background-color: var(--go-color);
+    color: black;
+    padding-block: 2px;
+    padding-inline: 4px;
+}
+
 .instance-item.running {
-    background-color: var(--accent-color);
+    background-color: color-mix(in srgb, 25% var(--go-color), var(--color-1))
 }
 
 .instance-item:has(.instance-checkbox:checked) {
@@ -761,7 +774,7 @@ h1 {
 }
 
 .instance-item.running:hover {
-    background-color: color-mix(in srgb, 85% var(--accent-color), var(--text-color));
+    background-color: color-mix(in srgb, 30% var(--go-color), var(--color-1))
 }
 
 .instance-item.dragging {

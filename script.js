@@ -1434,6 +1434,7 @@ class Instance {
         let running = checkForProcess(this.pid);
         if (!running && this.pid != null) this.setPid(null);
         let element = createElement("div", "instance-item");
+        element.dataset.runningText = translate("app.instances.running");
         makeArtificialButton(element, (event) => {
             if (this.suppressNextClick) {
                 this.suppressNextClick = false;
