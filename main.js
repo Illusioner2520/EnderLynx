@@ -4630,7 +4630,7 @@ async function getDefaultOptionsTXT(version) {
     let values = [];
     for (let e of options) {
         let old_key_code = await convertKeyInfo("key_code", "old_lwjgl_code", e.value);
-        if (data_version <= 1343 && old_key_code) {
+        if (data_version <= 1343 && old_key_code != null) {
             content += e.key + ":" + old_key_code + "\n"
             values.push(old_key_code);
         } else {
@@ -5318,8 +5318,15 @@ async function convertKeyInfo(from, to, value) {
     if (!key_info) {
         key_info = JSON.parse(await fsPromises.readFile(path.resolve(__dirname, "resources/keys.json"), 'utf-8'));
     }
+    if (from == "old_lwjgl_code" && value == 0) {
+        return key_info[0][to];
+    }
     let entry = key_info.find(item => item[from] == value);
-    return entry ? entry[to] : null;
+    if (entry) {
+        if (entry[to]) return entry[to];
+        if (to == "old_lwjgl_code") return 0;
+    }
+    return null;
 }
 ipcMain.handle('convert-key-info', async (_, from, to, value) => {
     return await convertKeyInfo(from, to, value);

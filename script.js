@@ -5043,7 +5043,7 @@ class InstanceScreen extends Screen {
                             onChange(keyCode);
                         } catch (e) {
                             displayError(translate("app.options.failed"));
-                            oldElement.innerHTML = oldInnerHtml;
+                            oldElement.innerHTML = oldInnerHTML;
                             oldElement.value = oldValue;
                         }
                     });
@@ -5056,11 +5056,15 @@ class InstanceScreen extends Screen {
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
 
             let onSet = async () => {
-                await DefaultOptions.setDefault(e.key, type == "text" ? '"' + inputElement.value + '"' : inputElement.value);
+                let value = inputElement.value;
+                if (type == "number" && e.key.startsWith("key_key")) {
+                    value = await window.enderlynx.convertKeyInfo("old_lwjgl_code", "key_code", value);
+                }
+                await DefaultOptions.setDefault(e.key, type == "text" ? '"' + value + '"' : value);
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 item.classList.add("default");
                 setDefaultButton.onclick = onRemove;
-                displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", inputElement.value));
+                displaySuccess(translate("app.options.default.set.success", "%k", e.key, "%v", value));
             }
 
             setDefaultButton.onclick = onSet;
@@ -5073,7 +5077,12 @@ class InstanceScreen extends Screen {
                 displaySuccess(translate("app.options.default.remove.success", "%k", e.key));
             }
 
-            if (await DefaultOptions.getDefault(e.key) == e.value) {
+            let value = e.value;
+            if (type == "number" && e.key.startsWith("key_key")) {
+                value = await window.enderlynx.convertKeyInfo("old_lwjgl_code", "key_code", e.value);
+            }
+
+            if (await DefaultOptions.getDefault(e.key) == value) {
                 setDefaultButton.innerHTML = '<i class="fa-solid fa-minus"></i>' + translate("app.options.default.remove");
                 item.classList.add("default");
                 setDefaultButton.onclick = onRemove;
@@ -5608,11 +5617,7 @@ class OptionsKeyManagement {
             else if (e.button == 2) keyCode = "key.mouse.right";
             else keyCode = `key.mouse.${e.button + 1}`;
         } else if (e instanceof KeyboardEvent) {
-            let code = e.code;
-            if (e.key == "NumLock") {
-                // because e.code for NumLock is returning "" on some systems.
-                code = "NumLock";
-            }
+            let code = e.code || e.key;
             keyCode = await window.enderlynx.convertKeyInfo("web_code", "key_code", code);
         }
         if (!keyCode) keyCode = "key.keyboard.unknown";
@@ -8256,18 +8261,15 @@ new NavigationButton(settingsButtonEle, translate("app.settings"), '<i class="fa
 
 settingsButtonEle.onclick = async () => {
     let values = await window.enderlynx.getDefaultOptions();
-    let def_opts = document.createElement("div");
-    def_opts.className = "option-list";
+    let def_opts = createElement("div", "option-list");
     let generateUIForOptions = async (values) => {
         def_opts.innerHTML = "";
         for (let i = 0; i < values.length; i++) {
             let e = values[i];
-            let item = document.createElement("div");
-            item.className = "option-item";
+            let item = createElement("div", "option-item");
             values[i].element = item;
 
-            let titleElement = document.createElement("div");
-            titleElement.className = "option-title";
+            let titleElement = createElement("div", "option-title");
             titleElement.innerHTML = e.key;
             item.appendChild(titleElement);
 
@@ -8298,56 +8300,47 @@ settingsButtonEle.onclick = async () => {
             let inputElement;
             item.dataset.type = type;
             if (type == "text") {
-                inputElement = document.createElement("input");
-                inputElement.className = "option-input";
+                inputElement = createElement("input", "option-input");
                 inputElement.value = e.value.slice(1, -1);
                 inputElement.onchange = () => {
                     DefaultOptions.setDefault(e.key, '"' + inputElement.value + '"');
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = '"' + inputElement.value + '"';
-                    oldvalue = inputElement.value;
                     onChange(inputElement.value);
                 }
                 item.appendChild(inputElement);
             } else if (type == "number") {
-                inputElement = document.createElement("input");
-                inputElement.className = "option-input";
+                inputElement = createElement("input", "option-input");
                 inputElement.value = e.value;
                 inputElement.type = "number";
                 inputElement.onchange = () => {
                     DefaultOptions.setDefault(e.key, inputElement.value);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = inputElement.value;
-                    oldvalue = inputElement.value;
                     onChange(inputElement.value);
                 }
                 item.appendChild(inputElement);
             } else if (type == "boolean") {
-                let inputElement1 = document.createElement("div");
-                inputElement1.className = "option-input";
+                let inputElement1 = createElement("div", "option-input");
                 inputElement = new Dropdown("", [{ "name": translate("app.options.true"), "value": "true" }, { "name": translate("app.options.false"), "value": "false" }], inputElement1, e.value, (v) => {
                     DefaultOptions.setDefault(e.key, v);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = v;
-                    oldvalue = v;
                     onChange(v);
                 });
                 item.appendChild(inputElement1);
             } else if (type == "unknown") {
-                inputElement = document.createElement("input");
-                inputElement.className = "option-input";
+                inputElement = createElement("input", "option-input");
                 inputElement.value = e.value;
                 inputElement.onchange = () => {
                     DefaultOptions.setDefault(e.key, inputElement.value);
                     displaySuccess(translate("app.options.updated_default"));
                     values[i].value = inputElement.value;
-                    oldvalue = inputElement.value;
                     onChange(inputElement.value);
                 }
                 item.appendChild(inputElement);
             } else if (type == "key") {
-                inputElement = document.createElement("button");
-                inputElement.className = "option-key-input";
+                inputElement = createElement("button", "option-key-input");
                 inputElement.value = e.value;
                 inputElement.dataset.key = e.key;
                 inputElement.innerHTML = (await window.enderlynx.convertKeyInfo("key_code", "text", e.value)) || e.value;
@@ -8361,8 +8354,7 @@ settingsButtonEle.onclick = async () => {
                 item.appendChild(inputElement);
             }
 
-            let setDefaultButton = document.createElement("button");
-            setDefaultButton.className = "option-button";
+            let setDefaultButton = createElement("button", "option-button");
             setDefaultButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.options.default.set");
 
             let onSet = () => {
@@ -8393,8 +8385,7 @@ settingsButtonEle.onclick = async () => {
     }
     generateUIForOptions(values);
 
-    let def_opts_buttons = document.createElement("div");
-    def_opts_buttons.className = "def_opts_actions";
+    let def_opts_buttons = createElement("div", "def_opts_actions");
 
     let importButton = document.createElement("button");
     importButton.innerHTML = '<i class="fa-solid fa-file-import"></i> ' + translate("app.settings.def_opts.import");
@@ -8438,16 +8429,15 @@ settingsButtonEle.onclick = async () => {
     importButton.className = "bug-button";
     def_opts_buttons.appendChild(importButton);
 
-    let exportButton = document.createElement("button");
+    let exportButton = createElement("button", "bug-button");
     exportButton.innerHTML = '<i class="fa-solid fa-file-export"></i> ' + translate("app.settings.def_opts.export");
     exportButton.onclick = async () => {
         let file_location = await window.enderlynx.generateOptionsTXT(values);
         openShareDialogForFile(file_location);
     }
-    exportButton.className = "bug-button";
     def_opts_buttons.appendChild(exportButton);
 
-    let addButton = document.createElement("button");
+    let addButton = createElement("button", "bug-button");
     addButton.innerHTML = '<i class="fa-solid fa-plus"></i> ' + translate("app.settings.def_opts.add");
     addButton.onclick = () => {
         let addDialog = new Dialog();
@@ -8479,10 +8469,9 @@ settingsButtonEle.onclick = async () => {
             generateUIForOptions(await window.enderlynx.getDefaultOptions());
         })
     }
-    addButton.className = "bug-button";
     def_opts_buttons.appendChild(addButton);
 
-    let applyDefaults = document.createElement("button");
+    let applyDefaults = createElement("button", "bug-button");
     applyDefaults.innerHTML = '<i class="fa-regular fa-file-lines"></i> ' + translate("app.settings.options.apply");
     applyDefaults.onclick = () => {
         let dialog = new Dialog();
@@ -8508,7 +8497,6 @@ settingsButtonEle.onclick = async () => {
             displaySuccess(translate("app.settings.options.apply.done"));
         })
     }
-    applyDefaults.className = "bug-button";
     def_opts_buttons.appendChild(applyDefaults);
 
     let dialog = new Dialog();
@@ -8605,7 +8593,7 @@ settingsButtonEle.onclick = async () => {
             ]
         });
     });
-    let app_info = document.createElement("div");
+    let app_info = createElement("div");
     app_info.style.display = "flex";
     app_info.style.flexDirection = "column";
     app_info.style.gap = "4px";
@@ -8657,7 +8645,7 @@ settingsButtonEle.onclick = async () => {
     }]
     for (let i = 0; i < info_to_show.length; i++) {
         let e = info_to_show[i];
-        let element = document.createElement("span");
+        let element = createElement("span");
         if (e.chips && !e.update) {
             let chipWrapper = createElement("div", "settings-chip-wrapper");
             let titleElement = createElement("span", "settings-chip-title");
@@ -8698,23 +8686,20 @@ settingsButtonEle.onclick = async () => {
         }
         app_info.appendChild(element);
     }
-    let bugButton = document.createElement("button");
+    let bugButton = createElement("button", "bug-button");
     bugButton.innerHTML = '<i class="fa-solid fa-bug"></i> ' + translate("app.settings.info.bug");
     bugButton.onclick = () => {
         window.enderlynx.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=1-bug_report.yml&version=" + window.enderlynx.version);
     }
-    bugButton.className = "bug-button";
     app_info.appendChild(bugButton);
-    let featureButton = document.createElement("button");
+    let featureButton = createElement("button", "bug-button");
     featureButton.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> ' + translate("app.settings.info.feature");
-    featureButton.className = "bug-button";
     featureButton.onclick = () => {
         window.enderlynx.openInBrowser("https://github.com/Illusioner2520/EnderLynx/issues/new?template=2-feature_request.yml");
     }
     app_info.appendChild(featureButton);
-    let updatesButton = document.createElement("button");
+    let updatesButton = createElement("button", "bug-button");
     updatesButton.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> ' + translate("app.settings.info.update");
-    updatesButton.className = "bug-button";
     let updateButtonClick = async () => {
         updatesButton.onclick = () => { }
         updatesButton.children[0].classList.add("spinning");
@@ -8724,9 +8709,8 @@ settingsButtonEle.onclick = async () => {
     }
     updatesButton.onclick = updateButtonClick;
     app_info.appendChild(updatesButton);
-    let clearCacheButton = document.createElement("button");
+    let clearCacheButton = createElement("button", "bug-button");
     clearCacheButton.innerHTML = '<i class="fa-solid fa-trash-can"></i> ' + translate("app.settings.clear_cache");
-    clearCacheButton.className = "bug-button";
     clearCacheButton.onclick = async () => {
         let success = await window.enderlynx.clearNetworkCache();
         if (success) {
@@ -14905,5 +14889,6 @@ window.debug = {
     DiscoverStateManagement,
     InstanceStateManagement,
     Modrinth,
-    CurseForge
+    CurseForge,
+    Instance
 }

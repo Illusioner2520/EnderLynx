@@ -1,495 +1,26 @@
 [
     {
-        "key_code": "key.keyboard.apostrophe",
-        "text": "'",
-        "web_code": "Quote",
-        "old_lwjgl_code": 40
-    },
-    {
-        "key_code": "key.keyboard.backslash",
-        "text": "\\",
-        "web_code": "Backslash",
-        "old_lwjgl_code": 43
-    },
-    {
-        "key_code": "key.keyboard.backspace",
-        "text": "Backspace",
-        "web_code": "Backspace",
-        "old_lwjgl_code": 14
-    },
-    {
-        "key_code": "key.keyboard.caps.lock",
-        "text": "Caps Lock",
-        "web_code": "CapsLock",
-        "old_lwjgl_code": 58
-    },
-    {
-        "key_code": "key.keyboard.comma",
-        "text": ",",
-        "web_code": "Comma",
-        "old_lwjgl_code": 51
-    },
-    {
-        "key_code": "key.keyboard.delete",
-        "text": "Delete",
-        "web_code": "Delete",
-        "old_lwjgl_code": 211
-    },
-    {
-        "key_code": "key.keyboard.down",
-        "text": "Down Arrow",
-        "web_code": "ArrowDown",
-        "old_lwjgl_code": 208
-    },
-    {
-        "key_code": "key.keyboard.end",
-        "text": "End",
-        "web_code": "End",
-        "old_lwjgl_code": 207
-    },
-    {
-        "key_code": "key.keyboard.enter",
-        "text": "Enter",
-        "web_code": "Enter",
-        "old_lwjgl_code": 28
-    },
-    {
-        "key_code": "key.keyboard.equal",
-        "text": "=",
-        "web_code": "Equal",
-        "old_lwjgl_code": 13
-    },
-    {
-        "key_code": "key.keyboard.f1",
-        "text": "F1",
-        "web_code": "F1",
-        "old_lwjgl_code": 59
-    },
-    {
-        "key_code": "key.keyboard.f2",
-        "text": "F2",
-        "web_code": "F2",
-        "old_lwjgl_code": 60
-    },
-    {
-        "key_code": "key.keyboard.f3",
-        "text": "F3",
-        "web_code": "F3",
-        "old_lwjgl_code": 61
-    },
-    {
-        "key_code": "key.keyboard.f4",
-        "text": "F4",
-        "web_code": "F4",
-        "old_lwjgl_code": 62
-    },
-    {
-        "key_code": "key.keyboard.f5",
-        "text": "F5",
-        "web_code": "F5",
-        "old_lwjgl_code": 63
-    },
-    {
-        "key_code": "key.keyboard.f6",
-        "text": "F6",
-        "web_code": "F6",
-        "old_lwjgl_code": 64
-    },
-    {
-        "key_code": "key.keyboard.f7",
-        "text": "F7",
-        "web_code": "F7",
-        "old_lwjgl_code": 65
-    },
-    {
-        "key_code": "key.keyboard.f8",
-        "text": "F8",
-        "web_code": "F8",
-        "old_lwjgl_code": 66
-    },
-    {
-        "key_code": "key.keyboard.f9",
-        "text": "F9",
-        "web_code": "F9",
-        "old_lwjgl_code": 67
-    },
-    {
-        "key_code": "key.keyboard.f10",
-        "text": "F10",
-        "web_code": "F10",
-        "old_lwjgl_code": 68
-    },
-    {
-        "key_code": "key.keyboard.f11",
-        "text": "F11",
-        "web_code": "F11",
-        "old_lwjgl_code": 87
-    },
-    {
-        "key_code": "key.keyboard.f12",
-        "text": "F12",
-        "web_code": "F12",
-        "old_lwjgl_code": 88
-    },
-    {
-        "key_code": "key.keyboard.f13",
-        "text": "F13",
-        "web_code": "F13",
-        "old_lwjgl_code": 100
-    },
-    {
-        "key_code": "key.keyboard.f14",
-        "text": "F14",
-        "web_code": "F14",
-        "old_lwjgl_code": 101
-    },
-    {
-        "key_code": "key.keyboard.f15",
-        "text": "F15",
-        "web_code": "F15",
-        "old_lwjgl_code": 102
-    },
-    {
-        "key_code": "key.keyboard.f16",
-        "text": "F16",
-        "web_code": "F16",
-        "old_lwjgl_code": 103
-    },
-    {
-        "key_code": "key.keyboard.f17",
-        "text": "F17",
-        "web_code": "F17",
-        "old_lwjgl_code": 104
-    },
-    {
-        "key_code": "key.keyboard.f18",
-        "text": "F18",
-        "web_code": "F18",
-        "old_lwjgl_code": 105
-    },
-    {
-        "key_code": "key.keyboard.f19",
-        "text": "F19",
-        "web_code": "F19",
-        "old_lwjgl_code": 113
-    },
-    {
-        "key_code": "key.keyboard.f20",
-        "text": "F20",
-        "web_code": "F20",
-        "old_lwjgl_code": 114
-    },
-    {
-        "key_code": "key.keyboard.f21",
-        "text": "F21",
-        "web_code": "F21",
-        "old_lwjgl_code": 115
-    },
-    {
-        "key_code": "key.keyboard.f22",
-        "text": "F22",
-        "web_code": "F22",
-        "old_lwjgl_code": 116
-    },
-    {
-        "key_code": "key.keyboard.f23",
-        "text": "F23",
-        "web_code": "F23",
-        "old_lwjgl_code": 117
-    },
-    {
-        "key_code": "key.keyboard.f24",
-        "text": "F24",
-        "web_code": "F24",
-        "old_lwjgl_code": 118
-    },
-    {
-        "key_code": "key.keyboard.f25",
-        "text": "F25",
-        "web_code": "F25",
-        "old_lwjgl_code": 119
-    },
-    {
-        "key_code": "key.keyboard.grave.accent",
-        "text": "`",
-        "web_code": "Backquote",
-        "old_lwjgl_code": 41
-    },
-    {
-        "key_code": "key.keyboard.home",
-        "text": "Home",
-        "web_code": "Home",
-        "old_lwjgl_code": 199
-    },
-    {
-        "key_code": "key.keyboard.insert",
-        "text": "Insert",
-        "web_code": "Insert",
-        "old_lwjgl_code": 210
-    },
-    {
-        "key_code": "key.keyboard.keypad.0",
-        "text": "Keypad 0",
-        "web_code": "Numpad0",
-        "old_lwjgl_code": 82
-    },
-    {
-        "key_code": "key.keyboard.keypad.1",
-        "text": "Keypad 1",
-        "web_code": "Numpad1",
-        "old_lwjgl_code": 79
-    },
-    {
-        "key_code": "key.keyboard.keypad.2",
-        "text": "Keypad 2",
-        "web_code": "Numpad2",
-        "old_lwjgl_code": 80
-    },
-    {
-        "key_code": "key.keyboard.keypad.3",
-        "text": "Keypad 3",
-        "web_code": "Numpad3",
-        "old_lwjgl_code": 81
-    },
-    {
-        "key_code": "key.keyboard.keypad.4",
-        "text": "Keypad 4",
-        "web_code": "Numpad4",
-        "old_lwjgl_code": 75
-    },
-    {
-        "key_code": "key.keyboard.keypad.5",
-        "text": "Keypad 5",
-        "web_code": "Numpad5",
-        "old_lwjgl_code": 76
-    },
-    {
-        "key_code": "key.keyboard.keypad.6",
-        "text": "Keypad 6",
-        "web_code": "Numpad6",
-        "old_lwjgl_code": 77
-    },
-    {
-        "key_code": "key.keyboard.keypad.7",
-        "text": "Keypad 7",
-        "web_code": "Numpad7",
-        "old_lwjgl_code": 71
-    },
-    {
-        "key_code": "key.keyboard.keypad.8",
-        "text": "Keypad 8",
-        "web_code": "Numpad8",
-        "old_lwjgl_code": 72
-    },
-    {
-        "key_code": "key.keyboard.keypad.9",
-        "text": "Keypad 9",
-        "web_code": "Numpad9",
-        "old_lwjgl_code": 73
-    },
-    {
-        "key_code": "key.keyboard.keypad.add",
-        "text": "Keypad +",
-        "web_code": "NumpadAdd",
-        "old_lwjgl_code": 78
-    },
-    {
-        "key_code": "key.keyboard.keypad.decimal",
-        "text": "Keypad Decimal",
-        "web_code": "NumpadDecimal",
-        "old_lwjgl_code": 83
-    },
-    {
-        "key_code": "key.keyboard.keypad.divide",
-        "text": "Keypad /",
-        "web_code": "NumpadDivide",
-        "old_lwjgl_code": 181
-    },
-    {
-        "key_code": "key.keyboard.keypad.enter",
-        "text": "Keypad Enter",
-        "web_code": "NumpadEnter",
-        "old_lwjgl_code": 156
-    },
-    {
-        "key_code": "key.keyboard.keypad.equal",
-        "text": "Keypad =",
-        "web_code": "NumpadEqual",
-        "old_lwjgl_code": 141
-    },
-    {
-        "key_code": "key.keyboard.keypad.multiply",
-        "text": "Keypad *",
-        "web_code": "NumpadMultiply",
-        "old_lwjgl_code": 55
-    },
-    {
-        "key_code": "key.keyboard.keypad.subtract",
-        "text": "Keypad -",
-        "web_code": "NumpadSubtract",
-        "old_lwjgl_code": 74
-    },
-    {
-        "key_code": "key.keyboard.left",
-        "text": "Left Arrow",
-        "web_code": "ArrowLeft",
-        "old_lwjgl_code": 203
-    },
-    {
-        "key_code": "key.keyboard.left.alt",
-        "text": "Left Alt",
-        "web_code": "AltLeft",
-        "old_lwjgl_code": 56
-    },
-    {
-        "key_code": "key.keyboard.left.bracket",
-        "text": "[",
-        "web_code": "BracketLeft",
-        "old_lwjgl_code": 26
-    },
-    {
-        "key_code": "key.keyboard.left.control",
-        "text": "Left Control",
-        "web_code": "ControlLeft",
-        "old_lwjgl_code": 29
-    },
-    {
-        "key_code": "key.keyboard.left.shift",
-        "text": "Left Shift",
-        "web_code": "ShiftLeft",
-        "old_lwjgl_code": 42
-    },
-    {
-        "key_code": "key.keyboard.left.win",
-        "text": "Left Win",
-        "web_code": "MetaLeft",
-        "old_lwjgl_code": 219
-    },
-    {
-        "key_code": "key.keyboard.menu",
-        "text": "Menu",
-        "web_code": "ContextMenu",
-        "old_lwjgl_code": 221
-    },
-    {
-        "key_code": "key.keyboard.minus",
-        "text": "-",
-        "web_code": "Minus",
-        "old_lwjgl_code": 12
-    },
-    {
-        "key_code": "key.keyboard.num.lock",
-        "text": "Num Lock",
-        "web_code": "NumLock",
-        "old_lwjgl_code": 69
-    },
-    {
-        "key_code": "key.keyboard.page.down",
-        "text": "Page Down",
-        "web_code": "PageDown",
-        "old_lwjgl_code": 209
-    },
-    {
-        "key_code": "key.keyboard.page.up",
-        "text": "Page Up",
-        "web_code": "PageUp",
-        "old_lwjgl_code": 201
-    },
-    {
-        "key_code": "key.keyboard.pause",
-        "text": "Pause",
-        "web_code": "Pause",
-        "old_lwjgl_code": 197
-    },
-    {
-        "key_code": "key.keyboard.period",
-        "text": ".",
-        "web_code": "Period",
-        "old_lwjgl_code": 52
-    },
-    {
-        "key_code": "key.keyboard.print.screen",
-        "text": "Print Screen",
-        "web_code": "PrintScreen",
-        "old_lwjgl_code": 183
-    },
-    {
-        "key_code": "key.keyboard.right",
-        "text": "Right Arrow",
-        "web_code": "ArrowRight",
-        "old_lwjgl_code": 205
-    },
-    {
-        "key_code": "key.keyboard.right.alt",
-        "text": "Right Alt",
-        "web_code": "AltRight",
-        "old_lwjgl_code": 184
-    },
-    {
-        "key_code": "key.keyboard.right.bracket",
-        "text": "]",
-        "web_code": "BracketRight",
-        "old_lwjgl_code": 27
-    },
-    {
-        "key_code": "key.keyboard.right.control",
-        "text": "Right Control",
-        "web_code": "ControlRight",
-        "old_lwjgl_code": 157
-    },
-    {
-        "key_code": "key.keyboard.right.shift",
-        "text": "Right Shift",
-        "web_code": "ShiftRight",
-        "old_lwjgl_code": 54
-    },
-    {
-        "key_code": "key.keyboard.right.win",
-        "text": "Right Win",
-        "web_code": "MetaRight",
-        "old_lwjgl_code": 220
-    },
-    {
-        "key_code": "key.keyboard.scroll.lock",
-        "text": "Scroll Lock",
-        "web_code": "ScrollLock",
-        "old_lwjgl_code": 70
-    },
-    {
-        "key_code": "key.keyboard.semicolon",
-        "text": ";",
-        "web_code": "Semicolon",
-        "old_lwjgl_code": 39
-    },
-    {
-        "key_code": "key.keyboard.slash",
-        "text": "/",
-        "web_code": "Slash",
-        "old_lwjgl_code": 53
-    },
-    {
-        "key_code": "key.keyboard.space",
-        "text": "Space",
-        "web_code": "Space",
-        "old_lwjgl_code": 57
-    },
-    {
-        "key_code": "key.keyboard.tab",
-        "text": "Tab",
-        "web_code": "Tab",
-        "old_lwjgl_code": 15
-    },
-    {
         "key_code": "key.keyboard.unknown",
         "text": "Not Bound",
-        "web_code": "Escape",
-        "old_lwjgl_code": 0
+        "web_code": "Escape"
     },
     {
-        "key_code": "key.keyboard.up",
-        "text": "Up Arrow",
-        "web_code": "ArrowUp",
-        "old_lwjgl_code": 200
+        "key_code": "key.mouse.left",
+        "text": "Left Button",
+        "web_code": "MouseLeft",
+        "old_lwjgl_code": -100
+    },
+    {
+        "key_code": "key.mouse.right",
+        "text": "Right Button",
+        "web_code": "MouseRight",
+        "old_lwjgl_code": -99
+    },
+    {
+        "key_code": "key.mouse.middle",
+        "text": "Middle Button",
+        "web_code": "MouseMiddle",
+        "old_lwjgl_code": -98
     },
     {
         "key_code": "key.keyboard.a",
@@ -648,12 +179,6 @@
         "old_lwjgl_code": 44
     },
     {
-        "key_code": "key.keyboard.0",
-        "text": "0",
-        "web_code": "Digit0",
-        "old_lwjgl_code": 11
-    },
-    {
         "key_code": "key.keyboard.1",
         "text": "1",
         "web_code": "Digit1",
@@ -708,153 +233,1044 @@
         "old_lwjgl_code": 10
     },
     {
-        "key_code": "key.mouse.left",
-        "text": "Left Button",
-        "web_code": "MouseLeft",
-        "old_lwjgl_code": -100
+        "key_code": "key.keyboard.0",
+        "text": "0",
+        "web_code": "Digit0",
+        "old_lwjgl_code": 11
     },
     {
-        "key_code": "key.mouse.middle",
-        "text": "Middle Button",
-        "web_code": "MouseMiddle",
-        "old_lwjgl_code": -98
+        "key_code": "key.keyboard.enter",
+        "text": "Enter",
+        "web_code": "Enter",
+        "old_lwjgl_code": 28
     },
     {
-        "key_code": "key.mouse.right",
-        "text": "Right Button",
-        "web_code": "MouseRight",
-        "old_lwjgl_code": -99
+        "key_code": "key.keyboard.escape",
+        "text": "Escape",
+        "old_lwjgl_code": 1
     },
     {
-        "key_code": "key.keyboard.world.1",
-        "text": "World 1",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.backspace",
+        "text": "Backspace",
+        "web_code": "Backspace",
+        "old_lwjgl_code": 14
+    },
+    {
+        "key_code": "key.keyboard.tab",
+        "text": "Tab",
+        "web_code": "Tab",
+        "old_lwjgl_code": 15
+    },
+    {
+        "key_code": "key.keyboard.space",
+        "text": "Space",
+        "web_code": "Space",
+        "old_lwjgl_code": 57
+    },
+    {
+        "key_code": "key.keyboard.minus",
+        "text": "-",
+        "web_code": "Minus",
+        "old_lwjgl_code": 12
+    },
+    {
+        "key_code": "key.keyboard.equal",
+        "text": "=",
+        "web_code": "Equal",
+        "old_lwjgl_code": 13
+    },
+    {
+        "key_code": "key.keyboard.left.bracket",
+        "text": "[",
+        "web_code": "BracketLeft",
+        "old_lwjgl_code": 26
+    },
+    {
+        "key_code": "key.keyboard.right.bracket",
+        "text": "]",
+        "web_code": "BracketRight",
+        "old_lwjgl_code": 27
+    },
+    {
+        "key_code": "key.keyboard.backslash",
+        "text": "\\",
+        "web_code": "Backslash",
+        "old_lwjgl_code": 43
     },
     {
         "key_code": "key.keyboard.world.2",
-        "text": "World 2",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "text": "World 2"
     },
     {
-        "key_code": "key.keyboard.keypad.plus.minus​",
-        "text": "Keypad ±",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.semicolon",
+        "text": ";",
+        "web_code": "Semicolon",
+        "old_lwjgl_code": 39
     },
     {
-        "key_code": "key.keyboard.keypad.left.parenthesis",
-        "text": "Keypad (",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.apostrophe",
+        "text": "'",
+        "web_code": "Quote",
+        "old_lwjgl_code": 40
     },
     {
-        "key_code": "key.keyboard.keypad.right.parenthesis",
-        "text": "Keypad )",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.grave.accent",
+        "text": "`",
+        "web_code": "Backquote",
+        "old_lwjgl_code": 41
+    },
+    {
+        "key_code": "key.keyboard.comma",
+        "text": ",",
+        "web_code": "Comma",
+        "old_lwjgl_code": 51
+    },
+    {
+        "key_code": "key.keyboard.period",
+        "text": ".",
+        "web_code": "Period",
+        "old_lwjgl_code": 52
+    },
+    {
+        "key_code": "key.keyboard.slash",
+        "text": "/",
+        "web_code": "Slash",
+        "old_lwjgl_code": 53
+    },
+    {
+        "key_code": "key.keyboard.caps.lock",
+        "text": "Caps Lock",
+        "web_code": "CapsLock",
+        "old_lwjgl_code": 58
+    },
+    {
+        "key_code": "key.keyboard.f1",
+        "text": "F1",
+        "web_code": "F1",
+        "old_lwjgl_code": 59
+    },
+    {
+        "key_code": "key.keyboard.f2",
+        "text": "F2",
+        "web_code": "F2",
+        "old_lwjgl_code": 60
+    },
+    {
+        "key_code": "key.keyboard.f3",
+        "text": "F3",
+        "web_code": "F3",
+        "old_lwjgl_code": 61
+    },
+    {
+        "key_code": "key.keyboard.f4",
+        "text": "F4",
+        "web_code": "F4",
+        "old_lwjgl_code": 62
+    },
+    {
+        "key_code": "key.keyboard.f5",
+        "text": "F5",
+        "web_code": "F5",
+        "old_lwjgl_code": 63
+    },
+    {
+        "key_code": "key.keyboard.f6",
+        "text": "F6",
+        "web_code": "F6",
+        "old_lwjgl_code": 64
+    },
+    {
+        "key_code": "key.keyboard.f7",
+        "text": "F7",
+        "web_code": "F7",
+        "old_lwjgl_code": 65
+    },
+    {
+        "key_code": "key.keyboard.f8",
+        "text": "F8",
+        "web_code": "F8",
+        "old_lwjgl_code": 66
+    },
+    {
+        "key_code": "key.keyboard.f9",
+        "text": "F9",
+        "web_code": "F9",
+        "old_lwjgl_code": 67
+    },
+    {
+        "key_code": "key.keyboard.f10",
+        "text": "F10",
+        "web_code": "F10",
+        "old_lwjgl_code": 68
+    },
+    {
+        "key_code": "key.keyboard.f11",
+        "text": "F11",
+        "web_code": "F11",
+        "old_lwjgl_code": 87
+    },
+    {
+        "key_code": "key.keyboard.f12",
+        "text": "F12",
+        "web_code": "F12",
+        "old_lwjgl_code": 88
+    },
+    {
+        "key_code": "key.keyboard.print.screen",
+        "text": "Print Screen",
+        "web_code": "PrintScreen",
+        "old_lwjgl_code": 183
+    },
+    {
+        "key_code": "key.keyboard.scroll.lock",
+        "text": "Scroll Lock",
+        "web_code": "ScrollLock",
+        "old_lwjgl_code": 70
+    },
+    {
+        "key_code": "key.keyboard.pause",
+        "text": "Pause",
+        "web_code": "Pause",
+        "old_lwjgl_code": 197
+    },
+    {
+        "key_code": "key.keyboard.insert",
+        "text": "Insert",
+        "web_code": "Insert",
+        "old_lwjgl_code": 210
+    },
+    {
+        "key_code": "key.keyboard.home",
+        "text": "Home",
+        "web_code": "Home",
+        "old_lwjgl_code": 199
+    },
+    {
+        "key_code": "key.keyboard.page.up",
+        "text": "Page Up",
+        "web_code": "PageUp",
+        "old_lwjgl_code": 201
+    },
+    {
+        "key_code": "key.keyboard.delete",
+        "text": "Delete",
+        "web_code": "Delete",
+        "old_lwjgl_code": 211
+    },
+    {
+        "key_code": "key.keyboard.end",
+        "text": "End",
+        "web_code": "End",
+        "old_lwjgl_code": 207
+    },
+    {
+        "key_code": "key.keyboard.page.down",
+        "text": "Page Down",
+        "web_code": "PageDown",
+        "old_lwjgl_code": 209
+    },
+    {
+        "key_code": "key.keyboard.right",
+        "text": "Right Arrow",
+        "web_code": "ArrowRight",
+        "old_lwjgl_code": 205
+    },
+    {
+        "key_code": "key.keyboard.left",
+        "text": "Left Arrow",
+        "web_code": "ArrowLeft",
+        "old_lwjgl_code": 203
+    },
+    {
+        "key_code": "key.keyboard.down",
+        "text": "Down Arrow",
+        "web_code": "ArrowDown",
+        "old_lwjgl_code": 208
+    },
+    {
+        "key_code": "key.keyboard.up",
+        "text": "Up Arrow",
+        "web_code": "ArrowUp",
+        "old_lwjgl_code": 200
+    },
+    {
+        "key_code": "key.keyboard.num.lock",
+        "text": "Num Lock",
+        "web_code": "NumLock",
+        "old_lwjgl_code": 69
+    },
+    {
+        "key_code": "key.keyboard.keypad.divide",
+        "text": "Keypad /",
+        "web_code": "NumpadDivide",
+        "old_lwjgl_code": 181
+    },
+    {
+        "key_code": "key.keyboard.keypad.multiply",
+        "text": "Keypad *",
+        "web_code": "NumpadMultiply",
+        "old_lwjgl_code": 55
+    },
+    {
+        "key_code": "key.keyboard.keypad.subtract",
+        "text": "Keypad -",
+        "web_code": "NumpadSubtract",
+        "old_lwjgl_code": 74
+    },
+    {
+        "key_code": "key.keyboard.keypad.add",
+        "text": "Keypad +",
+        "web_code": "NumpadAdd",
+        "old_lwjgl_code": 78
+    },
+    {
+        "key_code": "key.keyboard.keypad.enter",
+        "text": "Keypad Enter",
+        "web_code": "NumpadEnter",
+        "old_lwjgl_code": 156
+    },
+    {
+        "key_code": "key.keyboard.keypad.1",
+        "text": "Keypad 1",
+        "web_code": "Numpad1",
+        "old_lwjgl_code": 79
+    },
+    {
+        "key_code": "key.keyboard.keypad.2",
+        "text": "Keypad 2",
+        "web_code": "Numpad2",
+        "old_lwjgl_code": 80
+    },
+    {
+        "key_code": "key.keyboard.keypad.3",
+        "text": "Keypad 3",
+        "web_code": "Numpad3",
+        "old_lwjgl_code": 81
+    },
+    {
+        "key_code": "key.keyboard.keypad.4",
+        "text": "Keypad 4",
+        "web_code": "Numpad4",
+        "old_lwjgl_code": 75
+    },
+    {
+        "key_code": "key.keyboard.keypad.5",
+        "text": "Keypad 5",
+        "web_code": "Numpad5",
+        "old_lwjgl_code": 76
+    },
+    {
+        "key_code": "key.keyboard.keypad.6",
+        "text": "Keypad 6",
+        "web_code": "Numpad6",
+        "old_lwjgl_code": 77
+    },
+    {
+        "key_code": "key.keyboard.keypad.7",
+        "text": "Keypad 7",
+        "web_code": "Numpad7",
+        "old_lwjgl_code": 71
+    },
+    {
+        "key_code": "key.keyboard.keypad.8",
+        "text": "Keypad 8",
+        "web_code": "Numpad8",
+        "old_lwjgl_code": 72
+    },
+    {
+        "key_code": "key.keyboard.keypad.9",
+        "text": "Keypad 9",
+        "web_code": "Numpad9",
+        "old_lwjgl_code": 73
+    },
+    {
+        "key_code": "key.keyboard.keypad.0",
+        "text": "Keypad 0",
+        "web_code": "Numpad0",
+        "old_lwjgl_code": 82
     },
     {
         "key_code": "key.keyboard.keypad.period",
         "text": "Keypad .",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "web_code": "NumpadDecimal",
+        "old_lwjgl_code": 83
     },
     {
-        "key_code": "key.keyboard.keypad.comma",
-        "text": "Keypad ,",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.world.1",
+        "text": "World 1"
     },
     {
         "key_code": "key.keyboard.application",
-        "text": "Menu",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "text": "Menu"
     },
     {
-        "key_code": "key.keyboard.mute",
-        "text": "Mute",
-        "web_code": "AudioVolumeMute",
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.power",
+        "text": "Power",
+        "old_lwjgl_code": 222
     },
     {
-        "key_code": "key.keyboard.volume.down",
-        "text": "Volume Down",
-        "web_code": "AudioVolumeDown",
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.keypad.equal",
+        "text": "Keypad =",
+        "web_code": "NumpadEqual",
+        "old_lwjgl_code": 141
     },
     {
-        "key_code": "key.keyboard.volume.up",
-        "text": "Volume Up",
-        "web_code": "AudioVolumeUp",
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f13",
+        "text": "F13",
+        "web_code": "F13",
+        "old_lwjgl_code": 100
     },
     {
-        "key_code": "key.keyboard.media.play.pause",
-        "text": "Play/Pause",
-        "web_code": "MediaPlayPause",
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f14",
+        "text": "F14",
+        "web_code": "F14",
+        "old_lwjgl_code": 101
     },
     {
-        "key_code": "key.keyboard.stop",
-        "text": "Stop",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f15",
+        "text": "F15",
+        "web_code": "F15",
+        "old_lwjgl_code": 102
     },
     {
-        "key_code": "key.keyboard.cut",
-        "text": "Cut",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f16",
+        "text": "F16",
+        "web_code": "F16",
+        "old_lwjgl_code": 103
     },
     {
-        "key_code": "key.keyboard.copy",
-        "text": "Copy",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f17",
+        "text": "F17",
+        "web_code": "F17",
+        "old_lwjgl_code": 104
     },
     {
-        "key_code": "key.keyboard.paste",
-        "text": "Paste",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f18",
+        "text": "F18",
+        "web_code": "F18",
+        "old_lwjgl_code": 105
     },
     {
-        "key_code": "key.keyboard.undo",
-        "text": "Undo",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f19",
+        "text": "F19",
+        "web_code": "F19",
+        "old_lwjgl_code": 113
     },
     {
-        "key_code": "key.keyboard.again",
-        "text": "Again",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f20",
+        "text": "F20",
+        "web_code": "F20"
     },
     {
-        "key_code": "key.keyboard.new",
-        "text": "New",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f21",
+        "text": "F21",
+        "web_code": "F21"
     },
     {
-        "key_code": "key.keyboard.save",
-        "text": "Save",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "key_code": "key.keyboard.f22",
+        "text": "F22",
+        "web_code": "F22"
+    },
+    {
+        "key_code": "key.keyboard.f23",
+        "text": "F23",
+        "web_code": "F23"
+    },
+    {
+        "key_code": "key.keyboard.f24",
+        "text": "F24",
+        "web_code": "F24"
+    },
+    {
+        "key_code": "key.keyboard.execute",
+        "text": "Execute",
+        "web_code": "Execute"
     },
     {
         "key_code": "key.keyboard.help",
         "text": "Help",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "web_code": "Help"
+    },
+    {
+        "key_code": "key.keyboard.menu",
+        "text": "Menu",
+        "web_code": "ContextMenu",
+        "old_lwjgl_code": 221
+    },
+    {
+        "key_code": "key.keyboard.select",
+        "text": "Select",
+        "web_code": "Select"
+    },
+    {
+        "key_code": "key.keyboard.stop",
+        "text": "Stop"
+    },
+    {
+        "key_code": "key.keyboard.again",
+        "text": "Again"
+    },
+    {
+        "key_code": "key.keyboard.undo",
+        "text": "Undo"
+    },
+    {
+        "key_code": "key.keyboard.cut",
+        "text": "Cut"
+    },
+    {
+        "key_code": "key.keyboard.copy",
+        "text": "Copy"
+    },
+    {
+        "key_code": "key.keyboard.paste",
+        "text": "Paste"
     },
     {
         "key_code": "key.keyboard.find",
-        "text": "Find",
-        "web_code": null,
-        "old_lwjgl_code": 0
+        "text": "Find"
+    },
+    {
+        "key_code": "key.keyboard.mute",
+        "text": "Mute",
+        "web_code": "AudioVolumeMute"
+    },
+    {
+        "key_code": "key.keyboard.volume.up",
+        "text": "Volume Up",
+        "web_code": "AudioVolumeUp"
+    },
+    {
+        "key_code": "key.keyboard.volume.down",
+        "text": "Volume Down",
+        "web_code": "AudioVolumeDown"
+    },
+    {
+        "key_code": "key.keyboard.keypad.comma",
+        "text": "Keypad ,",
+        "old_lwjgl_code": 179
+    },
+    {
+        "key_code": "key.keyboard.keypad.equals.as400",
+        "text": "Keypad = (AS400)"
+    },
+    {
+        "key_code": "key.keyboard.international1",
+        "text": "International 1"
+    },
+    {
+        "key_code": "key.keyboard.international2",
+        "text": "International 2",
+        "web_code": "HiraganaKatakana"
+    },
+    {
+        "key_code": "key.keyboard.international3",
+        "text": "International 3",
+        "old_lwjgl_code": 125
+    },
+    {
+        "key_code": "key.keyboard.international4",
+        "text": "International 4",
+        "web_code": "henkan",
+        "old_lwjgl_code": 121
+    },
+    {
+        "key_code": "key.keyboard.international5",
+        "text": "International 5",
+        "web_code": "muhenkan",
+        "old_lwjgl_code": 123
+    },
+    {
+        "key_code": "key.keyboard.international6",
+        "text": "International 6"
+    },
+    {
+        "key_code": "key.keyboard.international7",
+        "text": "International 7"
+    },
+    {
+        "key_code": "key.keyboard.international8",
+        "text": "International 8"
+    },
+    {
+        "key_code": "key.keyboard.international9",
+        "text": "International 9"
+    },
+    {
+        "key_code": "key.keyboard.lang1",
+        "text": "Language 1"
+    },
+    {
+        "key_code": "key.keyboard.lang2",
+        "text": "Language 2"
+    },
+    {
+        "key_code": "key.keyboard.lang3",
+        "text": "Language 3"
+    },
+    {
+        "key_code": "key.keyboard.lang4",
+        "text": "Language 4"
+    },
+    {
+        "key_code": "key.keyboard.lang5",
+        "text": "Language 5",
+        "web_code": "ZenkakuHankaku"
+    },
+    {
+        "key_code": "key.keyboard.lang6",
+        "text": "Language 6"
+    },
+    {
+        "key_code": "key.keyboard.lang7",
+        "text": "Language 7"
+    },
+    {
+        "key_code": "key.keyboard.lang8",
+        "text": "Language 8"
+    },
+    {
+        "key_code": "key.keyboard.lang9",
+        "text": "Language 9"
+    },
+    {
+        "key_code": "key.keyboard.alternate.erase",
+        "text": "Alternate Erase"
+    },
+    {
+        "key_code": "key.keyboard.sys.req",
+        "text": "SysRq"
+    },
+    {
+        "key_code": "key.keyboard.cancel",
+        "text": "Cancel",
+        "web_code": "Cancel"
+    },
+    {
+        "key_code": "key.keyboard.clear",
+        "text": "Clear",
+        "web_code": "Clear",
+        "old_lwjgl_code": 218
+    },
+    {
+        "key_code": "key.keyboard.prior",
+        "text": "Prior",
+        "old_lwjgl_code": 201
+    },
+    {
+        "key_code": "key.keyboard.enter2",
+        "text": "Enter 2"
+    },
+    {
+        "key_code": "key.keyboard.separator",
+        "text": "Separator"
+    },
+    {
+        "key_code": "key.keyboard.out",
+        "text": "Out"
+    },
+    {
+        "key_code": "key.keyboard.oper",
+        "text": "Oper"
+    },
+    {
+        "key_code": "key.keyboard.clear.again",
+        "text": "Clear Again"
+    },
+    {
+        "key_code": "key.keyboard.crsel",
+        "text": "CrSel"
+    },
+    {
+        "key_code": "key.keyboard.exsel",
+        "text": "ExSel"
+    },
+    {
+        "key_code": "key.keyboard.keypad.00",
+        "text": "Keypad 00"
+    },
+    {
+        "key_code": "key.keyboard.keypad.000",
+        "text": "Keypad 000"
+    },
+    {
+        "key_code": "key.keyboard.thousands.separator",
+        "text": "Thousands Separator"
+    },
+    {
+        "key_code": "key.keyboard.decimal.separator",
+        "text": "Decimal Separator"
+    },
+    {
+        "key_code": "key.keyboard.currency.unit",
+        "text": "Currency Unit"
+    },
+    {
+        "key_code": "key.keyboard.currency.subunit",
+        "text": "Currency Subunit"
+    },
+    {
+        "key_code": "key.keyboard.keypad.left.parenthesis",
+        "text": "Keypad ("
+    },
+    {
+        "key_code": "key.keyboard.keypad.right.parenthesis",
+        "text": "Keypad )"
+    },
+    {
+        "key_code": "key.keyboard.keypad.left.brace",
+        "text": "Keypad {"
+    },
+    {
+        "key_code": "key.keyboard.keypad.right.brace",
+        "text": "Keypad }"
+    },
+    {
+        "key_code": "key.keyboard.keypad.tab",
+        "text": "Keypad Tab"
+    },
+    {
+        "key_code": "key.keyboard.keypad.backspace",
+        "text": "Keypad Backspace"
+    },
+    {
+        "key_code": "key.keyboard.keypad.a",
+        "text": "Keypad A"
+    },
+    {
+        "key_code": "key.keyboard.keypad.b",
+        "text": "Keypad B"
+    },
+    {
+        "key_code": "key.keyboard.keypad.c",
+        "text": "Keypad C"
+    },
+    {
+        "key_code": "key.keyboard.keypad.d",
+        "text": "Keypad D"
+    },
+    {
+        "key_code": "key.keyboard.keypad.e",
+        "text": "Keypad E"
+    },
+    {
+        "key_code": "key.keyboard.keypad.f",
+        "text": "Keypad F"
+    },
+    {
+        "key_code": "key.keyboard.keypad.xor",
+        "text": "Keypad XOR"
+    },
+    {
+        "key_code": "key.keyboard.keypad.power",
+        "text": "Keypad ^"
+    },
+    {
+        "key_code": "key.keyboard.keypad.percent",
+        "text": "Keypad %"
+    },
+    {
+        "key_code": "key.keyboard.keypad.less",
+        "text": "Keypad <"
+    },
+    {
+        "key_code": "key.keyboard.keypad.greater",
+        "text": "Keypad >"
+    },
+    {
+        "key_code": "key.keyboard.keypad.ampersand",
+        "text": "Keypad &"
+    },
+    {
+        "key_code": "key.keyboard.keypad.double.ampersand",
+        "text": "Keypad &&"
+    },
+    {
+        "key_code": "key.keyboard.keypad.vertical.bar",
+        "text": "Keypad |"
+    },
+    {
+        "key_code": "key.keyboard.keypad.double.vertical.bar",
+        "text": "Keypad ||"
+    },
+    {
+        "key_code": "key.keyboard.keypad.colon",
+        "text": "Keypad :"
+    },
+    {
+        "key_code": "key.keyboard.keypad.hash",
+        "text": "Keypad #"
+    },
+    {
+        "key_code": "key.keyboard.keypad.space",
+        "text": "Keypad Space"
+    },
+    {
+        "key_code": "key.keyboard.keypad.at",
+        "text": "Keypad @"
+    },
+    {
+        "key_code": "key.keyboard.keypad.exclamation",
+        "text": "Keypad !"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.store",
+        "text": "Keypad MS"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.recall",
+        "text": "Keypad MR"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.clear",
+        "text": "Keypad MC"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.add",
+        "text": "Keypad M+"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.subtract",
+        "text": "Keypad M-"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.multiply",
+        "text": "Keypad M*"
+    },
+    {
+        "key_code": "key.keyboard.keypad.memory.divide",
+        "text": "Keypad M/"
+    },
+    {
+        "key_code": "key.keyboard.keypad.plus.minus",
+        "text": "Keypad ±"
+    },
+    {
+        "key_code": "key.keyboard.keypad.clear",
+        "text": "Keypad Clear"
+    },
+    {
+        "key_code": "key.keyboard.keypad.clear.entry",
+        "text": "Keypad Clear Entry"
+    },
+    {
+        "key_code": "key.keyboard.keypad.binary",
+        "text": "Keypad Binary"
+    },
+    {
+        "key_code": "key.keyboard.keypad.octal",
+        "text": "Keypad Octal"
+    },
+    {
+        "key_code": "key.keyboard.keypad.decimal",
+        "text": "Keypad Decimal"
+    },
+    {
+        "key_code": "key.keyboard.keypad.hexadecimal",
+        "text": "Keypad Hexadecimal"
+    },
+    {
+        "key_code": "key.keyboard.left.control",
+        "text": "Left Control",
+        "web_code": "ControlLeft",
+        "old_lwjgl_code": 29
+    },
+    {
+        "key_code": "key.keyboard.left.shift",
+        "text": "Left Shift",
+        "web_code": "ShiftLeft",
+        "old_lwjgl_code": 42
+    },
+    {
+        "key_code": "key.keyboard.left.alt",
+        "text": "Left Alt",
+        "web_code": "AltLeft",
+        "old_lwjgl_code": 56
+    },
+    {
+        "key_code": "key.keyboard.left.win",
+        "text": "Left Win",
+        "web_code": "MetaLeft",
+        "old_lwjgl_code": 219
+    },
+    {
+        "key_code": "key.keyboard.right.control",
+        "text": "Right Control",
+        "web_code": "ControlRight",
+        "old_lwjgl_code": 157
+    },
+    {
+        "key_code": "key.keyboard.right.shift",
+        "text": "Right Shift",
+        "web_code": "ShiftRight",
+        "old_lwjgl_code": 54
+    },
+    {
+        "key_code": "key.keyboard.right.alt",
+        "text": "Right Alt",
+        "web_code": "AltRight",
+        "old_lwjgl_code": 184
+    },
+    {
+        "key_code": "key.keyboard.right.win",
+        "text": "Right Win",
+        "web_code": "MetaRight",
+        "old_lwjgl_code": 220
+    },
+    {
+        "key_code": "key.keyboard.mode",
+        "text": "Mode"
+    },
+    {
+        "key_code": "key.keyboard.sleep",
+        "text": "Sleep"
+    },
+    {
+        "key_code": "key.keyboard.wake",
+        "text": "Wake"
+    },
+    {
+        "key_code": "key.keyboard.channel.up",
+        "text": "Channel Up"
+    },
+    {
+        "key_code": "key.keyboard.channel.down",
+        "text": "Channel Down"
+    },
+    {
+        "key_code": "key.keyboard.media.play",
+        "text": "Media Play"
+    },
+    {
+        "key_code": "key.keyboard.media.pause",
+        "text": "Media Pause"
+    },
+    {
+        "key_code": "key.keyboard.media.record",
+        "text": "Record"
+    },
+    {
+        "key_code": "key.keyboard.media.fast.forward",
+        "text": "Fast Forward"
+    },
+    {
+        "key_code": "key.keyboard.media.rewind",
+        "text": "Rewind"
+    },
+    {
+        "key_code": "key.keyboard.media.next.track",
+        "text": "Next Track",
+        "web_code": "MediaTrackNext"
+    },
+    {
+        "key_code": "key.keyboard.media.previous.track",
+        "text": "Previous Track",
+        "web_code": "MediaTrackPrevious"
+    },
+    {
+        "key_code": "key.keyboard.media.stop",
+        "text": "Media Stop",
+        "web_code": "MediaStop"
+    },
+    {
+        "key_code": "key.keyboard.media.eject",
+        "text": "Eject"
+    },
+    {
+        "key_code": "key.keyboard.media.play.pause",
+        "text": "Play/Pause",
+        "web_code": "MediaPlayPause"
+    },
+    {
+        "key_code": "key.keyboard.media.select",
+        "text": "Media Select"
+    },
+    {
+        "key_code": "key.keyboard.ac.new",
+        "text": "AC New"
+    },
+    {
+        "key_code": "key.keyboard.new",
+        "text": "AC New"
+    },
+    {
+        "key_code": "key.keyboard.ac.open",
+        "text": "AC Open"
+    },
+    {
+        "key_code": "key.keyboard.ac.close",
+        "text": "AC Close"
+    },
+    {
+        "key_code": "key.keyboard.ac.exit",
+        "text": "AC Exit"
+    },
+    {
+        "key_code": "key.keyboard.ac.save",
+        "text": "AC Save"
+    },
+    {
+        "key_code": "key.keyboard.save",
+        "text": "AC Save"
+    },
+    {
+        "key_code": "key.keyboard.ac.print",
+        "text": "AC Print"
+    },
+    {
+        "key_code": "key.keyboard.ac.properties",
+        "text": "AC Properties"
+    },
+    {
+        "key_code": "key.keyboard.ac.search",
+        "text": "AC Search"
+    },
+    {
+        "key_code": "key.keyboard.ac.home",
+        "text": "AC Home"
+    },
+    {
+        "key_code": "key.keyboard.ac.back",
+        "text": "AC Back",
+        "web_code": "BrowserBack"
+    },
+    {
+        "key_code": "key.keyboard.ac.forward",
+        "text": "AC Forward",
+        "web_code": "BrowserForward"
+    },
+    {
+        "key_code": "key.keyboard.ac.stop",
+        "text": "AC Stop"
+    },
+    {
+        "key_code": "key.keyboard.ac.refresh",
+        "text": "AC Refresh",
+        "web_code": "BrowserRefresh"
+    },
+    {
+        "key_code": "key.keyboard.ac.bookmarks",
+        "text": "AC Favorites"
+    },
+    {
+        "key_code": "key.keyboard.soft.left",
+        "text": "Soft Left"
+    },
+    {
+        "key_code": "key.keyboard.soft.right",
+        "text": "Soft Right"
+    },
+    {
+        "key_code": "key.keyboard.call",
+        "text": "Call"
+    },
+    {
+        "key_code": "key.keyboard.end.call",
+        "text": "End Call"
+    },
+    {
+        "key_code": "key.keyboard.f25",
+        "text": "F25",
+        "web_code": "F25"
     }
 ]
