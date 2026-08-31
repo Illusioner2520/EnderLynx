@@ -254,6 +254,7 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     if (key == "mc_installed" || key == "failed") {
         InstanceStateManagement.calculateInstanceStatus(instance);
     }
+    console.log("SET " + key + " TO " + value + " FOR INSTANCE " + instance_id);
 });
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
@@ -1897,6 +1898,42 @@ class Profile {
     async runFriendAction(action, friend) {
         return await window.enderlynx.friendAction(this.id, action, friend);
     }
+
+    async applyCape(cape) {
+        try {
+            await window.enderlynx.setCape(this.id, cape ? cape.cape_id : null);
+            displaySuccess(translate("app.wardrobe.cape.change"));
+            return true;
+        } catch (e) {
+            displayError(e.message);
+            return false;
+        }
+    }
+
+    async applySkin(skin) {
+        if (skin.texture_key) return await this.applySkinFromURL(skin);
+        try {
+            await window.enderlynx.setSkin(this.id, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
+            accountSwitcher.reloadHeads();
+            displaySuccess(translate("app.wardrobe.skin.change"));
+            return true;
+        } catch (e) {
+            displayError(e.message);
+            return false;
+        }
+    }
+
+    async applySkinFromURL(skin) {
+        try {
+            await window.enderlynx.setSkinFromURL(this.id, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
+            accountSwitcher.reloadHeads();
+            displaySuccess(translate("app.wardrobe.skin.change"));
+            return true;
+        } catch (e) {
+            displayError(e.message);
+            return false;
+        }
+    }
 }
 
 class MinecraftAccountSwitcher {
@@ -1996,7 +2033,9 @@ class MinecraftAccountSwitcher {
             let addPlayerButton = document.createElement("button");
             addPlayerButton.classList.add("add-player");
             addPlayerButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.button.players.add");
-            addPlayerButton.onclick = toggleMicrosoftSignIn;
+            addPlayerButton.onclick = () => {
+                this.showMicrosoftSignIn();
+            }
             dropdownElement.appendChild(addPlayerButton);
             if (!alreadyThere) document.body.appendChild(dropdownElement);
         } else {
@@ -2018,7 +2057,9 @@ class MinecraftAccountSwitcher {
             pChevron.className = "player-chevron";
             pChevron.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i>';
             this.element.appendChild(pChevron);
-            this.element.onclick = toggleMicrosoftSignIn;
+            this.element.onclick = () => {
+                this.showMicrosoftSignIn();
+            }
         }
     }
     addPlayer(newPlayerInfo) {
@@ -2101,6 +2142,16 @@ class MinecraftAccountSwitcher {
         }
         if (Display.currentScreen.tabName == "home") {
             homeScreen.changeHomeWelcome();
+        }
+    }
+    async showMicrosoftSignIn() {
+        try {
+            let player = await window.enderlynx.triggerMicrosoftLogin();
+            this.selectPlayer(await getProfileFromUUID(player.uuid));
+            this.reloadHeads();
+        } catch (e) {
+            if (e.message.includes("error.gui.closed")) return;
+            displayError(translate("app.login_error"));
         }
     }
 }
@@ -7872,7 +7923,7 @@ class WardrobeScreen extends Screen {
                 loader.style.display = "block";
                 capeImg.style.display = "none";
                 let currentEle = capeEle;
-                let success = await applyCape(this.profile.id, e);
+                let success = await this.profile.applyCape(e);
                 if (success) {
                     let oldEle = document.querySelector(".my-account-option.cape.selected");
                     oldEle.classList.remove("selected");
@@ -7925,7 +7976,7 @@ class WardrobeScreen extends Screen {
             loader.style.display = "block";
             capeImg.style.display = "none";
             let currentEle = event.currentTarget;
-            let success = await applyCape(this.profile.id, null);
+            let success = await this.profile.applyCape(null);
             if (success) {
                 let oldEle = document.querySelector(".my-account-option.cape.selected");
                 oldEle.classList.remove("selected");
@@ -9135,17 +9186,6 @@ settingsButtonEle.onclick = async () => {
 
 let navButtons = [homeButton, instancesButton, discoverButton, wardrobeButton, friendsButton];
 
-async function toggleMicrosoftSignIn() {
-    try {
-        let player = await window.enderlynx.triggerMicrosoftLogin();
-        accountSwitcher.selectPlayer(await getProfileFromUUID(player.uuid));
-        accountSwitcher.reloadHeads();
-    } catch (e) {
-        if (e.message.includes("error.gui.closed")) return;
-        displayError(translate("app.login_error"));
-    }
-}
-
 let dont_override_my_page = false;
 
 async function applyDefaults() {
@@ -9277,7 +9317,7 @@ class SkinEntry {
             loader.style.display = "block";
             skinImg.style.display = "none";
             let currentEle = skinEle;
-            let success = e.texture_key ? (await applySkinFromURL(default_profile.id, e)) : (await applySkin(default_profile.id, e));
+            let success = await default_profile.applySkin(e);
             if (success) {
                 let oldEle = document.querySelector(".my-account-option.skin.selected");
                 if (oldEle) oldEle.classList.remove("selected");
@@ -11586,8 +11626,6 @@ function formatNumber(num) {
     return "Some Number";
 }
 
-let pages = 0;
-
 class Pagination {
     constructor(currentPage, totalPages, change_page_function) {
         let element = document.createElement("div");
@@ -12153,41 +12191,6 @@ function sanitize(input) {
 }
 
 const superSanitizer = new Sanitizer({ elements: ["p", "div", "span", { name: "img", attributes: ["src", "width", "height", "alt"] }, { name: "iframe", attributes: ["src", "width", "height", "alt"] }, "b", "center", "strong", { name: "details", attributes: ["open"] }, "summary", { name: "font", attributes: ["size"] }, "a", "h1", "h2", "h3", "h4", "h5", "h6", "i", "u", "br", "hr", "code", "dl", "dt", "em", "kbd", "li", "ol", "ul", "pre", "table", "tbody", "td", "th", "tfoot", "tr", "tt", "wbr", "blockquote", "section", "s", "thead", "sup", "abbr", "sub", "del", "strike", "ins"], "attributes": ["style", "title", "href", "align", "class"], "comments": false });
-
-async function applyCape(profile_id, cape) {
-    try {
-        await window.enderlynx.setCape(profile_id, cape ? cape.cape_id : null);
-        displaySuccess(translate("app.wardrobe.cape.change"));
-        return true;
-    } catch (e) {
-        displayError(e.message);
-        return false;
-    }
-}
-
-async function applySkin(profile_id, skin) {
-    try {
-        await window.enderlynx.setSkin(profile_id, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
-        accountSwitcher.reloadHeads();
-        displaySuccess(translate("app.wardrobe.skin.change"));
-        return true;
-    } catch (e) {
-        displayError(e.message);
-        return false;
-    }
-}
-
-async function applySkinFromURL(profile_id, skin) {
-    try {
-        await window.enderlynx.setSkinFromURL(profile_id, "https://textures.minecraft.net/texture/" + skin.texture_key, skin.model == "wide" ? "classic" : "slim");
-        accountSwitcher.reloadHeads();
-        displaySuccess(translate("app.wardrobe.skin.change"));
-        return true;
-    } catch (e) {
-        displayError(e.message);
-        return false;
-    }
-}
 
 document.getElementsByClassName("toasts")[0].showPopover();
 

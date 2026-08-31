@@ -5108,9 +5108,9 @@ ipcMain.handle('update-modpack', async (_, info, type, instance_id, name, sha1) 
 
 async function updateModpack(info, type, instance_id, name, sha1) {
     batchUpdateInstance({
+        "failed": false,
         "installing": true,
-        "mc_installed": false,
-        "failed": false
+        "mc_installed": false
     }, instance_id);
     await deleteFoldersForModpackUpdate(instance_id);
     clearInstanceContent(instance_id);
