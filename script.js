@@ -903,28 +903,32 @@ class Instance {
                 "id": "env_vars",
                 "name": translate("app.instances.settings.custom_env_vars"),
                 "default": this.env_vars,
-                "tab": "launch_hooks"
+                "tab": "launch_hooks",
+                "multiline": true
             },
             {
                 "type": "text",
                 "id": "pre_launch_hook",
                 "name": translate("app.instances.settings.pre_launch_hook"),
                 "default": this.pre_launch_hook,
-                "tab": "launch_hooks"
+                "tab": "launch_hooks",
+                "multiline": true
             },
             {
                 "type": "text",
                 "id": "post_launch_hook",
                 "name": translate("app.instances.settings.post_launch_hook"),
                 "default": this.post_launch_hook,
-                "tab": "launch_hooks"
+                "tab": "launch_hooks",
+                "multiline": true
             },
             {
                 "type": "text",
                 "id": "wrapper",
                 "name": translate("app.instances.settings.wrapper"),
                 "default": this.wrapper,
-                "tab": "launch_hooks"
+                "tab": "launch_hooks",
+                "multiline": true
             },
             {
                 "type": "text",
@@ -932,7 +936,8 @@ class Instance {
                 "name": translate("app.instances.settings.post_exit_hook"),
                 "default": this.post_exit_hook,
                 "tab": "launch_hooks",
-                "desc": translate("app.post_exit.notice")
+                "desc": translate("app.post_exit.notice"),
+                "multiline": true
             }
         ].filter(e => e), [
             { "type": "cancel", "content": translate("app.instances.settings.cancel") },
@@ -8999,35 +9004,40 @@ settingsButtonEle.onclick = async () => {
             "name": translate("app.settings.globals.custom_env_vars"),
             "tab": "globals",
             "id": "global_env_vars",
-            "default": await getDefault("global_env_vars")
+            "default": await getDefault("global_env_vars"),
+            "multiline": true
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.pre_launch_hook"),
             "tab": "globals",
             "id": "global_pre_launch_hook",
-            "default": await getDefault("global_pre_launch_hook")
+            "default": await getDefault("global_pre_launch_hook"),
+            "multiline": true
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.post_launch_hook"),
             "tab": "globals",
             "id": "global_post_launch_hook",
-            "default": await getDefault("global_post_launch_hook")
+            "default": await getDefault("global_post_launch_hook"),
+            "multiline": true
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.wrapper"),
             "tab": "globals",
             "id": "global_wrapper",
-            "default": await getDefault("global_wrapper")
+            "default": await getDefault("global_wrapper"),
+            "multiline": true
         },
         {
             "type": "text",
             "name": translate("app.settings.globals.post_exit_hook"),
             "tab": "globals",
             "id": "global_post_exit_hook",
-            "default": await getDefault("global_post_exit_hook")
+            "default": await getDefault("global_post_exit_hook"),
+            "multiline": true
         },
         {
             "type": "notice",

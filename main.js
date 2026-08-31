@@ -2201,13 +2201,50 @@ function parseEnvString(input) {
 
     if (!input) return env;
 
-    const lines = input.split(/\s+|\n/);
+    let tokens = [];
+    let current = "";
+    let quote = null;
 
-    for (const line of lines) {
-        if (!line || !line.includes('=')) continue;
-        const [key, ...rest] = line.split('=');
-        const value = rest.join('=');
-        env[key.trim()] = value.trim();
+    for (let char of input) {
+        if (quote) {
+            current += char;
+            if (char == quote) quote = null;
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            current += char;
+            quote = char;
+            continue;
+        }
+
+        if (/\s/.test(char)) {
+            if (current) {
+                tokens.push(current);
+                current = "";
+            }
+            continue;
+        }
+
+        current += char;
+    }
+
+    if (current) tokens.push(current);
+
+    for (let token of tokens) {
+        let eqIndex = token.indexOf('=');
+        if (eqIndex === -1) continue;
+
+        let key = token.slice(0, eqIndex).trim();
+        let value = token.slice(eqIndex + 1).trim();
+
+        if (!key) continue;
+
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+        }
+
+        env[key] = value;
     }
 
     return env;
