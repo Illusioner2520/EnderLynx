@@ -4389,13 +4389,14 @@ function batchUpdateInstance(info, instance_id) {
         if (typeof info[key] === "boolean") info[key] = Number(info[key]);
         if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
     }
-    for (let key in info) {
-        if (win && win.webContents) win.webContents.send('instance-updated', key, info[key], instance_id);
-    }
     let keys = Object.keys(info);
     let setClause = keys.map(key => `${key} = ?`).join(", ");
     let values = keys.map(key => info[key]);
-    return db.prepare(`UPDATE instances SET ${setClause} WHERE id = ?`).run(...values, instance_id);
+    let result = db.prepare(`UPDATE instances SET ${setClause} WHERE instance_id = ?`).run(...values, instance_id);
+    for (let key in info) {
+        if (win && win.webContents) win.webContents.send('instance-updated', key, info[key], instance_id);
+    }
+    return result;
 }
 function deleteInstance(instance_id) {
     db.prepare("DELETE FROM content WHERE instance = ?").run(instance_id);

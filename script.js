@@ -254,7 +254,6 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     if (key == "mc_installed" || key == "failed") {
         InstanceStateManagement.calculateInstanceStatus(instance);
     }
-    console.log("SET " + key + " TO " + value + " FOR INSTANCE " + instance_id);
 });
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
