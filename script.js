@@ -7178,6 +7178,7 @@ class InstancesScreen extends Screen {
             });
             this.clearSelection();
         }
+        this.newGroupButton = newGroupButton;
         floatingControls.appendChild(newGroupButton);
 
         let moveToGroupButton = createElement("button", "selected-button");
@@ -7210,6 +7211,7 @@ class InstancesScreen extends Screen {
                 this.clearSelection();
             });
         }
+        this.moveToGroupButton = moveToGroupButton;
         floatingControls.appendChild(moveToGroupButton);
 
         let deleteButton = createElement("button", "selected-button danger");
@@ -7375,6 +7377,8 @@ class InstancesScreen extends Screen {
         } else {
             this.activeGroups = this.customGroups;
         }
+        this.moveToGroupButton.style.display = how == "custom_groups" ? "" : "none";
+        this.newGroupButton.style.display = how == "custom_groups" ? "" : "none";
         this.groupList.classList.add("disable-instance-list-transitions");
         for (let group of this.activeGroups) {
             group.formGroupElement(groupMap[how == "custom_groups" ? group.id : group.name] || [], this.sortBy.value, async () => {
