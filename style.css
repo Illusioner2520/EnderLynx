@@ -3080,7 +3080,7 @@ textarea.dialog-text-input {
     animation-duration: 1s;
 }
 
-.my-account-option>.loading-container-spinner {
+.wardrobe-option>.loading-container-spinner {
     margin-block: auto;
 }
 
@@ -3238,7 +3238,7 @@ textarea.dialog-text-input {
     align-self: start;
 }
 
-.my-account-grid {
+.wardrobe-grid {
     padding: 10px;
     display: grid;
     gap: 10px;
@@ -3249,7 +3249,7 @@ textarea.dialog-text-input {
     overflow: auto;
 }
 
-.my-account-options {
+.wardrobe-options {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -3258,7 +3258,7 @@ textarea.dialog-text-input {
     max-height: 100%;
 }
 
-.my-account-option-box {
+.wardrobe-option-box {
     display: grid;
     gap: 10px;
     display: flex;
@@ -3266,19 +3266,19 @@ textarea.dialog-text-input {
     position: relative;
 }
 
-.my-account-option-list-skin {
+.wardrobe-option-list-skin {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
 }
 
-.my-account-option-list-cape {
+.wardrobe-option-list-cape {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
 }
 
-.my-account-option {
+.wardrobe-option {
     padding-top: 8px;
     border-radius: 8px;
     cursor: pointer;
@@ -3356,15 +3356,15 @@ textarea.dialog-text-input {
     }
 }
 
-.my-account-option.selected {
+.wardrobe-option.selected {
     background-color: color-mix(in srgb, var(--accent-color), var(--background-color));
 }
 
-.my-account-option:not(:has(.skin-more:hover)):not(:has(.skin-favorite:hover)):hover {
+.wardrobe-option:not(:has(.skin-more:hover)):not(:has(.skin-favorite:hover)):hover {
     background-color: var(--color-2t);
 }
 
-.my-account-option.selected:not(:has(.skin-more:hover)):not(:has(.skin-favorite:hover)):hover {
+.wardrobe-option.selected:not(:has(.skin-more:hover)):not(:has(.skin-favorite:hover)):hover {
     background-color: var(--accent-color);
     ;
 }
@@ -6601,12 +6601,12 @@ body.april_fools *::before {
     gap: 6px;
 }
 
-.wardrobe-default-skin-details:has(.my-account-option-list-skin:empty) {
+.wardrobe-default-skin-details:has(.wardrobe-option-list-skin:empty) {
     display: none;
     transition: none;
 }
 
-.my-account-option-list-skin:empty {
+.wardrobe-option-list-skin:empty {
     display: none;
 }
 

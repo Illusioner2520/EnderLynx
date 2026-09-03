@@ -127,6 +127,248 @@ class Skin {
     async isActive() {
         return await window.enderlynx.isActiveSkin(this.id);
     }
+
+    async equipSkinFromButton() {
+        this.loaderElement.style.display = "block";
+        this.skinImageElement.style.display = "none";
+        let success = await this.profile_for_button.applySkin(this);
+        if (success) {
+            let oldEle = document.querySelector(".wardrobe-option.skin.selected");
+            if (oldEle) oldEle.classList.remove("selected");
+            this.skinElement.classList.add("selected");
+            await this.setActive(this.profile_for_button.uuid);
+            if (this.skinViewer) this.skinViewer.loadSkin(this.skin_url, {
+                model: this.model == "wide" ? "default" : "slim"
+            });
+        }
+        this.loaderElement.style.display = "none";
+        this.skinImageElement.style.display = "block";
+    }
+
+    getName() {
+        return this.default_skin ? translate(this.name) : this.name;
+    }
+
+    getSkinButton(profile, skinViewer, refreshWardrobe, filterSkins, skinList) {
+        this.profile_for_button = profile;
+        this.skinList = skinList;
+        this.skinViewer = skinViewer;
+        let skinEle = createElement("div", "wardrobe-option skin");
+        this.skinElement = skinEle;
+        let buttons = new ContextMenuButtons([
+            {
+                "title": translate("app.wardrobe.skin.equip"),
+                "icon": '<i class="fa-solid fa-user"></i>',
+                "func": () => {
+                    this.equipSkinFromButton();
+                }
+            },
+            !this.default_skin ? {
+                "title": translate("app.wardrobe.skin.edit"),
+                "icon": '<i class="fa-solid fa-pencil"></i>',
+                "func": () => {
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.wardrobe.skin.edit.title"), "form", [
+                        {
+                            "type": "text",
+                            "id": "name",
+                            "name": translate("app.wardrobe.skin.edit.name"),
+                            "default": this.name,
+                            "maxlength": 50
+                        },
+                        {
+                            "type": "dropdown",
+                            "id": "model",
+                            "name": translate("app.wardrobe.skin.edit.model"),
+                            "options": [
+                                { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
+                                { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
+                            ],
+                            "default": this.model
+                        }
+                    ], [
+                        { "type": "cancel", "content": translate("app.wardrobe.skin.edit.cancel") },
+                        { "type": "confirm", "content": translate("app.wardrobe.skin.edit.confirm") }
+                    ], [], async (info) => {
+                        await this.setName(info.name);
+                        if (!info.name) await this.setName(translate("app.wardrobe.unnamed"));
+                        let needsToBeReequipped = false;
+                        if (this.model != info.model) needsToBeReequipped = true;
+                        await this.setModel(info.model);
+                        if (needsToBeReequipped && this.active_uuid.includes(";" + this.profile_for_button.uuid + ";")) {
+                            await this.equipSkinFromButton();
+                        }
+                        refreshWardrobe();
+                    });
+                }
+            } : null,
+            this.skinViewer ? {
+                "title": translate("app.wardrobe.skin.preview"),
+                "icon": '<i class="fa-solid fa-eye"></i>',
+                "func": () => {
+                    let skinRenderContainer = createElement("div", "skin-render-container");
+                    skinRenderContainer.style.gridColumn = "1";
+                    let skinRenderCanvas = createElement("canvas", "skin-render-canvas");
+                    skinRenderContainer.appendChild(skinRenderCanvas);
+                    const dpr = window.devicePixelRatio || 1;
+                    let skinViewer = new skinview3d.SkinViewer({
+                        canvas: skinRenderCanvas,
+                        width: 398 * dpr,
+                        height: 498 * dpr
+                    });
+                    skinRenderCanvas.style.width = "400px";
+                    skinRenderCanvas.style.height = "500px";
+                    skinViewer.pixelRatio = 2
+                    skinViewer.zoom = 0.8;
+                    skinViewer.controls.enablePan = true;
+                    let walkingAnimation = new skinview3d.WalkingAnimation();
+                    walkingAnimation.headBobbing = false;
+                    skinViewer.animation = walkingAnimation;
+                    skinViewer.animation.speed = 0.5;
+                    let pauseButton = createElement("button", 'skin-render-pause');
+                    pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                    let onPause = () => {
+                        skinViewer.animation.paused = true;
+                        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+                        pauseButton.onclick = onResume;
+                    }
+                    let onResume = () => {
+                        skinViewer.animation.paused = false;
+                        pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                        pauseButton.onclick = onPause;
+                    }
+                    if (document.body.matches(".potato")) {
+                        skinViewer.animation.paused = true;
+                        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
+                        pauseButton.onclick = onResume;
+                    }
+                    let onClose = () => {
+                        if (skinViewer.animation) skinViewer.animation.paused = true;
+                        if (skinViewer.controls) skinViewer.controls.enabled = false;
+                        if (skinViewer.renderLoopId) {
+                            cancelAnimationFrame(skinViewer.renderLoopId);
+                            skinViewer.renderLoopId = null;
+                        }
+                        skinViewer.draw = () => { };
+                        skinViewer.render = () => { };
+                        if (skinViewer.playerObject?.skin?.texture) skinViewer.playerObject.skin.texture.dispose();
+                        if (skinViewer.playerObject?.cape?.texture) skinViewer.playerObject.cape.texture.dispose();
+                        skinViewer.renderer?.dispose();
+                        const gl = skinViewer.renderer?.getContext();
+                        gl?.getExtension?.('WEBGL_lose_context')?.loseContext();
+                        skinViewer.canvas?.remove();
+                        skinViewer.playerObject = null;
+                        skinViewer.renderer = null;
+                        skinViewer.canvas = null;
+                        skinViewer.controls = null;
+                    }
+                    pauseButton.onclick = onPause;
+                    skinRenderContainer.appendChild(pauseButton);
+                    skinViewer.loadSkin(this.skin_url, {
+                        model: this.model == "wide" ? "default" : "slim"
+                    });
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.wardrobe.skin.preview.title"), "notice", skinRenderContainer, [
+                        {
+                            "type": "confirm",
+                            "content": translate("app.wardrobe.skin.preview.confirm")
+                        }
+                    ], [], () => {
+                        setTimeout(() => {
+                            onClose();
+                        }, 1000);
+                    }, () => {
+                        setTimeout(() => {
+                            onClose();
+                        }, 1000);
+                    })
+                }
+            } : null,
+            !this.default_skin ? {
+                "title": translate("app.wardrobe.skin.delete"),
+                "icon": '<i class="fa-solid fa-trash-can"></i>',
+                "danger": true,
+                "func": async (a, b) => {
+                    if (await this.isActive()) {
+                        displayError(translate("app.wardrobe.skin.delete.in_use"));
+                        return;
+                    }
+                    let dialog = new Dialog();
+                    dialog.showDialog(translate("app.wardrobe.delete.confirm.title"), "notice", translate("app.wardrobe.delete.confirm.description", "%s", this.name), [
+                        {
+                            "type": "cancel",
+                            "content": translate("app.wardrobe.delete.cancel")
+                        },
+                        {
+                            "type": "confirm",
+                            "content": translate("app.wardrobe.delete.confirm")
+                        }
+                    ], [], async () => {
+                        if (b) b.remove();
+                        await this.delete();
+                        refreshWardrobe();
+                        displaySuccess(translate("app.wardrobe.delete.success", "%s", this.name));
+                    });
+                }
+            } : null
+        ].filter(e => e));
+        skinEle.oncontextmenu = (e) => {
+            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
+        }
+        if (this.default_skin) skinEle.classList.add("default-skin");
+        skinEle.title = this.getName();
+        let skinMore = createElement("button", "skin-more");
+        skinMore.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
+        let skinFavorite = createElement("button", "skin-favorite");
+        let skinFavoriteIcon = createElement("i", "fa-star");
+        skinFavoriteIcon.classList.add(`fa-${this.favorited ? "solid" : "regular"}`);
+        skinFavorite.appendChild(skinFavoriteIcon);
+        if (this.favorited) skinFavorite.classList.add("starred");
+        skinFavorite.onclick = async (event) => {
+            event.stopPropagation();
+            await this.setFavorited(!this.favorited);
+            if (this.favorited) {
+                skinFavorite.classList.add("starred");
+                skinFavoriteIcon.classList.add("staranimation");
+                skinFavoriteIcon.classList.remove("fa-regular");
+                skinFavoriteIcon.classList.add("fa-solid");
+            } else {
+                skinFavorite.classList.remove("starred");
+                skinFavoriteIcon.classList.remove("fa-solid");
+                skinFavoriteIcon.classList.add("fa-regular");
+            }
+            skinFavoriteIcon.onanimationend = () => {
+                skinFavoriteIcon.classList.remove("staranimation");
+            }
+            if (filterSkins) filterSkins();
+        }
+        new MoreMenu(skinMore, buttons, true, 2);
+        if (!this.default_skin) skinEle.appendChild(skinFavorite);
+        skinEle.appendChild(skinMore);
+        let skinImg = createElement("img", "option-image-skin");
+        this.skinImageElement = skinImg;
+        this.getPreview((v) => {
+            skinImg.src = v;
+        });
+        let loader = createElement("div", "loading-container-spinner");
+        loader.style.display = "none";
+        this.loaderElement = loader;
+        let skinName = createElement("div", "skin-name");
+        skinEle.appendChild(skinImg);
+        skinEle.appendChild(loader);
+        skinEle.appendChild(skinName);
+        skinEle.dataset.id = this.id;
+        skinName.textContent = this.getName();
+        if (this.name.toLowerCase() == "dinnerbone" || this.name.toLowerCase() == "grumm" || this.name.toLowerCase() == "dinnerbone's skin" || this.name.toLowerCase() == "grumm's skin") {
+            skinImg.classList.add("dinnerbone");
+        }
+        if (this.active_uuid.includes(";" + this.profile_for_button.uuid + ";")) {
+            skinEle.classList.add("selected");
+        }
+        makeArtificialButton(skinEle, () => {
+            this.equipSkinFromButton();
+        }, [".skin-more", "i"]);
+    }
 }
 
 class Cape {
@@ -7519,7 +7761,7 @@ class WardrobeScreen extends Screen {
             return;
         }
         if (this.skinViewer) this.skinViewer.dispose();
-        this.contentElement.className = "my-account-grid";
+        this.contentElement.className = "wardrobe-grid";
         let ele = this.contentElement;
         let skinRenderContainer = createElement("div", "skin-render-container");
         let skinRenderCanvas = createElement("canvas", "skin-render-canvas");
@@ -7566,7 +7808,7 @@ class WardrobeScreen extends Screen {
             }
             skinRenderContainer.appendChild(pauseButton);
         }
-        let optionsContainer = createElement("div", "my-account-options");
+        let optionsContainer = createElement("div", "wardrobe-options");
         let title = createElement("div", "title-top");
         let h1 = document.createElement("h1");
         h1.innerHTML = translate("app.page.wardrobe");
@@ -7576,7 +7818,7 @@ class WardrobeScreen extends Screen {
         ele.appendChild(optionsContainer);
         let skinOptions = document.createElement("div");
         this.skinOptions = skinOptions;
-        skinOptions.className = "my-account-option-box";
+        skinOptions.className = "wardrobe-option-box";
         activeScreen.appendChild(skinOptions);
         let fileDrop = createElement("div", "small-drop-overlay drop-overlay");
         fileDrop.dataset.action = "skin-import";
@@ -7613,25 +7855,23 @@ class WardrobeScreen extends Screen {
         searchAndFilter.appendChild(dropdownElement);
         skinOptions.appendChild(searchAndFilter);
         let capeOptions = document.createElement("div");
-        capeOptions.className = "my-account-option-box";
+        capeOptions.className = "wardrobe-option-box";
         let skinList = document.createElement("div");
         let capeList = document.createElement("div");
         this.skinList = skinList;
         this.capeList = capeList;
-        skinList.className = 'my-account-option-list-skin';
-        capeList.className = 'my-account-option-list-cape';
+        skinList.className = 'wardrobe-option-list-skin';
+        capeList.className = 'wardrobe-option-list-cape';
         skinOptions.appendChild(skinList);
         capeOptions.appendChild(capeList);
 
         this.showCapes();
 
-        this.defaultSkinEntryList = [];
         getDefaultSkins((info) => {
             this.defaultSkinInfo = info;
             this.showDefaultSkins();
         });
 
-        this.skinEntries = [];
         this.showContent(true);
         let info = document.createElement("div");
         info.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>' + translate("app.wardrobe.notice");
@@ -7812,10 +8052,10 @@ class WardrobeScreen extends Screen {
         if (!noAnimate) animateGridReorderStart(".skin");
         let search = this.searchbar.value.toLowerCase().trim();
         let sort = this.sortdropdown.value;
-        this.defaultSkinEntryList.forEach(e => e.skinEntry.element.remove());
-        this.skinEntries.forEach(e => e.element.remove());
-        let filteredEntries = this.skinEntries.filter(e => e.name.toLowerCase().includes(search));
-        let filteredDefaultSkinEntries = this.defaultSkinEntryList.filter(e => e.skinEntry.name.toLowerCase().includes(search));
+        this.defaultSkins.forEach(e => e.skinElement.remove());
+        this.skins.forEach(e => e.skinElement.remove());
+        let filteredEntries = this.skins.filter(e => e.getName().toLowerCase().includes(search));
+        let filteredDefaultSkinEntries = this.defaultSkins.filter(e => e.getName().toLowerCase().includes(search));
         filteredEntries.sort((a, b) => {
             if (sort == "name") {
                 let av = a.name.toLowerCase();
@@ -7824,8 +8064,8 @@ class WardrobeScreen extends Screen {
                 if (av < bv) return -1;
                 return 0;
             }
-            let c = a.skin.last_used;
-            let d = b.skin.last_used;
+            let c = a.last_used;
+            let d = b.last_used;
             c = c.getTime();
             d = d.getTime();
             if (isNaN(c)) c = 0;
@@ -7834,37 +8074,37 @@ class WardrobeScreen extends Screen {
         });
         if (sort == "favorites_first") {
             filteredEntries.sort((a, b) => {
-                if (a.skin.favorited && b.skin.favorited) return 0;
-                if (a.skin.favorited) return -1;
-                if (b.skin.favorited) return 1;
+                if (a.favorited && b.favorited) return 0;
+                if (a.favorited) return -1;
+                if (b.favorited) return 1;
                 return 0;
             });
         }
         filteredEntries.forEach(e => {
-            this.skinList.appendChild(e.element);
+            e.skinList.appendChild(e.skinElement);
         });
         filteredDefaultSkinEntries.forEach(e => {
-            e.skinList.appendChild(e.skinEntry.element);
+            e.skinList.appendChild(e.skinElement);
         });
         if (!noAnimate) animateGridReorderEnd(".skin");
     }
     async showContent(noAnimate) {
         if (!noAnimate) animateGridReorderStart(".skin");
-        this.skinEntries = [];
         if (this.skinViewer) this.skinViewer.loadSkin(this.activeSkin?.skin_url || null, {
             model: this.activeSkin?.model == "slim" ? "slim" : "default",
         });
         if (this.skinViewer) this.skinViewer.loadCape(this.activeCape ? window.enderlynx.getCapePath(this.activeCape.cape_id) : null);
         this.skinList.innerHTML = '';
         let skins = await getSkinsNoDefaults();
+        this.skins = skins;
+        if (!this.defaultSkins) this.defaultSkins = [];
         for (let skin of skins) {
-            let skinEntry = new SkinEntry(skin, true, this.skinViewer, this.profile, () => {
-                this.showContent()
+            skin.getSkinButton(this.profile, this.skinViewer, () => {
+                this.showContent();
             }, (noAnimate) => {
                 this.filterSkins(noAnimate);
-            });
-            this.skinEntries.push(skinEntry);
-            this.skinList.appendChild(skinEntry.element);
+            }, this.skinList);
+            this.skinList.appendChild(skin.skinElement);
         }
         this.filterSkins(true);
         if (!noAnimate) animateGridReorderEnd(".skin");
@@ -7874,13 +8114,14 @@ class WardrobeScreen extends Screen {
         [...document.querySelectorAll(".wardrobe-default-skin-details")].forEach(e => e.remove());
         let tags = this.defaultSkinInfo.tags;
         let skins = this.defaultSkinInfo.skins;
-        for (let i = 0; i < tags.length; i++) {
+        this.defaultSkins = skins;
+        for (let tag of tags) {
             let detailsWrapper = createElement("div", "details wardrobe-default-skin-details");
             this.skinOptions.appendChild(detailsWrapper);
-            let defaultSkinList = createElement("div", "my-account-option-list-skin");
+            let defaultSkinList = createElement("div", "wardrobe-option-list-skin");
             let detailsTop = createElement("button", "details-top");
             let detailTitle = createElement("span", "details-top-text");
-            detailTitle.textContent = translate(tags[i]);
+            detailTitle.textContent = translate(tag);
             let detailChevron = createElement("span", "details-top-chevron");
             detailChevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
             detailsTop.appendChild(detailTitle);
@@ -7889,16 +8130,15 @@ class WardrobeScreen extends Screen {
             detailsWrapper.appendChild(detailsTop);
             detailsWrapper.appendChild(detailContent);
             detailContent.appendChild(defaultSkinList);
-            let skinsWithTag = skins.filter(e => e.tag == tags[i]);
-            skinsWithTag.forEach(e => {
-                let skinEntry = new SkinEntry(e, false, this.skinViewer, this.profile, () => {
-                    this.showContent()
+            let skinsWithTag = skins.filter(e => e.tag == tag);
+            for (let skin of skinsWithTag) {
+                skin.getSkinButton(this.profile, this.skinViewer, () => {
+                    this.showContent();
                 }, (noAnimate) => {
                     this.filterSkins(noAnimate);
-                });
-                this.defaultSkinEntryList.push({ skinList: defaultSkinList, skinEntry });
-                defaultSkinList.appendChild(skinEntry.element);
-            });
+                }, defaultSkinList);
+                defaultSkinList.appendChild(skin.skinElement);
+            }
             detailsTop.onclick = () => {
                 if (detailsWrapper.classList.contains("open")) {
                     detailsWrapper.classList.remove("open");
@@ -7930,7 +8170,7 @@ class WardrobeScreen extends Screen {
                 let currentEle = capeEle;
                 let success = await this.profile.applyCape(e);
                 if (success) {
-                    let oldEle = document.querySelector(".my-account-option.cape.selected");
+                    let oldEle = document.querySelector(".wardrobe-option.cape.selected");
                     oldEle.classList.remove("selected");
                     currentEle.classList.add("selected");
                     e.setActive();
@@ -7940,7 +8180,7 @@ class WardrobeScreen extends Screen {
                 loader.style.display = "none";
                 capeImg.style.display = "block";
             }
-            capeEle.className = "my-account-option";
+            capeEle.className = "wardrobe-option";
             capeEle.title = e.cape_name;
             capeEle.classList.add("cape");
             let capeImg = document.createElement("img");
@@ -7961,7 +8201,7 @@ class WardrobeScreen extends Screen {
             }
             capeEle.onclick = equipCape;
         });
-        let capeEle = createElement("button", "my-account-option");
+        let capeEle = createElement("button", "wardrobe-option");
         capeEle.classList.add("cape");
         capeEle.title = translate("app.wardrobe.no_cape");
         let capeImg = createElement("div", "option-image-cape");
@@ -7983,7 +8223,7 @@ class WardrobeScreen extends Screen {
             let currentEle = event.currentTarget;
             let success = await this.profile.applyCape(null);
             if (success) {
-                let oldEle = document.querySelector(".my-account-option.cape.selected");
+                let oldEle = document.querySelector(".wardrobe-option.cape.selected");
                 oldEle.classList.remove("selected");
                 currentEle.classList.add("selected");
                 this.profile.removeActiveCape();
@@ -9316,254 +9556,6 @@ function animateGridReorderEnd(querySelector, pseudoElements) {
     first2.clear();
     last.clear();
     last2.clear();
-}
-
-class SkinEntry {
-    constructor(e, allowEditing, skinViewer, default_profile, showContent, filterSkins) {
-        this.skin = e;
-        this.name = allowEditing ? e.name : translate(e.name);
-        let skinEle = document.createElement("div");
-        let equipSkin = async () => {
-            loader.style.display = "block";
-            skinImg.style.display = "none";
-            let currentEle = skinEle;
-            let success = await default_profile.applySkin(e);
-            if (success) {
-                let oldEle = document.querySelector(".my-account-option.skin.selected");
-                if (oldEle) oldEle.classList.remove("selected");
-                currentEle.classList.add("selected");
-                await e.setActive(default_profile.uuid);
-                if (skinViewer) skinViewer.loadSkin(e.skin_url, {
-                    model: e.model == "wide" ? "default" : "slim"
-                });
-            }
-            loader.style.display = "none";
-            skinImg.style.display = "block";
-        }
-        let buttons = new ContextMenuButtons([
-            {
-                "title": translate("app.wardrobe.skin.equip"),
-                "icon": '<i class="fa-solid fa-user"></i>',
-                "func": equipSkin
-            },
-            allowEditing ? {
-                "title": translate("app.wardrobe.skin.edit"),
-                "icon": '<i class="fa-solid fa-pencil"></i>',
-                "func": () => {
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.wardrobe.skin.edit.title"), "form", [
-                        {
-                            "type": "text",
-                            "id": "name",
-                            "name": translate("app.wardrobe.skin.edit.name"),
-                            "default": e.name,
-                            "maxlength": 50
-                        },
-                        {
-                            "type": "dropdown",
-                            "id": "model",
-                            "name": translate("app.wardrobe.skin.edit.model"),
-                            "options": [
-                                { "name": translate("app.wardrobe.skin.model.classic"), "value": "wide" },
-                                { "name": translate("app.wardrobe.skin.model.slim"), "value": "slim" }
-                            ],
-                            "default": e.model
-                        }
-                    ], [
-                        { "type": "cancel", "content": translate("app.wardrobe.skin.edit.cancel") },
-                        { "type": "confirm", "content": translate("app.wardrobe.skin.edit.confirm") }
-                    ], [], async (info) => {
-                        await e.setName(info.name);
-                        if (!info.name) await e.setName(translate("app.wardrobe.unnamed"));
-                        let needsToBeReequipped = false;
-                        if (e.model != info.model) needsToBeReequipped = true;
-                        await e.setModel(info.model);
-                        if (needsToBeReequipped && e.active_uuid.includes(";" + default_profile.uuid + ";")) {
-                            await equipSkin();
-                        }
-                        showContent(true);
-                    });
-                }
-            } : null,
-            skinViewer ? {
-                "title": translate("app.wardrobe.skin.preview"),
-                "icon": '<i class="fa-solid fa-eye"></i>',
-                "func": () => {
-                    let skinRenderContainer = document.createElement("div");
-                    skinRenderContainer.className = "skin-render-container";
-                    skinRenderContainer.style.gridColumn = "1";
-                    let skinRenderCanvas = document.createElement("canvas");
-                    skinRenderCanvas.className = "skin-render-canvas";
-                    skinRenderContainer.appendChild(skinRenderCanvas);
-                    const dpr = window.devicePixelRatio || 1;
-                    let skinViewer = new skinview3d.SkinViewer({
-                        canvas: skinRenderCanvas,
-                        width: 398 * dpr,
-                        height: 498 * dpr
-                    });
-                    skinRenderCanvas.style.width = "400px";
-                    skinRenderCanvas.style.height = "500px";
-                    skinViewer.pixelRatio = 2
-                    skinViewer.zoom = 0.8;
-                    skinViewer.controls.enablePan = true;
-                    let walkingAnimation = new skinview3d.WalkingAnimation();
-                    walkingAnimation.headBobbing = false;
-                    skinViewer.animation = walkingAnimation;
-                    skinViewer.animation.speed = 0.5;
-                    let pauseButton = document.createElement("button");
-                    pauseButton.className = 'skin-render-pause';
-                    pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
-                    let onPause = () => {
-                        skinViewer.animation.paused = true;
-                        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
-                        pauseButton.onclick = onResume;
-                    }
-                    let onResume = () => {
-                        skinViewer.animation.paused = false;
-                        pauseButton.innerHTML = '<i class="fa-solid fa-pause"></i>';
-                        pauseButton.onclick = onPause;
-                    }
-                    if (document.body.matches(".potato")) {
-                        skinViewer.animation.paused = true;
-                        pauseButton.innerHTML = '<i class="fa-solid fa-play"></i>'
-                        pauseButton.onclick = onResume;
-                    }
-                    let onClose = () => {
-                        if (skinViewer.animation) skinViewer.animation.paused = true;
-                        if (skinViewer.controls) skinViewer.controls.enabled = false;
-                        if (skinViewer.renderLoopId) {
-                            cancelAnimationFrame(skinViewer.renderLoopId);
-                            skinViewer.renderLoopId = null;
-                        }
-                        skinViewer.draw = () => { };
-                        skinViewer.render = () => { };
-                        if (skinViewer.playerObject?.skin?.texture) skinViewer.playerObject.skin.texture.dispose();
-                        if (skinViewer.playerObject?.cape?.texture) skinViewer.playerObject.cape.texture.dispose();
-                        skinViewer.renderer?.dispose();
-                        const gl = skinViewer.renderer?.getContext();
-                        gl?.getExtension?.('WEBGL_lose_context')?.loseContext();
-                        skinViewer.canvas?.remove();
-                        skinViewer.playerObject = null;
-                        skinViewer.renderer = null;
-                        skinViewer.canvas = null;
-                        skinViewer.controls = null;
-                    }
-                    pauseButton.onclick = onPause;
-                    skinRenderContainer.appendChild(pauseButton);
-                    skinViewer.loadSkin(e.skin_url, {
-                        model: e.model == "wide" ? "default" : "slim"
-                    });
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.wardrobe.skin.preview.title"), "notice", skinRenderContainer, [
-                        {
-                            "type": "confirm",
-                            "content": translate("app.wardrobe.skin.preview.confirm")
-                        }
-                    ], [], () => {
-                        setTimeout(() => {
-                            onClose();
-                        }, 1000);
-                    }, () => {
-                        setTimeout(() => {
-                            onClose();
-                        }, 1000);
-                    })
-                }
-            } : null,
-            allowEditing ? {
-                "title": translate("app.wardrobe.skin.delete"),
-                "icon": '<i class="fa-solid fa-trash-can"></i>',
-                "danger": true,
-                "func": async (a, b) => {
-                    if (await e.isActive()) {
-                        displayError(translate("app.wardrobe.skin.delete.in_use"));
-                        return;
-                    }
-                    let dialog = new Dialog();
-                    dialog.showDialog(translate("app.wardrobe.delete.confirm.title"), "notice", translate("app.wardrobe.delete.confirm.description", "%s", e.name), [
-                        {
-                            "type": "cancel",
-                            "content": translate("app.wardrobe.delete.cancel")
-                        },
-                        {
-                            "type": "confirm",
-                            "content": translate("app.wardrobe.delete.confirm")
-                        }
-                    ], [], async () => {
-                        if (b) b.remove();
-                        await e.delete();
-                        showContent();
-                        displaySuccess(translate("app.wardrobe.delete.success", "%s", e.name));
-                    });
-                }
-            } : null
-        ].filter(e => e));
-        skinEle.oncontextmenu = (e) => {
-            contextmenu.showContextMenu(buttons, e.clientX, e.clientY);
-        }
-        skinEle.className = "my-account-option";
-        if (!allowEditing) skinEle.classList.add("default-skin");
-        skinEle.classList.add("skin");
-        skinEle.title = allowEditing ? e.name : translate(e.name);
-        skinEle.setAttribute("role", "button");
-        skinEle.setAttribute("tabindex", 0);
-        let skinMore = document.createElement("button");
-        skinMore.className = "skin-more";
-        skinMore.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-        let skinFavorite = document.createElement("button");
-        skinFavorite.className = "skin-favorite";
-        let skinFavoriteIcon = document.createElement("i");
-        skinFavoriteIcon.classList.add("fa-star");
-        skinFavoriteIcon.classList.add(`fa-${e.favorited ? "solid" : "regular"}`);
-        skinFavorite.appendChild(skinFavoriteIcon);
-        if (e.favorited) skinFavorite.classList.add("starred");
-        skinFavorite.onclick = async (ev) => {
-            ev.stopPropagation();
-            await e.setFavorited(!e.favorited);
-            if (e.favorited) {
-                skinFavorite.classList.add("starred");
-                skinFavoriteIcon.classList.add("staranimation");
-                skinFavoriteIcon.classList.remove("fa-regular");
-                skinFavoriteIcon.classList.add("fa-solid");
-            } else {
-                skinFavorite.classList.remove("starred");
-                skinFavoriteIcon.classList.remove("fa-solid");
-                skinFavoriteIcon.classList.add("fa-regular");
-            }
-            skinFavoriteIcon.onanimationend = () => {
-                skinFavoriteIcon.classList.remove("staranimation");
-            }
-            if (filterSkins) filterSkins();
-        }
-        let moreMenu = new MoreMenu(skinMore, buttons, true, 2);
-        if (allowEditing) skinEle.appendChild(skinFavorite);
-        skinEle.appendChild(skinMore);
-        let skinImg = document.createElement("img");
-        e.getPreview((v) => {
-            skinImg.src = v;
-        })
-        skinImg.classList.add("option-image-skin");
-        let loader = document.createElement("div");
-        loader.className = "loading-container-spinner";
-        loader.style.display = "none";
-        let skinName = document.createElement("div");
-        skinEle.appendChild(skinImg);
-        skinEle.appendChild(loader);
-        skinEle.appendChild(skinName);
-        skinEle.dataset.id = e.id;
-        skinName.textContent = this.name;
-        skinName.className = "skin-name";
-        if (e.name.toLowerCase() == "dinnerbone" || e.name.toLowerCase() == "grumm" || e.name.toLowerCase() == "dinnerbone's skin" || e.name.toLowerCase() == "grumm's skin") {
-            skinImg.classList.add("dinnerbone");
-        }
-        this.element = skinEle;
-        if (e.active_uuid.includes(";" + default_profile.uuid + ";")) {
-            skinEle.classList.add("selected");
-        }
-        makeArtificialButton(skinEle, () => {
-            equipSkin();
-        }, [".skin-more", "i"]);
-    }
 }
 
 async function importSkin(info) {
