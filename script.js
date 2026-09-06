@@ -6545,7 +6545,6 @@ class DragManager {
         if (isArtificial) {
             makeArtificialButton(triggerElement, (event) => {
                 if (this.suppressNextClick) {
-                    console.log("Click suppressed");
                     this.suppressNextClick = false;
                     return;
                 }
@@ -6573,8 +6572,6 @@ class DragManager {
         triggerElement.onpointerup = (event) => {
             if (event.button != 0) return;
             if (this.currentlyDragging && (this.dragType != "reorder" || !this.reorderHasMoved)) this.suppressNextClick = true;
-            if (this.currentlyDragging) console.log("Suppressing next click");
-            console.log(event.target);
             this.canDrag = false;
         }
         triggerElement.onpointerleave = () => {

@@ -7084,7 +7084,6 @@ body.dragging .group-instances {
     z-index: 1000;
     transition: opacity .2s, display .2s allow-discrete;
     pointer-events: none;
-    padding: 4px;
 }
 
 .group.drag-overlay-shown .group-overlay {
