@@ -9957,13 +9957,13 @@ async function showCreateInstanceDialog() {
                 info.name = translate("app.instances.untitled");
             }
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, 0, info.icon, instance_id, 0, "custom", "", false, false);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, -1, info.icon, instance_id, 0, "custom", "", false, false);
             instance.display();
             await window.enderlynx.installMinecraft(instance_id, info.loader, info.game_version);
         } else if (info.selected_tab == "file") {
             let pack_info = await window.enderlynx.readPackFile(info.files[0].path);
             let instance_id = await window.enderlynx.getInstanceFolderName(info.name_f || pack_info.name);
-            let instance = await addInstance(info.name_f || pack_info.name, new Date(), new Date(), "", pack_info.loader, pack_info.game_version, pack_info.loader_version, false, true, "", info.icon_f || pack_info.image, instance_id, 0, "", "", true, false);
+            let instance = await addInstance(info.name_f || pack_info.name, new Date(), new Date(), "", pack_info.loader, pack_info.game_version, pack_info.loader_version, false, true, -1, info.icon_f || pack_info.image, instance_id, 0, "", "", true, false);
             instance.display();
             try {
                 await window.enderlynx.installModpack(info.files[0].path, "file", instance_id, info.name_f || pack_info.name, null);
@@ -9974,7 +9974,7 @@ async function showCreateInstanceDialog() {
             }
         } else if (info.selected_tab == "code") {
             let instance_id = await window.enderlynx.getInstanceFolderName(info.profile_code);
-            let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, 0, info.icon_c, instance_id, 0, "", "", true, false);
+            let instance = await addInstance(info.name_c, new Date(), new Date(), "", "", "", "", false, true, -1, info.icon_c, instance_id, 0, "", "", true, false);
             instance.display();
             try {
                 await window.enderlynx.installModpack(`https://api.curseforge.com/v1/shared-profile/${info.profile_code}`, "cf_url", instance_id, info.name_c, null);
@@ -13892,7 +13892,7 @@ async function installButtonClick(content, version, instance_id) {
                 displayError(translate("app.discover.error_creating_modpack", "%t", title, "%v", info.game_version, "%l", loaders[info.loader]));
                 return;
             }
-            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, 0, info.icon, instance_id, 0, source, project_id, true, false);
+            let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", true, true, -1, info.icon, instance_id, 0, source, project_id, true, false);
             await instance.setInstalledVersion(version.version_id);
             instance.display();
             try {
@@ -13988,7 +13988,7 @@ async function installButtonClick(content, version, instance_id) {
                     info.name = translate("app.instances.untitled");
                 }
                 let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, 0, info.icon, instance_id, 0, "custom", "", false, false);
+                let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, "", false, false, -1, info.icon, instance_id, 0, "custom", "", false, false);
                 await instance.setInstalling(true);
                 instance.display();
                 await installContent(source, content, version, instance);
@@ -14255,7 +14255,7 @@ let importInstance = (info, file_path) => {
         }
     ], [], async () => {
         let instance_id = await window.enderlynx.getInstanceFolderName(info.name);
-        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, 0, info.image, instance_id, 0, "", "", true, false);
+        let instance = await addInstance(info.name, new Date(), new Date(), "", info.loader, info.game_version, info.loader_version, false, true, -1, info.image, instance_id, 0, "", "", true, false);
         instance.display();
         await window.enderlynx.installModpack(file_path, "file", instance_id, info.name, null);
     });
