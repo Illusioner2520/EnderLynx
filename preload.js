@@ -602,7 +602,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     swapGroupPositions: async (group_id1, group_id2) => ipcRenderer.invoke('swap-group-positions', group_id1, group_id2),
     setGroupName: async (group_id, name) => ipcRenderer.invoke('set-group-name', group_id, name),
     deleteGroup: async (group_id) => ipcRenderer.invoke('delete-group', group_id),
-    setGroupPosition: async (group_id, position) => ipcRenderer.invoke('set-group-position', group_id, position)
+    moveGroup: async (group_id, group_id2) => ipcRenderer.invoke('move-group', group_id, group_id2)
 });
 
 async function getServerLastPlayed(instance_id, ip) {

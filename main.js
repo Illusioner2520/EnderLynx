@@ -4921,12 +4921,15 @@ function swapGroupPositions(group_id1, group_id2) {
     return true;
 }
 
-function setGroupPosition(group_id, position) {
+function moveGroup(group_id, group_id2) {
     let group = getGroup(group_id);
+    let group2 = group_id2 ? getGroup(group_id2) : null;
+    let position = group2?.position || getNextGroupPosition();
     let oldPosition = group.position;
     if (oldPosition > position) {
         db.prepare("UPDATE groups SET position = position + 1 WHERE position >= ? AND position < ?").run(position, oldPosition)
     } else {
+        if (group2) position -= 1;
         db.prepare("UPDATE groups SET position = position - 1 WHERE position > ? AND position <= ?").run(oldPosition, position);
     }
     db.prepare("UPDATE groups SET position = ? WHERE id = ?").run(position, group_id);
@@ -5011,7 +5014,7 @@ ipcMain.on('get-groups-by-type', (_, type, groups) => _.returnValue = getGroupsB
 ipcMain.handle('swap-group-positions', (_, group_id1, group_id2) => swapGroupPositions(group_id1, group_id2));
 ipcMain.handle('set-group-name', (_, group_id, name) => setGroupName(group_id, name));
 ipcMain.handle('delete-group', (_, group_id) => deleteGroup(group_id));
-ipcMain.handle('set-group-position', (_, group_id, position) => setGroupPosition(group_id, position));
+ipcMain.handle('move-group', (_, group_id, group_id2) => moveGroup(group_id, group_id2));
 
 function getMaxConcurrentDownloads() {
     let r = db.prepare("SELECT * FROM defaults WHERE default_type = ?").get("max_concurrent_downloads");

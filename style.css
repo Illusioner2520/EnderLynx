@@ -7012,7 +7012,8 @@ body:has(dialog[open]) .title-bar-button {
     z-index: 2;
 }
 
-.group-list.disable-instance-list-transitions .group-instances {
+.group-list.disable-instance-list-transitions .group-instances,
+body.dragging .group-instances {
     transition: none !important;
 }
 
@@ -7062,6 +7063,11 @@ body:has(dialog[open]) .title-bar-button {
 .group {
     transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
     position: relative;
+    background-color: var(--background-color);
+}
+
+.group.dragging {
+    opacity: .5;
 }
 
 .group-overlay {
@@ -7081,7 +7087,7 @@ body:has(dialog[open]) .title-bar-button {
     padding: 4px;
 }
 
-.group-overlay.shown {
+.group.drag-overlay-shown .group-overlay {
     display: flex;
     opacity: 1;
 
@@ -7205,7 +7211,7 @@ body:has(dialog[open]) .title-bar-button {
     display: none;
 }
 
-.instance-drag-preview {
+.drag-preview {
     position: fixed;
     left: 0;
     top: 0;
@@ -7226,4 +7232,8 @@ body:has(dialog[open]) .title-bar-button {
     transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), opacity 180ms cubic-bezier(0.2, 0, 0, 1);
     will-change: transform, opacity;
     box-shadow: 0 0 10px black;
+}
+
+.hidden-bumper {
+    display: none;
 }

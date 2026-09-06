@@ -1677,11 +1677,7 @@ class Instance {
         if (!running && this.pid != null) this.setPid(null);
         let element = createElement("div", "instance-item");
         element.dataset.runningText = translate("app.instances.running");
-        makeArtificialButton(element, (event) => {
-            if (this.suppressNextClick) {
-                this.suppressNextClick = false;
-                return;
-            }
+        DragManager.registerDraggableElement(element, element, (event) => {
             if (instancesScreen.selectedInstances?.has(this)) {
                 instancesScreen.deselectInstance(this);
                 return;
@@ -1694,32 +1690,33 @@ class Instance {
                 return;
             }
             this.display();
-        }, ["button", "i"]);
-        element.onpointerdown = (event) => {
-            if (event.button != 0) return;
-            this.canDrag = true;
-            let rect = this.instanceButton.getBoundingClientRect();
-            this.dragOffsetX = event.clientX - rect.left;
-            this.dragOffsetY = event.clientY - rect.top;
-            this.dragStartX = event.clientX;
-            this.dragStartY = event.clientY;
-        }
-        element.onpointerup = (event) => {
-            if (event.button != 0) return;
-            if (instancesScreen.dragging) this.suppressNextClick = true;
-            this.canDrag = false;
-        }
-        element.onpointerleave = () => {
-            this.canDrag = false;
-        }
-        element.onpointermove = (event) => {
-            if (!this.canDrag) return;
-            const dx = event.clientX - this.dragStartX;
-            const dy = event.clientY - this.dragStartY;
-            if (Math.hypot(dx, dy) < 8) return;
-            instancesScreen.startInstanceDrag(this, event, this.dragOffsetX, this.dragOffsetY);
-            this.canDrag = false;
-        }
+        }, "groups", ".group", true, ["button", "i"], () => {
+            if (instancesScreen.selectedInstances.has(this)) {
+                return [...instancesScreen.selectedInstances].filter(e => e != this).map(e => e.instanceButton);
+            }
+            return [];
+        }, () => {
+            if (instancesScreen.selectedInstances.has(this)) {
+                instancesScreen.draggedInstances = [...instancesScreen.selectedInstances];
+            } else {
+                instancesScreen.draggedInstances = [this];
+            }
+        }, (element) => {
+            let groupId = element?.dataset?.id;
+            if (!groupId) {
+                instancesScreen.draggedInstances = null;
+                return;
+            }
+            let group = instancesScreen.customGroupsById[groupId || -1];
+
+            animateGridReorderStart(".instance-item");
+            for (let instance of instancesScreen.draggedInstances) {
+                instance.setGroup(group.id);
+            }
+            instancesScreen.draggedInstances = null;
+        }, instancesScreen.contentElement, () => {
+            return instancesScreen.groupBy.value != "custom_groups";
+        });
         element.dataset.id = this.instance_id;
         if (running) {
             element.classList.add("running");
@@ -6523,6 +6520,255 @@ class HomeScreen extends Screen {
     }
 }
 
+class DragManager {
+    static currentlyDragging = false;
+    static canDrag = false;
+    static dragOffsetX = 0;
+    static dragOffsetY = 0;
+    static dragStartX = 0;
+    static dragStartY = 0;
+    static dragCursorX = 0;
+    static dragCursorY = 0;
+    static suppressNextClick = false;
+    static draggableElement = null;
+    static dragPreview = null;
+    static hoveredDragTarget = null;
+    static scrollableContainer = null;
+    static dragScrollFrame = null;
+    static onenddrag = null;
+    static dragType = "groups";
+    static dragTargets = "";
+    static draggedElements = [];
+    static reorderTarget = null;
+    static reorderHasMoved = false;
+    static registerDraggableElement(triggerElement, draggedElement, onclick, dragType, dragTargets, isArtificial, artificialButtonNotAllowedTargets, getAdditionalElements, onstartdrag, onenddrag, scrollableContainer, cancelDrag) {
+        if (isArtificial) {
+            makeArtificialButton(triggerElement, (event) => {
+                if (this.suppressNextClick) {
+                    console.log("Click suppressed");
+                    this.suppressNextClick = false;
+                    return;
+                }
+                onclick(event);
+            }, artificialButtonNotAllowedTargets);
+        } else {
+            triggerElement.onclick = (event) => {
+                if (this.suppressNextClick) {
+                    this.suppressNextClick = false;
+                    return;
+                }
+                onclick(event);
+            }
+        }
+        triggerElement.onpointerdown = (event) => {
+            if (event.button != 0) return;
+            this.canDrag = true;
+            this.draggableElement = draggedElement;
+            let rect = draggedElement.getBoundingClientRect();
+            this.dragOffsetX = event.clientX - rect.left;
+            this.dragOffsetY = event.clientY - rect.top;
+            this.dragStartX = event.clientX;
+            this.dragStartY = event.clientY;
+        }
+        triggerElement.onpointerup = (event) => {
+            if (event.button != 0) return;
+            if (this.currentlyDragging && (this.dragType != "reorder" || !this.reorderHasMoved)) this.suppressNextClick = true;
+            if (this.currentlyDragging) console.log("Suppressing next click");
+            console.log(event.target);
+            this.canDrag = false;
+        }
+        triggerElement.onpointerleave = () => {
+            this.canDrag = false;
+        }
+        triggerElement.onpointermove = (event) => {
+            if (!this.canDrag) return;
+            const dx = event.clientX - this.dragStartX;
+            const dy = event.clientY - this.dragStartY;
+            if (Math.hypot(dx, dy) < 8) return;
+            DragManager.startDrag(draggedElement, event, getAdditionalElements, scrollableContainer, onstartdrag, onenddrag, dragType, dragTargets, cancelDrag);
+            this.canDrag = false;
+        }
+    }
+    static startDrag(draggedElement, event, getAdditionalElements, scrollableContainer, onstartdrag, onenddrag, dragType, dragTargets, cancelDrag) {
+        if (cancelDrag()) return;
+        this.scrollableContainer = scrollableContainer;
+        this.onenddrag = onenddrag;
+        this.currentlyDragging = true;
+        this.dragType = dragType;
+        this.dragTargets = dragTargets;
+        this.reorderTarget = null;
+        this.reorderHasMoved = false;
+        document.body.classList.add("dragging");
+        let draggedElements = [draggedElement].concat(getAdditionalElements());
+        this.draggedElements = draggedElements;
+        DragManager.createDragPreview(draggedElements, event);
+        draggedElements.forEach(e => e.classList.add("dragging"));
+        this.dragScrollFrame = requestAnimationFrame(DragManager.dragScroll);
+        if (onstartdrag) onstartdrag();
+        DragManager.drag(event);
+    }
+    static createDragPreview(elements, event) {
+        if (this.dragPreview) this.dragPreview.remove();
+
+        let preview = createElement("div", "drag-preview");
+        let previewLeft = event.clientX - this.dragOffsetX;
+        let previewTop = event.clientY - this.dragOffsetY;
+        preview.style.left = previewLeft + "px";
+        preview.style.top = previewTop + "px";
+        document.body.appendChild(preview);
+
+        let fragment = document.createDocumentFragment();
+
+        let positions = elements.map(draggedElement => {
+            let rect = draggedElement.getBoundingClientRect();
+
+            return {
+                element: draggedElement,
+                x: rect.left,
+                y: rect.top,
+                width: rect.width,
+                height: rect.height
+            }
+        });
+
+        positions.forEach((posInfo, index) => {
+            let draggedElement = posInfo.element;
+            let item = draggedElement.cloneNode(true);
+            if (item.dataset?.id) delete item.dataset.id;
+            item.classList.add("drag-preview-item");
+
+            let depth = index;
+            let travelY = -1 * Math.pow(0.5, depth - 4) + 16;
+            let scale = Math.max(1 - (depth * 0.08), 0);
+            let opacity = 1 - (depth * 0.25);
+            let zIndex = -depth + 999999;
+
+            const dx = posInfo.x - previewLeft;
+            const dy = posInfo.y - previewTop;
+
+            item.style.width = `${posInfo.width}px`;
+            item.style.height = `${posInfo.height}px`;
+            item.style.scale = 1;
+            item.style.opacity = 1;
+            item.style.zIndex = zIndex;
+            item.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
+            item.style.transition = 'none';
+            if (posInfo.y < -100 || posInfo.y > window.innerHeight) {
+                item.style.opacity = opacity;
+                item.style.transform = `translate(0px, ${travelY}px) scale(${scale})`;
+            } else {
+                requestAnimationFrame(() => {
+                    item.style.opacity = opacity;
+                    item.style.transform = `translate(0px, ${travelY}px) scale(${scale})`;
+                    item.style.transition = '';
+                });
+            }
+
+            fragment.appendChild(item);
+        });
+        preview.appendChild(fragment);
+        this.dragPreview = preview;
+    }
+    static drag(event) {
+        if (!this.currentlyDragging) return;
+        this.dragCursorX = event.clientX;
+        this.dragCursorY = event.clientY;
+        this.dragPreview.style.left = (event.clientX - this.dragOffsetX) + "px";
+        this.dragPreview.style.top = (event.clientY - this.dragOffsetY) + "px";
+
+        if (this.dragType == "groups" && this.dragTargets) {
+            let hoveredElement = document.elementFromPoint(event.clientX, event.clientY);
+            let dragTarget = hoveredElement?.closest(this.dragTargets);
+
+            if (this.hoveredDragTarget != dragTarget) {
+                this.hoveredDragTarget?.classList.remove("drag-overlay-shown");
+                dragTarget?.classList.add("drag-overlay-shown");
+                this.hoveredDragTarget = dragTarget;
+            }
+        } else if (this.dragType == "reorder" && this.dragTargets) {
+            let allDragTargets = [...document.querySelectorAll(this.dragTargets)].filter(element => !this.dragPreview.contains(element));
+            let dragTargets = allDragTargets.filter(element => !this.draggedElements.includes(element) && !this.dragPreview.contains(element));
+            let insertBefore = dragTargets.find(element => {
+                let rect = element.getBoundingClientRect();
+                return event.clientY < rect.top + rect.height / 2;
+            }) || null;
+            let lastDragTarget = dragTargets.at(-1);
+            let parent = insertBefore?.parentNode || lastDragTarget?.parentNode;
+
+            if (!parent) return;
+            let lastDraggedElement = this.draggedElements.at(-1);
+            let draggedIndex = allDragTargets.indexOf(lastDraggedElement);
+            let currentNextTarget = allDragTargets[draggedIndex + 1] || null;
+            let insertionPoint = insertBefore;
+            if (!insertionPoint) {
+                insertionPoint = lastDragTarget?.nextSibling;
+                if (!insertionPoint || !insertionPoint.classList.contains("hidden-bumper")) {
+                    insertionPoint = parent._dragHiddenBumper;
+                    if (!insertionPoint) {
+                        insertionPoint = createElement("div", "hidden-bumper");
+                        parent._dragHiddenBumper = insertionPoint;
+                        parent.appendChild(insertionPoint);
+                    }
+                }
+            }
+            let alreadyInPosition = currentNextTarget == insertBefore;
+
+            if (!alreadyInPosition) {
+                animateGridReorderStart(this.dragTargets);
+                let fragment = document.createDocumentFragment();
+                this.draggedElements.forEach(element => fragment.appendChild(element));
+                parent.insertBefore(fragment, insertionPoint);
+                animateGridReorderEnd(this.dragTargets);
+                this.reorderHasMoved = true;
+            }
+            this.reorderTarget = insertBefore;
+        }
+
+    }
+    static dragScroll() {
+        if (!DragManager.currentlyDragging || !DragManager.scrollableContainer) return;
+        let threshold = 80;
+
+        let rect = DragManager.scrollableContainer.getBoundingClientRect();
+        let distanceFromTop = DragManager.dragCursorY - rect.top;
+        let distanceFromBottom = rect.bottom - DragManager.dragCursorY;
+        let maxScrollTop = DragManager.scrollableContainer.scrollHeight - DragManager.scrollableContainer.clientHeight;
+
+        if (distanceFromTop < threshold && DragManager.scrollableContainer.scrollTop > 0) {
+            DragManager.scrollableContainer.scrollTop = Math.max(0, DragManager.scrollableContainer.scrollTop - (threshold - distanceFromTop) * 0.8);
+        } else if (distanceFromBottom < threshold && DragManager.scrollableContainer.scrollTop < maxScrollTop) {
+            DragManager.scrollableContainer.scrollTop = Math.min(maxScrollTop, DragManager.scrollableContainer.scrollTop + (threshold - distanceFromBottom) * 0.8);
+        }
+
+        DragManager.dragScrollFrame = requestAnimationFrame(DragManager.dragScroll);
+    }
+    static endDrag(event) {
+        if (!this.currentlyDragging) return;
+        this.currentlyDragging = false;
+        document.body.classList.remove("dragging");
+
+        if (this.dragScrollFrame) {
+            cancelAnimationFrame(this.dragScrollFrame);
+            this.dragScrollFrame = null;
+        }
+
+        this.dragPreview?.remove();
+        this.hoveredDragTarget?.classList.remove("drag-overlay-shown");
+        this.hoveredDragTarget = null;
+
+        this.draggedElements.forEach(e => e.classList.remove("dragging"));
+
+        this.dragPreview = null;
+        if (!event) return;
+        let element = event ? document.elementFromPoint(event.clientX, event.clientY) : null;
+        if (this.dragType == "groups") element = element?.closest(this.dragTargets);
+        if (this.dragType == "reorder") element = this.reorderTarget || null;
+        if (this.onenddrag) this.onenddrag(element);
+    }
+}
+document.body.addEventListener("pointermove", (e) => DragManager.drag(e));
+document.body.addEventListener("pointerup", (e) => DragManager.endDrag(e));
+
 class Group {
     static groups = new Map();
     constructor(group) {
@@ -6670,20 +6916,21 @@ class Group {
         let groupOverlayInner = createElement("div", "group-overlay-inner");
         groupOverlay.appendChild(groupOverlayInner);
         groupElement.appendChild(groupOverlay);
-        groupElement.onpointerenter = () => {
-            groupOverlay.classList.toggle("shown", Boolean(instancesScreen.dragging));
-        }
-        groupElement.onpointerleave = () => {
-            groupOverlay.classList.remove("shown");
-        }
         this.overlay = groupOverlay;
         if (!this.collapsed) {
             groupElement.classList.add("open");
         }
         let groupHeader = createElement("div", "group-header");
-        makeArtificialButton(groupHeader, () => {
+        DragManager.registerDraggableElement(groupHeader, groupElement, () => {
             this.toggleCollapsed();
-        }, ["button", "button > i", ".group-actions", "input"]);
+        }, "reorder", ".group", true, ["button", "button > i", ".group-actions", "input"], () => {
+            return [];
+        }, () => { }, (element) => {
+            let groupId = element?.dataset?.id;
+            instancesScreen.moveGroup(this.id, groupId || null);
+        }, instancesScreen.contentElement, () => {
+            return instancesScreen.groupBy.value != "custom_groups";
+        });
         let groupChevron = createElement("i", "group-chevron fa-solid fa-chevron-down");
         let groupName = createElement("div", "group-name");
         this.groupNameElement = groupName;
@@ -6888,183 +7135,6 @@ class InstancesScreen extends Screen {
         }
     }
 
-    startInstanceDrag(instance, event, dragOffsetX, dragOffsetY) {
-        if (this.groupBy.value != "custom_groups") return;
-        if (this.selectedInstances.has(instance)) {
-            this.draggedInstances = [...this.selectedInstances];
-        } else {
-            this.draggedInstances = [instance];
-        }
-
-        this.dragOffsetX = dragOffsetX;
-        this.dragOffsetY = dragOffsetY;
-        this.dragCursor = { x: event.clientX, y: event.clientY };
-
-        this.dragging = true;
-        document.body.classList.add("dragging");
-
-        this.createDragPreview(instance, event);
-
-        this.customGroupsById[instance.group_id || -1].showOverlay();
-
-        for (let instance of this.draggedInstances) {
-            instance.instanceButton.classList.add("dragging");
-        }
-
-        this.instanceDrag = (event) => {
-            this.dragCursor.x = event.clientX;
-            this.dragCursor.y = event.clientY;
-            this.dragPreview.style.left = (event.clientX - this.dragOffsetX) + "px";
-            this.dragPreview.style.top = (event.clientY - this.dragOffsetY) + "px";
-        }
-
-        this.dragScroll = () => {
-            if (!this.dragging || !this.dragCursor) return;
-
-            let container = this.contentElement;
-            let threshold = 80;
-            if (!container) return;
-
-            let rect = container.getBoundingClientRect();
-            let distanceFromTop = this.dragCursor.y - rect.top;
-            let distanceFromBottom = rect.bottom - this.dragCursor.y;
-            let maxScrollTop = container.scrollHeight - container.clientHeight;
-
-            if (distanceFromTop < threshold && container.scrollTop > 0) {
-                container.scrollTop = Math.max(0, container.scrollTop - (threshold - distanceFromTop) * 0.8);
-            } else if (distanceFromBottom < threshold && container.scrollTop < maxScrollTop) {
-                container.scrollTop = Math.min(maxScrollTop, container.scrollTop + (threshold - distanceFromBottom) * 0.8);
-            }
-
-            this.dragScrollFrame = requestAnimationFrame(this.dragScroll);
-        }
-        this.dragScrollFrame = requestAnimationFrame(this.dragScroll);
-
-        this.endDrag = (e) => {
-            this.endInstanceDrag(e);
-        }
-        document.body.addEventListener("pointermove", this.instanceDrag);
-        document.body.addEventListener("pointerup", this.endDrag);
-    }
-
-    endInstanceDrag(event) {
-        for (let instance of this.draggedInstances) {
-            instance.instanceButton.classList.remove("dragging");
-        }
-
-        this.dragging = false;
-        document.body.classList.remove("dragging");
-
-        if (this.dragScrollFrame) {
-            cancelAnimationFrame(this.dragScrollFrame);
-            this.dragScrollFrame = null;
-        }
-
-        for (let group of this.activeGroups) {
-            group.hideOverlay();
-        }
-
-        this.dragPreview?.remove();
-
-        this.dragPreview = null;
-        document.body.removeEventListener("pointermove", this.instanceDrag);
-        document.body.removeEventListener("pointerup", this.endDrag);
-
-        if (!event) {
-            this.draggedInstances = null;
-            return;
-        }
-
-        let element = document.elementFromPoint(
-            event.clientX,
-            event.clientY
-        );
-
-        let groupElement = element?.closest(".group");
-        let groupId = groupElement?.dataset?.id;
-        if (!groupId) {
-            this.draggedInstances = null;
-            return;
-        }
-        let group = this.customGroupsById[groupId || -1];
-
-        animateGridReorderStart(".instance-item");
-        for (let instance of this.draggedInstances) {
-            instance.setGroup(group.id);
-        }
-        animateGridReorderEnd(".instance-item");
-        this.draggedInstances = null;
-    }
-
-    createDragPreview(instance, event) {
-        if (this.dragPreview) this.dragPreview.remove();
-
-        let preview = createElement("div", "instance-drag-preview");
-        let previewLeft = event.clientX - this.dragOffsetX;
-        let previewTop = event.clientY - this.dragOffsetY;
-        preview.style.left = previewLeft + "px";
-        preview.style.top = previewTop + "px";
-        document.body.appendChild(preview);
-
-        let targetIndex = instance ? this.draggedInstances.indexOf(instance) : this.draggedInstances.length - 1;
-        let fragment = document.createDocumentFragment();
-
-        let positions = this.draggedInstances.map(dragInstance => {
-            let rect = dragInstance.instanceButton.getBoundingClientRect();
-
-            return {
-                instance: dragInstance,
-                x: rect.left,
-                y: rect.top,
-                width: rect.width,
-                height: rect.height
-            }
-        });
-
-        positions.forEach((posInfo, index) => {
-            let dragInstance = posInfo.instance;
-            let item = dragInstance.instanceButton.cloneNode(true);
-            item.classList.add("drag-preview-item");
-
-            let depth = this.draggedInstances.length - 1 - index;
-            let isTop = index == targetIndex;
-            if (depth == 0 && !isTop) {
-                depth = this.draggedInstances.length - 1 - targetIndex;
-            }
-            if (isTop) depth = 0;
-            let travelY = -1 * Math.pow(0.5, depth - 4) + 16;
-            let scale = Math.max(1 - (depth * 0.08), 0);
-            let opacity = 1 - (depth * 0.25);
-            let zIndex = -depth + 999999;
-
-            const dx = posInfo.x - previewLeft;
-            const dy = posInfo.y - previewTop;
-
-            item.style.width = `${posInfo.width}px`;
-            item.style.height = `${posInfo.height}px`;
-            item.style.scale = 1;
-            item.style.opacity = 1;
-            item.style.zIndex = zIndex;
-            item.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
-            item.style.transition = 'none';
-            if (posInfo.y < -100 || posInfo.y > window.innerHeight) {
-                item.style.opacity = opacity;
-                item.style.transform = `translate(0px, ${isTop ? 0 : travelY}px) scale(${scale})`;
-            } else {
-                requestAnimationFrame(() => {
-                    item.style.opacity = opacity;
-                    item.style.transform = `translate(0px, ${isTop ? 0 : travelY}px) scale(${scale})`;
-                    item.style.transition = '';
-                });
-            }
-
-            fragment.appendChild(item);
-
-        });
-        preview.appendChild(fragment);
-        this.dragPreview = preview;
-    }
-
     async showInstances() {
         this.hasRequestGoing = true;
         this.instances = [];
@@ -7151,8 +7221,8 @@ class InstancesScreen extends Screen {
         this.keydownListener = (e) => {
             if (e.target.matches("dialog *")) return;
             if (e.key == "Escape") {
-                if (this.dragging) {
-                    this.endInstanceDrag();
+                if (DragManager.currentlyDragging) {
+                    DragManager.endDrag();
                 } else {
                     this.clearSelection();
                 }
@@ -7261,6 +7331,51 @@ class InstancesScreen extends Screen {
                 this.swapGroupPositions(group.id, this.getCustomGroupNeighbor(group.id, 1));
             }
         }
+    }
+
+    moveGroup(group_id1, group_id2) {
+        window.enderlynx.moveGroup(group_id1, group_id2);
+        let group1 = this.activeGroups.find(e => e.id == group_id1);
+        let group2 = this.activeGroups.find(e => e.id == group_id2) || null;
+        if (group2) {
+            let position = group2?.position || (this.activeGroups
+                .map(group => group.position)
+                .filter(position => Number.isFinite(position))
+                .reduce((max, position) => Math.max(max, position), -1) + 1);
+            let oldPosition = group1.position;
+            if (oldPosition > position) {
+                for (let group of this.activeGroups) {
+                    if (group !== group1 && Number.isFinite(group.position) &&
+                        group.position >= position && group.position < oldPosition) {
+                        group.position += 1;
+                    }
+                }
+            } else {
+                if (group2) position -= 1;
+                for (let group of this.activeGroups) {
+                    if (group !== group1 && Number.isFinite(group.position) &&
+                        group.position > oldPosition && group.position <= position) {
+                        group.position -= 1;
+                    }
+                }
+            }
+            group1.position = position;
+        } else {
+            let positions = this.activeGroups
+                .map(group => group.position)
+                .filter(position => Number.isFinite(position));
+            group1.position = positions.length ? Math.max(...positions) + 1 : 0;
+        }
+        let index1 = this.activeGroups.indexOf(group1);
+        let index2 = group2 ? this.activeGroups.indexOf(group2) : null;
+        this.activeGroups.splice(index1, 1);
+        if (group2) {
+            index2 = this.activeGroups.indexOf(group2);
+            this.activeGroups.splice(index2, 0, group1);
+        } else {
+            this.activeGroups.push(group1);
+        }
+        this.updateGroupActions();
     }
 
     swapGroupPositions(group_id1, group_id2) {
@@ -9530,6 +9645,7 @@ function animateGridReorderEnd(querySelector, pseudoElements) {
         if (dx || dy) {
             card.style.transform = `translate(${dx}px, ${dy}px)`;
             card.style.transition = 'none';
+            card.offsetWidth;
 
             requestAnimationFrame(() => {
                 card.style.transform = '';
@@ -9549,6 +9665,7 @@ function animateGridReorderEnd(querySelector, pseudoElements) {
         if (dx || dy) {
             card.style.setProperty("--pseudo-transform", `translate(${dx}px, ${dy}px)`);
             card.style.setProperty("--pseudo-transition", "none");
+            card.offsetWidth;
 
             requestAnimationFrame(() => {
                 card.style.setProperty("--pseudo-transform", ``);
@@ -14147,7 +14264,6 @@ let importInstanceFromContentProvider = (info) => {
 
 window.enderlynx.onOpenFile(importInstance);
 
-const overlay = document.getElementById('drop-overlay');
 document.getElementById('drop-overlay-inner').innerHTML = translate("app.import.drop");
 
 function isFileDrag(event) {
