@@ -6530,6 +6530,7 @@ class DragManager {
     static dragCursorX = 0;
     static dragCursorY = 0;
     static suppressNextClick = false;
+    static suppressNextClickElement = null;
     static draggableElement = null;
     static dragPreview = null;
     static hoveredDragTarget = null;
@@ -6544,16 +6545,18 @@ class DragManager {
     static registerDraggableElement(triggerElement, draggedElement, onclick, dragType, dragTargets, isArtificial, artificialButtonNotAllowedTargets, getAdditionalElements, onstartdrag, onenddrag, scrollableContainer, cancelDrag) {
         if (isArtificial) {
             makeArtificialButton(triggerElement, (event) => {
-                if (this.suppressNextClick) {
+                if (this.suppressNextClick && this.suppressNextClickElement == triggerElement) {
                     this.suppressNextClick = false;
+                    this.suppressNextClickElement = null;
                     return;
                 }
                 onclick(event);
             }, artificialButtonNotAllowedTargets);
         } else {
             triggerElement.onclick = (event) => {
-                if (this.suppressNextClick) {
+                if (this.suppressNextClick && this.suppressNextClickElement == triggerElement) {
                     this.suppressNextClick = false;
+                    this.suppressNextClickElement = null;
                     return;
                 }
                 onclick(event);
@@ -6571,7 +6574,10 @@ class DragManager {
         }
         triggerElement.onpointerup = (event) => {
             if (event.button != 0) return;
-            if (this.currentlyDragging && (this.dragType != "reorder" || !this.reorderHasMoved)) this.suppressNextClick = true;
+            if (this.currentlyDragging && this.draggedElements.includes(draggedElement) && (this.dragType != "reorder" || !this.reorderHasMoved)) {
+                this.suppressNextClick = true;
+                this.suppressNextClickElement = triggerElement;
+            }
             this.canDrag = false;
         }
         triggerElement.onpointerleave = () => {
