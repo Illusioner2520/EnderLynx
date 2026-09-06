@@ -7221,7 +7221,7 @@ class InstancesScreen extends Screen {
         this.keydownListener = (e) => {
             if (e.target.matches("dialog *")) return;
             if (e.key == "Escape") {
-                if (DragManager.currentlyDragging) {
+                if (DragManager.currentlyDragging && DragManager.dragType == "groups") {
                     DragManager.endDrag();
                 } else {
                     this.clearSelection();
