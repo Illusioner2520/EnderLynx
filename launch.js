@@ -1392,7 +1392,7 @@ class Minecraft {
                         } catch (e) { }
                     }
                 }
-                this.db.prepare("UPDATE mc_versions_cache SET data_version = ? WHERE name = ?").run(jarInfo.world_version, version);
+                this.db.prepare("UPDATE mc_versions_cache SET data_version = ? WHERE name = ?").run(data_version, version);
             }
             let java = new Java(this.db, this.userPath, this.win, this.translate);
             let paths = "";
