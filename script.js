@@ -12356,10 +12356,6 @@ async function getPinnedInstances() {
     let instanceList = [];
     for (let i = 0; i < instances.length; i++) {
         let instance = Instance.getInstance(instances[i].instance_id);
-        if (!instance) {
-            await instance.unpin(true);
-            continue;
-        }
         instanceList.push(instance);
     }
     return instanceList;
