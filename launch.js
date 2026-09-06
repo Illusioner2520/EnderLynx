@@ -1382,15 +1382,17 @@ class Minecraft {
             let databaseDataVersion = this.db.prepare("SELECT * FROM mc_versions_cache WHERE name = ?").get(version);
             if (!databaseDataVersion.data_version) {
                 let data_version = Minecraft.predefinedDataVersions[version] || "";
-                const jar = new AdmZip(jarFilePath);
-                const entry = jar.getEntry('version.json');
-                if (entry) {
-                    try {
-                        let jarInfo = JSON.parse(entry.getData().toString('utf-8'));
-                        if (!jarInfo.world_version) throw new Error();
-                        this.db.prepare("UPDATE mc_versions_cache SET data_version = ? WHERE name = ?").run(jarInfo.world_version, version);
-                    } catch (e) { }
+                if (!data_version) {
+                    const jar = new AdmZip(jarFilePath);
+                    const entry = jar.getEntry('version.json');
+                    if (entry) {
+                        try {
+                            let jarInfo = JSON.parse(entry.getData().toString('utf-8'));
+                            data_version = jarInfo.world_version || "";
+                        } catch (e) { }
+                    }
                 }
+                this.db.prepare("UPDATE mc_versions_cache SET data_version = ? WHERE name = ?").run(jarInfo.world_version, version);
             }
             let java = new Java(this.db, this.userPath, this.win, this.translate);
             let paths = "";
