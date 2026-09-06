@@ -12339,7 +12339,11 @@ async function getRecentlyPlayedWorlds(ignore_world_ids = []) {
 async function getRecentlyPlayedInstances(ignore_instance_ids = []) {
     let instances = await window.enderlynx.getInstances();
     instances = instances.filter(e => !ignore_instance_ids.includes(e.instance_id));
-    instances.sort((a, b) => new Date(b.last_played) - new Date(a.last_played));
+    instances.sort((a, b) => {
+        let aDate = Math.max(new Date(a.last_played), new Date(a.date_created));
+        let bDate = Math.max(new Date(b.last_played), new Date(b.date_created));
+        return bDate - aDate;
+    });
     let instanceList = [];
     for (let instance of instances) {
         instanceList.push(Instance.applyInstance(instance.instance_id, instance));
