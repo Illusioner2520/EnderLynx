@@ -37,10 +37,11 @@ module.exports = {
         packageAfterCopy: async (config, buildPath, electronVersion, platform, arch) => {
             let prebuildsPath = path.join(
                 buildPath,
-                "resources/app.asar.unpacked/node_modules/better-sqlite3/prebuilds"
+                "node_modules/better-sqlite3/prebuilds"
             );
 
             if (platform !== "linux") return;
+            if (!fs.existsSync(prebuildsPath)) return;
 
             let keep = `linux-${arch}.node`;
 
