@@ -34,6 +34,22 @@ module.exports = {
         ]
     },
     hooks: {
+        packageAfterCopy: async (config, buildPath, electronVersion, platform, arch) => {
+            let prebuildsPath = path.join(
+                buildPath,
+                "resources/app.asar.unpacked/node_modules/better-sqlite3/prebuilds"
+            );
+
+            if (platform !== "linux") return;
+
+            let keep = `linux-${arch}.node`;
+
+            for (const file of fs.readdirSync(prebuildsPath)) {
+                if (file !== keep) {
+                    fs.rmSync(path.join(prebuildsPath, file));
+                }
+            }
+        },
         postPackage: async () => {
             // Delete non-English locale files
             const localesDir = path.join(__dirname, 'out', '*', 'locales');
