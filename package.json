@@ -1,6 +1,6 @@
 {
   "name": "EnderLynx",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "main": "main.js",
   "scripts": {
     "start": "npm run prepare-electron && electron-forge start",
