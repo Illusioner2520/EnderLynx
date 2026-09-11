@@ -489,10 +489,11 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     let instance = Instance.getInstance(instance_id);
     if (instance[key] instanceof Date) value = Date(value);
     if (typeof instance[key] == 'boolean') value = Boolean(value);
-    if (instance?.listeners?.get(key)) {
-        instance.listeners.get(key)(value, instance[key]);
-    }
+    let oldValue = instance[key];
     instance[key] = value;
+    if (instance?.listeners?.get(key)) {
+        instance.listeners.get(key)(value, oldValue);
+    }
     if (key == "mc_installed" || key == "failed") {
         InstanceStateManagement.calculateInstanceStatus(instance);
     }
@@ -1269,7 +1270,7 @@ class Instance {
                                 "status": "error",
                                 "cancel": () => { }
                             }]);
-                            this.instanceScreen.tabs.selectOption("content");
+                            this.instanceScreen?.tabs?.selectOption("content");
                             return;
                         }
                     }
@@ -1282,7 +1283,7 @@ class Instance {
                         "cancel": () => { }
                     }]);
                     displaySuccess(translate("app.instances.updated_all").replace("%i", this.name));
-                    this.instanceScreen.tabs.selectOption("content");
+                    this.instanceScreen?.tabs?.selectOption("content");
                 }
                 await this.setMcInstalled(true);
             }
