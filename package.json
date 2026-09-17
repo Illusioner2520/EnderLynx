@@ -41,7 +41,7 @@
     "png-to-ico": "^3.0.1",
     "prismarine-nbt": "^2.8.0",
     "qrcode": "^1.5.4",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "skinview3d": "^3.4.1",
     "string-argv": "^0.3.2",
     "toml": "^5.0.0",
