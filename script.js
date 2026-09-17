@@ -11996,6 +11996,10 @@ class VanillaTweaksSelector {
         let dropdownElement = document.createElement("div");
         new Dropdown(translate("app.discover.vt.version"), [
             {
+                "name": "26.3",
+                "value": "26.3"
+            },
+            {
                 "name": "26.2",
                 "value": "26.2"
             },

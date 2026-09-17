@@ -761,7 +761,7 @@ class VanillaTweaks {
     static resource_pack_cache = {};
     static data_pack_cache = {};
     static crafting_tweak_cache = {};
-    static default_vanilla_tweaks_version = "26.2";
+    static default_vanilla_tweaks_version = "26.3";
     static async getDataPacksVersion(packs, version) {
         let link = [
             {
