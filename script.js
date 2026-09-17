@@ -13727,6 +13727,9 @@ async function checkForContentUpdates(source, project_id, version_ids, loaders, 
 async function updateContent(source, content, project, version, instance) {
     if (source == "player_install") return;
     if (!version) version = await project.getVersion(instance.loader, instance.vanilla_version, content.type, content.source_info, content.source);
+    if (!version && content.source == "vanilla_tweaks") {
+        version = await VanillaTweaks.getResourcePacksVersion(JSON.parse(content.version_id), instance.vanilla_version)
+    }
     if (!version) {
         let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resourcepack" ? "resourcepacks" : "shaderpacks", content.file_name);
         if (!new_file_name) {
