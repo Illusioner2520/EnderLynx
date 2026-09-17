@@ -7689,6 +7689,7 @@ class DiscoverScreen extends Screen {
             this.query = v;
         });
         this.searchBar.setValue(this.query);
+        this.previous_vanilla_tweaks_selector = null;
         let dropdownElement = document.createElement("div");
         dropdownElement.style.minWidth = "200px";
         this.sourceDropdown = new Dropdown(translate("app.discover.content_source"), sources, dropdownElement, sources[0].value, (v) => {
@@ -7824,7 +7825,7 @@ class DiscoverScreen extends Screen {
             if (added_vt_packs.length == 0 && this.currentTab == "resourcepack") {
                 added_vt_packs = JSON.parse(await window.enderlynx.getInstalledVanillaTweaksResourcePacks(this.instance?.instance_id));
             }
-            new VanillaTweaksSelector(this.currentTab, this.game_version, this.instance?.instance_id, undefined, this.discoverList, query);
+            this.previous_vanilla_tweaks_selector = new VanillaTweaksSelector(this.currentTab, this.game_version, this.instance?.instance_id, this.previous_vanilla_tweaks_selector?.vt_version, this.discoverList, query);
             return;
         }
         this.discoverListTop.style.display = "";
