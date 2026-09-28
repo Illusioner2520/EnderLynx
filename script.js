@@ -5532,9 +5532,8 @@ class InstanceScreen extends Screen {
             this.filesSaveButton = saveButton;
             this.filesSearch.appendChild(saveButton);
         } else {
-            let extensionsToNotEdit = ["png", "jpg", "jpeg", "webp", "avif", "dat", "dat_old", "apng", "mca", "zip", "jar", "nbt"];
-            for (let i = 0; i < files.length; i++) {
-                let file = files[i];
+            let extensionsToEdit = ["txt", "json", "", "mcmeta", "json5", "toml", "properties", "conf", "bak1", "cfg", "backup0", "backup1", "backup2", "backup3", "lock", "md", "html", "js", "css", "java", "py", "snbt", "jsonc", "ts", "mjs", "cjs", "mts", "cts", "svg", "xml", "csv", "log", "yaml", "yml"];
+            for (let file of files) {
                 fileList.push(
                     {
                         "primary_column": {
@@ -5568,9 +5567,9 @@ class InstanceScreen extends Screen {
                                 }
                             });
                         },
-                        "onclick": extensionsToNotEdit.includes(file.ext) ? null : () => {
+                        "onclick": extensionsToEdit.includes(file.ext) ? () => {
                             this.setFilesPath(paths + "/" + file.name);
-                        },
+                        } : null,
                         "more": {
                             "actionsList": [
                                 {
