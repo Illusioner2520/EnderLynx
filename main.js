@@ -3648,8 +3648,6 @@ ipcMain.handle('get-profile', async (_, player_id) => {
     await fixProfile({ ...player_info, ...skin_and_capes }, player_info.id);
 
     if (!res.ok) throw new Error(translate("app.profile.unable"));
-
-    return { "status": res.status, "player_info": player_info, "skin_info": skin_and_capes };
 });
 
 ipcMain.handle('import-skin', async (_, dataurl) => {
@@ -5549,10 +5547,15 @@ try {
             case "0.11.3":
             case "0.11.4":
             case "0.11.5":
-                db.prepare("UPDATE content SET version_id = source_info, source_info = NULL WHERE source = ? AND version_id IS NULL").run("vanilla_tweaks");
+                db.prepare("UPDATE content SET version_id = source_info, source_info = ? WHERE source = ? AND version_id IS NULL").run("vt-resourcepack", "vanilla_tweaks");
                 if (getDefault("default_sort") == "play_time") setDefault("default_sort", "playtime");
                 if (getDefault("default_sort") == "game_version") setDefault("default_sort", "vanilla_version");
                 groupMigration();
+            case "0.12.0":
+            case "0.12.1":
+            case "0.12.2":
+            case "0.12.3":
+                db.prepare("UPDATE content SET source_info = ? WHERE source = ? AND type = ?").run("vt-resourcepack", "vanilla_tweaks", "resourcepack")
         }
         setDefault("saved_version", version);
     })();

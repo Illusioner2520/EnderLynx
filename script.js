@@ -6169,8 +6169,8 @@ class HomeScreen extends Screen {
             e.pinned ? this.pinnedWorldGrid.appendChild(item) : this.lastPlayedWorldGrid.appendChild(item);
         }
         let instances = pinnedInstances.concat(lastPlayedInstances);
-        for (let i = 0; i < instances.length; i++) {
-            let e = instances[i];
+        for (let instance of instances) {
+            let e = instance;
             let item = document.createElement("div");
             item.className = "home-entry";
             makeArtificialButton(item, () => {
@@ -6180,7 +6180,7 @@ class HomeScreen extends Screen {
             let icon = document.createElement("img");
             icon.className = "instance-image";
             icon.src = e.image || getDefaultImage(e.instance_id);
-            instances[i].watchForChange("image", (image) => {
+            instance.watchForChange("image", (image) => {
                 icon.src = image || getDefaultImage(e.instance_id);
             });
             icon.onerror = () => {
@@ -6192,7 +6192,7 @@ class HomeScreen extends Screen {
             let itemTitle = document.createElement("div");
             itemTitle.className = "instance-name";
             itemTitle.textContent = e.name;
-            instances[i].watchForChange("name", (name) => {
+            instance.watchForChange("name", (name) => {
                 itemTitle.textContent = name;
             });
             let itemDesc = document.createElement("div");
@@ -6215,11 +6215,11 @@ class HomeScreen extends Screen {
                     itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
                 }, 3600000);
             }
-            instances[i].watchForChange("loader", (loader) => {
+            instance.watchForChange("loader", (loader) => {
                 e.loader = loader;
                 itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
             });
-            instances[i].watchForChange("vanilla_version", (vanilla_version) => {
+            instance.watchForChange("vanilla_version", (vanilla_version) => {
                 e.vanilla_version = vanilla_version;
                 itemDesc.innerHTML = formatTimeRelatively(e.last_played) + " • " + loaders[e.loader] + " " + e.vanilla_version;
             });
@@ -8909,12 +8909,11 @@ settingsButtonEle.onclick = async () => {
             }
         ], [], async () => {
             let instances = await getInstances();
-            for (let i = 0; i < instances.length; i++) {
-                let instanceInfo = instances[i];
+            for (let instance of instances) {
                 try {
-                    await window.enderlynx.setOptionsTXT(instanceInfo.instance_id, false, true);
+                    await window.enderlynx.setOptionsTXT(instance.instance_id, false, true);
                 } catch (e) {
-                    displayError(translate("app.settings.options.apply.fail", "%i", instanceInfo.name));
+                    displayError(translate("app.settings.options.apply.fail", "%i", instance.name));
                 }
             }
             displaySuccess(translate("app.settings.options.apply.done"));
@@ -12360,9 +12359,8 @@ async function getRecentlyPlayedInstances(ignore_instance_ids = []) {
 async function getPinnedInstances() {
     let instances = await window.enderlynx.getPinnedInstances();
     let instanceList = [];
-    for (let i = 0; i < instances.length; i++) {
-        let instance = Instance.getInstance(instances[i].instance_id);
-        instanceList.push(instance);
+    for (let instance of instances) {
+        instanceList.push(Instance.getInstance(instance.instance_id));
     }
     return instanceList;
 }
@@ -13930,8 +13928,7 @@ async function installButtonClick(content, version, instance_id) {
         } else {
             instances = instances.filter(e => game_versions.includes(e.vanilla_version));
         }
-        let installGrid = document.createElement("div");
-        installGrid.className = "install-grid";
+        let installGrid = createElement("div", "install-grid");
         let contentOther = await window.enderlynx.getContentBySourceInfo(project_id);
         let instanceIdsWithContent = contentOther.map(e => e.instance);
         let instancesWithContent = [];
@@ -13945,11 +13942,9 @@ async function installButtonClick(content, version, instance_id) {
             } catch (e) { }
         }
 
-        let installGridEntry = document.createElement("div");
-        installGridEntry.className = "install-grid-entry";
+        let installGridEntry = createElement("div", "install-grid-entry");
 
-        let createNewButton = document.createElement("button");
-        createNewButton.className = "install-grid-create";
+        let createNewButton = createElement("button", "install-grid-create");
         createNewButton.innerHTML = '<i class="fa-solid fa-plus"></i>' + translate("app.discover.select_instance.create");
         createNewButton.onclick = async () => {
             let dialog2 = new Dialog();
@@ -14008,35 +14003,27 @@ async function installButtonClick(content, version, instance_id) {
 
         installGridEntry.appendChild(createNewButton);
         installGrid.appendChild(installGridEntry);
-        for (let i = 0; i < instances.length; i++) {
-            if (instances[i].locked) continue;
-            let contentForThisInstance = contentOther.filter(e => e.instance == instances[i].instance_id);
+        for (let instance of instances) {
+            if (instance.locked) continue;
 
-            let updatesIndex = instanceIdsWithContent.indexOf(instances[i].instance_id);
+            let updatesIndex = instanceIdsWithContent.indexOf(instance.instance_id);
 
-            let installGridEntry = document.createElement("div");
-            installGridEntry.className = "install-grid-entry";
+            let installGridEntry = createElement("div", "install-grid-entry");
+            let installGridInstance = createElement("div", "install-grid-instance");
 
-            let installGridInstance = document.createElement("div");
-            installGridInstance.className = "install-grid-instance";
-
-            let image = document.createElement("img");
-            image.src = instances[i].image ? instances[i].image : getDefaultImage(instances[i].instance_id);
-            image.className = "instance-image";
+            let image = createElement("img", "instance-image");
+            image.src = instance.image || getDefaultImage(instance.instance_id);
             image.onerror = () => {
-                image.src = getDefaultImage(instances[i].instance_id);
+                image.src = getDefaultImage(instance.instance_id);
             }
 
-            let info = document.createElement("div");
-            info.className = "instance-info";
+            let info = createElement("div", "instance-info");
 
-            let name = document.createElement("div");
-            name.className = "instance-name";
-            name.innerText = instances[i].name;
+            let name = createElement("div", "instance-name");
+            name.innerText = instance.name;
 
-            let desc = document.createElement("div");
-            desc.className = "instance-desc";
-            desc.innerText = loaders[instances[i].loader] + " " + instances[i].vanilla_version;
+            let desc = createElement("div", "instance-desc");
+            desc.innerText = loaders[instance.loader] + " " + instance.vanilla_version;
 
             info.appendChild(name);
             info.appendChild(desc);
@@ -14044,12 +14031,11 @@ async function installButtonClick(content, version, instance_id) {
             installGridInstance.appendChild(image);
             installGridInstance.appendChild(info);
 
-            let installButton = document.createElement("button");
-            installButton.className = "install-grid-install";
+            let installButton = createElement("button", "install-grid-install");
             if (!version && updatesIndex != -1 && updates[updatesIndex]) {
-                DiscoverStateManagement.registerButton(content.id, updates[updatesIndex]?.version_id, installButton, content, updates[updatesIndex], instances[i], undefined, false, true);
+                DiscoverStateManagement.registerButton(content.id, updates[updatesIndex]?.version_id, installButton, content, updates[updatesIndex], instance, undefined, false, true);
             } else {
-                DiscoverStateManagement.registerButton(content.id, version?.version_id, installButton, content, version, instances[i], undefined, false, false);
+                DiscoverStateManagement.registerButton(content.id, version?.version_id, installButton, content, version, instance, undefined, false, false);
             }
 
             installGridEntry.appendChild(installGridInstance);
