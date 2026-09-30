@@ -8015,6 +8015,7 @@ class WardrobeScreen extends Screen {
             refreshButtonIcon.classList.add("spinning");
             try {
                 this.profile = await getDefaultProfile();
+                await window.enderlynx.getProfile(this.profile.id);
                 this.activeSkin = await this.profile.getActiveSkin();
                 this.activeCape = await this.profile.getActiveCape();
                 refreshButtonIcon.classList.remove("spinning");
