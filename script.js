@@ -8141,9 +8141,8 @@ class WardrobeScreen extends Screen {
                     info.name = info.name_l;
                     info.model = info.model_l;
                 }
-                await importSkin(info, () => {
-                    this.showContent();
-                });
+                await importSkin(info);
+                this.showContent();
             }, () => { }, undefined, true);
         }
         skinButtonContainer.appendChild(importButton);
