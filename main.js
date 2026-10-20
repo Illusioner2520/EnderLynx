@@ -3464,7 +3464,11 @@ ipcMain.handle('copy-image-to-clipboard', async (_, file_path) => {
     }
     if (image) {
         try {
-            clipboard.writeImage(image);
+            clipboard.write([
+                new ClipboardItem({
+                    'image/png': new Blob([image.toPNG()], { type: 'image/png' })
+                })
+            ]);
             return true;
         } catch (e) {
             return false;
