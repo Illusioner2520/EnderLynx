@@ -2156,7 +2156,7 @@ class Profile {
     }
 
     async applySkin(skin) {
-        if (skin.texture_key) return await this.applySkinFromURL(skin);
+        // if (skin.texture_key) return await this.applySkinFromURL(skin);
         try {
             await window.enderlynx.setSkin(this.id, skin.skin_id, skin.model == "wide" ? "classic" : "slim");
             accountSwitcher.reloadHeads();
