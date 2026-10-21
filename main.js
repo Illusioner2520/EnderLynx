@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, session, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, session, clipboard, net } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');
@@ -1149,7 +1149,7 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
 
     try {
         if (cf_project_ids.length > 0) {
-            const response = await fetch("https://api.curse.tools/v1/mods", {
+            const response = await net.fetch("https://api.curse.tools/v1/mods", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ modIds: cf_project_ids, filterPcOnly: false })
@@ -1255,7 +1255,7 @@ async function processCfZip(instance_id, info, title = ".zip file") {
             try {
                 file_name = await urlToFolder(`https://www.curseforge.com/api/v1/mods/${project_id}/files/${file_id}/download`, path.resolve(destDir, "temp"));
             } catch (e) {
-                let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
+                let res = await net.fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
                 let res_json = await res.json();
                 let download_url = res_json.data.downloadUrl;
                 if (!isValidDownloadURL(download_url)) throw new Error("Unknown host");
@@ -1313,7 +1313,7 @@ async function processCfZip(instance_id, info, title = ".zip file") {
 
         let cfData = [];
         try {
-            const response = await fetch("https://api.curse.tools/v1/mods", {
+            const response = await net.fetch("https://api.curse.tools/v1/mods", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ modIds: project_ids, filterPcOnly: false })
@@ -1667,7 +1667,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
                         if (!isValidDownloadURL(res.files[0].url)) throw new Error("Unknown host");
                         await urlToFile(res.files[0].url, path.resolve(destDir, install_path), { signal });
                     } else if (file.source == "curseforge") {
-                        let res = await fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
+                        let res = await net.fetch(`https://api.curse.tools/v1/cf/mods/${project_id}/files/${file_id}`);
                         let res_json = await res.json();
                         let download_url = res_json.data.downloadUrl;
                         if (!isValidDownloadURL(download_url)) throw new Error("Unknown host");
@@ -1790,7 +1790,7 @@ async function processElPack(instance_id, info, title = ".elpack file") {
 
         if (cf_project_ids.length) {
             try {
-                const response = await fetch("https://api.curse.tools/v1/mods", {
+                const response = await net.fetch("https://api.curse.tools/v1/mods", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ modIds: cf_project_ids.map(Number), filterPcOnly: false }),
