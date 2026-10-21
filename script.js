@@ -796,7 +796,10 @@ class Instance {
     async stop() {
         InstanceStateManagement.setInstanceStatus(this.instance_id, InstanceState.STOPPING);
         let success = await window.enderlynx.stopInstance(this.instance_id);
-        if (!success) displayError(translate("app.instance.stop.failed"));
+        if (!success) {
+            displayError(translate("app.instance.stop.failed"));
+            InstanceStateManagement.setInstanceStatus(this.instance_id, InstanceState.STOPPABLE);
+        }
         return success;
     }
 
