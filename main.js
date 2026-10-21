@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, nativeImage, session, clipboard, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, session, clipboard, net } = require('electron');
 const path = require('path');
 const RPC = require('discord-rpc');
 const windowStateKeeper = require('electron-window-state');

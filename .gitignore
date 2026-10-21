@@ -26,3 +26,5 @@ updater/Cargo.lock
 .vscode/
 
 main.py
+
+asar-files.txt
