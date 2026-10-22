@@ -480,6 +480,36 @@ class Content {
         await window.enderlynx.deleteContentDatabase(this.id);
     }
 
+    static getFolderFromType(type) {
+        if (type == "mod") return "mods";
+        if (type == "resourcepack") return "resourcepacks";
+        if (type == "shader") return "shaderpacks";
+        return "what";
+    }
+
+    async toggleDisabled() {
+        if (this.disabled) {
+            let new_file_name = await window.enderlynx.enableFile(this.instance, Content.getFolderFromType(this.type), this.file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_enable"));
+                return false;
+            }
+            await this.setDisabled(false);
+            await this.setFileName(new_file_name);
+            displaySuccess(translate("app.content.success_enable").replace("%s", this.name));
+        } else {
+            let new_file_name = await window.enderlynx.disableFile(this.instance, Content.getFolderFromType(this.type), this.file_name);
+            if (!new_file_name) {
+                displayError(translate("app.error.failure_to_disable"));
+                return false;
+            }
+            await this.setDisabled(true);
+            await this.setFileName(new_file_name);
+            displaySuccess(translate("app.content.success_disable").replace("%s", this.name));
+        }
+        return true;
+    }
+
     watchForChange(key, callback) {
         this.listeners.set(key, callback);
     }
@@ -1217,7 +1247,6 @@ class Instance {
             await this.setWrapper(info.wrapper);
             await this.setPostExitHook(info.post_exit_hook);
             if (info.modpack_version && info.modpack_version != this.installed_version && info.modpack_version != "loading") {
-                let source = this.install_source;
                 let modpack_info = info.modpack_version_pass;
                 this.updateModpack(modpack_info);
                 return;
@@ -1244,53 +1273,57 @@ class Instance {
                     await this.setJavaArgs(r.java_args);
                 }
                 if (info.update_content) {
-                    let content = await this.getContent();
-                    let processId = Math.random();
-                    let cancel = false;
-                    for (let i = 0; i < content.length; i++) {
-                        log.sendData([{
-                            "title": "Updating Content",
-                            "progress": i / content.length * 100,
-                            "desc": `Updating ${i + 1} of ${content.length}`,
-                            "id": processId,
-                            "status": "good",
-                            "cancel": () => {
-                                cancel = true;
-                            }
-                        }]);
-                        let c = content[i];
-                        try {
-                            await updateContent(c.source, c, new Project(), undefined, this);
-                        } catch (e) {
-                            displayError(translate("app.content.update_failed").replace("%c", c.name));
-                        }
-                        if (cancel) {
-                            log.sendData([{
-                                "title": "Updating Content",
-                                "progress": 100,
-                                "desc": "Canceled by User",
-                                "id": processId,
-                                "status": "error",
-                                "cancel": () => { }
-                            }]);
-                            this.instanceScreen?.tabs?.selectOption("content");
-                            return;
-                        }
-                    }
-                    log.sendData([{
-                        "title": "Updating Content",
-                        "progress": 100,
-                        "desc": "Done",
-                        "id": processId,
-                        "status": "done",
-                        "cancel": () => { }
-                    }]);
-                    displaySuccess(translate("app.instances.updated_all").replace("%i", this.name));
-                    this.instanceScreen?.tabs?.selectOption("content");
+                    await this.updateAllContent();
                 }
                 await this.setMcInstalled(true);
             }
         }, () => { }, undefined, false, true);
+    }
+
+    async updateAllContent() {
+        let content = await this.getContent();
+        let processId = Math.random();
+        let cancel = false;
+        for (let i = 0; i < content.length; i++) {
+            log.sendData([{
+                "title": translate("app.content.updating.title"),
+                "progress": i / content.length * 100,
+                "desc": translate("app.content.updating.description", "%i", i + 1, "%t", content.length),
+                "id": processId,
+                "status": "good",
+                "cancel": () => {
+                    cancel = true;
+                }
+            }]);
+            let c = content[i];
+            try {
+                await updateContent(c.source, c, new Project(), undefined, this);
+            } catch (e) {
+                displayError(translate("app.content.update_failed").replace("%c", c.name));
+            }
+            if (cancel) {
+                log.sendData([{
+                    "title": translate("app.content.updating.title"),
+                    "progress": 100,
+                    "desc": translate("app.user.canceled"),
+                    "id": processId,
+                    "status": "error",
+                    "cancel": () => { }
+                }]);
+                this.instanceScreen?.showContent();
+                return;
+            }
+        }
+        log.sendData([{
+            "title": translate("app.content.updating.title"),
+            "progress": 100,
+            "desc": translate("app.downloads.done"),
+            "id": processId,
+            "status": "done",
+            "cancel": () => { }
+        }]);
+        displaySuccess(translate("app.instances.updated_all").replace("%i", this.name));
+        this.instanceScreen?.showContent();
     }
 
     async showShareDialog() {
@@ -3193,9 +3226,6 @@ class ContentList {
             "enabled": true,
             "actionsList": ContextMenuButtons
         },
-        "second_column_centered": false,
-        "primary_column_name": "Name",
-        "secondary_column_name": "File Info",
         "refresh": {
             "enabled": true,
             "func": () => {}
@@ -3341,14 +3371,6 @@ class ContentList {
                 floatingControls.appendChild(actionElement);
             });
         }
-        let primaryColumnTitle = document.createElement("div");
-        primaryColumnTitle.className = "content-list-title";
-        primaryColumnTitle.textContent = features?.primary_column_name;
-        contentListTop.appendChild(primaryColumnTitle);
-        let secondaryColumnTitle = document.createElement("div");
-        secondaryColumnTitle.className = "content-list-title";
-        secondaryColumnTitle.textContent = features?.secondary_column_name;
-        contentListTop.appendChild(secondaryColumnTitle);
         if (features?.refresh?.enabled) {
             let refreshButton = document.createElement("button");
             refreshButton.className = "content-list-refresh";
@@ -3413,7 +3435,7 @@ class ContentList {
             if (contentInfo.class) contentEle.classList.add(contentInfo.class);
             if (contentInfo.type) contentEle.dataset.type = contentInfo.type;
             let item = {
-                "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title(), contentInfo.secondary_column.desc()].join("!!!!!!!!!!"),
+                "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title, contentInfo.secondary_column.desc].join("!!!!!!!!!!"),
                 "element": contentEle,
                 "type": contentInfo.type,
                 "height": contentInfo.icon ? 53 : 61
@@ -3421,23 +3443,20 @@ class ContentList {
             this.items.push(item);
             let checkboxElement;
             if (features?.checkbox?.enabled) {
-                checkboxElement = document.createElement("input");
+                checkboxElement = createElement("input", "content-list-checkbox");
                 checkboxElement.type = "checkbox";
-                checkboxElement.className = "content-list-checkbox";
-                checkboxElement.onchange = (e) => {
+                checkboxElement.onchange = () => {
                     this.figureOutMainCheckedState();
                 }
                 contentEle.appendChild(checkboxElement);
             }
             if (contentInfo.icon) {
-                let iconElement = document.createElement("span");
-                iconElement.className = "content-list-icon";
+                let iconElement = createElement("span", "content-list-icon");
                 iconElement.innerHTML = contentInfo.icon;
                 contentEle.appendChild(iconElement);
             } else {
-                let imageElement = document.createElement("img");
-                imageElement.className = "content-list-image";
-                imageElement.src = fixPathForImage(contentInfo.image ? contentInfo.image : getDefaultImage(contentInfo.primary_column.title));
+                let imageElement = createElement("img", "content-list-image");
+                imageElement.src = fixPathForImage(contentInfo.image || getDefaultImage(contentInfo.primary_column.title));
                 imageElement.loading = "lazy";
                 imageElement.onerror = () => {
                     if (contentInfo.onimagefail) {
@@ -3446,33 +3465,33 @@ class ContentList {
                 }
                 contentEle.appendChild(imageElement);
             }
-            let infoElement1 = document.createElement("div");
-            infoElement1.className = "content-list-info";
+            let infoElement1 = createElement("div", "content-list-info");
             contentEle.appendChild(infoElement1);
-            let infoElement1Title = document.createElement("div");
-            infoElement1Title.className = "content-list-info-title-1";
+            let infoElement1Title = createElement("div", "content-list-info-title-1");
             infoElement1Title.innerHTML = parseMinecraftFormatting(contentInfo.primary_column.title);
             infoElement1.appendChild(infoElement1Title);
-            let infoElement1Desc = document.createElement("div");
-            infoElement1Desc.className = "content-list-info-desc-1";
+            let infoElement1Desc = createElement("div", "content-list-info-desc-1");
             infoElement1Desc.textContent = contentInfo.primary_column.desc;
             infoElement1.appendChild(infoElement1Desc);
-            let infoElement2 = document.createElement("div");
-            infoElement2.className = "content-list-info";
+            let infoElement2 = createElement("div", "content-list-info");
             contentEle.appendChild(infoElement2);
-            let infoElement2Title = document.createElement("div");
-            infoElement2Title.className = "content-list-info-title-2";
-            infoElement2Title.textContent = await contentInfo.secondary_column.title();
+            let infoElement2Title = createElement("div", "content-list-info-title-2");
+            infoElement2Title.textContent = contentInfo.secondary_column.title;
+            if (contentInfo.secondary_column.titleWatch) {
+                contentInfo.secondary_column.titleWatch((title) => {
+                    infoElement2Title.textContent = title;
+                    item.name = [infoElement1Title.innerHTML, infoElement1Desc.textContent, infoElement2Title.textContent, infoElement2Desc.textContent].join("!!!!!!!!!!");
+                })
+            }
             infoElement2.appendChild(infoElement2Title);
-            let infoElement2Desc = document.createElement("div");
-            infoElement2Desc.className = "content-list-info-desc-2";
-            infoElement2Desc.innerHTML = (await contentInfo.secondary_column.desc());
-            this.second_column_elements.push({
-                infoElement2Title,
-                infoElement2Desc,
-                "title_func": contentInfo.secondary_column.title,
-                "desc_func": contentInfo.secondary_column.desc
-            })
+            let infoElement2Desc = createElement("div", "content-list-info-desc-2");
+            infoElement2Desc.innerHTML = contentInfo.secondary_column.desc;
+            if (contentInfo.secondary_column.descWatch) {
+                contentInfo.secondary_column.descWatch((desc) => {
+                    infoElement2Desc.textContent = desc;
+                    item.name = [infoElement1Title.innerHTML, infoElement1Desc.textContent, infoElement2Title.textContent, infoElement2Desc.textContent].join("!!!!!!!!!!");
+                })
+            }
             if (contentInfo?.secondary_column?.desc_hidden) {
                 infoElement2Desc.style.width = "fit-content";
                 infoElement2Desc.classList.add("hidden-text");
@@ -3486,15 +3505,17 @@ class ContentList {
                 let toggleElement = document.createElement("button");
                 toggleElement.className = 'content-list-toggle';
                 toggle = new Toggle(toggleElement, async (v) => {
-                    let result = await toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown);
+                    let result = await contentInfo.pass_to_checkbox.toggleDisabled();
+                    let toggleIndex = theActionList?.buttons?.findIndex(btn => btn.func_id == "toggle") || -1;
+                    if (toggleIndex != -1) {
+                        let isDisabled = !toggle.value;
+                        theActionList.buttons[toggleIndex].title = isDisabled ? translate("app.content.enable") : translate("app.content.disable");
+                        theActionList.buttons[toggleIndex].icon = isDisabled ? '<i class="fa-solid fa-eye"></i>' : '<i class="fa-solid fa-eye-slash"></i>';
+                    }
+                    moreDropdown?.refreshButtons();
                     if (!result) {
                         toggle.setValueWithoutTrigger(!v);
                         return;
-                    }
-                    if (infoElement2Desc.innerHTML.endsWith(".disabled")) {
-                        infoElement2Desc.textContent = infoElement2Desc.innerHTML.slice(0, -9);
-                    } else {
-                        infoElement2Desc.textContent = infoElement2Desc.innerHTML + ".disabled";
                     }
                 }, !contentInfo.disabled);
                 contentInfo.pass_to_checkbox.watchForChange("disabled", (v) => {
@@ -3513,9 +3534,8 @@ class ContentList {
                 contentEle.appendChild(playButton);
             }
             if (features?.remove?.enabled) {
-                let removeElement = document.createElement("button");
+                let removeElement = createElement("button", "content-list-remove");
                 removeElement.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
-                removeElement.className = 'content-list-remove';
                 removeElement.onclick = () => {
                     contentInfo.onremove(contentEle);
                 }
@@ -3540,16 +3560,15 @@ class ContentList {
                     }
                     return {
                         ...e,
-                        "func": func
+                        func
                     }
                 })
                 theActionList = new ContextMenuButtons(actionList);
                 contentEle.oncontextmenu = (e) => {
                     contextmenu.showContextMenu(theActionList, e.clientX, e.clientY);
                 }
-                let moreElement = document.createElement("button");
+                let moreElement = createElement("button", "content-list-more");
                 moreElement.innerHTML = '<i class="fa-solid fa-ellipsis-vertical"></i>';
-                moreElement.className = 'content-list-more';
                 moreDropdown = new MoreMenu(moreElement, theActionList);
                 contentEle.appendChild(moreElement);
             }
@@ -3725,53 +3744,6 @@ class ContentList {
 
         return offset;
     }
-}
-
-
-async function toggleDisabledContent(contentInfo, theActionList, toggle, moreDropdown) {
-    let content = await contentInfo.instance_info.getContent();
-    for (let i = 0; i < content.length; i++) {
-        let e = content[i];
-        if (e.file_name == await contentInfo.secondary_column.desc()) {
-            if (e.disabled) {
-                let new_file_name = await window.enderlynx.enableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks", e.file_name);
-                if (!new_file_name) {
-                    displayError(translate("app.error.failure_to_enable"));
-                    return;
-                }
-                await e.setDisabled(false);
-                await e.setFileName(new_file_name);
-                contentInfo.secondary_column.desc = () => new_file_name;
-                displaySuccess(translate("app.content.success_enable").replace("%s", e.name));
-            } else {
-                let new_file_name = await window.enderlynx.disableFile(contentInfo.instance_info.instance_id, e.type == "mod" ? "mods" : e.type == "resourcepack" ? "resourcepacks" : "shaderpacks", e.file_name);
-                if (!new_file_name) {
-                    displayError(translate("app.error.failure_to_disable"));
-                    return;
-                }
-                await e.setDisabled(true);
-                await e.setFileName(new_file_name);
-                contentInfo.secondary_column.desc = () => new_file_name;
-                displaySuccess(translate("app.content.success_disable").replace("%s", e.name));
-            }
-            break;
-        }
-    }
-    if (!theActionList) return;
-    const toggleIndex = theActionList.buttons.findIndex(
-        btn => btn.func_id === "toggle"
-    );
-    if (toggleIndex !== -1) {
-        const isDisabled = !toggle.value;
-        theActionList.buttons[toggleIndex].title = isDisabled
-            ? translate("app.content.enable")
-            : translate("app.content.disable");
-        theActionList.buttons[toggleIndex].icon = isDisabled
-            ? '<i class="fa-solid fa-eye"></i>'
-            : '<i class="fa-solid fa-eye-slash"></i>';
-    }
-    moreDropdown.refreshButtons();
-    return true;
 }
 
 class LoadingContainer {
@@ -4263,8 +4235,14 @@ class InstanceScreen extends Screen {
                         "desc": e.author ? "by " + e.author : ""
                     },
                     "secondary_column": {
-                        "title": () => e.version,
-                        "desc": () => e.file_name
+                        "title": e.version,
+                        "titleWatch": (f) => {
+                            e.watchForChange("version", f);
+                        },
+                        "desc": e.file_name,
+                        "descWatch": (f) => {
+                            e.watchForChange("file_name", f);
+                        },
                     },
                     "type": e.type,
                     "class": e.source,
@@ -4449,9 +4427,6 @@ class InstanceScreen extends Screen {
                 "more": {
                     "enabled": true
                 },
-                "second_column_centered": false,
-                "primary_column_name": translate("app.content.name"),
-                "secondary_column_name": translate("app.content.file_info"),
                 "refresh": {
                     "enabled": true,
                     "func": () => {
@@ -4462,49 +4437,7 @@ class InstanceScreen extends Screen {
                     "enabled": this.instance.locked ? false : true,
                     "func": async (b) => {
                         b.innerHTML = "<i class='spinner'></i>" + translate("app.content.updating")
-                        let content = await this.instance.getContent();
-                        let processId = Math.random();
-                        let cancel = false;
-                        for (let i = 0; i < content.length; i++) {
-                            log.sendData([{
-                                "title": "Updating Content",
-                                "progress": i / content.length * 100,
-                                "desc": `Updating ${i + 1} of ${content.length}`,
-                                "id": processId,
-                                "status": "good",
-                                "cancel": () => {
-                                    cancel = true;
-                                }
-                            }]);
-                            let c = content[i];
-                            try {
-                                await updateContent(c.source, c, new Project(), undefined, this.instance);
-                            } catch (e) {
-                                displayError(translate("app.content.update_failed").replace("%c", c.name));
-                            }
-                            if (cancel) {
-                                log.sendData([{
-                                    "title": "Updating Content",
-                                    "progress": 100,
-                                    "desc": "Canceled by User",
-                                    "id": processId,
-                                    "status": "error",
-                                    "cancel": () => { }
-                                }]);
-                                if (this.currentTab == "content") this.showContent();
-                                return;
-                            }
-                        }
-                        log.sendData([{
-                            "title": "Updating Content",
-                            "progress": 100,
-                            "desc": "Done",
-                            "id": processId,
-                            "status": "done",
-                            "cancel": () => { }
-                        }]);
-                        displaySuccess(translate("app.instances.updated_all", "%i", this.instance.name));
-                        if (this.currentTab == "content") this.showContent();
+                        await this.instance.updateAllContent();
                     }
                 }
             }, dropdownInfo, translate("app.content.not_found"), this.contentElement);
@@ -4692,8 +4625,8 @@ class InstanceScreen extends Screen {
                     "desc": world.last_played.getFullYear() < 2000 || isNaN(world.last_played.getFullYear()) ? translate("app.never_played") : translate("app.worlds.last_played").replace("%s", formatTimeRelatively(world.last_played))
                 },
                 "secondary_column": {
-                    "title": () => translate("app.worlds.description." + world.type),
-                    "desc": () => world_description || world.ip,
+                    "title": translate("app.worlds.description." + world.type),
+                    "desc": world_description || world.ip,
                     "desc_hidden": world.type == "multiplayer"
                 },
                 "type": world.type,
@@ -4867,9 +4800,6 @@ class InstanceScreen extends Screen {
             "more": {
                 "enabled": true
             },
-            "second_column_centered": true,
-            "primary_column_name": translate("app.worlds.name"),
-            "secondary_column_name": "",
             "refresh": {
                 "enabled": true,
                 "func": () => {
@@ -5544,8 +5474,8 @@ class InstanceScreen extends Screen {
                             "desc": ""
                         },
                         "secondary_column": {
-                            "title": () => formatTimeRelatively(file.dateModified),
-                            "desc": () => ""
+                            "title": formatTimeRelatively(file.dateModified),
+                            "desc": ""
                         },
                         "type": file.isDirectory ? "folder" : "file",
                         "icon": file.isDirectory ? '<i class="fa-regular fa-folder"></i>' : '<i class="fa-regular fa-file"></i>',
@@ -5750,9 +5680,6 @@ class InstanceScreen extends Screen {
                 "more": {
                     "enabled": true
                 },
-                "second_column_centered": true,
-                "primary_column_name": translate("app.worlds.name"),
-                "secondary_column_name": "",
                 "refresh": {
                     "enabled": true,
                     "func": () => {
@@ -13730,14 +13657,8 @@ async function updateContent(source, content, project, version, instance) {
     if (!version && content.source == "vanilla_tweaks") {
         version = await VanillaTweaks.getResourcePacksVersion(JSON.parse(content.version_id), instance.vanilla_version)
     }
-    if (!version) {
-        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resourcepack" ? "resourcepacks" : "shaderpacks", content.file_name);
-        if (!new_file_name) {
-            displayError(translate("app.error.failure_to_disable"));
-            return false;
-        }
-        await content.setDisabled(true);
-        await content.setFileName(new_file_name);
+    if (!version && !content.disabled) {
+        content.toggleDisabled();
         displayError(translate("app.content.update.failed", "%c", content.name));
         return false;
     }
@@ -13751,7 +13672,7 @@ async function updateContent(source, content, project, version, instance) {
     await content.setVersionId(version.version_id);
 
     if (content.disabled) {
-        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, content.type == "mod" ? "mods" : content.type == "resourcepack" ? "resourcepacks" : "shaderpacks", initialContent.file_name);
+        let new_file_name = await window.enderlynx.disableFile(instance.instance_id, Content.getFolderFromType(content.type), initialContent.file_name);
         if (!new_file_name) {
             displayError(translate("app.error.failure_to_disable"));
             await content.setDisabled(false);

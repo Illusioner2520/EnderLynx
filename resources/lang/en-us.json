@@ -1318,5 +1318,7 @@
     "app.instances.instance_in_use": "This instance is already running.",
     "app.instances.instance_installing": "This instance isn't installed yet.",
     "app.instances.instance_failed": "This instance failed to install.",
-    "app.instances.running": "● Playing"
+    "app.instances.running": "● Playing",
+    "app.content.updating.title": "Updating Content",
+    "app.content.updating.description": "Updating %i of %t"
 }

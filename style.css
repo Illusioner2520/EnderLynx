@@ -1417,14 +1417,6 @@ i {
     accent-color: var(--accent-color);
 }
 
-.content-list-title {
-    font-size: 1rem;
-    color: var(--text-color);
-    width: 10px;
-    flex-grow: 1;
-    display: none;
-}
-
 .content-list-refresh {
     border-radius: 8px;
     padding: 8px;
