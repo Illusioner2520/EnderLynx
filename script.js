@@ -4064,7 +4064,6 @@ class InstanceScreen extends Screen {
     }
 
     async analyzeLogs() {
-        console.log("ANALYZING LOGS");
         let info = await window.enderlynx.analyzeLogs(this.instance.instance_id);
         await this.instance.setPlaytime(info.total_playtime + this.instance.playtime);
         if (info.most_recent_log) await this.instance.setLastAnalyzedLog(info.most_recent_log);
