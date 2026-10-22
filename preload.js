@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     nodeversion: process.versions.node,
     chromeversion: process.versions.chrome,
     v8version: process.versions.v8,
+    sqliteversion: process.versions.sqlite,
     localIPs: () => {
         const nets = os.networkInterfaces();
         let ipv4s = [];

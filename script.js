@@ -8951,90 +8951,71 @@ settingsButtonEle.onclick = async () => {
     let ips = window.enderlynx.localIPs();
     let info_to_show = [{
         "name": translate("app.settings.info.enderlynx"),
-        "value": window.enderlynx.version,
-        "chips": true
+        "value": window.enderlynx.version
     }, {
         "name": translate("app.settings.info.electron"),
-        "value": window.enderlynx.electronversion,
-        "chips": true
+        "value": window.enderlynx.electronversion
     }, {
         "name": translate("app.settings.info.os.platform"),
-        "value": window.enderlynx.osplatform(),
-        "chips": true
+        "value": window.enderlynx.osplatform()
     }, {
         "name": translate("app.settings.info.os.arch"),
-        "value": window.enderlynx.osarch(),
-        "chips": true
+        "value": window.enderlynx.osarch()
     }, {
         "name": translate("app.settings.info.os.release"),
-        "value": window.enderlynx.osrelease(),
-        "chips": true
+        "value": window.enderlynx.osrelease()
     }, {
         "name": translate("app.settings.info.os.version"),
-        "value": window.enderlynx.osversion(),
-        "chips": true
+        "value": window.enderlynx.osversion()
     }, {
         "name": translate("app.settings.info.node"),
-        "value": window.enderlynx.nodeversion,
-        "chips": true
+        "value": window.enderlynx.nodeversion
     }, {
         "name": translate("app.settings.info.chromium"),
-        "value": window.enderlynx.chromeversion,
-        "chips": true
+        "value": window.enderlynx.chromeversion
     }, {
         "name": translate("app.settings.info.v8"),
-        "value": window.enderlynx.v8version,
-        "chips": true
+        "value": window.enderlynx.v8version
+    }, {
+        "name": translate("app.settings.info.sqlite"),
+        "value": window.enderlynx.sqliteversion
     }, {
         "name": translate("app.settings.info.local_ip_address.ipv4"),
-        "value": ips.IPv4,
-        "chips": true
+        "value": ips.IPv4
     }, {
         "name": translate("app.settings.info.local_ip_address.ipv6"),
-        "value": ips.IPv6,
-        "chips": true
+        "value": ips.IPv6
     }]
     for (let i = 0; i < info_to_show.length; i++) {
         let e = info_to_show[i];
         let element = createElement("span");
-        if (e.chips && !e.update) {
-            let chipWrapper = createElement("div", "settings-chip-wrapper");
-            let titleElement = createElement("span", "settings-chip-title");
-            titleElement.innerHTML = e.name + ": ";
-            chipWrapper.appendChild(titleElement);
-            if (typeof e.value == 'string') e.value = [e.value];
-            for (let j = 0; j < e.value.length; j++) {
-                let chip = createElement("div", "settings-chip");
-                let text = createElement("div", undefined, { innerHTML: e.value[j] });
-                let copyButton = createElement("button", "settings-chip-copy", { innerHTML: '<i class="fa-solid fa-copy"></i>', title: translate("app.settings.info.copy_to_clipboard") });
-                copyButton.onclick = async () => {
-                    let success = await window.enderlynx.copyToClipboard(e.value[j]);
-                    if (success) {
-                        displaySuccess(translate("app.settings.info.copy.success"));
-                    } else {
-                        displayError(translate("app.settings.info.copy.fail"));
-                    }
-                    copyButton.innerHTML = '<i class="fa-solid fa-check"></i>';
-                    setTimeout(() => {
-                        copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>';
-                    }, 2000);
+        let chipWrapper = createElement("div", "settings-chip-wrapper");
+        let titleElement = createElement("span", "settings-chip-title");
+        titleElement.innerHTML = e.name;
+        chipWrapper.appendChild(titleElement);
+        if (typeof e.value == 'string') e.value = [e.value];
+        for (let j = 0; j < e.value.length; j++) {
+            let chip = createElement("div", "settings-chip");
+            let text = createElement("div", undefined, { innerHTML: e.value[j] });
+            let copyButton = createElement("button", "settings-chip-copy", { innerHTML: '<i class="fa-solid fa-copy"></i>', title: translate("app.settings.info.copy_to_clipboard") });
+            copyButton.onclick = async () => {
+                let success = await window.enderlynx.copyToClipboard(e.value[j]);
+                if (success) {
+                    displaySuccess(translate("app.settings.info.copy.success"));
+                } else {
+                    displayError(translate("app.settings.info.copy.fail"));
                 }
-                chip.appendChild(text);
-                chip.appendChild(copyButton);
-                chipWrapper.appendChild(chip);
+                copyButton.innerHTML = '<i class="fa-solid fa-check"></i>';
+                setTimeout(() => {
+                    copyButton.innerHTML = '<i class="fa-solid fa-copy"></i>';
+                }, 2000);
             }
-            element.appendChild(chipWrapper);
-        } else if (!e.update) {
-            element.innerHTML = e.name + ": " + e.value;
+            chip.appendChild(text);
+            chip.appendChild(copyButton);
+            chipWrapper.appendChild(chip);
         }
+        element.appendChild(chipWrapper);
         element.style.color = "var(--subtle-text-color)";
-        if (e.update) {
-            setInterval(async () => {
-                if (element) {
-                    element.innerHTML = e.name + ": " + await e.value();
-                }
-            }, e.update);
-        }
         app_info.appendChild(element);
     }
     let bugButton = createElement("button", "bug-button");
