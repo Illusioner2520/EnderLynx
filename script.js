@@ -3891,15 +3891,15 @@ class InstanceScreen extends Screen {
             instanceTopVersions.innerHTML = `<i class="fa-solid fa-gamepad"></i>${sanitize(this.loader_text + " " + this.version_text)}`;
         });
         this.last_played = new Date(this.instance.last_played);
-        this.playtime = this.instance.playtime + (this.running ? Math.floor((new Date().getTime() - this.last_played.getTime()) / 1000) : 0);
+        this.playtime = this.instance.playtime + (this.instance.pid ? Math.floor((new Date().getTime() - this.last_played.getTime()) / 1000) : 0);
         let instanceTopPlaytime = createElement("div", "instance-top-sub-info-specific", { title: translate("app.instances.play_time"), innerHTML: `<i class="fa-solid fa-clock"></i>${formatTime(this.playtime)}` });
         this.instance.watchForChange("playtime", (time) => {
-            if (!this.running) instanceTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(time)}`
+            if (!this.instance.pid) instanceTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(time)}`
             this.playtime = time;
         });
         this.playtimeInterval = setInterval(() => {
             if (!document.body.contains(instanceTopPlaytime)) clearInterval(this.playtimeInterval);
-            if (!this.running) return;
+            if (!this.instance.pid) return;
             instanceTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(this.playtime + Math.floor((new Date().getTime() - this.last_played.getTime()) / 1000))}`;
         }, 1000);
         let instanceTopLastPlayed = createElement("div", "instance-top-sub-info-specific", { title: translate("app.instances.last_played", "%t", formatDate(this.last_played, 2000)), innerHTML: `<i class="fa-solid fa-clock-rotate-left"></i>${formatTimeRelatively(this.last_played)}` });
@@ -4064,6 +4064,7 @@ class InstanceScreen extends Screen {
     }
 
     async analyzeLogs() {
+        console.log("ANALYZING LOGS");
         let info = await window.enderlynx.analyzeLogs(this.instance.instance_id);
         await this.instance.setPlaytime(info.total_playtime + this.instance.playtime);
         if (info.most_recent_log) await this.instance.setLastAnalyzedLog(info.most_recent_log);
@@ -14771,6 +14772,7 @@ window.enderlynx.onInstanceStopped((instance_id) => {
     let instance = Instance.getInstance(instance_id);
     InstanceStateManagement.calculateInstanceStatus(instance);
     live.findLive();
+    instance.instanceScreen.analyzeLogs();
 });
 
 window.enderlynx.onInstanceStarted((instance_id) => {

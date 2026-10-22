@@ -5343,10 +5343,10 @@ function watchProcessForExit(pid, last_played, instance_id) {
         let check = checkForProcess(pid);
         if (!check) {
             clearInterval(timer);
+            updateInstance("pid", null, instance_id);
             if (win) {
                 win.webContents.send('instance-stopped', instance_id);
             }
-            updateInstance("pid", null, instance_id);
         }
     }, 1000);
 }
