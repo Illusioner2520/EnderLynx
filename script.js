@@ -2812,6 +2812,9 @@ class ContextMenu {
                     this.hideContextMenu();
                 }, button.goToInstancePageWhenClicked);
             }
+            if (button.type == "instance-button") {
+                InstanceStateManagement.registerUniqueButton(buttonElement, button.instance, button.running, button.notRunning);
+            }
             this.element.appendChild(buttonElement);
         }
         this.element.showPopover();
