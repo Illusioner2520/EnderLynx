@@ -3974,14 +3974,21 @@ ipcMain.handle('analyze-logs', async (_, instance_id) => {
         "total_playtime": (totalPlaytime / 1000),
         "most_recent_log": most_recent_log
     });
-})
+});
+
+function getFolderFromType(type, def) {
+    if (type == "mod") return "mods";
+    if (type == "resourcepack") return "resourcepacks";
+    if (type == "shader") return "shaderpacks";
+    return def || "what";
+}
 
 ipcMain.handle('import-content', async (_, info, content_type, instance_id) => {
     let destFolder = "";
     let fileType = content_type;
     let fileName = info.has_buffer ? info.name : path.basename(info);
 
-    if (content_type === "auto") {
+    if (content_type == "auto") {
         if (fileName.endsWith(".jar") || fileName.endsWith(".jar.disabled")) {
             destFolder = "mods";
             fileType = "mod";
@@ -4006,10 +4013,7 @@ ipcMain.handle('import-content', async (_, info, content_type, instance_id) => {
             return null;
         }
     } else {
-        if (content_type === "mod") destFolder = "mods";
-        else if (content_type === "resourcepack") destFolder = "resourcepacks";
-        else if (content_type === "shader") destFolder = "shaderpacks";
-        else destFolder = "mods";
+        destFolder = getFolderFromType(content_type, "mods");
     }
 
     const destPath = path.resolve(user_path, `minecraft/instances/${instance_id}/${destFolder}`);
@@ -4260,19 +4264,22 @@ ipcMain.handle('delete-screenshot', async (_, instance_id, file_name) => {
     }
 });
 
-ipcMain.handle('disable-file', async (_, instance_id, type, file_name) => {
-    let file_path = path.resolve(user_path, "minecraft", "instances", instance_id, type, file_name);
+async function disableFile(file_path) {
     try {
-        const disabledPath = file_path.endsWith('.disabled') ? file_path : file_path + '.disabled';
+        let disabledPath = file_path.endsWith('.disabled') ? file_path : file_path + '.disabled';
         await fsPromises.rename(file_path, disabledPath);
         return path.basename(disabledPath);
     } catch (err) {
         return false;
     }
+}
+
+ipcMain.handle('disable-file', async (_, instance_id, type, file_name) => {
+    let file_path = path.resolve(user_path, "minecraft", "instances", instance_id, type, file_name);
+    return await disableFile(file_path);
 });
 
-ipcMain.handle('enable-file', async (_, instance_id, type, file_name) => {
-    let file_path = path.resolve(user_path, "minecraft", "instances", instance_id, type, file_name);
+async function enableFile(file_path) {
     try {
         if (file_path.endsWith('.disabled')) {
             const enabledPath = file_path.slice(0, -9);
@@ -4282,6 +4289,24 @@ ipcMain.handle('enable-file', async (_, instance_id, type, file_name) => {
         return false;
     } catch (err) {
         return false;
+    }
+}
+
+ipcMain.handle('toggle-disabled', async (_, content_id) => {
+    let content = getContent(content_id);
+    let file_path = path.resolve(user_path, "minecraft", "instances", content.instance, getFolderFromType(content.type), content.file_name);
+    if (content.disabled) {
+        let new_file_name = await enableFile(file_path);
+        if (!new_file_name) return [true, false];
+        updateContent("disabled", false, content_id);
+        updateContent("file_name", new_file_name, content_id);
+        return [true, true];
+    } else {
+        let new_file_name = await disableFile(file_path);
+        if (!new_file_name) return [false, false];
+        updateContent("disabled", true, content_id);
+        updateContent("file_name", new_file_name, content_id);
+        return [false, true]
     }
 });
 

@@ -488,26 +488,12 @@ class Content {
     }
 
     async toggleDisabled() {
-        if (this.disabled) {
-            let new_file_name = await window.enderlynx.enableFile(this.instance, Content.getFolderFromType(this.type), this.file_name);
-            if (!new_file_name) {
-                displayError(translate("app.error.failure_to_enable"));
-                return false;
-            }
-            await this.setDisabled(false);
-            await this.setFileName(new_file_name);
-            displaySuccess(translate("app.content.success_enable").replace("%s", this.name));
-        } else {
-            let new_file_name = await window.enderlynx.disableFile(this.instance, Content.getFolderFromType(this.type), this.file_name);
-            if (!new_file_name) {
-                displayError(translate("app.error.failure_to_disable"));
-                return false;
-            }
-            await this.setDisabled(true);
-            await this.setFileName(new_file_name);
-            displaySuccess(translate("app.content.success_disable").replace("%s", this.name));
-        }
-        return true;
+        let status = await window.enderlynx.toggleDisabled(this.id);
+        if (status[0] && status[1]) displaySuccess(translate("app.content.success_enable").replace("%s", this.name));
+        if (status[0] && !status[1]) displayError(translate("app.error.failure_to_enable"));
+        if (!status[0] && status[1]) displaySuccess(translate("app.content.success_disable").replace("%s", this.name));
+        if (!status[0] && !status[1]) displayError(translate("app.error.failure_to_disable"));
+        return status[1];
     }
 
     watchForChange(key, callback) {
