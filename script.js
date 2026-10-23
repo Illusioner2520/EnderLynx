@@ -1673,6 +1673,14 @@ class Instance {
         return await window.enderlynx.installContent(this.instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     }
 
+    async unlinkProcess() {
+        let oldpid = this.pid;
+        await this.setPid(null);
+        InstanceStateManagement.calculateInstanceStatus(this);
+        live.findLive();
+        return oldpid;
+    }
+
     applyImage(imgElement) {
         imgElement.src = this.getImage();
         imgElement.onerror = () => {
@@ -1838,6 +1846,10 @@ class Instance {
             {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.button.instances.delete"),
+                "type": "instance-button",
+                "instance": this,
+                "running": false,
+                "notRunning": true,
                 "func": () => {
                     this.showDeleteDialog(() => {
                         animateGridReorderStart(".instance-item");
@@ -1904,6 +1916,25 @@ class InstanceStateManagement {
             callWhenRun,
             goToInstancePageWhenClicked,
             iconOnly
+        }
+        let instance_id = instance.instance_id;
+        if (this.states[instance_id]?.buttons) {
+            this.states[instance_id].buttons.push(info);
+        } else {
+            this.states[instance_id] = {
+                state: this.calculateState(instance),
+                buttons: [info]
+            }
+        }
+        this.updateButton(info, this.states[instance_id]);
+    }
+    static registerUniqueButton(button, instance, displayWhenRunning, displayWhenNotRunning) {
+        let info = {
+            unique: true,
+            element: button,
+            instance,
+            displayWhenRunning,
+            displayWhenNotRunning
         }
         let instance_id = instance.instance_id;
         if (this.states[instance_id]?.buttons) {
@@ -2003,6 +2034,14 @@ class InstanceStateManagement {
         }
     }
     static updateButton(buttonInfo, info) {
+        if (buttonInfo.unique) {
+            if (info.state == InstanceState.STOPPABLE || info.start == InstanceState.STOPPING) {
+                buttonInfo.element.style.display = buttonInfo.displayWhenRunning ? "" : "none";
+            } else {
+                buttonInfo.element.style.display = buttonInfo.displayWhenNotRunning ? "" : "none";
+            }
+            return;
+        }
         if (buttonInfo.world == null) {
             if (info.state == InstanceState.FAILED) this.applyPlayButtonState(PlayButtonState.FAILED, buttonInfo);
             if (info.state == InstanceState.INSTALLING) this.applyPlayButtonState(PlayButtonState.INSTALLING, buttonInfo);
@@ -2697,6 +2736,9 @@ class MoreMenu {
                 InstanceStateManagement.registerButton(buttonElement, button.instance, button.world || null, false, true, () => {
                     this.element.hidePopover();
                 }, button.goToInstancePageWhenClicked);
+            }
+            if (button.type == "instance-button") {
+                InstanceStateManagement.registerUniqueButton(buttonElement, button.instance, button.running, button.notRunning);
             }
             this.element.appendChild(buttonElement);
         }
@@ -3917,14 +3959,14 @@ class InstanceScreen extends Screen {
             {
                 "icon": '<i class="fa-solid fa-gear"></i>',
                 "title": translate("app.button.instances.open_settings"),
-                "func": async (e) => {
+                "func": () => {
                     this.instance.showSettingsDialog();
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-folder"></i>',
                 "title": translate("app.button.instances.open_folder"),
-                "func": (e) => {
+                "func": () => {
                     window.enderlynx.openInstanceFolder(this.instance.instance_id);
                 }
             },
@@ -3945,22 +3987,38 @@ class InstanceScreen extends Screen {
                 }
             },
             {
+                "icon": '<i class="fa-solid fa-link-slash"></i>',
+                "title": translate("app.instances.unlink_process"),
+                "type": "instance-button",
+                "instance": this.instance,
+                "running": true,
+                "notRunning": false,
+                "func": async () => {
+                    let pid = await this.instance.unlinkProcess();
+                    displaySuccess(translate("app.instances.unlink_process.done", "%p", pid));
+                }
+            },
+            {
                 "icon": '<i class="fa-solid fa-share"></i>',
                 "title": translate("app.button.instances.share"),
-                "func": (e) => {
+                "func": () => {
                     this.instance.showShareDialog();
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-copy"></i>',
                 "title": translate("app.button.instances.duplicate"),
-                "func": (e) => {
+                "func": () => {
                     this.instance.showDuplicateDialog();
                 }
             },
             {
                 "icon": '<i class="fa-solid fa-wrench"></i>',
                 "title": translate("app.button.instances.repair"),
+                "type": "instance-button",
+                "instance": this.instance,
+                "running": false,
+                "notRunning": true,
                 "func": () => {
                     this.instance.showRepairDialog();
                 }
@@ -3968,7 +4026,11 @@ class InstanceScreen extends Screen {
             {
                 "icon": '<i class="fa-solid fa-trash-can"></i>',
                 "title": translate("app.button.instances.delete"),
-                "func": (e) => {
+                "type": "instance-button",
+                "instance": this.instance,
+                "running": false,
+                "notRunning": true,
+                "func": () => {
                     this.instance.showDeleteDialog(() => {
                         instancesScreen.display();
                     });
@@ -6146,7 +6208,7 @@ class HomeScreen extends Screen {
                 instanceInfo.locked ? null : {
                     "icon": '<i class="fa-solid fa-plus"></i>',
                     "title": translate("app.button.content.add"),
-                    "func": async (e) => {
+                    "func": async () => {
                         discoverScreen.display(false, instanceInfo, instanceInfo.vanilla_version, instanceInfo.loader);
                     }
                 },
@@ -6190,7 +6252,11 @@ class HomeScreen extends Screen {
                 {
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "title": translate("app.button.instances.delete"),
-                    "func": (e) => {
+                    "type": "instance-button",
+                    "instance": instanceInfo,
+                    "running": false,
+                    "notRunning": true,
+                    "func": () => {
                         instanceInfo.showDeleteDialog(() => {
                             pinnedInstancesList = pinnedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);
                             lastPlayedInstancesList = lastPlayedInstancesList.filter(e => e.instance_id != instanceInfo.instance_id);

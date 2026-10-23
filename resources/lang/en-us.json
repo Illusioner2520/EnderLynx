@@ -1321,5 +1321,7 @@
     "app.instances.instance_failed": "This instance failed to install.",
     "app.instances.running": "● Playing",
     "app.content.updating.title": "Updating Content",
-    "app.content.updating.description": "Updating %i of %t"
+    "app.content.updating.description": "Updating %i of %t",
+    "app.instances.unlink_process": "Unlink Process",
+    "app.instances.unlink_process.done": "The process with PID %p is no longer linked to this instance."
 }
