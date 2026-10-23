@@ -79,7 +79,7 @@ db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) V
 
 db.pragma('journal_mode = WAL');
 
-let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false" };
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true" };
 
 let minecraftVersions = [];
 

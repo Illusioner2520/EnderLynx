@@ -1670,7 +1670,6 @@ class Instance {
     }
 
     async installContent(project_type, project_url, sha1, filename, data_pack_world, content_id) {
-        console.log(project_type, project_url, sha1, filename, data_pack_world, content_id);
         return await window.enderlynx.installContent(this.instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     }
 
@@ -9260,6 +9259,14 @@ settingsButtonEle.onclick = async () => {
             "default": await getDefault("auto_apply_resource_packs") == "true"
         },
         {
+            "type": "toggle",
+            "name": translate("app.settings.auto_download_dependencies"),
+            "tab": "appearance",
+            "id": "auto_download_dependencies",
+            "desc": translate("app.settings.auto_download_dependencies.description"),
+            "default": await getDefault("auto_download_dependencies") == "true"
+        },
+        {
             "type": "slider",
             "name": translate("app.settings.resources.downloads"),
             "desc": translate("app.settings.resources.downloads.description"),
@@ -9426,15 +9433,16 @@ settingsButtonEle.onclick = async () => {
     ], async (info) => {
         await setDefault("default_width", info.default_width);
         await setDefault("default_height", info.default_height);
-        await setDefault("default_fullscreen", (info.default_fullscreen).toString());
+        await setDefault("default_fullscreen", info.default_fullscreen.toString());
         await setDefault("default_ram", info.default_ram);
         await setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
         await setDefault("default_page", info.default_page);
-        await setDefault("discord_rpc", (info.discord_rpc).toString());
-        await setDefault("potato_mode", (info.potato_mode).toString());
-        await setDefault("hide_ip", (info.hide_ip).toString());
-        await setDefault("link_with_modrinth", (info.modrinth_link).toString());
-        await setDefault("auto_apply_resource_packs", (info.auto_apply_resource_packs).toString());
+        await setDefault("discord_rpc", info.discord_rpc.toString());
+        await setDefault("potato_mode", info.potato_mode.toString());
+        await setDefault("hide_ip", info.hide_ip.toString());
+        await setDefault("link_with_modrinth", info.modrinth_link.toString());
+        await setDefault("auto_apply_resource_packs", info.auto_apply_resource_packs.toString());
+        await setDefault("auto_download_dependencies", info.auto_download_dependencies.toString());
         await setDefault("global_pre_launch_hook", info.global_pre_launch_hook);
         await setDefault("global_post_launch_hook", info.global_post_launch_hook);
         await setDefault("global_wrapper", info.global_wrapper);
@@ -9444,7 +9452,7 @@ settingsButtonEle.onclick = async () => {
         await setDefault("default_accent_color", info.default_accent_color);
         await setDefault("default_sidebar", info.default_sidebar);
         await setDefault("default_sidebar_side", info.default_sidebar_side);
-        await setDefault("thin_scrollbars", (info.thin_scrollbars).toString());
+        await setDefault("thin_scrollbars", info.thin_scrollbars.toString());
         if (info.potato_mode) {
             document.body.classList.add("potato");
         } else {
@@ -12265,7 +12273,7 @@ async function installSpecificVersion(version, source, instance, project_type, t
     }
     if (project_type != "world" && project_type != "datapack") await instance.addContent(title, author, icon_url, initialContent.file_name, source, initialContent.type, version_number, project_id, false, version_id);
     if (initialContent.stop_installing_dependencies) return initialContent;
-    if (dependencies && project_type != "world" && project_type != "datapack") {
+    if (dependencies && project_type != "world" && project_type != "datapack" && await getDefault("auto_download_dependencies") == "true") {
         for (let j = 0; j < dependencies.length; j++) {
             let dependency = dependencies[j];
             if (modrinth_ids.includes(dependency.project_id) || curseforge_ids.includes(dependency.project_id)) continue;
