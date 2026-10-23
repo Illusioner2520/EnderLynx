@@ -2050,7 +2050,7 @@ class InstanceStateManagement {
             if (info.state == InstanceState.STOPPING) this.applyPlayButtonState(PlayButtonState.STOPPING, buttonInfo);
             if (info.state == InstanceState.LOADING) this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
         } else {
-            if (info.state == InstanceState.LOADING && (buttonInfo.world.id == this.active_world || buttonInfo.world.ip == this.active_world)) {
+            if (info.state == InstanceState.LOADING && (buttonInfo.world.id == this.active_world || buttonInfo.world.ip == this.active_world) && this.active_world) {
                 this.applyPlayButtonState(PlayButtonState.LOADING, buttonInfo);
             } else if (info.state == InstanceState.PLAYABLE) {
                 this.applyPlayButtonState(PlayButtonState.PLAY_SPECIFIC_WORLD, buttonInfo);
