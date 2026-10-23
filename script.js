@@ -3925,6 +3925,7 @@ class InstanceScreen extends Screen {
             if (!this.instance.pid) instanceTopPlaytime.innerHTML = `<i class="fa-solid fa-clock"></i>${formatTime(time)}`
             this.playtime = time;
         });
+        clearInterval(this.playtimeInterval);
         this.playtimeInterval = setInterval(() => {
             if (!document.body.contains(instanceTopPlaytime)) clearInterval(this.playtimeInterval);
             if (!this.instance.pid) return;
