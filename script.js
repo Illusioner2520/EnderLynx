@@ -3464,7 +3464,7 @@ class ContentList {
             contentEle.classList.add("content-list-item");
             if (contentInfo.onclick) {
                 makeArtificialButton(contentEle, () => {
-                    contentInfo.onclick();
+                    contentInfo.onclick(contentEle);
                 }, ["button", "i", "input"]);
                 contentEle.classList.add("content-list-button");
             }
@@ -3474,7 +3474,8 @@ class ContentList {
                 "name": [contentInfo.primary_column.title, contentInfo.primary_column.desc, contentInfo.secondary_column.title, contentInfo.secondary_column.desc].join("!!!!!!!!!!"),
                 "element": contentEle,
                 "type": contentInfo.type,
-                "height": contentInfo.icon ? 53 : 61
+                "height": contentInfo.icon ? 53 : 61,
+                "unique_id": contentInfo.unique_id
             }
             this.items.push(item);
             let checkboxElement;
@@ -3640,6 +3641,10 @@ class ContentList {
     }
 
     removeElement(ele) {
+        if (typeof ele == 'string') {
+            let candidates = this.items.find(e => e.unique_id == ele);
+            ele = candidates.element;
+        }
         ele.remove();
         this.items = this.items.filter(e => e.element != ele);
         this.reApplyFilters();
@@ -5512,7 +5517,9 @@ class InstanceScreen extends Screen {
             this.filesSaveButton = saveButton;
             this.filesSearch.appendChild(saveButton);
         } else {
-            let extensionsToEdit = ["txt", "json", "", "mcmeta", "json5", "toml", "properties", "conf", "bak1", "cfg", "backup0", "backup1", "backup2", "backup3", "lock", "md", "html", "js", "css", "java", "py", "snbt", "jsonc", "ts", "mjs", "cjs", "mts", "cts", "svg", "xml", "csv", "log", "yaml", "yml"];
+            let extensionsToEdit = ["txt", "json", "", "mcmeta", "json5", "toml", "properties", "conf", "bak1", "cfg", "backup0", "backup1", "backup2", "backup3", "lock", "md", "html", "js", "css", "java", "py", "snbt", "jsonc", "ts", "mjs", "cjs", "mts", "cts", "xml", "csv", "log", "yaml", "yml"];
+            let imageExtensions = ["png", "jpg", "jpeg", "gif", "svg", "avif", "webp", "apng", "jfif", "pjpeg", "pjp", "bmp", "ico", "cur"];
+            let screenshotInformation = files.filter(e => imageExtensions.includes(e.ext)).map(e => ({ "name": e.name, "file": e.fullPath, "relative_file_path": e.relativePath }));
             for (let file of files) {
                 fileList.push(
                     {
@@ -5524,6 +5531,7 @@ class InstanceScreen extends Screen {
                             "title": formatTimeRelatively(file.dateModified),
                             "desc": ""
                         },
+                        "unique_id": file.relativePath,
                         "type": file.isDirectory ? "folder" : "file",
                         "icon": file.isDirectory ? '<i class="fa-regular fa-folder"></i>' : '<i class="fa-regular fa-file"></i>',
                         "onremove": (ele) => {
@@ -5547,7 +5555,11 @@ class InstanceScreen extends Screen {
                                 }
                             });
                         },
-                        "onclick": extensionsToEdit.includes(file.ext) ? () => {
+                        "onclick": imageExtensions.includes(file.ext) ? (ele) => {
+                            displayScreenshot(file.name, null, file.fullPath, file.relativePath, this.instance, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(file.fullPath), translate("app.file"), (relative_path) => {
+                                contentList.removeElement(relative_path);
+                            });
+                        } : extensionsToEdit.includes(file.ext) ? () => {
                             this.setFilesPath(paths + "/" + file.name);
                         } : null,
                         "more": {
@@ -5767,9 +5779,11 @@ class InstanceScreen extends Screen {
             screenshotElement.className = "gallery-screenshot";
             screenshotElement.dataset.title = formatDateAndTime(e.file_name);
             screenshotElement.style.backgroundImage = `url("${e.file_path}")`;
-            let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path }));
+            let screenshotInformation = screenshots.map(e => ({ "name": formatDateAndTime(e.file_name), "file": e.file_path, "relative_file_path": e.relative_file_path }));
             screenshotElement.onclick = () => {
-                displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, e.file_name, this.instance, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path));
+                displayScreenshot(formatDateAndTime(e.file_name), null, e.file_path, e.file_name, this.instance, screenshotInformation, screenshotInformation.map(e => e.file).indexOf(e.file_path), undefined, () => {
+                    this.showScreenshots();
+                });
             }
             let buttons = new ContextMenuButtons([
                 {
@@ -5809,7 +5823,7 @@ class InstanceScreen extends Screen {
                     "icon": '<i class="fa-solid fa-trash-can"></i>',
                     "title": translate("app.screenshots.delete"),
                     "func": async () => {
-                        let success = await window.enderlynx.deleteScreenshot(this.instance.instance_id, e.file_name);
+                        let success = await window.enderlynx.deleteInstanceFile(this.instance.instance_id, e.relative_file_path);
                         if (success) {
                             displaySuccess(translate("app.screenshots.delete.success"));
                         } else {
@@ -9983,13 +9997,13 @@ class Display {
     }
 }
 
-function displayScreenshot(name, desc, file, file_name, instanceInfo, list, currentIndex, word = translate("app.screenshot")) {
+function displayScreenshot(name, desc, file, relative_file_path, instanceInfo, list, currentIndex, word = translate("app.screenshot"), afterImageDelete) {
     let index = currentIndex;
     let buttonLeft = document.createElement("button");
     buttonLeft.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
     buttonLeft.className = "screenshot-arrow";
     let screenshotElement;
-    let changeDisplay = (name, file, desc) => {
+    let changeDisplay = (name, file, desc, relative_file_path) => {
         screenshotDisplayW.innerHTML = '';
         let spinner = document.createElement("div");
         spinner.className = "loading-container-spinner";
@@ -10019,14 +10033,14 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
         }
         if (instanceInfo) {
             screenshotAction5.onclick = async () => {
-                let success = await window.enderlynx.deleteScreenshot(instanceInfo.instance_id, file_name);
+                let success = await window.enderlynx.deleteInstanceFile(instanceInfo.instance_id, relative_file_path);
                 if (success) {
                     screenshotPreview.close();
                     displaySuccess(translate("app.screenshots.custom.delete.success", "%w", word));
+                    afterImageDelete(relative_file_path);
                 } else {
                     displayError(translate("app.screenshots.custom.delete.fail", "%w", word));
                 }
-                instanceInfo.instanceScreen.showScreenshots();
             };
         }
         let screenshotDisplay = document.createElement("img");
@@ -10053,12 +10067,12 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
     let shiftLeft = () => {
         index--;
         if (index < 0) index = list.length - 1;
-        changeDisplay(list[index].name, list[index].file, list[index].desc);
+        changeDisplay(list[index].name, list[index].file, list[index].desc, list[index].relative_file_path);
     }
     let shiftRight = () => {
         index++;
         if (index > list.length - 1) index = 0;
-        changeDisplay(list[index].name, list[index].file, list[index].desc);
+        changeDisplay(list[index].name, list[index].file, list[index].desc, list[index].relative_file_path);
     }
     buttonLeft.onclick = shiftLeft;
     let buttonRight = document.createElement("button");
@@ -10141,7 +10155,7 @@ function displayScreenshot(name, desc, file, file_name, instanceInfo, list, curr
     screenshotWrapper.appendChild(buttonRight);
     screenshotWrapper.appendChild(screenshotInfo);
     screenshotPreview.appendChild(screenshotWrapper);
-    changeDisplay(name, file, desc);
+    changeDisplay(name, file, desc, relative_file_path);
     screenshotPreview.showModal();
     document.getElementsByClassName("toasts")[0].hidePopover();
     document.getElementsByClassName("toasts")[0].showPopover();

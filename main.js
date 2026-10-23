@@ -3430,6 +3430,7 @@ ipcMain.handle('get-screenshots', async (_, instance_id) => {
             return {
                 file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
                 real_file_name: file,
+                relative_file_path: path.join("screenshots", file),
                 file_path: path.resolve(screenshotsPath, file).replace(/\\/g, '/')
             }
         });
@@ -4259,8 +4260,8 @@ ipcMain.handle('delete-content', async (_, instance_id, project_type, filename) 
     return true;
 });
 
-ipcMain.handle('delete-screenshot', async (_, instance_id, file_name) => {
-    let file_path = path.resolve(user_path, "minecraft/instances", instance_id, "screenshots", file_name);
+ipcMain.handle('delete-instance-file', async (_, instance_id, relative_file_path) => {
+    let file_path = path.resolve(user_path, "minecraft/instances", instance_id, relative_file_path);
     try {
         await fsPromises.unlink(file_path);
         return true;
