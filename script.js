@@ -1636,7 +1636,7 @@ class Instance {
 
     async getServerLastPlayed(ip) {
         let result = await window.enderlynx.getServerLastPlayed(this.instance_id, ip);
-        return new Date(result ? result : null);
+        return new Date(result || null);
     }
 
     async getSingleplayerWorlds() {
@@ -5891,8 +5891,8 @@ class HomeScreen extends Screen {
         pinnedWorlds.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
         pinnedInstances.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
-        let pinnedWorldIdentifiers = pinnedWorlds.map(e => (e.id ? e.id : e.ip) + ":" + e.instance_id);
-        let lastPlayedWorlds = lastPlayedWorldsList.filter(e => !pinnedWorldIdentifiers.includes((e.id ? e.id : e.ip) + ":" + e.instance_id)).slice(0, 5);
+        let pinnedWorldIdentifiers = pinnedWorlds.map(e => (e.id || e.ip) + ":" + e.instance_id);
+        let lastPlayedWorlds = lastPlayedWorldsList.filter(e => !pinnedWorldIdentifiers.includes((e.id || e.ip) + ":" + e.instance_id)).slice(0, 5);
         let pinnedInstanceIdentifiers = pinnedInstances.map(e => e.instance_id);
         let lastPlayedInstances = lastPlayedInstancesList.filter(e => !pinnedInstanceIdentifiers.includes(e.instance_id)).slice(0, 5);
         pinnedInstances.forEach(e => e.actuallyPinned = true);
@@ -5918,7 +5918,7 @@ class HomeScreen extends Screen {
             item.dataset.id = "world:" + (e.type == "singleplayer" ? e.id : e.ip) + ":" + e.instance_id;
             let icon = document.createElement("img");
             icon.className = "instance-image";
-            icon.src = fixPathForImage(e.icon ? e.icon : getDefaultImage(e.type == "singleplayer" ? e.id : e.ip));
+            icon.src = fixPathForImage(e.icon || getDefaultImage(e.type == "singleplayer" ? e.id : e.ip));
             icon.onerror = () => {
                 icon.src = getDefaultImage(e.type == "singleplayer" ? e.id : e.ip);
             }
@@ -6374,7 +6374,7 @@ class HomeScreen extends Screen {
             }
             let img = document.createElement("img");
             img.className = "home-discover-image";
-            img.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
+            img.src = e.icon_url || getDefaultImage(e.title);
             item.appendChild(img);
             let itemInfo = document.createElement("div");
             itemInfo.className = "home-discover-info";
@@ -9583,6 +9583,12 @@ async function importSkin(info) {
         return;
     }
     let model = info.model;
+    let name = info.name;
+    if (!name && info.selected_tab == "username") {
+        name = translate("app.wardrobe.username_import.default_name", "%u", info.username)
+    } else if (!name) {
+        name = translate("app.wardrobe.unnamed");
+    }
     if (info.model == "auto") {
         return await new Promise((resolve) => {
             const tempImg = new Image();
@@ -9599,13 +9605,13 @@ async function importSkin(info) {
                 } else {
                     model = "wide";
                 }
-                await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
+                await addSkin(name, model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
                 resolve();
             };
             tempImg.src = info.skin;
         });
     }
-    await addSkin(info.name ? info.name : info.selected_tab == "username" ? translate("app.wardrobe.username_import.default_name", "%u", info.username) : translate("app.wardrobe.unnamed"), model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
+    await addSkin(name, model, "", await window.enderlynx.importSkin(info.skin), info.skin, true, null);
 }
 
 async function getImageDimensionsFromDataURL(dataURL) {
@@ -10647,7 +10653,7 @@ class ImageUpload {
         element.className = "image-upload-wrapper";
         let preview = document.createElement("img");
         preview.className = "image-preview";
-        preview.src = defaultImage ? defaultImage : getDefaultImage(defaultImageCode);
+        preview.src = defaultImage || getDefaultImage(defaultImageCode);
         this.previewElement = preview;
         element.appendChild(preview);
         let containButtons = document.createElement("div");
@@ -10661,7 +10667,7 @@ class ImageUpload {
         containButtons.appendChild(uploadButton);
         containButtons.appendChild(removeButton);
         element.appendChild(containButtons);
-        this.value = defaultImage ? defaultImage : "";
+        this.value = defaultImage || "";
         uploadButton.onclick = () => {
             let temp = document.createElement("input");
             temp.setAttribute("type", "file");
@@ -11364,7 +11370,7 @@ class Dialog {
                             label.innerHTML = translate("app.instances.settings.loader_version", "%l", loaders[loader]);
                         } catch (err) {
                             if (currentToken !== updateToken) return;
-                            displayError(translate("app.failed_to_load", "%m", (err && err.message ? err.message : err)));
+                            displayError(translate("app.failed_to_load", "%m", err?.message || err));
                             label.textContent = translate("app.dialog.unable_to_load", "%n", info.name);
                             multiSelect.setOptions([{ "name": translate("app.dialog.unable_to_load.no_name"), "value": "loading" }], "loading");
                         }
@@ -11506,7 +11512,7 @@ class Dialog {
                     label.textContent = info.name;
                 } catch (err) {
                     if (currentToken !== updateToken) return;
-                    displayError(translate("app.failed_to_load", "%m", (err && err.message ? err.message : err)));
+                    displayError(translate("app.failed_to_load", "%m", err?.message || err));
                     label.textContent = translate("app.dialog.unable_to_load", "%n", info.name);
                     if (value.setOptions) {
                         value.setOptions([{ "name": translate("app.dialog.unable_to_load.no_name"), "value": "loading" }], "loading");
@@ -12025,7 +12031,7 @@ class VanillaTweaksSelector {
             let vtIcon = document.createElement("img");
             vtIcon.className = "vt-icon";
             vtIcon.loading = "lazy";
-            vtIcon.src = e.icon_url ? e.icon_url : getDefaultImage(e.title);
+            vtIcon.src = e.icon_url || getDefaultImage(e.title);
             let vtInfo = document.createElement("div");
             vtInfo.className = "vt-info";
             let vtTitle = document.createElement("div");
@@ -12221,7 +12227,7 @@ async function getRecentlyPlayedWorlds(ignore_world_ids = []) {
     }
     let last_played_worlds = await window.enderlynx.getRecentlyPlayedWorlds((await getInstances()).map(e => e.instance_id));
     let all = last_played_worlds.concat(allServersMapped);
-    all = all.filter(e => !ignore_world_ids.includes((e.id ? e.id : e.ip) + ":" + e.instance_id))
+    all = all.filter(e => !ignore_world_ids.includes((e.id || e.ip) + ":" + e.instance_id))
     all.sort((a, b) => b.last_played - a.last_played);
     return all;
 }
@@ -12667,7 +12673,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         allGameVersions.map(e => ({ "name": e, "value": e }))
                     ),
                     mcVersionFilter,
-                    vanilla_version ? vanilla_version : "all",
+                    vanilla_version || "all",
                     (v) => {
                         filterVersions(v, loaderDropdown.value, 1);
                     }
@@ -12680,7 +12686,7 @@ async function displayContentInfo(content_source, content, content_id, instance_
                         "name": translate("app.discover.loader.all"),
                         "value": "all"
                     }].concat(allLoaders.map(e => ({ "name": translate("app.loader." + e), "value": e }))),
-                    mcLoaderFilter, loader ? loader : "all", (v) => {
+                    mcLoaderFilter, loader || "all", (v) => {
                         filterVersions(versionDropdown.value, v, 1);
                     });
 
@@ -13702,7 +13708,7 @@ async function installButtonClick(content, version, instance_id) {
             { "content": translate("app.discover.datapacks.cancel"), "type": "cancel" },
             { "content": translate("app.discover.datapacks.confirm"), "type": "confirm" }
         ], [], async (info) => {
-            let instance = instance_id ? instance_id : info.instance;
+            let instance = instance_id || info.instance;
             let world = info.world;
             if (world == "loading" || world == "" || !world) {
                 displayError(translate("app.discover.datapack.world", "%t", title));
