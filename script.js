@@ -3399,7 +3399,6 @@ class ContentList {
         }
 
         this.items = [];
-        this.second_column_elements = [];
 
         let spacer = document.createElement("div");
         contentMainElement.appendChild(spacer);
@@ -3664,14 +3663,6 @@ class ContentList {
             return w;
         });
         this.render(this.filteredItems);
-    }
-
-    updateSecondaryColumn() {
-        let list = this.second_column_elements;
-        list.forEach(async (e) => {
-            e.infoElement2Title.textContent = await e.title_func();
-            e.infoElement2Desc.textContent = await e.desc_func();
-        });
     }
 
     figureOutMainCheckedState() {
@@ -4306,7 +4297,6 @@ class InstanceScreen extends Screen {
                                     try {
                                         let s = await updateContent(e.source, e, new Project(), undefined, this.instance);
                                         if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
-                                        if (contentList?.updateSecondaryColumn) contentList.updateSecondaryColumn();
                                     } catch (f) {
                                         displayError(translate("app.content.update_failed", "%c", e.name));
                                         throw f;
@@ -4364,7 +4354,6 @@ class InstanceScreen extends Screen {
                                 try {
                                     let s = await updateContent(e.source, e, new Project(), undefined, this.instance);
                                     if (s !== false) displaySuccess(translate("app.content.updated", "%c", e.name));
-                                    if (contentList?.updateSecondaryColumn) contentList.updateSecondaryColumn();
                                 } catch (f) {
                                     displayError(translate("app.content.update_failed", "%c", e.name));
                                     throw f;
@@ -14632,7 +14621,6 @@ class DiscoverStateManagement {
                 }
                 if (!theContent) return;
                 await updateContent(content.source, theContent, buttonInfo.content, version, buttonInfo.instance);
-                if (buttonInfo.content_list_to_update?.updateSecondaryColumn) buttonInfo.content_list_to_update.updateSecondaryColumn();
             }
             button.classList.remove("disabled");
         } else if (state == InstallButtonState.SWITCH_VERSION_DISABLED) {
