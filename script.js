@@ -2063,6 +2063,12 @@ class InstanceStateManagement {
             }
         }
     }
+    static getInstanceStatus(instance_id) {
+        if (this.states[instance_id]) {
+            return this.states[instance_id].state;
+        }
+        return null;
+    }
     static setInstanceStatus(instance_id, state, world_id) {
         if (!this.states[instance_id]) {
             this.states[instance_id] = {
@@ -10601,7 +10607,10 @@ window.enderlynx.onLaunchInstance(async (launch_info) => {
         } else {
             instance.display(launch_info.world_id ? "worlds" : "content", true);
         }
-        InstanceStateManagement.setInstanceStatus(launch_info.instance_id, PlayButtonState.LOADING, launch_info.world_id);
+        let current_state = InstanceStateManagement.getInstanceStatus(launch_info.instance_id);
+        if (current_state == InstanceState.PLAYABLE) {
+            InstanceStateManagement.setInstanceStatus(launch_info.instance_id, InstanceState.LOADING, launch_info.world_id);
+        }
     } catch (e) {
         displayError(translate("app.launch_error"));
     }
