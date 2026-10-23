@@ -831,6 +831,8 @@
     "app.share.copy_path.fail": "Unable to copy to clipboard",
     "app.share.email": "Send an Email",
     "app.share.save": "Save to Disk",
+    "app.share.save.success": "File saved to disk.",
+    "app.share.save.fail": "Failed to save file to disk.",
     "app.share.folder": "Open Folder",
     "app.share.browser": "Open Link in Browser",
     "app.share.x": "Share on X (Twitter)",
@@ -1323,5 +1325,8 @@
     "app.content.updating.title": "Updating Content",
     "app.content.updating.description": "Updating %i of %t",
     "app.instances.unlink_process": "Unlink Process",
-    "app.instances.unlink_process.done": "The process with PID %p is no longer linked to this instance."
+    "app.instances.unlink_process.done": "The process with PID %p is no longer linked to this instance.",
+    "app.files.edit.saving": "Saving",
+    "app.files.edit.save": "Save",
+    "app.files.edit.reset": "Reset"
 }

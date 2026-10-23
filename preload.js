@@ -441,7 +441,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
         return await ipcRenderer.invoke('analyze-logs', instance_id);
     },
     saveToDisk: async (file_path) => {
-        let result = await ipcRenderer.invoke('show-save-dialog', {
+        return await ipcRenderer.invoke('show-save-dialog', {
             title: await translate("app.save.file"),
             defaultPath: file_path,
             buttonLabel: await translate("app.save.save"),

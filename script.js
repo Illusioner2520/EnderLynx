@@ -5482,14 +5482,14 @@ class InstanceScreen extends Screen {
             aceEditor.session.setMode("ace/mode/enderlynx");
             aceEditor.setFontSize(".9rem");
             let saveFunction = async () => {
-                saveButton.innerHTML = '<i class="spinner"></i>Saving';
+                saveButton.innerHTML = '<i class="spinner"></i>' + translate("app.files.edit.saving");
                 let success = await window.enderlynx.editFile(this.instance.instance_id, paths, aceEditor.getValue());
                 if (success) {
                     displaySuccess(translate("app.files.edit.success"));
                 } else {
                     displayError(translate("app.files.edit.fail"));
                 }
-                saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+                saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>' + translate("app.files.edit.save");
             }
             aceEditor.commands.addCommand({
                 name: "save",
@@ -5498,7 +5498,7 @@ class InstanceScreen extends Screen {
             });
             contentListWrap.appendChild(editor);
             let resetButton = document.createElement("button");
-            resetButton.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>Reset';
+            resetButton.innerHTML = '<i class="fa-solid fa-clock-rotate-left"></i>' + translate("app.files.edit.reset");
             resetButton.className = "editor-button";
             resetButton.onclick = () => {
                 aceEditor.setValue(files, -1);
@@ -5506,7 +5506,7 @@ class InstanceScreen extends Screen {
             this.filesSearch.appendChild(resetButton);
             this.filesResetButton = resetButton;
             let saveButton = document.createElement("button");
-            saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>Save';
+            saveButton.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>' + translate("app.files.edit.save");
             saveButton.className = "editor-button";
             saveButton.onclick = saveFunction;
             this.filesSaveButton = saveButton;
@@ -13499,8 +13499,13 @@ function openShareDialogForFile(file_path) {
     let linkList = [
         {
             "icon": '<i class="fa-solid fa-floppy-disk"></i>',
-            "func": () => {
-                window.enderlynx.saveToDisk(file_path);
+            "func": async () => {
+                let success = await window.enderlynx.saveToDisk(file_path);
+                if (success) {
+                    displaySuccess(translate("app.share.save.success"));
+                } else {
+                    displayError(translate("app.share.save.fail"));
+                }
             },
             "tooltip": translate("app.share.save")
         },

@@ -386,9 +386,14 @@ ipcMain.handle('show-open-dialog', async (event, options) => {
 });
 
 ipcMain.handle('show-save-dialog', async (event, options, file_path) => {
-    const result = await dialog.showSaveDialog(win, options);
-    if (result.canceled || !result.filePath) return;
-    await fsPromises.copyFile(file_path, result.filePath);
+    try {
+        const result = await dialog.showSaveDialog(win, options);
+        if (result.canceled || !result.filePath) return false;
+        await fsPromises.copyFile(file_path, result.filePath);
+        return true;
+    } catch (e) {
+        return false;
+    }
 });
 
 ipcMain.handle('get-desktop', (_) => {
