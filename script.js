@@ -8999,7 +8999,7 @@ settingsButtonEle.onclick = async () => {
     app_info.style.display = "flex";
     app_info.style.flexDirection = "column";
     app_info.style.gap = "4px";
-    let ips = window.enderlynx.localIPs();
+    let ips = await window.enderlynx.localIPs();
     let info_to_show = [{
         "name": translate("app.settings.info.enderlynx"),
         "value": window.enderlynx.version

@@ -74,7 +74,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
     chromeversion: process.versions.chrome,
     v8version: process.versions.v8,
     sqliteversion: process.versions.sqlite,
-    localIPs: () => {
+    localIPs: async () => {
         const nets = os.networkInterfaces();
         let ipv4s = [];
         let ipv6s = [];
@@ -87,7 +87,7 @@ contextBridge.exposeInMainWorld('enderlynx', {
                 }
             }
         }
-        return { IPv4: ipv4s || [translate("app.settings.info.local_ip_address.na")], IPv6: ipv6s || [translate("app.settings.info.local_ip_address.na")] }
+        return { IPv4: ipv4s || [await translate("app.settings.info.local_ip_address.na")], IPv6: ipv6s || [await translate("app.settings.info.local_ip_address.na")] }
     },
     readPackFile,
     getInstanceFiles: async (instance_id) => {
