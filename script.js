@@ -1670,6 +1670,7 @@ class Instance {
     }
 
     async installContent(project_type, project_url, sha1, filename, data_pack_world, content_id) {
+        console.log(project_type, project_url, sha1, filename, data_pack_world, content_id);
         return await window.enderlynx.installContent(this.instance_id, project_type, project_url, sha1, filename, data_pack_world, content_id);
     }
 
@@ -12215,7 +12216,7 @@ class Details {
 async function installContent(source, project, version, instance, data_pack_world) {
     DiscoverStateManagement.setContentStatus(project.id, instance.instance_id, DiscoverState.INSTALLING);
     if (project.server_modpack?.kind == "vanilla") {
-        await instance.installContent(instance, "server", project.ip_address, null, project.name, project.icon);
+        await instance.installContent("server", project.ip_address, null, project.name, project.icon, project.id);
         DiscoverStateManagement.setContentStatus(project.id, instance.instance_id, DiscoverState.INSTALLED);
         return { id: true };
     }
