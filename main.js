@@ -891,9 +891,8 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                     forgeModJson = toml.parse(modsTomlData);
                     if (Array.isArray(forgeModJson.mods) && forgeModJson.mods.length > 0) {
                         const mod = forgeModJson.mods[0];
-                        if (mod.logoFile || forgeModJson.logoFile) {
-                            let logoFile = mod.logoFile;
-                            if (!mod.logoFile) logoFile = forgeModJson.logoFile;
+                        let logoFile = mod.logoFile || forgeModJson.logoFile || mod.iconFile || forgeModJson.iconFile;
+                        if (logoFile) {
                             let iconPath = Array.isArray(logoFile) ? logoFile[0] : logoFile;
                             const iconEntry = admZip.getEntry(iconPath);
                             if (iconEntry) {
@@ -933,9 +932,8 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                     forgeModJson = toml.parse(modsTomlData);
                     if (Array.isArray(forgeModJson.mods) && forgeModJson.mods.length > 0) {
                         const mod = forgeModJson.mods[0];
-                        if (mod.logoFile || forgeModJson.logoFile) {
-                            let logoFile = mod.logoFile;
-                            if (!mod.logoFile) logoFile = forgeModJson.logoFile;
+                        let logoFile = mod.logoFile || forgeModJson.logoFile || mod.iconFile || forgeModJson.iconFile;
+                        if (logoFile) {
                             let iconPath = Array.isArray(logoFile) ? logoFile[0] : logoFile;
                             const iconEntry = admZip.getEntry(iconPath);
                             if (iconEntry) {
