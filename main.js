@@ -79,7 +79,7 @@ db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) V
 
 db.pragma('journal_mode = WAL');
 
-let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true" };
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": Math.min(Math.floor(os.totalmem() / (1024 * 1024) / 4), 4096), "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true" };
 
 let minecraftVersions = [];
 
@@ -2034,11 +2034,11 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid
         }, {
-            "width": width || 854,
-            "height": height || 480,
+            "width": width || defaults.default_width,
+            "height": height || defaults.default_height,
             "fullscreen": Boolean(fullscreen || false)
         },
-            settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+            settings.quickPlay, settings.demo, allocated_ram || defaults.default_ram, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
         if (win) win.webContents.send('instance-started', instance_id);
