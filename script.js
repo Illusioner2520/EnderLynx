@@ -8544,7 +8544,9 @@ class FriendsScreen extends Screen {
         for (let presence of friends?.presence?.presence || []) {
             friends.presence[presence.profileId.replaceAll("-", "")] = presence;
         }
-        for (let friend of friends?.friends || []) {
+        let friendsList = friends?.friends || [];
+        friendsList.sort((a, b) => a.name - b.name);
+        for (let friend of friendsList) {
             let buttons = new ContextMenuButtons([
                 {
                     "title": translate("app.friends.unfriend"),
