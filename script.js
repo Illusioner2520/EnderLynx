@@ -503,7 +503,7 @@ class Content {
 
 window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     let instance = Instance.getInstance(instance_id);
-    if (instance[key] instanceof Date) value = Date(value);
+    if (instance[key] instanceof Date) value = new Date(value);
     if (typeof instance[key] == 'boolean') value = Boolean(value);
     let oldValue = instance[key];
     instance[key] = value;
@@ -517,7 +517,7 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
     let content = Content.getContent(content_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -527,7 +527,7 @@ window.enderlynx.onContentUpdated(async (key, value, content_id) => {
 
 window.enderlynx.onProfileUpdated(async (key, value, profile_id) => {
     let content = Profile.getProfile(profile_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -537,7 +537,7 @@ window.enderlynx.onProfileUpdated(async (key, value, profile_id) => {
 
 window.enderlynx.onSkinUpdated(async (key, value, skin_id) => {
     let content = Skin.getSkin(skin_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -547,7 +547,7 @@ window.enderlynx.onSkinUpdated(async (key, value, skin_id) => {
 
 window.enderlynx.onCapeUpdated(async (key, value, cape_id) => {
     let content = Cape.getCape(cape_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
