@@ -7020,7 +7020,6 @@ body.dragging .group-instances {
     height: 0px;
     padding-top: 0px;
     opacity: 0;
-    overflow: hidden;
     color: var(--subtle-text-color);
 }
 
