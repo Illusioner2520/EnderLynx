@@ -323,8 +323,8 @@ contextBridge.exposeInMainWorld('enderlynx', {
     copyImageToClipboard: async (file_path) => {
         return await ipcRenderer.invoke('copy-image-to-clipboard', file_path);
     },
-    deleteScreenshot: async (instance_id, file_name) => {
-        return await ipcRenderer.invoke('delete-screenshot', instance_id, file_name);
+    deleteInstanceFile: async (instance_id, relative_file_path) => {
+        return await ipcRenderer.invoke('delete-instance-file', instance_id, relative_file_path);
     },
     disableFile: async (instance_id, type, file_name) => {
         return await ipcRenderer.invoke('disable-file', instance_id, type, file_name);

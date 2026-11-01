@@ -666,6 +666,7 @@
     "app.screenshots.delete.fail": "Failed to delete screenshot",
     "app.screenshots.not_found":  "No Screenshots Found",
     "app.screenshot": "Screenshot",
+    "app.file": "File",
     "app.screenshots.custom.copy.success": "%w copied to clipboard!",
     "app.screenshots.share.text": "Check out this gallery image:",
     "app.screenshots.custom.delete.success": "%w deleted!",

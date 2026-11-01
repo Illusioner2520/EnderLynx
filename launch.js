@@ -1330,7 +1330,7 @@ class Minecraft {
                     java_args = java_args.concat(args[i].value);
                 }
             }
-            java_args = java_args.filter(e => !e.startsWith("-Xms") && !e.startsWith("-Xmx"));
+            java_args = java_args.filter(e => !e.startsWith("-Xms") && !e.startsWith("-Xmx") && !e.startsWith("-XX:ErgoHeapSizeLimit") && !e.startsWith("-XX:MaxRAMPercentage"));
             java_args = quoteArgs(java_args);
             if (!java_args) java_args = "-XX:+UnlockExperimentalVMOptions\n-XX:+UseG1GC\n-XX:G1NewSizePercent=20\n-XX:G1ReservePercent=20\n-XX:MaxGCPauseMillis=50\n-XX:G1HeapRegionSize=32M";
             signal.throwIfAborted();

@@ -79,7 +79,7 @@ db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) V
 
 db.pragma('journal_mode = WAL');
 
-let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": 4096, "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true" };
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": Math.min(Math.floor(os.totalmem() / (1024 * 1024) / 4), 4096), "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true" };
 
 let minecraftVersions = [];
 
@@ -891,9 +891,8 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                     forgeModJson = toml.parse(modsTomlData);
                     if (Array.isArray(forgeModJson.mods) && forgeModJson.mods.length > 0) {
                         const mod = forgeModJson.mods[0];
-                        if (mod.logoFile || forgeModJson.logoFile) {
-                            let logoFile = mod.logoFile;
-                            if (!mod.logoFile) logoFile = forgeModJson.logoFile;
+                        let logoFile = mod.logoFile || forgeModJson.logoFile || mod.iconFile || forgeModJson.iconFile;
+                        if (logoFile) {
                             let iconPath = Array.isArray(logoFile) ? logoFile[0] : logoFile;
                             const iconEntry = admZip.getEntry(iconPath);
                             if (iconEntry) {
@@ -933,9 +932,8 @@ ipcMain.handle('get-instance-content', async (_, instance_id) => {
                     forgeModJson = toml.parse(modsTomlData);
                     if (Array.isArray(forgeModJson.mods) && forgeModJson.mods.length > 0) {
                         const mod = forgeModJson.mods[0];
-                        if (mod.logoFile || forgeModJson.logoFile) {
-                            let logoFile = mod.logoFile;
-                            if (!mod.logoFile) logoFile = forgeModJson.logoFile;
+                        let logoFile = mod.logoFile || forgeModJson.logoFile || mod.iconFile || forgeModJson.iconFile;
+                        if (logoFile) {
                             let iconPath = Array.isArray(logoFile) ? logoFile[0] : logoFile;
                             const iconEntry = admZip.getEntry(iconPath);
                             if (iconEntry) {
@@ -2036,11 +2034,11 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid
         }, {
-            "width": width || 854,
-            "height": height || 480,
+            "width": width || defaults.default_width,
+            "height": height || defaults.default_height,
             "fullscreen": Boolean(fullscreen || false)
         },
-            settings.quickPlay, settings.demo, allocated_ram || 4096, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+            settings.quickPlay, settings.demo, allocated_ram || defaults.default_ram, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
         if (win) win.webContents.send('instance-started', instance_id);
@@ -3430,6 +3428,7 @@ ipcMain.handle('get-screenshots', async (_, instance_id) => {
             return {
                 file_name: isNaN(parsedDate.getTime()) ? file : parsedDate.toString(),
                 real_file_name: file,
+                relative_file_path: path.join("screenshots", file),
                 file_path: path.resolve(screenshotsPath, file).replace(/\\/g, '/')
             }
         });
@@ -4259,8 +4258,8 @@ ipcMain.handle('delete-content', async (_, instance_id, project_type, filename) 
     return true;
 });
 
-ipcMain.handle('delete-screenshot', async (_, instance_id, file_name) => {
-    let file_path = path.resolve(user_path, "minecraft/instances", instance_id, "screenshots", file_name);
+ipcMain.handle('delete-instance-file', async (_, instance_id, relative_file_path) => {
+    let file_path = path.resolve(user_path, "minecraft/instances", instance_id, relative_file_path);
     try {
         await fsPromises.unlink(file_path);
         return true;
@@ -5373,8 +5372,10 @@ function watchProcessForExit(pid, last_played, instance_id) {
         let check = checkForProcess(pid);
         if (!check) {
             clearInterval(timer);
-            updateInstance("pid", null, instance_id);
-            if (win) {
+            let instance = getInstance(instance_id);
+            let oldpid = instance.pid;
+            if (win && oldpid == pid) {
+                updateInstance("pid", null, instance_id);
                 win.webContents.send('instance-stopped', instance_id);
             }
         }
