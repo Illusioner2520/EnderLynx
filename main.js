@@ -3380,8 +3380,6 @@ ipcMain.handle('stop-instance', async (_, instance_id) => {
             }, 500);
         });
     });
-
-    if (done) updateInstance("pid", null, instance_id);
     return done;
 });
 
