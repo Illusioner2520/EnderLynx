@@ -7157,11 +7157,14 @@ class InstancesScreen extends Screen {
         let to = Math.max(start, end);
 
         for (let i = from; i <= to; i++) {
-            this.selectInstance(sortedInstances[i]);
+            if (sortedInstances[i].name.toLowerCase().includes(this.query)) {
+                this.selectInstance(sortedInstances[i]);
+            }
         }
     }
 
     async showInstances() {
+        this.query = "";
         this.hasRequestGoing = true;
         this.instances = [];
         this.selectedInstances = new Set();
@@ -7536,6 +7539,7 @@ class InstancesScreen extends Screen {
 
     searchInstances(query) {
         query = query.toLowerCase().trim();
+        this.query = query;
         let instances = this.instances;
         for (let instance of instances) {
             let button = instance.instanceButton;
