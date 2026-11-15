@@ -1331,5 +1331,9 @@
     "app.instances.unlink_process.done": "The process with PID %p is no longer linked to this instance.",
     "app.files.edit.saving": "Saving",
     "app.files.edit.save": "Save",
-    "app.files.edit.reset": "Reset"
+    "app.files.edit.reset": "Reset",
+    "app.settings.defaults.mimic_vanilla_launcher": "Default Mimic Vanilla Minecraft Launcher",
+    "app.settings.mimic_vanilla_launcher": "Mimic Vanilla Minecraft Launcher",
+    "app.settings.uses_custom_mimic_vanilla_launcher": "Custom Mimic Options",
+    "app.settings.mimic_vanilla_launcher.description": "Tell the game that it was launched using the vanilla launcher."
 }

@@ -602,6 +602,8 @@ class Instance {
         this.source_server = content.source_server;
         this.uses_custom_window = Boolean(content.uses_custom_window);
         this.uses_custom_allocated_ram = Boolean(content.uses_custom_allocated_ram);
+        this.mimic_vanilla_launcher = Boolean(content.mimic_vanilla_launcher);
+        this.uses_custom_mimic_vanilla_launcher = Boolean(content.uses_custom_mimic_vanilla_launcher);
         this.instanceScreen = new InstanceScreen(this);
     }
 
@@ -737,6 +739,12 @@ class Instance {
     }
     async setUsesCustomAllocatedRam(uses_custom_allocated_ram) {
         await window.enderlynx.updateInstance("uses_custom_allocated_ram", uses_custom_allocated_ram, this.instance_id);
+    }
+    async setMimicVanillaLauncher(mimic_vanilla_launcher) {
+        await window.enderlynx.updateInstance("mimic_vanilla_launcher", mimic_vanilla_launcher, this.instance_id);
+    }
+    async setUsesCustomMimicVanillaLauncher(uses_custom_mimic_vanilla_launcher) {
+        await window.enderlynx.updateInstance("uses_custom_mimic_vanilla_launcher", uses_custom_mimic_vanilla_launcher, this.instance_id);
     }
 
     async addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
@@ -1047,6 +1055,24 @@ class Instance {
             },
             {
                 "type": "override-default",
+                "id": "uses_custom_mimic_vanilla_launcher",
+                "name": translate("app.settings.uses_custom_mimic_vanilla_launcher"),
+                "tab": "window",
+                "enabled": this.uses_custom_mimic_vanilla_launcher,
+                "children": [
+                    {
+                        "type": "toggle",
+                        "name": translate("app.settings.mimic_vanilla_launcher"),
+                        "id": "mimic_vanilla_launcher",
+                        "default": this.mimic_vanilla_launcher ?? false,
+                        "custom_value": this.mimic_vanilla_launcher ?? false,
+                        "default_value": await getDefault("default_mimic_vanilla_launcher") == "true",
+                        "desc": translate("app.settings.mimic_vanilla_launcher.description")
+                    }
+                ]
+            },
+            {
+                "type": "override-default",
                 "id": "uses_custom_allocated_ram",
                 "name": translate("app.instances.settings.custom.allocated_ram"),
                 "tab": "java",
@@ -1232,6 +1258,8 @@ class Instance {
             await this.setPostLaunchHook(info.post_launch_hook);
             await this.setWrapper(info.wrapper);
             await this.setPostExitHook(info.post_exit_hook);
+            await this.setMimicVanillaLauncher(info.mimic_vanilla_launcher);
+            await this.setUsesCustomMimicVanillaLauncher(info.uses_custom_mimic_vanilla_launcher);
             if (info.modpack_version && info.modpack_version != this.installed_version && info.modpack_version != "loading") {
                 let modpack_info = info.modpack_version_pass;
                 this.updateModpack(modpack_info);
@@ -9349,6 +9377,14 @@ settingsButtonEle.onclick = async () => {
             "default": await getDefault("default_fullscreen") == "true"
         },
         {
+            "type": "toggle",
+            "name": translate("app.settings.defaults.mimic_vanilla_launcher"),
+            "desc": translate("app.settings.mimic_vanilla_launcher.description"),
+            "tab": "defaults",
+            "id": "default_mimic_vanilla_launcher",
+            "default": await getDefault("default_mimic_vanilla_launcher") == "true"
+        },
+        {
             "type": "text",
             "name": translate("app.settings.globals.custom_env_vars"),
             "tab": "globals",
@@ -9450,6 +9486,7 @@ settingsButtonEle.onclick = async () => {
         await setDefault("default_width", info.default_width);
         await setDefault("default_height", info.default_height);
         await setDefault("default_fullscreen", info.default_fullscreen.toString());
+        await setDefault("default_mimic_vanilla_launcher", info.default_mimic_vanilla_launcher.toString());
         await setDefault("default_ram", info.default_ram);
         await setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
         await setDefault("default_page", info.default_page);

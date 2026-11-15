@@ -61,7 +61,7 @@ if (!fs.existsSync(user_path)) {
 
 const db = new Database(path.resolve(user_path, "app.db"));
 
-db.prepare('CREATE TABLE IF NOT EXISTS instances (name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS instances (name TEXT, date_created TEXT, date_modified TEXT, last_played TEXT, loader TEXT, vanilla_version TEXT, loader_version TEXT, playtime INTEGER, locked INTEGER, downloaded INTEGER, group_id INTEGER, image TEXT, instance_id TEXT UNIQUE, java_version INTEGER, java_path TEXT, current_log_file TEXT, pid INTEGER, install_source TEXT, install_id TEXT, installing INTEGER, mc_installed INTEGER, window_width INTEGER, window_height INTEGER, allocated_ram INTEGER, java_args TEXT, env_vars TEXT, pre_launch_hook TEXT, post_launch_hook TEXT, wrapper TEXT, post_exit_hook TEXT, installed_version TEXT, last_analyzed_log TEXT, failed INTEGER, uses_custom_java_args INTEGER, provided_java_args TEXT, uses_custom_java_installation INTEGER, source_server TEXT, fullscreen INTEGER, uses_custom_window INTEGER, uses_custom_allocated_ram INTEGER, mimic_vanilla_launcher INTEGER, uses_custom_mimic_vanilla_launcher INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, access_token TEXT, expires TEXT, name TEXT, refresh_token TEXT, uuid TEXT, xuid TEXT, is_demo INTEGER, is_default INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS defaults (id INTEGER PRIMARY KEY, default_type TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS content (id INTEGER PRIMARY KEY, name TEXT, author TEXT, disabled INTEGER, image TEXT, file_name TEXT, source TEXT, type TEXT, version TEXT, version_id TEXT, instance TEXT, source_info TEXT)').run();
@@ -79,7 +79,7 @@ db.prepare('INSERT OR IGNORE INTO groups (id, name, position, collapsed, type) V
 
 db.pragma('journal_mode = WAL');
 
-let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": Math.min(Math.floor(os.totalmem() / (1024 * 1024) / 4), 4096), "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true" };
+let defaults = { "default_accent_color": "light_blue", "default_sort": "name", "default_group": "custom_groups", "default_page": "home", "default_width": 854, "default_height": 480, "default_ram": Math.min(Math.floor(os.totalmem() / (1024 * 1024) / 4), 4096), "default_mode": "dark", "default_sidebar": "spacious", "default_sidebar_side": "left", "discord_rpc": "true", "global_env_vars": "", "global_pre_launch_hook": "", "global_post_launch_hook": "", "global_wrapper": "", "global_post_exit_hook": "", "potato_mode": "false", "hide_ip": "false", "saved_version": version, "latest_release": "hello there", "max_concurrent_downloads": 10, "link_with_modrinth": "true", "thin_scrollbars": "true", "default_fullscreen": "false", "auto_apply_resource_packs": "false", "auto_download_dependencies": "true", "default_mimic_vanilla_launcher": "false" };
 
 let minecraftVersions = [];
 
@@ -2027,6 +2027,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
         let width = instance_info.uses_custom_window ? instance_info.window_width : Number(getDefault("default_width"));
         let height = instance_info.uses_custom_window ? instance_info.window_height : Number(getDefault("default_height"));
         let fullscreen = instance_info.uses_custom_window ? instance_info.fullscreen : getDefault("default_fullscreen") == "true";
+        let mimic_vanilla_launcher = instance_info.uses_custom_mimic_vanilla_launcher ? instance_info.mimic_vanilla_launcher : getDefault("default_mimic_vanilla_launcher") == "true";
         let allocated_ram = instance_info.uses_custom_allocated_ram ? instance_info.allocated_ram : Number(getDefault("default_ram"));
         let java_installation = instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version);
         let java_args = instance_info.uses_custom_java_args ? instance_info.java_args : instance_info.provided_java_args;
@@ -2038,7 +2039,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "height": height || defaults.default_height,
             "fullscreen": Boolean(fullscreen || false)
         },
-            settings.quickPlay, settings.demo, allocated_ram || defaults.default_ram, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit);
+        settings.quickPlay, settings.demo, allocated_ram || defaults.default_ram, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit, mimic_vanilla_launcher);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
         if (win) win.webContents.send('instance-started', instance_id);
@@ -2735,7 +2736,9 @@ async function duplicateInstance(old_instance_id, new_instance_id, name, icon, n
         "window_width": oldInstance.window_width,
         "fullscreen": oldInstance.fullscreen,
         "installed_version": oldInstance.installed_version,
-        "source_server": oldInstance.source_server
+        "source_server": oldInstance.source_server,
+        "uses_custom_mimic_vanilla_launcher": oldInstance.uses_custom_mimic_vanilla_launcher,
+        "mimic_vanilla_launcher": oldInstance.mimic_vanilla_launcher
     }, new_instance_id);
     if (contentIdList.length == 0) return newInstance;
     let idPlaceholders = contentIdList.map(() => '?').join(',');
@@ -4441,13 +4444,13 @@ function getInstances() {
 function updateInstance(key, value, instance_id) {
     if (value instanceof Date) value = value.toISOString();
     if (typeof value === "boolean") value = Number(value);
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen", "uses_custom_window", "uses_custom_allocated_ram"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen", "uses_custom_window", "uses_custom_allocated_ram", "mimic_vanilla_launcher", "uses_custom_mimic_vanilla_launcher"];
     if (!allowedKeys.includes(key)) throw new Error("Unable to edit value " + key);
     if (win && win.webContents) win.webContents.send('instance-updated', key, value, instance_id);
     return db.prepare(`UPDATE instances SET ${key} = ? WHERE instance_id = ?`).run(value, instance_id);
 }
 function batchUpdateInstance(info, instance_id) {
-    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen", "uses_custom_window", "uses_custom_allocated_ram"];
+    let allowedKeys = ["name", "date_modified", "last_played", "loader", "vanilla_version", "loader_version", "playtime", "locked", "group_id", "image", "java_version", "java_path", "current_log_file", "pid", "install_source", "install_id", "installing", "mc_installed", "window_width", "window_height", "allocated_ram", "java_args", "env_vars", "pre_launch_hook", "post_launch_hook", "wrapper", "post_exit_hook", "installed_version", "last_analyzed_log", "failed", "uses_custom_java_args", "provided_java_args", "uses_custom_java_installation", "source_server", "fullscreen", "uses_custom_window", "uses_custom_allocated_ram", "mimic_vanilla_launcher", "uses_custom_mimic_vanilla_launcher"];
     for (let key in info) {
         if (info[key] instanceof Date) info[key] = info[key].toISOString();
         if (typeof info[key] === "boolean") info[key] = Number(info[key]);
@@ -5586,7 +5589,12 @@ try {
             case "0.12.1":
             case "0.12.2":
             case "0.12.3":
-                db.prepare("UPDATE content SET source_info = ? WHERE source = ? AND type = ?").run("vt-resourcepack", "vanilla_tweaks", "resourcepack")
+                db.prepare("UPDATE content SET source_info = ? WHERE source = ? AND type = ?").run("vt-resourcepack", "vanilla_tweaks", "resourcepack");
+            case "0.12.4":
+            case "0.12.5":
+            case "0.12.6":
+                addColumnIfMissing("instances", "mimic_vanilla_launcher", "INTEGER");
+                addColumnIfMissing("instances", "uses_custom_mimic_vanilla_launcher", "INTEGER");
         }
         setDefault("saved_version", version);
     })();
