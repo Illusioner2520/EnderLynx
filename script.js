@@ -10762,10 +10762,7 @@ class VersionList {
     constructor() { }
     static async getVersions(loader) {
         if (loader == "vanilla") {
-            if (version_cache["vanilla"]) return version_cache["vanilla"];
-            let v = await window.enderlynx.getVanillaVersions();
-            version_cache["vanilla"] = v;
-            return v;
+            return minecraftVersions.toReversed();
         } else if (loader == "fabric") {
             if (version_cache["fabric"]) return version_cache["fabric"];
             let v = await window.enderlynx.getFabricVersions();
