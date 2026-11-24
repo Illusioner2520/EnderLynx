@@ -503,7 +503,7 @@ class Content {
 
 window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
     let instance = Instance.getInstance(instance_id);
-    if (instance[key] instanceof Date) value = Date(value);
+    if (instance[key] instanceof Date) value = new Date(value);
     if (typeof instance[key] == 'boolean') value = Boolean(value);
     let oldValue = instance[key];
     instance[key] = value;
@@ -517,7 +517,7 @@ window.enderlynx.onInstanceUpdated(async (key, value, instance_id) => {
 
 window.enderlynx.onContentUpdated(async (key, value, content_id) => {
     let content = Content.getContent(content_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -527,7 +527,7 @@ window.enderlynx.onContentUpdated(async (key, value, content_id) => {
 
 window.enderlynx.onProfileUpdated(async (key, value, profile_id) => {
     let content = Profile.getProfile(profile_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -537,7 +537,7 @@ window.enderlynx.onProfileUpdated(async (key, value, profile_id) => {
 
 window.enderlynx.onSkinUpdated(async (key, value, skin_id) => {
     let content = Skin.getSkin(skin_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -547,7 +547,7 @@ window.enderlynx.onSkinUpdated(async (key, value, skin_id) => {
 
 window.enderlynx.onCapeUpdated(async (key, value, cape_id) => {
     let content = Cape.getCape(cape_id);
-    if (content[key] instanceof Date) value = Date(value);
+    if (content[key] instanceof Date) value = new Date(value);
     if (typeof content[key] == 'boolean') value = Boolean(value);
     content[key] = value;
     if (content?.listeners?.get(key)) {
@@ -602,6 +602,8 @@ class Instance {
         this.source_server = content.source_server;
         this.uses_custom_window = Boolean(content.uses_custom_window);
         this.uses_custom_allocated_ram = Boolean(content.uses_custom_allocated_ram);
+        this.mimic_vanilla_launcher = Boolean(content.mimic_vanilla_launcher);
+        this.uses_custom_mimic_vanilla_launcher = Boolean(content.uses_custom_mimic_vanilla_launcher);
         this.instanceScreen = new InstanceScreen(this);
     }
 
@@ -737,6 +739,12 @@ class Instance {
     }
     async setUsesCustomAllocatedRam(uses_custom_allocated_ram) {
         await window.enderlynx.updateInstance("uses_custom_allocated_ram", uses_custom_allocated_ram, this.instance_id);
+    }
+    async setMimicVanillaLauncher(mimic_vanilla_launcher) {
+        await window.enderlynx.updateInstance("mimic_vanilla_launcher", mimic_vanilla_launcher, this.instance_id);
+    }
+    async setUsesCustomMimicVanillaLauncher(uses_custom_mimic_vanilla_launcher) {
+        await window.enderlynx.updateInstance("uses_custom_mimic_vanilla_launcher", uses_custom_mimic_vanilla_launcher, this.instance_id);
     }
 
     async addContent(name, author, image, file_name, source, type, version, source_info, disabled, version_id) {
@@ -1047,6 +1055,24 @@ class Instance {
             },
             {
                 "type": "override-default",
+                "id": "uses_custom_mimic_vanilla_launcher",
+                "name": translate("app.settings.uses_custom_mimic_vanilla_launcher"),
+                "tab": "window",
+                "enabled": this.uses_custom_mimic_vanilla_launcher,
+                "children": [
+                    {
+                        "type": "toggle",
+                        "name": translate("app.settings.mimic_vanilla_launcher"),
+                        "id": "mimic_vanilla_launcher",
+                        "default": this.mimic_vanilla_launcher ?? false,
+                        "custom_value": this.mimic_vanilla_launcher ?? false,
+                        "default_value": await getDefault("default_mimic_vanilla_launcher") == "true",
+                        "desc": translate("app.settings.mimic_vanilla_launcher.description")
+                    }
+                ]
+            },
+            {
+                "type": "override-default",
                 "id": "uses_custom_allocated_ram",
                 "name": translate("app.instances.settings.custom.allocated_ram"),
                 "tab": "java",
@@ -1232,6 +1258,8 @@ class Instance {
             await this.setPostLaunchHook(info.post_launch_hook);
             await this.setWrapper(info.wrapper);
             await this.setPostExitHook(info.post_exit_hook);
+            await this.setMimicVanillaLauncher(info.mimic_vanilla_launcher);
+            await this.setUsesCustomMimicVanillaLauncher(info.uses_custom_mimic_vanilla_launcher);
             if (info.modpack_version && info.modpack_version != this.installed_version && info.modpack_version != "loading") {
                 let modpack_info = info.modpack_version_pass;
                 this.updateModpack(modpack_info);
@@ -7129,11 +7157,14 @@ class InstancesScreen extends Screen {
         let to = Math.max(start, end);
 
         for (let i = from; i <= to; i++) {
-            this.selectInstance(sortedInstances[i]);
+            if (sortedInstances[i].name.toLowerCase().includes(this.query)) {
+                this.selectInstance(sortedInstances[i]);
+            }
         }
     }
 
     async showInstances() {
+        this.query = "";
         this.hasRequestGoing = true;
         this.instances = [];
         this.selectedInstances = new Set();
@@ -7508,6 +7539,7 @@ class InstancesScreen extends Screen {
 
     searchInstances(query) {
         query = query.toLowerCase().trim();
+        this.query = query;
         let instances = this.instances;
         for (let instance of instances) {
             let button = instance.instanceButton;
@@ -8558,7 +8590,9 @@ class FriendsScreen extends Screen {
         for (let presence of friends?.presence?.presence || []) {
             friends.presence[presence.profileId.replaceAll("-", "")] = presence;
         }
-        for (let friend of friends?.friends || []) {
+        let friendsList = friends?.friends || [];
+        friendsList.sort((a, b) => a.name - b.name);
+        for (let friend of friendsList) {
             let buttons = new ContextMenuButtons([
                 {
                     "title": translate("app.friends.unfriend"),
@@ -9347,6 +9381,14 @@ settingsButtonEle.onclick = async () => {
             "default": await getDefault("default_fullscreen") == "true"
         },
         {
+            "type": "toggle",
+            "name": translate("app.settings.defaults.mimic_vanilla_launcher"),
+            "desc": translate("app.settings.mimic_vanilla_launcher.description"),
+            "tab": "defaults",
+            "id": "default_mimic_vanilla_launcher",
+            "default": await getDefault("default_mimic_vanilla_launcher") == "true"
+        },
+        {
             "type": "text",
             "name": translate("app.settings.globals.custom_env_vars"),
             "tab": "globals",
@@ -9448,6 +9490,7 @@ settingsButtonEle.onclick = async () => {
         await setDefault("default_width", info.default_width);
         await setDefault("default_height", info.default_height);
         await setDefault("default_fullscreen", info.default_fullscreen.toString());
+        await setDefault("default_mimic_vanilla_launcher", info.default_mimic_vanilla_launcher.toString());
         await setDefault("default_ram", info.default_ram);
         await setDefault("max_concurrent_downloads", info.max_concurrent_downloads);
         await setDefault("default_page", info.default_page);
@@ -10719,10 +10762,7 @@ class VersionList {
     constructor() { }
     static async getVersions(loader) {
         if (loader == "vanilla") {
-            if (version_cache["vanilla"]) return version_cache["vanilla"];
-            let v = await window.enderlynx.getVanillaVersions();
-            version_cache["vanilla"] = v;
-            return v;
+            return minecraftVersions.toReversed();
         } else if (loader == "fabric") {
             if (version_cache["fabric"]) return version_cache["fabric"];
             let v = await window.enderlynx.getFabricVersions();

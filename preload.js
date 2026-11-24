@@ -258,11 +258,6 @@ contextBridge.exposeInMainWorld('enderlynx', {
         installInstanceCallback = callback;
         if (installInfo) callback(installInfo);
     },
-    getVanillaVersions: async () => {
-        let res = await fetch("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-        let json = await res.json();
-        return json.versions.map(e => e.id);
-    },
     getFabricVersions: async () => {
         return (await ipcRenderer.invoke('fabric-vanilla-versions'));
     },

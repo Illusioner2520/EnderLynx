@@ -12,6 +12,7 @@ const { ipcMain } = require('electron');
 const stringArgv = require('string-argv').default;
 
 let launchername = "EnderLynx";
+let vanillalaunchername = "minecraft-launcher";
 let launcherversion = version;
 
 let cancelLaunchFunctions = {};
@@ -798,7 +799,7 @@ class Minecraft {
             throw err;
         }
     }
-    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit) {
+    async launchGame(loader, version, loaderVersion, username, uuid, auth, customResolution, quickPlay, isDemo, allocatedRam, javaPath, javaArgs, envVars, preLaunch, postLaunch, wrapper, postExit, globalPreLaunch, globalPostLaunch, globalWrapper, globalPostExit, mimicVanillaLauncher) {
         if (!javaArgs || !javaArgs.length) javaArgs = ["-XX:+UnlockExperimentalVMOptions", "-XX:+UseG1GC", "-XX:G1NewSizePercent=20", "-XX:G1ReservePercent=20", "-XX:MaxGCPauseMillis=50", "-XX:G1HeapRegionSize=32M"];
         let initial_heap_size = allocatedRam / 2;
         if (initial_heap_size < 512) initial_heap_size = 512;
@@ -1076,20 +1077,20 @@ class Minecraft {
                     if (Array.isArray(newVal)) {
                         newVal = newVal.map((e) => {
                             e = e.replace("${natives_directory}", path.resolve(this.userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
-                            e = e.replace("${launcher_name}", launchername);
+                            e = e.replace("${launcher_name}", mimicVanillaLauncher ? vanillalaunchername : launchername);
                             e = e.replace("${launcher_version}", launcherversion);
                             return e;
                         })
                         args = args.concat(newVal);
                     } else {
                         newVal = newVal.replace("${natives_directory}", path.resolve(this.userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
-                        newVal = newVal.replace("${launcher_name}", launchername);
+                        newVal = newVal.replace("${launcher_name}", mimicVanillaLauncher ? vanillalaunchername : launchername);
                         newVal = newVal.replace("${launcher_version}", launcherversion);
                         args.push(newVal);
                     }
                 } else {
                     e = e.replace("${natives_directory}", path.resolve(this.userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
-                    e = e.replace("${launcher_name}", launchername);
+                    e = e.replace("${launcher_name}", mimicVanillaLauncher ? vanillalaunchername : launchername);
                     e = e.replace("${launcher_version}", launcherversion);
                     if (e.includes("${classpath}")) {
                         let theargs = [this.libs + this.jarfile];
@@ -1117,7 +1118,7 @@ class Minecraft {
             }
             args.push("-Dlog4j2.formatMsgNoLookups=true");
             args.push("-Djava.library.path=" + path.resolve(this.userPath, `minecraft/meta/natives/${this.instance_id}-${version}`));
-            args.push("-Dminecraft.launcher.brand=" + launchername);
+            args.push("-Dminecraft.launcher.brand=" + (mimicVanillaLauncher ? vanillalaunchername : launchername));
             args.push("-Dminecraft.launcher.version=" + launcherversion);
             args.push("-Dminecraft.client.jar=" + this.jarfile);
             args.push("-cp");
@@ -1171,7 +1172,7 @@ class Minecraft {
             MC_UUID: uuid,
             MC_ALLOCATED_RAM_MB: allocatedRam.toString(),
             MC_ALLOCATED_RAM_GB: (allocatedRam / 1024).toString(),
-            MC_LAUNCHER_NAME: launchername,
+            MC_LAUNCHER_NAME: mimicVanillaLauncher ? vanillalaunchername : launchername,
             MC_LAUNCHER_VERSION: launcherversion,
             MC_GAME_DIR: path.resolve(this.userPath, "minecraft", "instances", this.instance_id),
             MC_MODS_DIR: path.resolve(this.userPath, "minecraft", "instances", this.instance_id, "mods"),
