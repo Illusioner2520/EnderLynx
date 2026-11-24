@@ -69,7 +69,7 @@ db.prepare('CREATE TABLE IF NOT EXISTS skins (id INTEGER PRIMARY KEY, name TEXT,
 db.prepare('CREATE TABLE IF NOT EXISTS capes (id INTEGER PRIMARY KEY, uuid TEXT, cape_name TEXT, cape_id TEXT, cape_url TEXT, active INTEGER)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS options_defaults (id INTEGER PRIMARY KEY, key TEXT, value TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS pins (id INTEGER PRIMARY KEY, type TEXT, instance_id TEXT, world_id TEXT, world_type TEXT)').run();
-db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT, data_version INTEGER)').run();
+db.prepare('CREATE TABLE IF NOT EXISTS mc_versions_cache (id INTEGER PRIMARY KEY, name TEXT, date_published TEXT, data_version INTEGER, json_url TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS last_played_servers (id INTEGER PRIMARY KEY, instance_id TEXT, ip TEXT, date TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS java_versions (id INTEGER PRIMARY KEY, version INTEGER UNIQUE, file_path TEXT, package_uuid TEXT)').run();
 db.prepare('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT, position INTEGER, collapsed INTEGER, type TEXT)').run();
@@ -197,6 +197,9 @@ async function launchGameFromArgs(instance_id_to_launch, world_type_to_launch, w
         if (!profile) {
             throw new Error(uuid_to_launch ? translate("app.launch.profile.invalid.uuid", "%u", uuid_to_launch) : translate("app.launch.profile.no.default"));
         }
+        try {
+            await fetchUpdatedMCVersions();
+        } catch (e) { }
         let profile_id = profile.id;
         if (world_type_to_launch) {
             await playMinecraft(instance_id_to_launch, { profile_id, quickPlay: { "type": world_type_to_launch, "info": world_id_to_launch } });
@@ -2031,6 +2034,7 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
         let allocated_ram = instance_info.uses_custom_allocated_ram ? instance_info.allocated_ram : Number(getDefault("default_ram"));
         let java_installation = instance_info.uses_custom_java_installation ? instance_info.java_path : await getJavaInstallation(instance_info.java_version);
         let java_args = instance_info.uses_custom_java_args ? instance_info.java_args : instance_info.provided_java_args;
+        let json_url = db.prepare("SELECT * FROM mc_versions_cache WHERE name = ?").get(instance_info.vanilla_version)?.json_url;
         let minecraft = await mc.launchGame(instance_info.loader, instance_info.vanilla_version, instance_info.loader_version, player_info.name, player_info.uuid, {
             "accessToken": player_info.access_token,
             "xuid": player_info.xuid
@@ -2039,9 +2043,12 @@ async function playMinecraft(instance_id, settings = { player_id: null, quickPla
             "height": height || defaults.default_height,
             "fullscreen": Boolean(fullscreen || false)
         },
-        settings.quickPlay, settings.demo, allocated_ram || defaults.default_ram, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit, mimic_vanilla_launcher);
+        settings.quickPlay, settings.demo, allocated_ram || defaults.default_ram, java_installation, parseJavaArgs(java_args), { ...parseEnvString(globalEnvVars), ...parseEnvString(instance_info.env_vars) }, instance_info.pre_launch_hook, instance_info.post_launch_hook, parseJavaArgs(instance_info.wrapper), instance_info.post_exit_hook, globalPreLaunch, globalPostLaunch, parseJavaArgs(globalWrapper), globalPostExit, mimic_vanilla_launcher, json_url);
         updateInstance("current_log_file", minecraft.log, instance_id);
         updateInstance("pid", minecraft.pid, instance_id);
+        if (minecraft.new_java_args.length) {
+            updateInstance("provided_java_args", minecraft.new_java_args, instance_id)
+        }
         if (win) win.webContents.send('instance-started', instance_id);
         watchProcessForExit(minecraft.pid, last_played, instance_id);
         return { minecraft, player_info }
@@ -2123,7 +2130,7 @@ ipcMain.handle('repair-minecraft', async (_, instance_id, loader, vanilla_versio
 async function downloadMinecraft(instance_id, loader, vanilla_version, loader_version) {
     try {
         let mc = new Minecraft(instance_id, undefined, db, user_path, win, translate);
-        let r = await mc.downloadGame(loader, vanilla_version);
+        let r = await mc.downloadGame(vanilla_version);
         setOptionsTXT(instance_id, true, true);
         if (loader == "fabric") {
             await mc.installFabric(vanilla_version, loader_version);
@@ -2145,7 +2152,7 @@ async function repairMinecraft(instance_id, loader, vanilla_version, loader_vers
         updateInstance("mc_installed", false, instance_id);
         updateInstance("failed", false, instance_id);
         let mc = new Minecraft(instance_id, undefined, db, user_path, win, translate);
-        let r = await mc.downloadGame(loader, vanilla_version, true, whatToRepair);
+        let r = await mc.downloadGame(vanilla_version, true, whatToRepair);
         if (whatToRepair.includes("mod_loader")) {
             if (loader == "fabric") {
                 await mc.installFabric(vanilla_version, loader_version, true);
@@ -4732,12 +4739,17 @@ async function fetchUpdatedMCVersions() {
     let result = await result_pre_json.json();
     setDefault("latest_release", result.latest.release);
     let mc_versions = db.prepare('SELECT * FROM mc_versions_cache').all();
+    let mc_versions_map = {};
+    mc_versions.forEach(e => mc_versions_map[e] = e);
     let mc_version_names = mc_versions.map(e => e.name);
     for (let i = 0; i < result.versions.length; i++) {
         let e = result.versions[i];
         if (!mc_version_names.includes(e.id)) {
-            db.prepare("INSERT INTO mc_versions_cache (name, date_published) VALUES (?, ?)").run(e.id, e.releaseTime);
+            db.prepare("INSERT INTO mc_versions_cache (name, date_published, json_url) VALUES (?, ?, ?)").run(e.id, e.releaseTime, e.url);
         } else {
+            if (mc_versions.json_url != e.url) {
+                db.prepare("UPDATE mc_versions_cache SET json_url = ? WHERE name = ?").run(e.url, e.id);
+            }
             mc_version_names.splice(mc_version_names.indexOf(e.id), 1);
         }
     }
@@ -5593,6 +5605,8 @@ try {
             case "0.12.6":
                 addColumnIfMissing("instances", "mimic_vanilla_launcher", "INTEGER");
                 addColumnIfMissing("instances", "uses_custom_mimic_vanilla_launcher", "INTEGER");
+            case "0.12.7":
+                addColumnIfMissing("mc_versions_cache", "json_url", "TEXT");
         }
         setDefault("saved_version", version);
     })();
