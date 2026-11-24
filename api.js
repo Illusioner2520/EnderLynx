@@ -36,13 +36,13 @@ class Project {
         6: "embedded"
     }
     constructor() { }
-    applyInfoFromModrinth(urlInfo) {
+    applyInfoFromModrinth(urlInfo, prioritizeDataPackProjectType) {
         if (!urlInfo) throw new Error("Failed to fetch");
         this.source = "modrinth";
         this.id = urlInfo.id || urlInfo.project_id;
         this.slug = urlInfo.slug;
         this.team = urlInfo.team_id;
-        this.project_type = urlInfo.project_types.includes("mod") ? "mod" : Project.modrinth_project_type_conversion[urlInfo.project_types[0]] || urlInfo.project_types[0];
+        this.project_type = prioritizeDataPackProjectType && urlInfo.project_types.includes("datapack") ? "datapack" : (urlInfo.project_types.includes("mod") ? "mod" : Project.modrinth_project_type_conversion[urlInfo.project_types[0]] || urlInfo.project_types[0]);
         this.name = urlInfo.name;
         this.summary = urlInfo.summary;
         this.description = urlInfo.description;
@@ -669,7 +669,7 @@ class Modrinth {
         let projects = [];
         for (let i = 0; i < urlInfo.hits.length; i++) {
             let project = new Project();
-            project.applyInfoFromModrinth(urlInfo.hits[i]);
+            project.applyInfoFromModrinth(urlInfo.hits[i], project_type == "datapack");
             projects.push(project);
         }
         return { projects, total_hits: urlInfo.total_hits };

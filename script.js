@@ -12431,7 +12431,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
     let instance = instance_id ? Instance.getInstance(instance_id) : null;
     let instance_content = [];
     if (instance_id) instance_content = await instance.getContent();
-    let currentlyInstalling = false;
 
     if (Display.currentScreen.tabName != "discover") {
         DiscoverStateManagement.setInstance(instance);
@@ -12889,7 +12888,6 @@ async function displayContentInfo(content_source, content, content_id, instance_
                 }
 
                 let showVersions = () => {
-                    currentlyInstalling = false;
                     wrapper.innerHTML = "";
                     wrapper.appendChild(topBar);
                     wrapper.appendChild(notfound.element);
